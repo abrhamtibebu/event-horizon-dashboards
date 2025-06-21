@@ -1,5 +1,5 @@
 
-import { Settings as SettingsIcon, User, Bell, Security, Palette } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Shield, Palette } from "lucide-react";
 import { DashboardCard } from "@/components/DashboardCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,7 @@ export default function Settings() {
               {[
                 { icon: User, label: "Profile", active: true },
                 { icon: Bell, label: "Notifications", active: false },
-                { icon: Security, label: "Security", active: false },
+                { icon: Shield, label: "Security", active: false },
                 { icon: Palette, label: "Appearance", active: false },
               ].map((item) => (
                 <button
