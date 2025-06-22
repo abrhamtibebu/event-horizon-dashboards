@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { 
   Upload, 
   Download, 
@@ -9,7 +8,8 @@ import {
   FileText,
   CheckCircle,
   AlertCircle,
-  Users
+  Users,
+  X
 } from "lucide-react";
 import { DashboardCard } from "@/components/DashboardCard";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import Papa from "papaparse";
+import { toast } from "sonner";
+
+interface BadgeData {
+  name: string;
+  badgeId: string;
+  badgeType: string;
+  zone: string;
+  section: string;
+  tray: string;
+  organization: string;
+  email: string;
+  notes: string;
+}
 
 const sampleBadgeData = [
   {
@@ -87,10 +101,11 @@ const sampleBadgeData = [
 ];
 
 export default function LocateBadges() {
+  const [data, setData] = useState<BadgeData[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedZone, setSelectedZone] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -114,34 +129,48 @@ export default function LocateBadges() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setUploadedFile(file);
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (result) => {
+          setData(result.data as BadgeData[]);
+          toast.success("CSV file uploaded and parsed successfully!");
+        },
+        error: (error) => {
+          toast.error("Error parsing CSV file:", error.message);
+        },
+      });
     }
   };
 
-  const downloadSampleCSV = () => {
-    const csvContent = `Name,Company,Email,Guest Type,Zone,Section,Table,Seat
-John Smith,Tech Corp,john.smith@techcorp.com,VIP,A,A1,12,3
-Sarah Johnson,Marketing Plus,sarah.johnson@marketingplus.com,Speaker,B,B2,8,1
-Mike Davis,Innovation Ltd,mike.davis@innovation.com,Visitor,C,C3,25,7
-Lisa Wilson,Business Solutions,lisa.wilson@bizsolut.com,Staff,A,A2,5,2`;
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'badge_location_template.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+  const downloadSampleCsv = () => {
+    const csv = Papa.unparse([
+      {
+        name: "John Doe",
+        badgeId: "12345",
+        badgeType: "VIP",
+        zone: "A",
+        section: "1",
+        tray: "A1",
+        organization: "Tech Corp",
+        email: "john.doe@example.com",
+        notes: "Speaker",
+      },
+    ]);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", "sample_badges.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const filteredData = sampleBadgeData.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.company.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesZone = selectedZone === "all" || item.zone === selectedZone;
-    const matchesStatus = selectedStatus === "all" || item.status === selectedStatus;
-    
-    return matchesSearch && matchesZone && matchesStatus;
-  });
+  const filteredData = data.filter((row) =>
+    Object.values(row).some((value) =>
+      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  );
 
   return (
     <div className="space-y-6">
@@ -149,82 +178,28 @@ Lisa Wilson,Business Solutions,lisa.wilson@bizsolut.com,Staff,A,A2,5,2`;
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Locate Badges</h1>
-          <p className="text-gray-600 mt-1">Manage badge locations and seating arrangements</p>
+          <p className="text-gray-600 mt-1">
+            Upload a CSV to find badge locations quickly
+          </p>
         </div>
-        <Button 
-          onClick={downloadSampleCSV}
-          variant="outline"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Download Sample CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={downloadSampleCsv}>
+            <Download className="w-4 h-4 mr-2" />
+            Download Sample
+          </Button>
+          <Button onClick={() => fileInputRef.current?.click()}>
+            <Upload className="w-4 h-4 mr-2" />
+            Upload CSV
+          </Button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept=".csv"
+            onChange={handleFileUpload}
+          />
+        </div>
       </div>
-
-      {/* Upload Section */}
-      <DashboardCard title="Upload Badge Location Data">
-        <div className="space-y-4">
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-            <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <div className="space-y-2">
-              <p className="text-lg font-medium text-gray-900">Upload CSV File</p>
-              <p className="text-gray-600">
-                Upload a CSV file with guest information and badge location details
-              </p>
-              <div className="flex items-center justify-center gap-4 mt-4">
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  id="csv-upload"
-                />
-                <label
-                  htmlFor="csv-upload"
-                  className="cursor-pointer bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity"
-                >
-                  Choose File
-                </label>
-                {uploadedFile && (
-                  <span className="text-sm text-gray-600">
-                    Selected: {uploadedFile.name}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <FileText className="w-5 h-5 text-blue-600 mt-0.5" />
-              <div>
-                <h4 className="font-medium text-blue-900">CSV Format Requirements</h4>
-                <p className="text-blue-700 text-sm mt-1">
-                  Your CSV file should include the following columns: Name, Company, Email, Guest Type, Zone, Section, Table, Seat
-                </p>
-                <ul className="text-blue-700 text-sm mt-2 list-disc list-inside">
-                  <li>Guest Type: VIP, Speaker, Staff, or Visitor</li>
-                  <li>Zone: Alphabetic zones (A, B, C, etc.)</li>
-                  <li>Section: Zone + number (A1, B2, C3, etc.)</li>
-                  <li>Table: Numeric table number</li>
-                  <li>Seat: Numeric seat number</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {uploadedFile && (
-            <div className="flex gap-3">
-              <Button className="bg-gradient-to-r from-green-600 to-blue-600">
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Process Upload
-              </Button>
-              <Button variant="outline" onClick={() => setUploadedFile(null)}>
-                Cancel
-              </Button>
-            </div>
-          )}
-        </div>
-      </DashboardCard>
 
       {/* Search and Filter Section */}
       <DashboardCard title="Badge Location Management">
@@ -232,7 +207,7 @@ Lisa Wilson,Business Solutions,lisa.wilson@bizsolut.com,Staff,A,A2,5,2`;
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <Input
-                placeholder="Search by name or company..."
+                placeholder="Search by any field..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full"
@@ -268,7 +243,7 @@ Lisa Wilson,Business Solutions,lisa.wilson@bizsolut.com,Staff,A,A2,5,2`;
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-blue-600 text-sm font-medium">Total Badges</p>
-                  <p className="text-2xl font-bold text-blue-900">{sampleBadgeData.length}</p>
+                  <p className="text-2xl font-bold text-blue-900">{data.length}</p>
                 </div>
                 <Users className="w-8 h-8 text-blue-600" />
               </div>
@@ -278,7 +253,7 @@ Lisa Wilson,Business Solutions,lisa.wilson@bizsolut.com,Staff,A,A2,5,2`;
                 <div>
                   <p className="text-green-600 text-sm font-medium">Located</p>
                   <p className="text-2xl font-bold text-green-900">
-                    {sampleBadgeData.filter(item => item.status === 'located').length}
+                    {data.filter(item => item.status === 'located').length}
                   </p>
                 </div>
                 <CheckCircle className="w-8 h-8 text-green-600" />
@@ -289,7 +264,7 @@ Lisa Wilson,Business Solutions,lisa.wilson@bizsolut.com,Staff,A,A2,5,2`;
                 <div>
                   <p className="text-yellow-600 text-sm font-medium">Pending</p>
                   <p className="text-2xl font-bold text-yellow-900">
-                    {sampleBadgeData.filter(item => item.status === 'pending').length}
+                    {data.filter(item => item.status === 'pending').length}
                   </p>
                 </div>
                 <AlertCircle className="w-8 h-8 text-yellow-600" />
@@ -300,7 +275,7 @@ Lisa Wilson,Business Solutions,lisa.wilson@bizsolut.com,Staff,A,A2,5,2`;
                 <div>
                   <p className="text-purple-600 text-sm font-medium">VIP Guests</p>
                   <p className="text-2xl font-bold text-purple-900">
-                    {sampleBadgeData.filter(item => item.guestType === 'VIP').length}
+                    {data.filter(item => item.guestType === 'VIP').length}
                   </p>
                 </div>
                 <MapPin className="w-8 h-8 text-purple-600" />
@@ -314,48 +289,44 @@ Lisa Wilson,Business Solutions,lisa.wilson@bizsolut.com,Staff,A,A2,5,2`;
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Guest Type</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Check-in</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead>Badge ID</TableHead>
+                  <TableHead>Badge Type</TableHead>
+                  <TableHead>Zone</TableHead>
+                  <TableHead>Section</TableHead>
+                  <TableHead>Tray</TableHead>
+                  <TableHead>Organization</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Notes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredData.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell>{item.company}</TableCell>
-                    <TableCell>
-                      <Badge className={getGuestTypeColor(item.guestType)}>
-                        {item.guestType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div>Zone {item.zone} - {item.section}</div>
-                        <div className="text-gray-600">Table {item.table}, Seat {item.seat}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(item.status)}>
-                        {item.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{item.checkIn}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline">
-                          <MapPin className="w-4 h-4" />
-                        </Button>
-                        <Button size="sm" variant="outline">
-                          Edit
-                        </Button>
-                      </div>
+                {filteredData.length > 0 ? (
+                  filteredData.map((row, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{row.name}</TableCell>
+                      <TableCell>{row.badgeId}</TableCell>
+                      <TableCell>{row.badgeType}</TableCell>
+                      <TableCell>{row.zone}</TableCell>
+                      <TableCell>{row.section}</TableCell>
+                      <TableCell>{row.tray}</TableCell>
+                      <TableCell>{row.organization}</TableCell>
+                      <TableCell>{row.email}</TableCell>
+                      <TableCell>{row.notes}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-10">
+                      <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-700">
+                        No data to display
+                      </h3>
+                      <p className="text-gray-500">
+                        Upload a CSV file to get started.
+                      </p>
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </div>

@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, Navigate } from "react-router-dom";
 import { 
   Calendar, Users, MapPin, Clock, Mail, Phone, MessageSquare, 
   Download, Printer, QrCode, UserPlus, Plus, Edit, Settings,
@@ -38,26 +37,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-
-// Mock data for the event
-const eventData = {
-  id: "evt_123",
-  name: "Tech Conference 2024",
-  description: "Annual technology conference featuring the latest innovations in AI, blockchain, and web development.",
-  startDate: "2024-07-15",
-  endDate: "2024-07-17",
-  startTime: "09:00",
-  endTime: "18:00",
-  location: "Convention Center, Downtown",
-  maxGuests: 500,
-  registrationStart: "2024-06-01",
-  registrationEnd: "2024-07-10",
-  status: "active",
-  organizer: "Tech Events Co.",
-  image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800",
-  registeredAttendees: 342,
-  checkedInAttendees: 186
-};
+import { events as allEvents } from "./Events";
 
 const attendees = [
   {
@@ -129,6 +109,12 @@ export default function EventDetails() {
   const [isNewConversationDialogOpen, setIsNewConversationDialogOpen] = useState(false);
   const [isCommunicationDialogOpen, setIsCommunicationDialogOpen] = useState(false);
 
+  const eventData = allEvents.find(event => event.id.toString() === eventId);
+
+  if (!eventData) {
+    return <Navigate to="/dashboard/events" replace />;
+  }
+
   const getGuestTypeColor = (type: string) => {
     switch (type.toLowerCase()) {
       case "speaker": return "bg-purple-100 text-purple-800 border-purple-200";
@@ -185,7 +171,7 @@ export default function EventDetails() {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <Link to="/events" className="text-blue-600 hover:text-blue-800 text-sm">← Back to Events</Link>
+            <Link to="/dashboard/events" className="text-yellow-500 hover:text-yellow-600 text-sm">← Back to Events</Link>
           </div>
           <h1 className="text-3xl font-bold text-gray-900">{eventData.name}</h1>
           <p className="text-gray-600 mt-1">Event ID: {eventData.id}</p>

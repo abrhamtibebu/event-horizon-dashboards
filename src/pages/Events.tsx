@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const events = [
+export const events = [
   {
     id: 1,
     name: "Tech Conference 2024",
@@ -191,7 +191,7 @@ export default function Events() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-2 pt-2">
-                  <Link to={`/events/${event.id}`} className="flex-1">
+                  <Link to={`/dashboard/events/${event.id}`} className="flex-1">
                     <Button variant="outline" size="sm" className="w-full">
                       <Eye className="w-4 h-4 mr-1" />
                       View Details

@@ -1,5 +1,4 @@
-
-import { Bell, Search, User } from "lucide-react";
+import { Bell, Search, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -12,8 +11,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/use-auth.tsx";
 
 export function Header() {
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+  };
+
   return (
     <header className="h-16 border-b bg-white/80 backdrop-blur-sm flex items-center px-6 justify-between">
       <div className="flex items-center gap-4">
@@ -41,7 +47,9 @@ export function Header() {
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
                 <User className="w-4 h-4 text-white" />
               </div>
-              <span className="hidden md:inline text-sm font-medium">Admin User</span>
+              <span className="hidden md:inline text-sm font-medium">
+                Welcome, {user?.email}
+              </span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
@@ -53,6 +61,11 @@ export function Header() {
             <DropdownMenuItem className="text-red-600">Logout</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <Button onClick={handleLogout} variant="ghost" size="sm">
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
       </div>
     </header>
   );

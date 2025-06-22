@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
@@ -515,7 +514,7 @@ export default function CreateEvent() {
             variant="outline"
             onClick={() => {
               setFormData(prev => ({ ...prev, status: "draft" }));
-              handleSubmit(new Event("submit") as any);
+              handleSubmit(new Event("submit") as React.FormEvent<HTMLFormElement>);
             }}
           >
             <FileText className="w-4 h-4 mr-2" />
