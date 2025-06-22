@@ -13,6 +13,8 @@ import Messages from "./pages/Messages";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import AuditLogs from "./pages/AuditLogs";
+import SignIn from "./pages/SignIn";
+import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +26,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Authentication Routes */}
+          <Route path="/signin" element={<SignIn />} />
+          <Route path="/register" element={<Register />} />
+          
+          {/* Protected Routes with Layout */}
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
             <Route path="events" element={<Events />} />
@@ -34,6 +41,8 @@ const App = () => (
             <Route path="settings" element={<Settings />} />
             <Route path="audit-logs" element={<AuditLogs />} />
           </Route>
+          
+          {/* 404 Route */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
