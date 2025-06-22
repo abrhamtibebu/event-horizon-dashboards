@@ -1,10 +1,10 @@
-
 import { useState } from "react";
 import { Users, Search, Filter, Plus, Mail, Phone, Edit, Trash2, UserCheck, UserX, Power } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DashboardCard } from "@/components/DashboardCard";
+import { Link } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -89,7 +89,6 @@ const organizers = [
 export default function Organizers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -124,48 +123,12 @@ export default function Organizers() {
           <h1 className="text-3xl font-bold text-gray-900">Organizer Management</h1>
           <p className="text-gray-600 mt-1">Manage event organizers, contacts, and permissions</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Organizer
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Create New Organizer</DialogTitle>
-              <DialogDescription>
-                Add a new organizer to the system. They will be able to create and manage events.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="orgName">Organization Name</Label>
-                <Input id="orgName" placeholder="Enter organization name" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="contactName">Primary Contact Name</Label>
-                <Input id="contactName" placeholder="Enter contact person name" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input id="email" type="email" placeholder="Enter email address" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input id="phone" type="tel" placeholder="Enter phone number" />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                Create Organizer
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Link to="/organizers/add">
+          <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Organizer
+          </Button>
+        </Link>
       </div>
 
       {/* Stats Cards */}

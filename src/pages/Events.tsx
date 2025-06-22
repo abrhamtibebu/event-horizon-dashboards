@@ -1,10 +1,10 @@
-
 import { useState } from "react";
-import { Calendar, Users, MapPin, Plus, Search, Filter } from "lucide-react";
+import { Calendar, Users, MapPin, Plus, Search, Filter, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { DashboardCard } from "@/components/DashboardCard";
+import { Link } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -97,10 +97,12 @@ export default function Events() {
           <h1 className="text-3xl font-bold text-gray-900">Events</h1>
           <p className="text-gray-600 mt-1">Manage and monitor all your events</p>
         </div>
-        <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-          <Plus className="w-4 h-4 mr-2" />
-          Create Event
-        </Button>
+        <Link to="/events/create">
+          <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Create Event
+          </Button>
+        </Link>
       </div>
 
       {/* Filters */}
@@ -189,9 +191,12 @@ export default function Events() {
 
                 {/* Action Buttons */}
                 <div className="flex gap-2 pt-2">
-                  <Button variant="outline" size="sm" className="flex-1">
-                    View Details
-                  </Button>
+                  <Link to={`/events/${event.id}`} className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full">
+                      <Eye className="w-4 h-4 mr-1" />
+                      View Details
+                    </Button>
+                  </Link>
                   <Button size="sm" className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600">
                     Manage
                   </Button>
@@ -207,10 +212,12 @@ export default function Events() {
           <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No events found</h3>
           <p className="text-gray-600 mb-4">Try adjusting your search or filter criteria</p>
-          <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Your First Event
-          </Button>
+          <Link to="/events/create">
+            <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Your First Event
+            </Button>
+          </Link>
         </div>
       )}
     </div>
