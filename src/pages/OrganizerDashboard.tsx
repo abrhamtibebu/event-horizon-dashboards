@@ -315,7 +315,7 @@ export default function OrganizerDashboard() {
                   <p className="font-medium text-gray-900 text-sm">{task.task}</p>
                   <p className="text-xs text-gray-600 mt-1">Due: {task.due}</p>
                 </div>
-                <Badge className={getPriorityColor(task.priority)} size="sm">
+                <Badge className={getPriorityColor(task.priority)}>
                   {task.priority}
                 </Badge>
               </div>
