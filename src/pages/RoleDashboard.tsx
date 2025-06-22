@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import AdminDashboard from "./AdminDashboard";
 import OrganizerDashboard from "./OrganizerDashboard";
-import AttendeeDashboard from "./AttendeeDashboard";
+import UsherDashboard from "./UsherDashboard";
 
 // Mock function to get user role - replace with actual authentication
 const getCurrentUserRole = (): string => {
@@ -70,14 +70,14 @@ export default function RoleDashboard() {
             Organizer
           </button>
           <button
-            onClick={() => switchRole("attendee")}
+            onClick={() => switchRole("usher")}
             className={`px-3 py-1 text-xs rounded ${
-              userRole === "attendee" 
+              userRole === "usher" 
                 ? "bg-green-600 text-white" 
                 : "bg-white text-green-600 border border-green-600"
             }`}
           >
-            Attendee
+            Usher
           </button>
         </div>
       </div>
@@ -85,7 +85,7 @@ export default function RoleDashboard() {
       {/* Render appropriate dashboard based on role */}
       {userRole === "admin" && <AdminDashboard />}
       {userRole === "organizer" && <OrganizerDashboard />}
-      {userRole === "attendee" && <AttendeeDashboard />}
+      {userRole === "usher" && <UsherDashboard />}
     </div>
   );
 }

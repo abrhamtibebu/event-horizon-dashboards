@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,6 +19,7 @@ import SignIn from "./pages/SignIn";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 import RoleDashboard from "./pages/RoleDashboard";
+import LocateBadges from "./pages/LocateBadges";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +43,7 @@ const App = () => (
             <Route path="users" element={<Users />} />
             <Route path="organizers" element={<Organizers />} />
             <Route path="organizers/add" element={<AddOrganizer />} />
+            <Route path="locate-badges" element={<LocateBadges />} />
             <Route path="messages" element={<Messages />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />

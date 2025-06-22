@@ -9,7 +9,8 @@ import {
   MessageSquare,
   Settings,
   Activity,
-  Shield
+  Shield,
+  MapPin
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,6 +30,7 @@ const items = [
   { title: "Events", url: "/events", icon: Calendar },
   { title: "Users", url: "/users", icon: Users },
   { title: "Organizers", url: "/organizers", icon: Building2 },
+  { title: "Locate Badges", url: "/locate-badges", icon: MapPin },
   { title: "Messages", url: "/messages", icon: MessageSquare },
   { title: "Reports", url: "/reports", icon: BarChart },
   { title: "Audit Logs", url: "/audit-logs", icon: Shield },
