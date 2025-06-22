@@ -97,7 +97,7 @@ export default function Events() {
           <h1 className="text-3xl font-bold text-gray-900">Events</h1>
           <p className="text-gray-600 mt-1">Manage and monitor all your events</p>
         </div>
-        <Link to="/events/create">
+        <Link to="/dashboard/events/create">
           <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
             <Plus className="w-4 h-4 mr-2" />
             Create Event
@@ -212,7 +212,7 @@ export default function Events() {
           <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No events found</h3>
           <p className="text-gray-600 mb-4">Try adjusting your search or filter criteria</p>
-          <Link to="/events/create">
+          <Link to="/dashboard/events/create">
             <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
               <Plus className="w-4 h-4 mr-2" />
               Create Your First Event

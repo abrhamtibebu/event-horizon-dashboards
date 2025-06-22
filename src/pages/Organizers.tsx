@@ -123,7 +123,7 @@ export default function Organizers() {
           <h1 className="text-3xl font-bold text-gray-900">Organizer Management</h1>
           <p className="text-gray-600 mt-1">Manage event organizers, contacts, and permissions</p>
         </div>
-        <Link to="/organizers/add">
+        <Link to="/dashboard/organizers/add">
           <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
             <Plus className="w-4 h-4 mr-2" />
             Add Organizer

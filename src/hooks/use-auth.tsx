@@ -43,12 +43,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const login = async (credentials: {email: string, password: string}) => {
-        const { data } = await api.post('/login', credentials, {
-            headers: { 'x-api-key': import.meta.env.VITE_API_KEY }
-        });
-        const { token, user: userData } = data;
-        localStorage.setItem('jwt', token);
-        setUser(userData);
+        // Mock login for development
+        console.log("Mock login with:", credentials.email);
+        const mockUser: User = {
+            id: 'mock-user-id',
+            email: credentials.email,
+            role: 'admin' // Or any role you want to test with
+        };
+        localStorage.setItem('jwt', 'mock-jwt-token');
+        setUser(mockUser);
+        return Promise.resolve();
     };
 
     const logout = async () => {

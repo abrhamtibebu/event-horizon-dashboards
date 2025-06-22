@@ -33,6 +33,7 @@ const allItems = [
   { title: "Users", url: "/dashboard/users", icon: Users, roles: ["admin"] },
   { title: "Organizers", url: "/dashboard/organizers", icon: Building2, roles: ["admin"] },
   { title: "Locate Badges", url: "/dashboard/locate-badges", icon: MapPin, roles: ["admin", "usher"] },
+  { title: "Badge Designer", url: "/apps/badge-designer", icon: ClipboardList, roles: ["admin", "organizer"] },
   { title: "Messages", url: "/dashboard/messages", icon: MessageSquare, roles: ["admin", "organizer"] },
   { title: "Event Analytics", url: "/dashboard/reports", icon: BarChart, roles: ["organizer"] },
   { title: "Attendee Check-in", url: "/dashboard/check-in", icon: UserCheck, roles: ["usher"] },
@@ -48,7 +49,7 @@ export function AppSidebar() {
 
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
     isActive
-      ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold shadow-lg"
+      ? "bg-gradient-to-r from-blue-600 to-purple-600 text-text-blue-600 font-semibold shadow-lg"
       : "text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-md transition-all duration-200 ease-in-out";
 
   const filteredItems = allItems.filter(item => user && item.roles.includes(user.role));

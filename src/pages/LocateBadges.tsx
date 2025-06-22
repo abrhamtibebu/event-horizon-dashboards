@@ -103,6 +103,7 @@ const sampleBadgeData = [
 export default function LocateBadges() {
   const [data, setData] = useState<BadgeData[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedGuest, setSelectedGuest] = useState<BadgeData | null>(null);
   const [selectedZone, setSelectedZone] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -201,6 +202,49 @@ export default function LocateBadges() {
         </div>
       </div>
 
+      {selectedGuest && (
+        <DashboardCard title="Badge Location Details" icon={<MapPin className="w-6 h-6 text-blue-600" />}>
+            <div className="relative p-6 bg-blue-50 rounded-lg shadow-inner">
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
+                    onClick={() => setSelectedGuest(null)}
+                >
+                    <X className="w-5 h-5" />
+                </Button>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <p className="text-sm font-medium text-gray-500">Guest Name</p>
+                        <p className="text-lg font-bold text-gray-900">{selectedGuest.name}</p>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-gray-500">Organization</p>
+                        <p className="text-lg font-bold text-gray-900">{selectedGuest.organization}</p>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-gray-500">Badge Type</p>
+                        <Badge className={getGuestTypeColor(selectedGuest.badgeType)}>{selectedGuest.badgeType}</Badge>
+                    </div>
+                </div>
+                <div className="mt-6 pt-6 border-t border-blue-200 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                    <div>
+                        <p className="text-sm font-medium text-gray-500">Zone</p>
+                        <p className="text-3xl font-bold text-blue-700">{selectedGuest.zone}</p>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-gray-500">Section</p>
+                        <p className="text-3xl font-bold text-blue-700">{selectedGuest.section}</p>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-gray-500">Tray</p>
+                        <p className="text-3xl font-bold text-blue-700">{selectedGuest.tray}</p>
+                    </div>
+                </div>
+            </div>
+        </DashboardCard>
+      )}
+
       {/* Search and Filter Section */}
       <DashboardCard title="Badge Location Management">
         <div className="space-y-4">
@@ -289,44 +333,34 @@ export default function LocateBadges() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Badge ID</TableHead>
-                  <TableHead>Badge Type</TableHead>
-                  <TableHead>Zone</TableHead>
-                  <TableHead>Section</TableHead>
-                  <TableHead>Tray</TableHead>
                   <TableHead>Organization</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Notes</TableHead>
+                  <TableHead>Badge Type</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredData.length > 0 ? (
-                  filteredData.map((row, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{row.name}</TableCell>
-                      <TableCell>{row.badgeId}</TableCell>
-                      <TableCell>{row.badgeType}</TableCell>
-                      <TableCell>{row.zone}</TableCell>
-                      <TableCell>{row.section}</TableCell>
-                      <TableCell>{row.tray}</TableCell>
-                      <TableCell>{row.organization}</TableCell>
-                      <TableCell>{row.email}</TableCell>
-                      <TableCell>{row.notes}</TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10">
-                      <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold text-gray-700">
-                        No data to display
-                      </h3>
-                      <p className="text-gray-500">
-                        Upload a CSV file to get started.
-                      </p>
+                {filteredData.map((row, index) => (
+                  <TableRow 
+                    key={index} 
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => setSelectedGuest(row)}
+                  >
+                    <TableCell>{row.name}</TableCell>
+                    <TableCell>{row.organization}</TableCell>
+                    <TableCell>{row.email}</TableCell>
+                    <TableCell>
+                      <Badge className={getGuestTypeColor(row.badgeType)}>{row.badgeType}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      Zone {row.zone}, Section {row.section}, Tray {row.tray}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor("located")}>Located</Badge>
                     </TableCell>
                   </TableRow>
-                )}
+                ))}
               </TableBody>
             </Table>
           </div>
