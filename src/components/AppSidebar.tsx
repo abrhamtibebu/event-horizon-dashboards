@@ -48,8 +48,8 @@ export function AppSidebar() {
 
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
     isActive
-      ? "bg-yellow-400 text-black font-semibold shadow-lg"
-      : "text-slate-600 hover:bg-white hover:text-yellow-500 hover:shadow-md transition-all duration-200 ease-in-out";
+      ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold shadow-lg"
+      : "text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-md transition-all duration-200 ease-in-out";
 
   const filteredItems = allItems.filter(item => user && item.roles.includes(user.role));
 
@@ -57,7 +57,9 @@ export function AppSidebar() {
     <Sidebar className={`bg-slate-50 border-r border-slate-200 ${isCollapsed ? "w-14" : "w-64"}`} collapsible="icon">
       <div className="p-4 border-b border-slate-200">
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="VEMS Logo" className="w-10 h-10" />
+          <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+            <Activity className="w-5 h-5 text-white" />
+          </div>
           {!isCollapsed && (
             <div>
               <h2 className="font-bold text-gray-800 text-lg">VEMS</h2>
