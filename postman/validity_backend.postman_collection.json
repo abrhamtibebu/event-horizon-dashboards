@@ -1,0 +1,1389 @@
+{
+    "info": {
+        "_postman_id": "b1e7e2c0-1234-4cde-9a1a-abcdef123456",
+        "name": "Validity Backend API",
+        "description": "A comprehensive Postman collection for the Validity Event Management Backend.\n\n**Authentication:**\n- All endpoints (except register/login) require JWT in the Authorization header.\n- Registration and login require an `x-api-key` header.\n- Admin, organizer, and usher roles are enforced via middleware.\n\n**Note:** All request/response bodies, required fields, and error cases are described in each request.\n**Base URL:**\n- http://localhost:8000/api/\n",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Authentication",
+            "description": "Endpoints for user registration, login, logout, and profile info. Registration and login require an API key in the `x-api-key` header. All other endpoints require JWT in the Authorization header.",
+            "item": [
+                {
+                    "name": "Register (Usher by default)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "x-api-key",
+                                "value": "<API_KEY>",
+                                "type": "text",
+                                "description": "API key from .env"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\",\n  \"password_confirmation\": \"password123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/register",
+                            "host": ["{{base_url}}"],
+                            "path": ["register"]
+                        },
+                        "description": "Register a new user. Default role is 'usher'.\n\n**Required fields:**\n- name (string)\n- email (string, unique)\n- password (string, min 6)\n- password_confirmation (string, must match password)\n\n**Headers:**\n- x-api-key: API key from .env\n- Content-Type: application/json\n\n**Response:**\n- 200: JWT token and user object\n- 422: Validation errors\n"
+                    }
+                },
+                {
+                    "name": "Login",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "x-api-key",
+                                "value": "<API_KEY>",
+                                "type": "text",
+                                "description": "API key from .env"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"superadmin@validity.et\",\n  \"password\": \"72A47F39-550B-4038-BD40-D6809C90B9CA\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/login",
+                            "host": ["{{base_url}}"],
+                            "path": ["login"]
+                        },
+                        "description": "Login with email and password.\n\n**Required fields:**\n- email (string)\n- password (string)\n\n**Headers:**\n- x-api-key: API key from .env\n- Content-Type: application/json\n\n**Response:**\n- 200: JWT token and user object\n- 401: Invalid credentials\n"
+                    }
+                },
+                {
+                    "name": "Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/logout",
+                            "host": ["{{base_url}}"],
+                            "path": ["logout"]
+                        },
+                        "description": "Logout the current user.\n\n**Headers:**\n- Authorization: Bearer <JWT>\n\n**Response:**\n- 200: Successfully logged out\n"
+                    }
+                },
+                {
+                    "name": "Get Current User (me)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/me",
+                            "host": ["{{base_url}}"],
+                            "path": ["me"]
+                        },
+                        "description": "Get the currently authenticated user's details.\n\n**Headers:**\n- Authorization: Bearer <JWT>\n\n**Response:**\n- 200: User object\n"
+                    }
+                },
+                {
+                    "name": "Change User Role (Admin Only)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (admin)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"role\": \"organizer\" }"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/users/:user_id/role",
+                            "host": ["{{base_url}}"],
+                            "path": ["users", ":user_id", "role"]
+                        },
+                        "description": "Change the role of a user.\n\n**Required fields:**\n- role (string, one of: admin, organizer, usher)\n\n**Headers:**\n- Authorization: Bearer <JWT> (admin)\n- Content-Type: application/json\n\n**Response:**\n- 200: Role updated\n- 422: Validation errors\n- 403: Forbidden\n"
+                    }
+                }
+            ]
+        },
+        
+        {
+            "name": "Organizer Management (Admin Only)",
+            "description": "Endpoints for admin to manage organizers (companies), assign contacts, activate/suspend, and CRUD operations. All require JWT with admin role.",
+            "item": [
+                {
+                    "name": "Create Organizer",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (admin)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Acme Corp\",\n  \"location\": \"Addis Ababa\",\n  \"tin_number\": \"123456789\",\n  \"email\": \"acme@company.com\",\n  \"phone_number\": \"+251900000000\"\n  // logo: (file upload, optional, use form-data if uploading)\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/organizers",
+                            "host": ["{{base_url}}"],
+                            "path": ["organizers"]
+                        },
+                        "description": "Create a new organizer (company).\n\n**Required fields:**\n- name (string)\n- location (string)\n- tin_number (string, unique)\n- email (string, unique)\n- phone_number (string)\n- logo (file, optional, image)\n\n**Headers:**\n- Authorization: Bearer <JWT> (admin)\n- Content-Type: application/json (or multipart/form-data for file upload)\n\n**Response:**\n- 201: Organizer object\n- 422: Validation errors\n"
+                    }
+                },
+                {
+                    "name": "List All Organizers",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/organizers",
+                            "host": ["{{base_url}}"],
+                            "path": ["organizers"]
+                        },
+                        "description": "List all organizers (companies).\n\n**Headers:**\n- Authorization: Bearer <JWT> (admin)\n\n**Response:**\n- 200: Array of organizer objects\n"
+                    }
+                },
+                {
+                    "name": "Assign Contacts to Organizer",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (admin)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"user_ids\": [2, 3],\n  \"primary_contact_id\": 2\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/organizers/:organizer_id/contacts",
+                            "host": ["{{base_url}}"],
+                            "path": ["organizers", ":organizer_id", "contacts"]
+                        },
+                        "description": "Assign users as contacts to an organizer. Only users with role 'organizer' can be assigned.\n\n**Required fields:**\n- user_ids (array of user IDs, must be organizers)\n- primary_contact_id (user ID, must be in user_ids)\n\n**Headers:**\n- Authorization: Bearer <JWT> (admin)\n- Content-Type: application/json\n\n**Response:**\n- 200: Contacts assigned\n- 422: Validation errors or user not eligible\n"
+                    }
+                },
+                {
+                    "name": "List Organizer Contacts",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/organizers/:organizer_id/contacts",
+                            "host": ["{{base_url}}"],
+                            "path": ["organizers", ":organizer_id", "contacts"]
+                        },
+                        "description": "List all contacts (users) for a given organizer.\n\n**Headers:**\n- Authorization: Bearer <JWT> (admin)\n\n**Response:**\n- 200: Array of user objects\n- 403: Forbidden\n"
+                    }
+                },
+                {
+                    "name": "Remove Contact from Organizer",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/organizers/:organizer_id/contacts/:user_id",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "organizers",
+                                ":organizer_id",
+                                "contacts",
+                                ":user_id"
+                            ]
+                        },
+                        "description": "Remove a user as a contact from an organizer.\n\n**Headers:**\n- Authorization: Bearer <JWT> (admin)\n\n**Response:**\n- 200: Contact removed\n- 422: User not a contact\n"
+                    }
+                },
+                {
+                    "name": "Set Primary Contact for Organizer",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/organizers/:organizer_id/contacts/:user_id/primary",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "organizers",
+                                ":organizer_id",
+                                "contacts",
+                                ":user_id",
+                                "primary"
+                            ]
+                        },
+                        "description": "Set a user as the primary contact for an organizer.\n\n**Headers:**\n- Authorization: Bearer <JWT> (admin)\n\n**Response:**\n- 200: Primary contact set\n- 422: User not a contact\n"
+                    }
+                },
+                {
+                    "name": "Delete Organizer",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/organizers/:organizer_id",
+                            "host": ["{{base_url}}"],
+                            "path": ["organizers", ":organizer_id"]
+                        },
+                        "description": "Delete an organizer.\n\n**Headers:**\n- Authorization: Bearer <JWT> (admin)\n\n**Response:**\n- 200: Organizer deleted\n- 409: Organizer has events or users\n"
+                    }
+                },
+                {
+                    "name": "Deactivate Organizer (Soft Delete)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/organizers/:organizer_id/deactivate",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "organizers",
+                                ":organizer_id",
+                                "deactivate"
+                            ]
+                        },
+                        "description": "Deactivate (soft delete) an organizer.\n\n**Headers:**\n- Authorization: Bearer <JWT> (admin)\n\n**Response:**\n- 200: Organizer deactivated\n"
+                    }
+                },
+                {
+                    "name": "Reactivate Organizer",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/organizers/:organizer_id/reactivate",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "organizers",
+                                ":organizer_id",
+                                "reactivate"
+                            ]
+                        },
+                        "description": "Reactivate a previously deactivated organizer.\n\n**Headers:**\n- Authorization: Bearer <JWT> (admin)\n\n**Response:**\n- 200: Organizer reactivated\n"
+                    }
+                },
+                {
+                    "name": "Activate Organizer",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/organizers/:organizer_id/activate",
+                            "host": ["{{base_url}}"],
+                            "path": ["organizers", ":organizer_id", "activate"]
+                        },
+                        "description": "Activate an organizer.\n\n**Headers:**\n- Authorization: Bearer <JWT> (admin)\n\n**Response:**\n- 200: Organizer activated\n"
+                    }
+                },
+                {
+                    "name": "Suspend Organizer",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/organizers/:organizer_id/suspend",
+                            "host": ["{{base_url}}"],
+                            "path": ["organizers", ":organizer_id", "suspend"]
+                        },
+                        "description": "Suspend an organizer.\n\n**Headers:**\n- Authorization: Bearer <JWT> (admin)\n\n**Response:**\n- 200: Organizer suspended\n"
+                    }
+                }
+            ]
+        },
+        
+        {
+            "name": "Event Management (Organizer/Admin)",
+            "description": "Endpoints for organizers to create, update, view, and delete events. Admins can access all events. Includes guest type management, usher assignment, event image upload, advertisement, and reporting.",
+            "item": [
+                {
+                    "name": "List Events (Organizer)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/events",
+                            "host": ["{{base_url}}"],
+                            "path": ["events"]
+                        },
+                        "description": "List all events for the authenticated organizer.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer)\n\n**Response:**\n- 200: Array of event objects\n"
+                    }
+                },
+                {
+                    "name": "Create Event",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "multipart/form-data",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "name",
+                                    "value": "Annual Gala",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "description",
+                                    "value": "A major event.",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "start_date",
+                                    "value": "2025-07-01T18:00:00Z",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "end_date",
+                                    "value": "2025-07-01T23:00:00Z",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "location",
+                                    "value": "Hilton Hotel",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "max_guests",
+                                    "value": "500",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "registration_start_date",
+                                    "value": "2025-06-01T00:00:00Z",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "registration_end_date",
+                                    "value": "2025-06-30T23:59:59Z",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "event_type_id",
+                                    "value": "1",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "event_category_id",
+                                    "value": "1",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "event_image",
+                                    "type": "file",
+                                    "src": ""
+                                },
+                                {
+                                    "key": "guest_types[0]",
+                                    "value": "VIP",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "guest_types[1]",
+                                    "value": "Speaker",
+                                    "type": "text"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/events",
+                            "host": ["{{base_url}}"],
+                            "path": ["events"]
+                        },
+                        "description": "Create a new event.\n\n**Required fields:**\n- name (string)\n- start_date, end_date (ISO8601 string)\n- location (string)\n- max_guests (integer)\n- registration_start_date, registration_end_date (ISO8601 string)\n- event_type_id (integer)\n- event_category_id (integer)\n- guest_types (array of strings, e.g. ['VIP', 'Speaker'])\n- event_image (file, optional)\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer)\n- Content-Type: multipart/form-data\n\n**Response:**\n- 201: Event object\n- 422: Validation errors\n"
+                    }
+                },
+                {
+                    "name": "Get Event (Organizer)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id",
+                            "host": ["{{base_url}}"],
+                            "path": ["events", ":event_id"]
+                        },
+                        "description": "Get details of a specific event.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer)\n\n**Response:**\n- 200: Event object\n- 403: Forbidden\n"
+                    }
+                },
+                {
+                    "name": "Delete Event (Organizer)",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id",
+                            "host": ["{{base_url}}"],
+                            "path": ["events", ":event_id"]
+                        },
+                        "description": "Delete an event. Can only delete if event is done and has no attendees.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer)\n\n**Response:**\n- 200: Event soft deleted\n- 409: Event has attendees or is not done\n- 403: Forbidden\n"
+                    }
+                },
+                {
+                    "name": "Assign Ushers to Event",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"ushers\": [\n    {\n      \"id\": 5,\n      \"tasks\": [\"Check-in\", \"Security\"]\n    }\n  ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/ushers",
+                            "host": ["{{base_url}}"],
+                            "path": ["events", ":event_id", "ushers"]
+                        },
+                        "description": "Assign ushers to an event with specific tasks.\n\n**Required fields:**\n- ushers (array of objects)\n  - id (usher user ID)\n  - tasks (array of strings)\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer)\n- Content-Type: application/json\n\n**Response:**\n- 200: Ushers assigned\n- 422: Validation errors\n- 403: Forbidden\n"
+                    }
+                },
+                {
+                    "name": "List Ushers for Event",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/ushers",
+                            "host": ["{{base_url}}"],
+                            "path": ["events", ":event_id", "ushers"]
+                        },
+                        "description": "List all ushers assigned to an event.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer)\n\n**Response:**\n- 200: Array of usher objects\n- 403: Forbidden\n"
+                    }
+                },
+                {
+                    "name": "Update Usher Tasks for Event",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"tasks\": [\"Check-in\", \"Security\"]\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/ushers/:usher_id",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "events",
+                                ":event_id",
+                                "ushers",
+                                ":usher_id"
+                            ]
+                        },
+                        "description": "Update the tasks assigned to a specific usher for an event.\n\n**Required fields:**\n- tasks (array of strings)\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer)\n- Content-Type: application/json\n\n**Response:**\n- 200: Usher tasks updated\n- 422: Validation errors\n- 403: Forbidden\n"
+                    }
+                },
+                {
+                    "name": "Remove Usher from Event",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/ushers/:usher_id",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "events",
+                                ":event_id",
+                                "ushers",
+                                ":usher_id"
+                            ]
+                        },
+                        "description": "Remove an usher from an event.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer)\n\n**Response:**\n- 200: Usher removed\n- 403: Forbidden\n"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Guest & Attendee Management",
+            "description": "Endpoints for registering attendees, listing attendees, deleting guests, and uploading guest profile images. Organizer or usher permissions required for most endpoints.",
+            "item": [
+                {
+                    "name": "Register Attendee (Create or Find Guest)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or usher)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Jane Smith\",\n  \"email\": \"jane@example.com\",\n  \"phone\": \"+251911111111\",\n  \"company\": \"Acme Corp\",\n  \"jobtitle\": \"Manager\",\n  \"gender\": \"Female\",\n  \"country\": \"Ethiopia\",\n  \"guest_type_id\": 1\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/attendees",
+                            "host": ["{{base_url}}"],
+                            "path": ["events", ":event_id", "attendees"]
+                        },
+                        "description": "Register an attendee for an event. If the guest does not exist (by email or phone), they will be created.\n\n**Required fields:**\n- name (string)\n- email (string)\n- phone (string)\n- guest_type_id (integer, must exist for event)\n\n**Optional fields:**\n- company (string)\n- jobtitle (string)\n- gender (string)\n- country (string)\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or usher)\n- Content-Type: application/json\n\n**Response:**\n- 201: guest_id and attendee_id\n- 422: Validation errors\n- 403: Forbidden\n"
+                    }
+                },
+                {
+                    "name": "List Attendees for Event",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or usher)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/attendees",
+                            "host": ["{{base_url}}"],
+                            "path": ["events", ":event_id", "attendees"]
+                        },
+                        "description": "List all attendees for a specific event.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or usher)\n\n**Response:**\n- 200: Array of attendee objects (with guest and guestType)\n- 403: Forbidden\n"
+                    }
+                },
+                {
+                    "name": "Delete Guest (Soft Delete)",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/guests/:guest_id",
+                            "host": ["{{base_url}}"],
+                            "path": ["guests", ":guest_id"]
+                        },
+                        "description": "Delete a guest (soft delete). Can only delete if guest is not registered for any active events.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer)\n\n**Response:**\n- 200: Guest soft deleted\n- 409: Guest is registered for active events\n"
+                    }
+                },
+                {
+                    "name": "Upload Guest Profile Image",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or admin)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "multipart/form-data",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "profile_image",
+                                    "type": "file",
+                                    "src": ""
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/guests/:guest_id/profile-image",
+                            "host": ["{{base_url}}"],
+                            "path": ["guests", ":guest_id", "profile-image"]
+                        },
+                        "description": "Upload or update a guest's profile image.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or admin)\n- Content-Type: multipart/form-data\n\n**Response:**\n- 200: profile_image URL\n- 422: Validation errors\n- 403: Forbidden\n"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Usher Management",
+            "description": "Endpoints for ushers to set/get their availability, for organizers to list available ushers, and for managing usher notes and event tasks.",
+            "item": [
+                {
+                    "name": "Set Usher Availability (Usher Only)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (usher)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"available\": true,\n  \"note\": \"Available for evening events\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/usher/availability",
+                            "host": ["{{base_url}}"],
+                            "path": ["usher", "availability"]
+                        },
+                        "description": "Set or update usher's availability.\n\n**Required fields:**\n- available (boolean)\n- note (string, optional)\n\n**Headers:**\n- Authorization: Bearer <JWT> (usher)\n- Content-Type: application/json\n\n**Response:**\n- 200: Usher availability object\n- 422: Validation errors\n"
+                    }
+                },
+                {
+                    "name": "Get Usher Availability (Usher Only)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (usher)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/usher/availability",
+                            "host": ["{{base_url}}"],
+                            "path": ["usher", "availability"]
+                        },
+                        "description": "Get the current usher's availability.\n\n**Headers:**\n- Authorization: Bearer <JWT> (usher)\n\n**Response:**\n- 200: Usher availability object\n"
+                    }
+                },
+                {
+                    "name": "List Available Ushers (Organizer Only)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/ushers/available",
+                            "host": ["{{base_url}}"],
+                            "path": ["ushers", "available"]
+                        },
+                        "description": "List all ushers who are currently available.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer)\n\n**Response:**\n- 200: Array of usher objects with availability\n"
+                    }
+                },
+                {
+                    "name": "List Usher Events & Tasks (Usher Only)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (usher)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/usher/events",
+                            "host": ["{{base_url}}"],
+                            "path": ["usher", "events"]
+                        },
+                        "description": "List all events and assigned tasks for the current usher.\n\n**Headers:**\n- Authorization: Bearer <JWT> (usher)\n\n**Response:**\n- 200: Array of event objects with usher tasks\n"
+                    }
+                },
+                {
+                    "name": "Complete Usher Task (Usher Only)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (usher)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"task\": \"Check-in\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/usher/tasks/complete",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "events",
+                                ":event_id",
+                                "usher",
+                                "tasks",
+                                "complete"
+                            ]
+                        },
+                        "description": "Mark a specific usher task as completed for an event.\n\n**Required fields:**\n- task (string)\n\n**Headers:**\n- Authorization: Bearer <JWT> (usher)\n- Content-Type: application/json\n\n**Response:**\n- 200: Task completion status\n- 422: Validation errors\n"
+                    }
+                },
+                {
+                    "name": "Add Usher Note to Event (Usher Only)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (usher)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"note\": \"VIP guest arrived late.\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/usher-notes",
+                            "host": ["{{base_url}}"],
+                            "path": ["events", ":event_id", "usher-notes"]
+                        },
+                        "description": "Add a note to an event as an usher.\n\n**Required fields:**\n- note (string)\n\n**Headers:**\n- Authorization: Bearer <JWT> (usher)\n- Content-Type: application/json\n\n**Response:**\n- 201: Usher note object\n- 422: Validation errors\n"
+                    }
+                },
+                {
+                    "name": "List Usher Notes for Event (Organizer/Usher)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or usher)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/usher-notes",
+                            "host": ["{{base_url}}"],
+                            "path": ["events", ":event_id", "usher-notes"]
+                        },
+                        "description": "List all usher notes for a specific event.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or usher)\n\n**Response:**\n- 200: Array of usher note objects\n"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Messaging & Notifications",
+            "description": "Endpoints for event-based messaging between organizers and ushers, and for user notifications.",
+            "item": [
+                {
+                    "name": "Send Message (Organizer/Usher)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or usher)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"recipient_id\": 5,\n  \"content\": \"Please arrive by 6pm.\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/messages",
+                            "host": ["{{base_url}}"],
+                            "path": ["events", ":event_id", "messages"]
+                        },
+                        "description": "Send a message to another user (organizer or usher) for a specific event.\n\n**Required fields:**\n- recipient_id (user ID)\n- content (string)\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or usher)\n- Content-Type: application/json\n\n**Response:**\n- 201: Message object\n- 422: Validation errors\n- 403: Forbidden\n"
+                    }
+                },
+                {
+                    "name": "List Messages for Event (Organizer/Usher)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or usher)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/messages",
+                            "host": ["{{base_url}}"],
+                            "path": ["events", ":event_id", "messages"]
+                        },
+                        "description": "List all messages for a specific event.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or usher)\n\n**Response:**\n- 200: Array of message objects\n- 403: Forbidden\n"
+                    }
+                },
+                {
+                    "name": "Mark Message as Read (Organizer/Usher)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or usher)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/messages/:message_id/read",
+                            "host": ["{{base_url}}"],
+                            "path": ["messages", ":message_id", "read"]
+                        },
+                        "description": "Mark a message as read.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or usher)\n\n**Response:**\n- 200: Message marked as read\n- 403: Forbidden\n"
+                    }
+                },
+                {
+                    "name": "Get Unread Message Count (Organizer/Usher)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or usher)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/messages/unread/count",
+                            "host": ["{{base_url}}"],
+                            "path": ["messages", "unread", "count"]
+                        },
+                        "description": "Get the count of unread messages for the current user.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or usher)\n\n**Response:**\n- 200: { count: integer }\n"
+                    }
+                },
+                {
+                    "name": "List Unread Messages (Organizer/Usher)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or usher)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/messages/unread",
+                            "host": ["{{base_url}}"],
+                            "path": ["messages", "unread"]
+                        },
+                        "description": "List all unread messages for the current user.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or usher)\n\n**Response:**\n- 200: Array of unread message objects\n"
+                    }
+                },
+                {
+                    "name": "List Notifications (All Roles)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/notifications",
+                            "host": ["{{base_url}}"],
+                            "path": ["notifications"]
+                        },
+                        "description": "List all notifications for the current user.\n\n**Headers:**\n- Authorization: Bearer <JWT>\n\n**Response:**\n- 200: Array of notification objects\n"
+                    }
+                },
+                {
+                    "name": "Mark Notification as Read (All Roles)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/notifications/:notification_id/read",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "notifications",
+                                ":notification_id",
+                                "read"
+                            ]
+                        },
+                        "description": "Mark a notification as read.\n\n**Headers:**\n- Authorization: Bearer <JWT>\n\n**Response:**\n- 200: Notification marked as read\n"
+                    }
+                },
+                {
+                    "name": "Get Unread Notification Count (All Roles)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/notifications/unread/count",
+                            "host": ["{{base_url}}"],
+                            "path": ["notifications", "unread", "count"]
+                        },
+                        "description": "Get the count of unread notifications for the current user.\n\n**Headers:**\n- Authorization: Bearer <JWT>\n\n**Response:**\n- 200: { count: integer }\n"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Reporting & Export",
+            "description": "Endpoints for global and per-event reporting, CSV/PDF export, advertisement status, email campaigns, and advertisement logs. Organizer or admin permissions required for most endpoints.",
+            "item": [
+                {
+                    "name": "Get Global Report (Organizer/Admin)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/reports/summary",
+                            "host": ["{{base_url}}"],
+                            "path": ["reports", "summary"]
+                        },
+                        "description": "Get a global summary report (all events, metrics, breakdowns).\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or admin)\n\n**Response:**\n- 200: Report summary object\n"
+                    }
+                },
+                {
+                    "name": "Export Global Report as CSV (Organizer/Admin)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/reports/summary/csv",
+                            "host": ["{{base_url}}"],
+                            "path": ["reports", "summary", "csv"]
+                        },
+                        "description": "Export the global report as a CSV file.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or admin)\n\n**Response:**\n- 200: CSV file download\n"
+                    }
+                },
+                {
+                    "name": "Get Event Report (Organizer/Admin)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/report",
+                            "host": ["{{base_url}}"],
+                            "path": ["events", ":event_id", "report"]
+                        },
+                        "description": "Get a detailed report for a specific event.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or admin)\n\n**Response:**\n- 200: Event report object\n"
+                    }
+                },
+                {
+                    "name": "Export Event Report as CSV (Organizer/Admin)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/report/csv",
+                            "host": ["{{base_url}}"],
+                            "path": ["events", ":event_id", "report", "csv"]
+                        },
+                        "description": "Export the event report as a CSV file.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or admin)\n\n**Response:**\n- 200: CSV file download\n"
+                    }
+                },
+                {
+                    "name": "Update Event Advertisement Status (Organizer/Admin)",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or admin)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"advertisement_status\": \"sent\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/advertisement-status",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "events",
+                                ":event_id",
+                                "advertisement-status"
+                            ]
+                        },
+                        "description": "Update the advertisement status for an event.\n\n**Required fields:**\n- advertisement_status (string, e.g. 'pending', 'sent', 'failed')\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or admin)\n- Content-Type: application/json\n\n**Response:**\n- 200: Advertisement status updated\n- 422: Validation errors\n"
+                    }
+                },
+                {
+                    "name": "Send Email Campaign to Event Guests (Organizer/Admin)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or admin)"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"subject\": \"Event Reminder\",\n  \"message\": \"Don't forget our event!\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/advertise/email",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "events",
+                                ":event_id",
+                                "advertise",
+                                "email"
+                            ]
+                        },
+                        "description": "Send an email campaign to all guests of an event.\n\n**Required fields:**\n- subject (string)\n- message (string)\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or admin)\n- Content-Type: application/json\n\n**Response:**\n- 200: Email campaign sent\n- 422: Validation errors\n"
+                    }
+                },
+                {
+                    "name": "List Advertisement Logs for Event (Organizer/Admin)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (organizer or admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/events/:event_id/advertisement-logs",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "events",
+                                ":event_id",
+                                "advertisement-logs"
+                            ]
+                        },
+                        "description": "List all advertisement logs for a specific event.\n\n**Headers:**\n- Authorization: Bearer <JWT> (organizer or admin)\n\n**Response:**\n- 200: Array of advertisement log objects\n"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Audit Logs (Admin Only)",
+            "description": "Endpoints for admins to view all audit logs in the system.",
+            "item": [
+                {
+                    "name": "List Audit Logs (Admin Only)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token (admin)"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/audit-logs",
+                            "host": ["{{base_url}}"],
+                            "path": ["audit-logs"]
+                        },
+                        "description": "List all audit logs in the system.\n\n**Headers:**\n- Authorization: Bearer <JWT> (admin)\n\n**Response:**\n- 200: Paginated array of audit log objects\n"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Profile & Image Uploads",
+            "description": "Endpoints for uploading user and guest profile images.",
+            "item": [
+                {
+                    "name": "Upload User Profile Image (All Roles)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer <JWT>",
+                                "type": "text",
+                                "description": "JWT token"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "multipart/form-data",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "profile_image",
+                                    "type": "file",
+                                    "src": ""
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/user/profile-image",
+                            "host": ["{{base_url}}"],
+                            "path": ["user", "profile-image"]
+                        },
+                        "description": "Upload or update the current user's profile image.\n\n**Headers:**\n- Authorization: Bearer <JWT>\n- Content-Type: multipart/form-data\n\n**Response:**\n- 200: profile_image URL\n- 422: Validation errors\n- 403: Forbidden\n"
+                    }
+                }
+            ]
+        }
+    ]
+}

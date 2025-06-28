@@ -1,85 +1,102 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import api from '@/lib/api';
-import { useNavigate } from 'react-router-dom';
+import {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useEffect,
+} from 'react'
+import api from '@/lib/api'
+import { useNavigate } from 'react-router-dom'
 
-export type Role = 'admin' | 'organizer' | 'usher' | 'attendee';
+export type Role = 'admin' | 'organizer' | 'usher' | 'attendee'
 
 interface User {
-  id: string;
-  email: string;
-  role: Role;
+  id: string
+  email: string
+  role: Role
 }
 
 interface AuthContextType {
-  isAuthenticated: boolean;
-  user: User | null;
-  login: (credentials: {email: string, password: string}) => Promise<void>;
-  logout: () => Promise<void>;
-  isLoading: boolean;
+  isAuthenticated: boolean
+  user: User | null
+  login: (
+    credentials: { email: string; password: string },
+    remember?: boolean
+  ) => Promise<void>
+  logout: () => Promise<void>
+  isLoading: boolean
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const [user, setUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
 
-    useEffect(() => {
-        const checkLoggedIn = async () => {
-            const token = localStorage.getItem('jwt');
-            if (token) {
-                try {
-                    const { data } = await api.get('/me');
-                    setUser(data);
-                } catch (error) {
-                    console.error("Session expired or invalid", error);
-                    localStorage.removeItem('jwt');
-                    setUser(null);
-                }
-            }
-            setIsLoading(false);
-        };
-        checkLoggedIn();
-    }, []);
-
-    const login = async (credentials: {email: string, password: string}) => {
-        // Mock login for development
-        console.log("Mock login with:", credentials.email);
-        const mockUser: User = {
-            id: 'mock-user-id',
-            email: credentials.email,
-            role: 'admin' // Or any role you want to test with
-        };
-        localStorage.setItem('jwt', 'mock-jwt-token');
-        setUser(mockUser);
-        return Promise.resolve();
-    };
-
-    const logout = async () => {
+  useEffect(() => {
+    const checkLoggedIn = async () => {
+      const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
+      if (token) {
         try {
-            await api.post('/logout');
+          const { data } = await api.get('/me')
+          setUser(data)
         } catch (error) {
-            console.error("Logout failed", error);
-        } finally {
-            localStorage.removeItem('jwt');
-            setUser(null);
-            window.location.href = '/';
+          console.error('Session expired or invalid', error)
+          localStorage.removeItem('jwt')
+          sessionStorage.removeItem('jwt')
+          setUser(null)
         }
-    };
-    
-    const value = { isAuthenticated: !!user, user, login, logout, isLoading };
+      }
+      setIsLoading(false)
+    }
+    checkLoggedIn()
+  }, [])
 
-    return (
-        <AuthContext.Provider value={value}>
-            {!isLoading && children}
-        </AuthContext.Provider>
-    );
-};
+  const login = async (
+    credentials: { email: string; password: string },
+    remember = false
+  ) => {
+    const apiKey = import.meta.env.VITE_API_KEY || ''
+    const res = await api.post('/login', credentials, {
+      headers: {
+        'x-api-key': apiKey,
+      },
+    })
+    const { token, user } = res.data
+    if (remember) {
+      localStorage.setItem('jwt', token)
+    } else {
+      sessionStorage.setItem('jwt', token)
+    }
+    setUser(user)
+  }
+
+  const logout = async () => {
+    try {
+      await api.post('/logout')
+    } catch (error) {
+      console.error('Logout failed', error)
+    } finally {
+      localStorage.removeItem('jwt')
+      sessionStorage.removeItem('jwt')
+      setUser(null)
+      window.location.href = '/'
+    }
+  }
+
+  const value = { isAuthenticated: !!user, user, login, logout, isLoading }
+
+  return (
+    <AuthContext.Provider value={value}>
+      {!isLoading && children}
+    </AuthContext.Provider>
+  )
+}
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
+  const context = useContext(AuthContext)
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth must be used within an AuthProvider')
   }
-  return context;
-}; 
+  return context
+}

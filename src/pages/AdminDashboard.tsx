@@ -1,23 +1,23 @@
-
-import { useState } from "react";
-import { 
-  Calendar, 
-  Users, 
-  Building2, 
-  BarChart3, 
-  Settings, 
-  TrendingUp, 
-  UserCheck, 
+import { useState, useEffect } from 'react'
+import {
+  Calendar,
+  Users,
+  Building2,
+  BarChart3,
+  Settings,
+  TrendingUp,
+  UserCheck,
   AlertCircle,
   Plus,
   FileText,
-  Shield
-} from "lucide-react";
-import { MetricCard } from "@/components/MetricCard";
-import { DashboardCard } from "@/components/DashboardCard";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+  Shield,
+  Trash2,
+} from 'lucide-react'
+import { MetricCard } from '@/components/MetricCard'
+import { DashboardCard } from '@/components/DashboardCard'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import {
   LineChart,
   Line,
@@ -30,68 +30,100 @@ import {
   Pie,
   Cell,
   BarChart,
-  Bar
-} from "recharts";
-import { Link } from "react-router-dom";
-
-const eventMetrics = [
-  { month: "Jan", events: 15, users: 450, revenue: 12500 },
-  { month: "Feb", events: 22, users: 680, revenue: 18600 },
-  { month: "Mar", events: 18, users: 520, revenue: 15200 },
-  { month: "Apr", events: 28, users: 920, revenue: 25400 },
-  { month: "May", users: 1150, revenue: 31200 },
-  { month: "Jun", events: 32, users: 1280, revenue: 35800 },
-];
-
-const eventStatusData = [
-  { name: "Active", value: 45, color: "#10b981" },
-  { name: "Completed", value: 38, color: "#3b82f6" },
-  { name: "Draft", value: 12, color: "#f59e0b" },
-  { name: "Cancelled", value: 5, color: "#ef4444" },
-];
-
-const userRoleData = [
-  { role: "Attendees", count: 2840, growth: 12 },
-  { role: "Organizers", count: 145, growth: 8 },
-  { role: "Ushers", count: 89, growth: 15 },
-  { role: "Admins", count: 12, growth: 0 },
-];
-
-const recentActivities = [
-  { id: 1, action: "New event created", user: "Sarah Johnson", time: "2 min ago", type: "event" },
-  { id: 2, action: "User registered", user: "John Doe", time: "5 min ago", type: "user" },
-  { id: 3, action: "Event approved", user: "Mike Davis", time: "15 min ago", type: "approval" },
-  { id: 4, action: "Report generated", user: "Admin", time: "1 hour ago", type: "report" },
-];
-
-const systemAlerts = [
-  { id: 1, message: "Server maintenance scheduled for tonight", severity: "warning", time: "30 min ago" },
-  { id: 2, message: "High traffic detected on registration system", severity: "info", time: "1 hour ago" },
-  { id: 3, message: "Backup completed successfully", severity: "success", time: "2 hours ago" },
-];
+  Bar,
+} from 'recharts'
+import { Link } from 'react-router-dom'
+import api from '@/lib/api'
 
 export default function AdminDashboard() {
-  const [selectedTimeRange, setSelectedTimeRange] = useState("7d");
+  const [stats, setStats] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [trashCount, setTrashCount] = useState(0)
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true)
+        // NOTE: This assumes a single /dashboard/admin endpoint exists.
+        // If data comes from multiple endpoints, this needs to be adjusted.
+        const response = await api.get('/dashboard/admin')
+        setStats(response.data)
+        setError(null)
+      } catch (err) {
+        setError(
+          'Failed to fetch dashboard data. The backend endpoint might not be implemented yet.'
+        )
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    const fetchTrashCount = async () => {
+      try {
+        const response = await api.get('/trash')
+        setTrashCount(response.data.total_items || 0)
+      } catch (error) {
+        console.error('Failed to fetch trash count:', error)
+      }
+    }
+
+    fetchDashboardData()
+    fetchTrashCount()
+  }, [])
 
   const getActivityIcon = (type: string) => {
     switch (type) {
-      case "event": return <Calendar className="w-4 h-4" />;
-      case "user": return <Users className="w-4 h-4" />;
-      case "approval": return <UserCheck className="w-4 h-4" />;
-      case "report": return <FileText className="w-4 h-4" />;
-      default: return <AlertCircle className="w-4 h-4" />;
+      case 'event':
+        return <Calendar className="w-4 h-4" />
+      case 'user':
+        return <Users className="w-4 h-4" />
+      case 'approval':
+        return <UserCheck className="w-4 h-4" />
+      case 'report':
+        return <FileText className="w-4 h-4" />
+      default:
+        return <AlertCircle className="w-4 h-4" />
     }
-  };
+  }
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case "warning": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "info": return "bg-blue-100 text-blue-800 border-blue-200";
-      case "success": return "bg-green-100 text-green-800 border-green-200";
-      case "error": return "bg-red-100 text-red-800 border-red-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
+      case 'warning':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'info':
+        return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'success':
+        return 'bg-green-100 text-green-800 border-green-200'
+      case 'error':
+        return 'bg-red-100 text-red-800 border-red-200'
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200'
     }
-  };
+  }
+
+  if (loading) {
+    return <div>Loading dashboard...</div>
+  }
+
+  if (error) {
+    return <div className="text-red-500">{error}</div>
+  }
+
+  if (!stats) {
+    return <div>No dashboard data available.</div>
+  }
+
+  // Destructure stats from the API response
+  const {
+    keyMetrics,
+    eventGrowth,
+    eventStatusDistribution,
+    userRoleDistribution,
+    systemAlerts,
+    recentActivities,
+  } = stats
 
   return (
     <div className="space-y-6">
@@ -99,16 +131,18 @@ export default function AdminDashboard() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-600 mt-1">System overview and management center</p>
+          <p className="text-gray-600 mt-1">
+            System overview and management center
+          </p>
         </div>
         <div className="flex gap-3">
-          <Link to="/events/create">
+          <Link to="/dashboard/events/create">
             <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
               <Plus className="w-4 h-4 mr-2" />
               Create Event
             </Button>
           </Link>
-          <Link to="/settings">
+          <Link to="/dashboard/settings">
             <Button variant="outline">
               <Settings className="w-4 h-4 mr-2" />
               Settings
@@ -121,27 +155,28 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
           title="Total Events"
-          value="287"
+          value={keyMetrics?.totalEvents?.value || 'N/A'}
           icon={<Calendar className="w-6 h-6 text-blue-600" />}
-          trend={{ value: 18, isPositive: true }}
+          trend={keyMetrics?.totalEvents?.trend}
         />
         <MetricCard
           title="Total Users"
-          value="3,086"
+          value={keyMetrics?.totalUsers?.value || 'N/A'}
           icon={<Users className="w-6 h-6 text-purple-600" />}
-          trend={{ value: 12, isPositive: true }}
+          trend={keyMetrics?.totalUsers?.trend}
         />
         <MetricCard
           title="Active Organizers"
-          value="145"
+          value={keyMetrics?.activeOrganizers?.value || 'N/A'}
           icon={<Building2 className="w-6 h-6 text-green-600" />}
-          trend={{ value: 8, isPositive: true }}
+          trend={keyMetrics?.activeOrganizers?.trend}
         />
         <MetricCard
-          title="Monthly Revenue"
-          value="$35,800"
-          icon={<TrendingUp className="w-6 h-6 text-orange-600" />}
-          trend={{ value: 24, isPositive: true }}
+          title="Items in Trash"
+          value={trashCount.toString()}
+          icon={<Trash2 className="w-6 h-6 text-red-600" />}
+          trend={null}
+          link="/dashboard/trash"
         />
       </div>
 
@@ -149,22 +184,22 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DashboardCard title="Event & User Growth">
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={eventMetrics}>
+            <LineChart data={eventGrowth}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />
               <Tooltip />
-              <Line 
-                type="monotone" 
-                dataKey="events" 
-                stroke="#3b82f6" 
+              <Line
+                type="monotone"
+                dataKey="events"
+                stroke="#3b82f6"
                 strokeWidth={3}
                 name="Events"
               />
-              <Line 
-                type="monotone" 
-                dataKey="users" 
-                stroke="#8b5cf6" 
+              <Line
+                type="monotone"
+                dataKey="users"
+                stroke="#8b5cf6"
                 strokeWidth={3}
                 name="Users"
               />
@@ -176,14 +211,14 @@ export default function AdminDashboard() {
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={eventStatusData}
+                data={eventStatusDistribution}
                 cx="50%"
                 cy="50%"
                 innerRadius={60}
                 outerRadius={120}
                 dataKey="value"
               >
-                {eventStatusData.map((entry, index) => (
+                {eventStatusDistribution?.map((entry: any, index: number) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
@@ -191,10 +226,10 @@ export default function AdminDashboard() {
             </PieChart>
           </ResponsiveContainer>
           <div className="flex justify-center gap-4 mt-4">
-            {eventStatusData.map((item) => (
+            {eventStatusDistribution?.map((item: any) => (
               <div key={item.name} className="flex items-center gap-2">
-                <div 
-                  className="w-3 h-3 rounded-full" 
+                <div
+                  className="w-3 h-3 rounded-full"
                   style={{ backgroundColor: item.color }}
                 />
                 <span className="text-sm text-gray-600">{item.name}</span>
@@ -208,7 +243,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DashboardCard title="User Role Distribution">
           <div className="space-y-4">
-            {userRoleData.map((role) => (
+            {userRoleDistribution?.map((role: any) => (
               <div key={role.role} className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="font-medium text-gray-900">{role.role}</span>
@@ -221,7 +256,13 @@ export default function AdminDashboard() {
                     )}
                   </div>
                 </div>
-                <Progress value={(role.count / 3086) * 100} className="h-2" />
+                <Progress
+                  value={
+                    (role.count / (keyMetrics?.totalUsers?.numericValue || 1)) *
+                    100
+                  }
+                  className="h-2"
+                />
               </div>
             ))}
           </div>
@@ -229,8 +270,13 @@ export default function AdminDashboard() {
 
         <DashboardCard title="System Alerts">
           <div className="space-y-3">
-            {systemAlerts.map((alert) => (
-              <div key={alert.id} className={`p-3 rounded-lg border ${getSeverityColor(alert.severity)}`}>
+            {systemAlerts?.map((alert: any) => (
+              <div
+                key={alert.id}
+                className={`p-3 rounded-lg border ${getSeverityColor(
+                  alert.severity
+                )}`}
+              >
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
@@ -249,56 +295,58 @@ export default function AdminDashboard() {
 
       {/* Recent Activity & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DashboardCard title="Recent System Activity">
+        <DashboardCard title="Recent Activity">
           <div className="space-y-4">
-            {recentActivities.map((activity) => (
-              <div key={activity.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="p-2 bg-white rounded-lg">
+            {recentActivities?.map((activity: any) => (
+              <div key={activity.id} className="flex items-center gap-3">
+                <div className="p-2 bg-gray-100 rounded-full">
                   {getActivityIcon(activity.type)}
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                  <p className="text-xs text-gray-600">by {activity.user} • {activity.time}</p>
+                <div>
+                  <p className="text-sm font-medium">
+                    {activity.action} by{' '}
+                    <span className="font-semibold">{activity.user}</span>
+                  </p>
+                  <p className="text-xs text-gray-500">{activity.time}</p>
                 </div>
               </div>
             ))}
           </div>
-          <Link to="/audit-logs">
-            <Button variant="outline" size="sm" className="w-full mt-4">
-              View Full Activity Log
-            </Button>
-          </Link>
         </DashboardCard>
 
         <DashboardCard title="Quick Actions">
-          <div className="grid grid-cols-2 gap-3">
-            <Link to="/users" className="block">
-              <Button variant="outline" className="w-full h-20 flex-col gap-2">
-                <Users className="w-6 h-6" />
-                <span className="text-sm">Manage Users</span>
-              </Button>
+          <div className="grid grid-cols-2 gap-4">
+            <Link
+              to="/users/add"
+              className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
+            >
+              <Users className="w-8 h-8 mx-auto mb-2 text-gray-600" />
+              <span className="font-medium">Add User</span>
             </Link>
-            <Link to="/organizers" className="block">
-              <Button variant="outline" className="w-full h-20 flex-col gap-2">
-                <Building2 className="w-6 h-6" />
-                <span className="text-sm">Organizers</span>
-              </Button>
+            <Link
+              to="/organizers/add"
+              className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
+            >
+              <Building2 className="w-8 h-8 mx-auto mb-2 text-gray-600" />
+              <span className="font-medium">Add Organizer</span>
             </Link>
-            <Link to="/reports" className="block">
-              <Button variant="outline" className="w-full h-20 flex-col gap-2">
-                <BarChart3 className="w-6 h-6" />
-                <span className="text-sm">Reports</span>
-              </Button>
+            <Link
+              to="/reports"
+              className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
+            >
+              <BarChart3 className="w-8 h-8 mx-auto mb-2 text-gray-600" />
+              <span className="font-medium">View Reports</span>
             </Link>
-            <Link to="/settings" className="block">
-              <Button variant="outline" className="w-full h-20 flex-col gap-2">
-                <Shield className="w-6 h-6" />
-                <span className="text-sm">Security</span>
-              </Button>
+            <Link
+              to="/audit-logs"
+              className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
+            >
+              <Shield className="w-8 h-8 mx-auto mb-2 text-gray-600" />
+              <span className="font-medium">Audit Logs</span>
             </Link>
           </div>
         </DashboardCard>
       </div>
     </div>
-  );
+  )
 }

@@ -1,4 +1,5 @@
-import { useLocation, NavLink } from "react-router-dom";
+import { useLocation, NavLink } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import {
   Calendar,
   Users,
@@ -12,7 +13,8 @@ import {
   ClipboardList,
   Ticket,
   UserCheck,
-} from "lucide-react";
+  Trash2,
+} from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -23,39 +25,129 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar";
-import { useAuth } from "@/hooks/use-auth.tsx";
+} from '@/components/ui/sidebar'
+import { Badge } from '@/components/ui/badge'
+import { useAuth } from '@/hooks/use-auth.tsx'
+import api from '@/lib/api'
 
 const allItems = [
-  { title: "Dashboard", url: "/dashboard", icon: Activity, roles: ["admin", "organizer", "usher"] },
-  { title: "Events", url: "/dashboard/events", icon: Calendar, roles: ["admin", "organizer"] },
-  { title: "Create Event", url: "/dashboard/events/create", icon: ClipboardList, roles: ["organizer"] },
-  { title: "Users", url: "/dashboard/users", icon: Users, roles: ["admin"] },
-  { title: "Organizers", url: "/dashboard/organizers", icon: Building2, roles: ["admin"] },
-  { title: "Locate Badges", url: "/dashboard/locate-badges", icon: MapPin, roles: ["admin", "usher"] },
-  { title: "Badge Designer", url: "/apps/badge-designer", icon: ClipboardList, roles: ["admin", "organizer"] },
-  { title: "Messages", url: "/dashboard/messages", icon: MessageSquare, roles: ["admin", "organizer"] },
-  { title: "Event Analytics", url: "/dashboard/reports", icon: BarChart, roles: ["organizer"] },
-  { title: "Attendee Check-in", url: "/dashboard/check-in", icon: UserCheck, roles: ["usher"] },
-  { title: "My Tickets", url: "/dashboard/tickets", icon: Ticket, roles: ["attendee"] },
-  { title: "System Logs", url: "/dashboard/audit-logs", icon: Shield, roles: ["admin"] },
-  { title: "Settings", url: "/dashboard/settings", icon: Settings, roles: ["admin", "organizer"] },
-];
+  {
+    title: 'Dashboard',
+    url: '/dashboard',
+    icon: Activity,
+    roles: ['admin', 'organizer', 'usher'],
+  },
+  {
+    title: 'Events',
+    url: '/dashboard/events',
+    icon: Calendar,
+    roles: ['admin', 'organizer'],
+  },
+  {
+    title: 'Create Event',
+    url: '/dashboard/events/create',
+    icon: ClipboardList,
+    roles: ['organizer'],
+  },
+  { title: 'Users', url: '/dashboard/users', icon: Users, roles: ['admin'] },
+  {
+    title: 'Organizers',
+    url: '/dashboard/organizers',
+    icon: Building2,
+    roles: ['admin'],
+  },
+  {
+    title: 'Locate Badges',
+    url: '/dashboard/locate-badges',
+    icon: MapPin,
+    roles: ['admin', 'usher'],
+  },
+  {
+    title: 'Badge Designer',
+    url: '/apps/badge-designer',
+    icon: ClipboardList,
+    roles: ['admin', 'organizer'],
+  },
+  {
+    title: 'Messages',
+    url: '/dashboard/messages',
+    icon: MessageSquare,
+    roles: ['admin', 'organizer'],
+  },
+  {
+    title: 'Event Analytics',
+    url: '/dashboard/reports',
+    icon: BarChart,
+    roles: ['organizer'],
+  },
+  {
+    title: 'Attendee Check-in',
+    url: '/dashboard/check-in',
+    icon: UserCheck,
+    roles: ['usher'],
+  },
+  {
+    title: 'My Tickets',
+    url: '/dashboard/tickets',
+    icon: Ticket,
+    roles: ['attendee'],
+  },
+  {
+    title: 'System Logs',
+    url: '/dashboard/audit-logs',
+    icon: Shield,
+    roles: ['admin'],
+  },
+  { title: 'Trash', url: '/dashboard/trash', icon: Trash2, roles: ['admin'] },
+  {
+    title: 'Settings',
+    url: '/dashboard/settings',
+    icon: Settings,
+    roles: ['admin', 'organizer'],
+  },
+]
 
 export function AppSidebar() {
-  const { state } = useSidebar();
-  const { user } = useAuth();
-  const isCollapsed = state === "collapsed";
+  const { state } = useSidebar()
+  const { user } = useAuth()
+  const isCollapsed = state === 'collapsed'
+  const [trashCount, setTrashCount] = useState(0)
 
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
     isActive
-      ? "bg-gradient-to-r from-blue-600 to-purple-600 text-text-blue-600 font-semibold shadow-lg"
-      : "text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-md transition-all duration-200 ease-in-out";
+      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-text-blue-600 font-semibold shadow-lg'
+      : 'text-slate-600 hover:bg-white hover:text-blue-600 hover:shadow-md transition-all duration-200 ease-in-out'
 
-  const filteredItems = allItems.filter(item => user && item.roles.includes(user.role));
+  const filteredItems = allItems.filter(
+    (item) => user && item.roles.includes(user.role)
+  )
+
+  // Fetch trash count for admin users
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      const fetchTrashCount = async () => {
+        try {
+          const response = await api.get('/trash')
+          setTrashCount(response.data.total_items || 0)
+        } catch (error) {
+          console.error('Failed to fetch trash count:', error)
+        }
+      }
+
+      fetchTrashCount()
+      // Refresh trash count every 30 seconds
+      const interval = setInterval(fetchTrashCount, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [user?.role])
 
   return (
-    <Sidebar className={`bg-slate-50 border-r border-slate-200 ${isCollapsed ? "w-14" : "w-64"}`} collapsible="icon">
+    <Sidebar
+      className={`bg-slate-50 border-r border-slate-200 ${
+        isCollapsed ? 'w-14' : 'w-64'
+      }`}
+      collapsible="icon"
+    >
       <div className="p-4 border-b border-slate-200">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -64,7 +156,9 @@ export function AppSidebar() {
           {!isCollapsed && (
             <div>
               <h2 className="font-bold text-gray-800 text-lg">VEMS</h2>
-              <p className="text-xs text-gray-500 font-medium">Event Management</p>
+              <p className="text-xs text-gray-500 font-medium">
+                Event Management
+              </p>
             </div>
           )}
         </div>
@@ -73,7 +167,7 @@ export function AppSidebar() {
       <SidebarContent className="flex-1 overflow-y-auto">
         <SidebarGroup>
           <SidebarGroupLabel className="text-slate-500 text-xs uppercase tracking-wider font-semibold px-4 pt-4 pb-2">
-            {!isCollapsed ? "Navigation" : ""}
+            {!isCollapsed ? 'Navigation' : ''}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1 px-2">
@@ -82,11 +176,29 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
-                      end={item.url === "/dashboard"}
+                      end={item.url === '/dashboard'}
                       className={getNavCls}
                     >
-                      <item.icon className="w-5 h-5 flex-shrink-0" />
-                      {!isCollapsed && <span className="ml-3 font-medium">{item.title}</span>}
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center">
+                          <item.icon className="w-5 h-5 flex-shrink-0" />
+                          {!isCollapsed && (
+                            <span className="ml-3 font-medium">
+                              {item.title}
+                            </span>
+                          )}
+                        </div>
+                        {!isCollapsed &&
+                          item.title === 'Trash' &&
+                          trashCount > 0 && (
+                            <Badge
+                              variant="destructive"
+                              className="ml-2 text-xs"
+                            >
+                              {trashCount}
+                            </Badge>
+                          )}
+                      </div>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -96,5 +208,5 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
     </Sidebar>
-  );
+  )
 }

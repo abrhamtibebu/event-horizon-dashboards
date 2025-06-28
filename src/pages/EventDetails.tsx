@@ -1,22 +1,44 @@
-import { useState } from "react";
-import { useParams, Link, Navigate } from "react-router-dom";
-import { 
-  Calendar, Users, MapPin, Clock, Mail, Phone, MessageSquare, 
-  Download, Printer, QrCode, UserPlus, Plus, Edit, Settings,
-  CheckCircle, XCircle, Filter, Search, MoreHorizontal, Send,
-  FileText, BarChart3, Upload, Star, Shield, Award
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { DashboardCard } from "@/components/DashboardCard";
+import { useState, useEffect } from 'react'
+import { useParams, Link, Navigate } from 'react-router-dom'
+import {
+  Calendar,
+  Users,
+  MapPin,
+  Clock,
+  Mail,
+  Phone,
+  MessageSquare,
+  Download,
+  Printer,
+  QrCode,
+  UserPlus,
+  Plus,
+  Edit,
+  Settings,
+  CheckCircle,
+  XCircle,
+  Filter,
+  Search,
+  MoreHorizontal,
+  Send,
+  FileText,
+  BarChart3,
+  Upload,
+  Star,
+  Shield,
+  Award,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { DashboardCard } from '@/components/DashboardCard'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -24,7 +46,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from '@/components/ui/table'
 import {
   Dialog,
   DialogContent,
@@ -33,137 +55,123 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import { events as allEvents } from "./Events";
-
-const attendees = [
-  {
-    id: "att_1",
-    name: "Sarah Johnson",
-    email: "sarah@techcorp.com",
-    phone: "+1 (555) 123-4567",
-    company: "TechCorp Inc.",
-    jobTitle: "Senior Developer",
-    country: "United States",
-    guestType: "Speaker",
-    registeredAt: "2024-06-15",
-    checkedIn: true,
-    profileImage: "https://images.unsplash.com/photo-1494790108755-2616b612b3fd?w=100"
-  },
-  {
-    id: "att_2",
-    name: "Michael Chen",
-    email: "michael@innovate.com",
-    phone: "+1 (555) 234-5678",
-    company: "Innovate Solutions",
-    jobTitle: "CTO",
-    country: "Canada",
-    guestType: "VIP",
-    registeredAt: "2024-06-20",
-    checkedIn: false,
-    profileImage: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100"
-  },
-  {
-    id: "att_3",
-    name: "Emily Rodriguez",
-    email: "emily@startup.io",
-    phone: "+1 (555) 345-6789",
-    company: "StartupIO",
-    jobTitle: "Product Manager",
-    country: "Mexico",
-    guestType: "Visitor",
-    registeredAt: "2024-06-25",
-    checkedIn: true,
-    profileImage: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100"
-  }
-];
-
-const ushers = [
-  {
-    id: "ush_1",
-    name: "David Wilson",
-    email: "david.wilson@vems.com",
-    phone: "+1 (555) 456-7890",
-    tasks: ["Registration Desk", "Main Hall"],
-    availability: "available"
-  },
-  {
-    id: "ush_2",
-    name: "Lisa Brown",
-    email: "lisa.brown@vems.com",
-    phone: "+1 (555) 567-8901",
-    tasks: ["VIP Lounge", "Speaker Green Room"],
-    availability: "busy"
-  }
-];
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { toast } from 'sonner'
+import api from '@/lib/api'
 
 export default function EventDetails() {
-  const { eventId } = useParams();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [guestTypeFilter, setGuestTypeFilter] = useState("all");
-  const [checkedInFilter, setCheckedInFilter] = useState("all");
-  const [isAssignUsherDialogOpen, setIsAssignUsherDialogOpen] = useState(false);
-  const [isNewConversationDialogOpen, setIsNewConversationDialogOpen] = useState(false);
-  const [isCommunicationDialogOpen, setIsCommunicationDialogOpen] = useState(false);
+  const { eventId } = useParams()
+  const [searchTerm, setSearchTerm] = useState('')
+  const [guestTypeFilter, setGuestTypeFilter] = useState('all')
+  const [checkedInFilter, setCheckedInFilter] = useState('all')
+  const [isAssignUsherDialogOpen, setIsAssignUsherDialogOpen] = useState(false)
+  const [isNewConversationDialogOpen, setIsNewConversationDialogOpen] =
+    useState(false)
+  const [isCommunicationDialogOpen, setIsCommunicationDialogOpen] =
+    useState(false)
 
-  const eventData = allEvents.find(event => event.id.toString() === eventId);
+  const [eventData, setEventData] = useState<any>(null)
+  const [eventLoading, setEventLoading] = useState(true)
+  const [eventError, setEventError] = useState<string | null>(null)
+  const [attendees, setAttendees] = useState<any[]>([])
+  const [attendeesLoading, setAttendeesLoading] = useState(true)
+  const [attendeesError, setAttendeesError] = useState<string | null>(null)
 
-  if (!eventData) {
-    return <Navigate to="/dashboard/events" replace />;
+  // Fetch event details
+  useEffect(() => {
+    if (!eventId) return
+    setEventLoading(true)
+    setEventError(null)
+    api
+      .get(`/events/${eventId}`)
+      .then((res) => setEventData(res.data))
+      .catch((err) => setEventError('Failed to fetch event details.'))
+      .finally(() => setEventLoading(false))
+  }, [eventId])
+
+  // Fetch attendees
+  useEffect(() => {
+    if (!eventId) return
+    setAttendeesLoading(true)
+    setAttendeesError(null)
+    api
+      .get(`/events/${eventId}/attendees`)
+      .then((res) => setAttendees(res.data))
+      .catch((err) => setAttendeesError('Failed to fetch attendees.'))
+      .finally(() => setAttendeesLoading(false))
+  }, [eventId])
+
+  if (eventLoading) {
+    return <div className="text-center py-12">Loading event details...</div>
+  }
+  if (eventError || !eventData) {
+    return <Navigate to="/dashboard/events" replace />
   }
 
   const getGuestTypeColor = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "speaker": return "bg-purple-100 text-purple-800 border-purple-200";
-      case "vip": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "staff": return "bg-blue-100 text-blue-800 border-blue-200";
-      case "visitor": return "bg-gray-100 text-gray-800 border-gray-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
+    switch (type?.toLowerCase()) {
+      case 'speaker':
+        return 'bg-purple-100 text-purple-800 border-purple-200'
+      case 'vip':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'staff':
+        return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'visitor':
+        return 'bg-gray-100 text-gray-800 border-gray-200'
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200'
     }
-  };
+  }
 
   const getGuestTypeIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case "speaker": return <Star className="w-3 h-3" />;
-      case "vip": return <Award className="w-3 h-3" />;
-      case "staff": return <Shield className="w-3 h-3" />;
-      default: return <Users className="w-3 h-3" />;
+    switch (type?.toLowerCase()) {
+      case 'speaker':
+        return <Star className="w-3 h-3" />
+      case 'vip':
+        return <Award className="w-3 h-3" />
+      case 'staff':
+        return <Shield className="w-3 h-3" />
+      default:
+        return <Users className="w-3 h-3" />
     }
-  };
+  }
 
-  const filteredAttendees = attendees.filter(attendee => {
-    const matchesSearch = attendee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         attendee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         attendee.company.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesGuestType = guestTypeFilter === "all" || attendee.guestType.toLowerCase() === guestTypeFilter;
-    const matchesCheckedIn = checkedInFilter === "all" || 
-                            (checkedInFilter === "checked-in" && attendee.checkedIn) ||
-                            (checkedInFilter === "not-checked-in" && !attendee.checkedIn);
-    return matchesSearch && matchesGuestType && matchesCheckedIn;
-  });
+  const filteredAttendees = attendees.filter((attendee) => {
+    const matchesSearch =
+      attendee.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      attendee.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      attendee.company?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesGuestType =
+      guestTypeFilter === 'all' ||
+      attendee.guestType?.toLowerCase() === guestTypeFilter
+    const matchesCheckedIn =
+      checkedInFilter === 'all' ||
+      (checkedInFilter === 'checked-in' && attendee.checkedIn) ||
+      (checkedInFilter === 'not-checked-in' && !attendee.checkedIn)
+    return matchesSearch && matchesGuestType && matchesCheckedIn
+  })
 
-  const generateBadge = (attendee: typeof attendees[0]) => {
-    toast.success(`Badge generated for ${attendee.name}`);
+  const generateBadge = (attendee: (typeof attendees)[0]) => {
+    toast.success(`Badge generated for ${attendee.name}`)
     // In a real application, this would generate a PDF badge
-  };
+  }
 
   const exportCSV = () => {
-    toast.success("Attendee data exported to CSV");
+    toast.success('Attendee data exported to CSV')
     // In a real application, this would generate and download a CSV file
-  };
+  }
 
   const generateReport = () => {
-    toast.success("Event summary report generated");
+    toast.success('Event summary report generated')
     // In a real application, this would generate a comprehensive report
-  };
+  }
 
   const exportLogs = () => {
-    toast.success("Event logs exported");
+    toast.success('Event logs exported')
     // In a real application, this would export audit logs
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -171,7 +179,12 @@ export default function EventDetails() {
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <Link to="/dashboard/events" className="text-yellow-500 hover:text-yellow-600 text-sm">← Back to Events</Link>
+            <Link
+              to="/dashboard/events"
+              className="text-yellow-500 hover:text-yellow-600 text-sm"
+            >
+              ← Back to Events
+            </Link>
           </div>
           <h1 className="text-3xl font-bold text-gray-900">{eventData.name}</h1>
           <p className="text-gray-600 mt-1">Event ID: {eventData.id}</p>
@@ -206,14 +219,18 @@ export default function EventDetails() {
                   <Calendar className="w-5 h-5 text-blue-600" />
                   <div>
                     <p className="text-sm text-gray-600">Date</p>
-                    <p className="font-medium">{eventData.startDate} - {eventData.endDate}</p>
+                    <p className="font-medium">
+                      {eventData.startDate} - {eventData.endDate}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <Clock className="w-5 h-5 text-green-600" />
                   <div>
                     <p className="text-sm text-gray-600">Time</p>
-                    <p className="font-medium">{eventData.startTime} - {eventData.endTime}</p>
+                    <p className="font-medium">
+                      {eventData.startTime} - {eventData.endTime}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -227,7 +244,9 @@ export default function EventDetails() {
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-gray-600">Description</p>
-                  <p className="font-medium text-gray-900 mt-1">{eventData.description}</p>
+                  <p className="font-medium text-gray-900 mt-1">
+                    {eventData.description}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Organizer</p>
@@ -245,15 +264,21 @@ export default function EventDetails() {
           <DashboardCard title="Quick Stats" className="text-center">
             <div className="space-y-4">
               <div>
-                <div className="text-3xl font-bold text-blue-600">{eventData.registeredAttendees}</div>
+                <div className="text-3xl font-bold text-blue-600">
+                  {eventData.registeredAttendees}
+                </div>
                 <div className="text-sm text-gray-600">Registered</div>
               </div>
               <div>
-                <div className="text-3xl font-bold text-green-600">{eventData.checkedInAttendees}</div>
+                <div className="text-3xl font-bold text-green-600">
+                  {eventData.checkedInAttendees}
+                </div>
                 <div className="text-sm text-gray-600">Checked In</div>
               </div>
               <div>
-                <div className="text-3xl font-bold text-gray-600">{eventData.maxGuests}</div>
+                <div className="text-3xl font-bold text-gray-600">
+                  {eventData.maxGuests}
+                </div>
                 <div className="text-sm text-gray-600">Max Capacity</div>
               </div>
             </div>
@@ -261,7 +286,10 @@ export default function EventDetails() {
 
           <DashboardCard title="Quick Actions">
             <div className="space-y-2">
-              <Dialog open={isAssignUsherDialogOpen} onOpenChange={setIsAssignUsherDialogOpen}>
+              <Dialog
+                open={isAssignUsherDialogOpen}
+                onOpenChange={setIsAssignUsherDialogOpen}
+              >
                 <DialogTrigger asChild>
                   <Button variant="outline" className="w-full justify-start">
                     <UserPlus className="w-4 h-4 mr-2" />
@@ -294,7 +322,10 @@ export default function EventDetails() {
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsAssignUsherDialogOpen(false)}>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsAssignUsherDialogOpen(false)}
+                    >
                       Cancel
                     </Button>
                     <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
@@ -304,7 +335,10 @@ export default function EventDetails() {
                 </DialogContent>
               </Dialog>
 
-              <Dialog open={isNewConversationDialogOpen} onOpenChange={setIsNewConversationDialogOpen}>
+              <Dialog
+                open={isNewConversationDialogOpen}
+                onOpenChange={setIsNewConversationDialogOpen}
+              >
                 <DialogTrigger asChild>
                   <Button variant="outline" className="w-full justify-start">
                     <MessageSquare className="w-4 h-4 mr-2" />
@@ -326,8 +360,12 @@ export default function EventDetails() {
                           <SelectValue placeholder="Select recipients" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all-attendees">All Attendees</SelectItem>
-                          <SelectItem value="speakers">Speakers Only</SelectItem>
+                          <SelectItem value="all-attendees">
+                            All Attendees
+                          </SelectItem>
+                          <SelectItem value="speakers">
+                            Speakers Only
+                          </SelectItem>
                           <SelectItem value="vips">VIP Guests</SelectItem>
                           <SelectItem value="ushers">Ushers</SelectItem>
                         </SelectContent>
@@ -343,7 +381,10 @@ export default function EventDetails() {
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsNewConversationDialogOpen(false)}>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsNewConversationDialogOpen(false)}
+                    >
                       Cancel
                     </Button>
                     <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
@@ -354,7 +395,10 @@ export default function EventDetails() {
                 </DialogContent>
               </Dialog>
 
-              <Dialog open={isCommunicationDialogOpen} onOpenChange={setIsCommunicationDialogOpen}>
+              <Dialog
+                open={isCommunicationDialogOpen}
+                onOpenChange={setIsCommunicationDialogOpen}
+              >
                 <DialogTrigger asChild>
                   <Button variant="outline" className="w-full justify-start">
                     <Phone className="w-4 h-4 mr-2" />
@@ -390,8 +434,12 @@ export default function EventDetails() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Attendees</SelectItem>
-                          <SelectItem value="checked-in">Checked-in Only</SelectItem>
-                          <SelectItem value="not-checked-in">Not Checked-in</SelectItem>
+                          <SelectItem value="checked-in">
+                            Checked-in Only
+                          </SelectItem>
+                          <SelectItem value="not-checked-in">
+                            Not Checked-in
+                          </SelectItem>
                           <SelectItem value="speakers">Speakers</SelectItem>
                           <SelectItem value="vips">VIPs</SelectItem>
                         </SelectContent>
@@ -403,7 +451,10 @@ export default function EventDetails() {
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsCommunicationDialogOpen(false)}>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsCommunicationDialogOpen(false)}
+                    >
                       Cancel
                     </Button>
                     <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
@@ -478,15 +529,23 @@ export default function EventDetails() {
                         className="w-10 h-10 rounded-full object-cover"
                       />
                       <div>
-                        <div className="font-medium text-gray-900">{attendee.name}</div>
-                        <div className="text-sm text-gray-500">{attendee.country}</div>
+                        <div className="font-medium text-gray-900">
+                          {attendee.name}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {attendee.country}
+                        </div>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium text-gray-900">{attendee.company}</div>
-                      <div className="text-sm text-gray-500">{attendee.jobTitle}</div>
+                      <div className="font-medium text-gray-900">
+                        {attendee.company}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {attendee.jobTitle}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -516,33 +575,33 @@ export default function EventDetails() {
                       ) : (
                         <XCircle className="w-4 h-4 text-red-600" />
                       )}
-                      <span className={`text-sm ${attendee.checkedIn ? 'text-green-600' : 'text-red-600'}`}>
+                      <span
+                        className={`text-sm ${
+                          attendee.checkedIn ? 'text-green-600' : 'text-red-600'
+                        }`}
+                      >
                         {attendee.checkedIn ? 'Checked In' : 'Not Checked In'}
                       </span>
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={() => generateBadge(attendee)}
                         title="Print Badge"
                       >
                         <Printer className="w-4 h-4" />
                       </Button>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         title="Generate QR Code"
                       >
                         <QrCode className="w-4 h-4" />
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        title="Send Message"
-                      >
+                      <Button variant="outline" size="sm" title="Send Message">
                         <Mail className="w-4 h-4" />
                       </Button>
                     </div>
@@ -558,8 +617,10 @@ export default function EventDetails() {
       <DashboardCard title="Assigned Ushers">
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <p className="text-gray-600">Manage ushering staff for this event</p>
-            <Button 
+            <p className="text-gray-600">
+              Manage ushering staff for this event
+            </p>
+            <Button
               variant="outline"
               onClick={() => setIsAssignUsherDialogOpen(true)}
             >
@@ -567,22 +628,33 @@ export default function EventDetails() {
               Add Usher
             </Button>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {ushers.map((usher) => (
-              <div key={usher.id} className="p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50">
+              <div
+                key={usher.id}
+                className="p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50"
+              >
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h4 className="font-medium text-gray-900">{usher.name}</h4>
                     <p className="text-sm text-gray-600">{usher.email}</p>
                     <p className="text-sm text-gray-600">{usher.phone}</p>
                   </div>
-                  <Badge className={usher.availability === 'available' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                  <Badge
+                    className={
+                      usher.availability === 'available'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }
+                  >
                     {usher.availability}
                   </Badge>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-700 mb-1">Assigned Tasks:</p>
+                  <p className="text-sm font-medium text-gray-700 mb-1">
+                    Assigned Tasks:
+                  </p>
                   <div className="flex flex-wrap gap-1">
                     {usher.tasks.map((task, index) => (
                       <Badge key={index} variant="outline" className="text-xs">
@@ -607,5 +679,5 @@ export default function EventDetails() {
         </div>
       </DashboardCard>
     </div>
-  );
+  )
 }

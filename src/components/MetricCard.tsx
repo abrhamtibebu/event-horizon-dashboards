@@ -1,33 +1,45 @@
-
-import { ReactNode } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { ReactNode } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
+import { Link } from 'react-router-dom'
 
 interface MetricCardProps {
-  title: string;
-  value: string | number;
-  icon: ReactNode;
+  title: string
+  value: string | number
+  icon: ReactNode
   trend?: {
-    value: number;
-    isPositive: boolean;
-  };
-  className?: string;
+    value: number
+    isPositive: boolean
+  }
+  className?: string
+  link?: string
 }
 
-export function MetricCard({ title, value, icon, trend, className }: MetricCardProps) {
-  return (
-    <Card className={cn("hover:shadow-md transition-all duration-200", className)}>
+export function MetricCard({
+  title,
+  value,
+  icon,
+  trend,
+  className,
+  link,
+}: MetricCardProps) {
+  const cardContent = (
+    <Card
+      className={cn('hover:shadow-md transition-all duration-200', className)}
+    >
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">{title}</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
             {trend && (
-              <p className={cn(
-                "text-sm mt-1",
-                trend.isPositive ? "text-green-600" : "text-red-600"
-              )}>
-                {trend.isPositive ? "↗" : "↘"} {Math.abs(trend.value)}%
+              <p
+                className={cn(
+                  'text-sm mt-1',
+                  trend.isPositive ? 'text-green-600' : 'text-red-600'
+                )}
+              >
+                {trend.isPositive ? '↗' : '↘'} {Math.abs(trend.value)}%
               </p>
             )}
           </div>
@@ -37,5 +49,15 @@ export function MetricCard({ title, value, icon, trend, className }: MetricCardP
         </div>
       </CardContent>
     </Card>
-  );
+  )
+
+  if (link) {
+    return (
+      <Link to={link} className="block">
+        {cardContent}
+      </Link>
+    )
+  }
+
+  return cardContent
 }
