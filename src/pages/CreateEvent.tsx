@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Calendar,
@@ -8,7 +8,6 @@ import {
   Save,
   X,
   Tag,
-  Building2,
   FileText,
   Image,
 } from 'lucide-react'
@@ -22,9 +21,19 @@ import { DateRange } from 'react-date-range'
 import 'react-date-range/dist/styles.css'
 import 'react-date-range/dist/theme/default.css'
 import '@/index.css'
+import { useAuth } from '@/hooks/use-auth'
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from '@/components/ui/select'
 
 export default function CreateEvent() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const imageInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -41,6 +50,7 @@ export default function CreateEvent() {
     event_image: null as File | null,
     requirements: '',
     agenda: '',
+    guest_types: '',
   })
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -76,6 +86,10 @@ export default function CreateEvent() {
   })
 
   useEffect(() => {
+    if (user && user.role === 'organizer' && user.organizer_id) {
+      handleInputChange('organizer_id', user.organizer_id)
+    }
+
     const fetchData = async (
       endpoint: string,
       setData: Function,
@@ -97,7 +111,12 @@ export default function CreateEvent() {
       }
     }
 
-    fetchData('/organizers', setOrganizers, 'organizers', 'organizers')
+    if (user?.role !== 'organizer') {
+      fetchData('/organizers', setOrganizers, 'organizers', 'organizers')
+    } else {
+      setLoading((prev) => ({ ...prev, organizers: false }))
+    }
+
     fetchData('/event-types', setEventTypes, 'eventTypes', 'eventTypes')
     fetchData(
       '/event-categories',
@@ -105,7 +124,7 @@ export default function CreateEvent() {
       'eventCategories',
       'eventCategories'
     )
-  }, [])
+  }, [user])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -118,6 +137,14 @@ export default function CreateEvent() {
       const reader = new FileReader()
       reader.onloadend = () => setImagePreview(reader.result as string)
       reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveImage = () => {
+    setFormData((prev) => ({ ...prev, event_image: null }))
+    setImagePreview(null)
+    if (imageInputRef.current) {
+      imageInputRef.current.value = ''
     }
   }
 
@@ -138,13 +165,25 @@ export default function CreateEvent() {
       if (formData.event_image) {
         payload = new FormData()
         Object.entries(processedFormData).forEach(([key, value]) => {
-          if (key === 'event_image' && value)
+          if (key === 'event_image' && value) {
             payload.append('event_image', value)
-          else payload.append(key, value as any)
+          } else if (key === 'guest_types') {
+            const guestTypesArr = (value as string)
+              .split(',')
+              .map((s: string) => s.trim())
+              .filter(Boolean)
+            guestTypesArr.forEach((type) => payload.append('guest_types[]', type))
+          } else {
+            payload.append(key, value as any)
+          }
         })
         headers = { 'Content-Type': 'multipart/form-data' }
       } else {
-        payload = { ...processedFormData }
+        const guestTypesArr = (processedFormData.guest_types as string)
+          .split(',')
+          .map((s: string) => s.trim())
+          .filter(Boolean)
+        payload = { ...processedFormData, guest_types: guestTypesArr }
       }
       await api.post('/events', payload, { headers })
       toast.success('Event created successfully!')
@@ -249,29 +288,37 @@ export default function CreateEvent() {
                   htmlFor="organizer_id"
                   className="flex items-center gap-2 text-gray-700"
                 >
-                  <Building2 className="w-4 h-4" /> Organizer
+                  <Tag className="w-4 h-4" /> Organizer
                 </Label>
-                <select
-                  id="organizer_id"
-                  value={formData.organizer_id}
-                  onChange={(e) =>
-                    handleInputChange('organizer_id', e.target.value)
-                  }
-                  disabled={loading.organizers}
-                  className="mt-1 w-full rounded border-gray-300 focus:ring-blue-500"
-                >
-                  {loading.organizers && <option>Loading...</option>}
-                  {error.organizers && (
-                    <option>Error loading organizers</option>
-                  )}
-                  {!loading.organizers &&
-                    !error.organizers &&
-                    organizers.map((org) => (
-                      <option key={org.id} value={org.id}>
-                        {org.name}
-                      </option>
-                    ))}
-                </select>
+                {user?.role === 'organizer' ? (
+                  <Input
+                    value={user.organizer?.name || ''}
+                    disabled
+                    className="mt-1"
+                  />
+                ) : (
+                  <Select
+                    value={formData.organizer_id}
+                    onValueChange={(value) => handleInputChange('organizer_id', value)}
+                    disabled={loading.organizers}
+                    required
+                  >
+                    <SelectTrigger className="mt-1 w-full" id="organizer_id">
+                      <SelectValue placeholder="Select an organizer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loading.organizers && <SelectItem value="" disabled>Loading...</SelectItem>}
+                      {error.organizers && <SelectItem value="" disabled>Error loading organizers</SelectItem>}
+                      {!loading.organizers &&
+                        !error.organizers &&
+                        organizers.map((org) => (
+                          <SelectItem key={org.id} value={org.id.toString()}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="md:col-span-2">
                 <Label
@@ -298,24 +345,23 @@ export default function CreateEvent() {
                 >
                   <Tag className="w-4 h-4" /> Event Type
                 </Label>
-                <select
-                  id="event_type_id"
-                  name="event_type_id"
+                <Select
                   value={formData.event_type_id}
-                  onChange={(e) =>
-                    handleInputChange('event_type_id', e.target.value)
-                  }
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring focus:ring-purple-200 focus:ring-opacity-50"
-                  required
+                  onValueChange={(value) => handleInputChange('event_type_id', value)}
                   disabled={loading.eventTypes}
+                  required
                 >
-                  <option value="">Select event type</option>
-                  {eventTypes.map((type: any) => (
-                    <option key={type.id} value={type.id}>
-                      {type.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="mt-1 w-full" id="event_type_id">
+                    <SelectValue placeholder="Select event type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {eventTypes.map((type: any) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        {type.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {error.eventTypes && (
                   <div className="text-xs text-red-500 mt-1">
                     {error.eventTypes}
@@ -329,24 +375,23 @@ export default function CreateEvent() {
                 >
                   <Tag className="w-4 h-4" /> Event Category
                 </Label>
-                <select
-                  id="event_category_id"
-                  name="event_category_id"
+                <Select
                   value={formData.event_category_id}
-                  onChange={(e) =>
-                    handleInputChange('event_category_id', e.target.value)
-                  }
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring focus:ring-purple-200 focus:ring-opacity-50"
-                  required
+                  onValueChange={(value) => handleInputChange('event_category_id', value)}
                   disabled={loading.eventCategories}
+                  required
                 >
-                  <option value="">Select event category</option>
-                  {eventCategories.map((cat: any) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="mt-1 w-full" id="event_category_id">
+                    <SelectValue placeholder="Select event category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {eventCategories.map((cat: any) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {error.eventCategories && (
                   <div className="text-xs text-red-500 mt-1">
                     {error.eventCategories}
@@ -388,6 +433,26 @@ export default function CreateEvent() {
                   className="mt-1"
                 />
               </div>
+              <div>
+                <Label
+                  htmlFor="guest_types"
+                  className="flex items-center gap-2 text-gray-700"
+                >
+                  <Users className="w-4 h-4" /> Guest Types
+                </Label>
+                <Input
+                  id="guest_types"
+                  value={formData.guest_types}
+                  onChange={(e) =>
+                    handleInputChange('guest_types', e.target.value)
+                  }
+                  placeholder="e.g. VIP, Regular, Staff"
+                  className="mt-1"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Comma-separated list of guest types.
+                </p>
+              </div>
               <div className="md:col-span-2">
                 <Label
                   htmlFor="event_image"
@@ -399,6 +464,7 @@ export default function CreateEvent() {
                   <input
                     type="file"
                     id="event_image"
+                    ref={imageInputRef}
                     accept="image/*"
                     onChange={handleImageUpload}
                     className="hidden"
@@ -415,15 +481,24 @@ export default function CreateEvent() {
                   </span>
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
-                  Upload an event image (PNG, JPG, SVG)
+                  Upload your event banner (PNG, JPG, SVG)
                 </p>
                 {imagePreview && (
-                  <div className="mt-2">
+                  <div className="mt-2 relative inline-block">
                     <img
                       src={imagePreview}
-                      alt="Event preview"
-                      className="h-16 rounded shadow border"
+                      alt="Event image preview"
+                      className="h-24 rounded shadow border"
                     />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -top-2 -right-2 rounded-full h-6 w-6"
+                      onClick={handleRemoveImage}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
               </div>

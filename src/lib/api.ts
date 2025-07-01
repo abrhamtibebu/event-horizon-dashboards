@@ -21,3 +21,18 @@ api.interceptors.request.use(
 )
 
 export default api
+
+export const getBadgeTemplates = (eventId: string) =>
+  api.get(`/events/${eventId}/badge-templates`)
+
+export const createBadgeTemplate = (eventId: string, data: { name: string, template_json: any }) =>
+  api.post(`/events/${eventId}/badge-templates`, data)
+
+export const updateBadgeTemplate = (eventId: string, templateId: string, data: { name?: string, template_json?: any }) =>
+  api.put(`/events/${eventId}/badge-templates/${templateId}`, data)
+
+export const deleteBadgeTemplate = (eventId: string, templateId: string) =>
+  api.delete(`/events/${eventId}/badge-templates/${templateId}`)
+
+export const getGlobalReport = () =>
+  api.get('/reports/summary')

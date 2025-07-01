@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import api from '@/lib/api'
-import { Star, Trash2, ArrowLeft, Pencil, Eye } from 'lucide-react'
+import { Star, Trash2, ArrowLeft, Pencil, Eye, X, Edit } from 'lucide-react'
 import { format } from 'date-fns'
 import {
   Dialog,
@@ -26,16 +26,22 @@ import {
   SelectItem,
   SelectValue,
 } from '@/components/ui/select'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function OrganizerProfile() {
   const { organizerId } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [organizer, setOrganizer] = useState<any>(null)
   const [contacts, setContacts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [auditLogs, setAuditLogs] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [createImagePreview, setCreateImagePreview] = useState<string | null>(
+    null
+  )
+  const createImageInputRef = useRef<HTMLInputElement>(null)
   const [createForm, setCreateForm] = useState<any>({
     name: '',
     description: '',
@@ -58,6 +64,9 @@ export default function OrganizerProfile() {
   const [editLoading, setEditLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [editOrganizerDialogOpen, setEditOrganizerDialogOpen] = useState(false)
+  const [editOrganizerForm, setEditOrganizerForm] = useState<any>(null)
+  const [editOrganizerLoading, setEditOrganizerLoading] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -74,8 +83,16 @@ export default function OrganizerProfile() {
           `/audit-logs?target_type=Organizer&target_id=${organizerId}`
         )
         setAuditLogs(logsRes.data.data || [])
-        const eventsRes = await api.get(`/organizers/${organizerId}/events`)
-        setEvents(eventsRes.data)
+
+        if (user?.role === 'admin') {
+          const eventsRes = await api.get(
+            `/admin/organizers/${organizerId}/events`
+          )
+          setEvents(eventsRes.data)
+        } else {
+          // Organizer-specific logic can go here if needed in the future
+          setEvents([]) // Or fetch organizer-specific events if an endpoint exists
+        }
       } catch (err) {
         toast.error('Failed to load organizer details')
       } finally {
@@ -83,7 +100,7 @@ export default function OrganizerProfile() {
       }
     }
     fetchData()
-  }, [organizerId])
+  }, [organizerId, user])
 
   const handleRemoveContact = async (userId: string) => {
     try {
@@ -113,7 +130,20 @@ export default function OrganizerProfile() {
 
   const handleCreateFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) setCreateForm((prev: any) => ({ ...prev, event_image: file }))
+    if (file) {
+      setCreateForm((prev: any) => ({ ...prev, event_image: file }))
+      const reader = new FileReader()
+      reader.onloadend = () => setCreateImagePreview(reader.result as string)
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveCreateImage = () => {
+    setCreateForm((prev: any) => ({ ...prev, event_image: null }))
+    setCreateImagePreview(null)
+    if (createImageInputRef.current) {
+      createImageInputRef.current.value = ''
+    }
   }
 
   const handleCreateEvent = async (e: React.FormEvent) => {
@@ -227,6 +257,34 @@ export default function OrganizerProfile() {
     }
   }
 
+  const handleEditOrganizerInput = (field: string, value: any) => {
+    setEditOrganizerForm((prev: any) => ({ ...prev, [field]: value }))
+  }
+
+  const handleEditOrganizerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setEditOrganizerLoading(true)
+    try {
+      await api.put(`/organizers/${organizerId}`, editOrganizerForm)
+      toast.success('Organizer updated successfully!')
+      setEditOrganizerDialogOpen(false)
+      const orgRes = await api.get(`/organizers`)
+      const org = orgRes.data.find(
+        (o: any) => String(o.id) === String(organizerId)
+      )
+      setOrganizer(org)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update organizer')
+    } finally {
+      setEditOrganizerLoading(false)
+    }
+  }
+
+  const openEditOrganizerDialog = () => {
+    setEditOrganizerForm(organizer)
+    setEditOrganizerDialogOpen(true)
+  }
+
   if (loading) return <div className="p-8 text-center">Loading...</div>
   if (!organizer)
     return (
@@ -239,7 +297,14 @@ export default function OrganizerProfile() {
         <ArrowLeft className="w-4 h-4 mr-2" /> Back
       </Button>
       <Card className="p-4 sm:p-6 mb-6">
-        <h2 className="text-2xl font-bold mb-2">{organizer.name}</h2>
+        <div className="flex justify-between items-start">
+          <h2 className="text-2xl font-bold mb-2">{organizer.name}</h2>
+          {user?.role === 'admin' && (
+            <Button variant="outline" onClick={openEditOrganizerDialog}>
+              <Edit className="w-4 h-4 mr-2" /> Edit Organizer
+            </Button>
+          )}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
             <Label>Email</Label>
@@ -320,175 +385,205 @@ export default function OrganizerProfile() {
       <Card className="p-4 sm:p-6 mt-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
           <h3 className="text-xl font-semibold">Events Managed</h3>
-          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                onClick={() => setCreateDialogOpen(true)}
-                variant="outline"
-              >
-                Create Event
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg w-full">
-              <DialogHeader>
-                <DialogTitle>Create Event</DialogTitle>
-                <DialogDescription>
-                  Fill in the event details below.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCreateEvent} className="space-y-4">
-                <Input
-                  placeholder="Event Name"
-                  value={createForm.name}
-                  onChange={(e) => handleCreateInput('name', e.target.value)}
-                  required
-                />
-                <Textarea
-                  placeholder="Description"
-                  value={createForm.description}
-                  onChange={(e) =>
-                    handleCreateInput('description', e.target.value)
-                  }
-                />
-                <div className="flex flex-col sm:flex-row gap-2">
+          {user?.role === 'admin' && (
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  onClick={() => setCreateDialogOpen(true)}
+                  variant="outline"
+                >
+                  Create Event
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg w-full">
+                <DialogHeader>
+                  <DialogTitle>Create Event</DialogTitle>
+                  <DialogDescription>
+                    Fill in the event details below.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreateEvent} className="space-y-4">
                   <Input
-                    type="date"
-                    placeholder="Start Date"
-                    value={createForm.start_date}
+                    placeholder="Event Name"
+                    value={createForm.name}
+                    onChange={(e) => handleCreateInput('name', e.target.value)}
+                    required
+                  />
+                  <Textarea
+                    placeholder="Description"
+                    value={createForm.description}
                     onChange={(e) =>
-                      handleCreateInput('start_date', e.target.value)
+                      handleCreateInput('description', e.target.value)
+                    }
+                  />
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Input
+                      type="date"
+                      placeholder="Start Date"
+                      value={createForm.start_date}
+                      onChange={(e) =>
+                        handleCreateInput('start_date', e.target.value)
+                      }
+                      required
+                    />
+                    <Input
+                      type="date"
+                      placeholder="End Date"
+                      value={createForm.end_date}
+                      onChange={(e) =>
+                        handleCreateInput('end_date', e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+                  <Input
+                    placeholder="Location"
+                    value={createForm.location}
+                    onChange={(e) =>
+                      handleCreateInput('location', e.target.value)
                     }
                     required
                   />
                   <Input
-                    type="date"
-                    placeholder="End Date"
-                    value={createForm.end_date}
+                    type="number"
+                    placeholder="Max Guests"
+                    value={createForm.max_guests}
                     onChange={(e) =>
-                      handleCreateInput('end_date', e.target.value)
+                      handleCreateInput('max_guests', e.target.value)
                     }
                     required
                   />
-                </div>
-                <Input
-                  placeholder="Location"
-                  value={createForm.location}
-                  onChange={(e) =>
-                    handleCreateInput('location', e.target.value)
-                  }
-                  required
-                />
-                <Input
-                  type="number"
-                  placeholder="Max Guests"
-                  value={createForm.max_guests}
-                  onChange={(e) =>
-                    handleCreateInput('max_guests', e.target.value)
-                  }
-                  required
-                />
-                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Input
+                      type="date"
+                      placeholder="Registration Start Date"
+                      value={createForm.registration_start_date}
+                      onChange={(e) =>
+                        handleCreateInput(
+                          'registration_start_date',
+                          e.target.value
+                        )
+                      }
+                      required
+                    />
+                    <Input
+                      type="date"
+                      placeholder="Registration End Date"
+                      value={createForm.registration_end_date}
+                      onChange={(e) =>
+                        handleCreateInput('registration_end_date', e.target.value)
+                      }
+                      required
+                    />
+                  </div>
                   <Input
-                    type="date"
-                    placeholder="Registration Start Date"
-                    value={createForm.registration_start_date}
+                    placeholder="Event Type ID"
+                    value={createForm.event_type_id}
                     onChange={(e) =>
-                      handleCreateInput(
-                        'registration_start_date',
-                        e.target.value
-                      )
+                      handleCreateInput('event_type_id', e.target.value)
                     }
                     required
                   />
                   <Input
-                    type="date"
-                    placeholder="Registration End Date"
-                    value={createForm.registration_end_date}
+                    placeholder="Event Category ID"
+                    value={createForm.event_category_id}
                     onChange={(e) =>
-                      handleCreateInput('registration_end_date', e.target.value)
+                      handleCreateInput('event_category_id', e.target.value)
                     }
                     required
                   />
-                </div>
-                <Input
-                  placeholder="Event Type ID"
-                  value={createForm.event_type_id}
-                  onChange={(e) =>
-                    handleCreateInput('event_type_id', e.target.value)
-                  }
-                  required
-                />
-                <Input
-                  placeholder="Event Category ID"
-                  value={createForm.event_category_id}
-                  onChange={(e) =>
-                    handleCreateInput('event_category_id', e.target.value)
-                  }
-                  required
-                />
-                <Input type="file" onChange={handleCreateFile} />
-                <Input
-                  placeholder="Guest Types (comma separated)"
-                  value={createForm.guest_types}
-                  onChange={(e) =>
-                    handleCreateInput('guest_types', e.target.value)
-                  }
-                  required
-                />
-                <DialogFooter>
-                  <Button type="submit" disabled={createLoading}>
-                    {createLoading ? 'Creating...' : 'Create Event'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <div>
+                    <Label htmlFor="create_event_image">Event Image</Label>
+                    <Input
+                      id="create_event_image"
+                      type="file"
+                      onChange={handleCreateFile}
+                      ref={createImageInputRef}
+                      className="mt-1"
+                    />
+                    {createImagePreview && (
+                      <div className="mt-2 relative inline-block">
+                        <img
+                          src={createImagePreview}
+                          alt="Event image preview"
+                          className="h-24 rounded shadow border"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute -top-2 -right-2 rounded-full h-6 w-6"
+                          onClick={handleRemoveCreateImage}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <Input
+                    placeholder="Guest Types (comma separated)"
+                    value={createForm.guest_types}
+                    onChange={(e) =>
+                      handleCreateInput('guest_types', e.target.value)
+                    }
+                    required
+                  />
+                  <DialogFooter>
+                    <Button type="submit" disabled={createLoading}>
+                      {createLoading ? 'Creating...' : 'Create Event'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
-        {events.length === 0 ? (
-          <div className="text-gray-400">
-            No events managed by this organizer.
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {events.map((event) => (
-              <div
-                key={event.id}
-                className="flex flex-col sm:flex-row md:items-center md:gap-4 border-b last:border-b-0 py-2"
-              >
-                <span className="font-semibold text-gray-800">
-                  {event.name}
-                </span>
-                <span className="text-gray-600">{event.location}</span>
-                <span className="text-gray-500">
-                  {event.start_date} - {event.end_date}
-                </span>
-                <div className="flex gap-2 mt-2 sm:mt-0">
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => openViewDialog(event)}
-                  >
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => openEditDialog(event)}
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => openDeleteDialog(event)}
-                  >
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </Button>
+        {user?.role === 'admin' &&
+          (events.length === 0 ? (
+            <div className="text-gray-400">
+              No events managed by this organizer.
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {events.map((event) => (
+                <div
+                  key={event.id}
+                  className="flex flex-col sm:flex-row md:items-center md:gap-4 border-b last:border-b-0 py-2"
+                >
+                  <span className="font-semibold text-gray-800">
+                    {event.name}
+                  </span>
+                  <span className="text-gray-600">{event.location}</span>
+                  <span className="text-gray-500">
+                    {event.start_date} - {event.end_date}
+                  </span>
+                  <div className="flex gap-2 mt-2 sm:mt-0">
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => openViewDialog(event)}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => openEditDialog(event)}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => openDeleteDialog(event)}
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          ))}
       </Card>
       <Card className="p-4 sm:p-6 mt-6">
         <h3 className="text-xl font-semibold mb-4">Audit Log</h3>
@@ -691,6 +786,63 @@ export default function OrganizerProfile() {
               Cancel
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Edit Organizer Dialog */}
+      <Dialog
+        open={editOrganizerDialogOpen}
+        onOpenChange={setEditOrganizerDialogOpen}
+      >
+        <DialogContent className="max-w-lg w-full">
+          <DialogHeader>
+            <DialogTitle>Edit Organizer</DialogTitle>
+          </DialogHeader>
+          {editOrganizerForm && (
+            <form onSubmit={handleEditOrganizerSubmit} className="space-y-4">
+              <Input
+                placeholder="Organizer Name"
+                value={editOrganizerForm.name}
+                onChange={(e) =>
+                  handleEditOrganizerInput('name', e.target.value)
+                }
+                required
+              />
+              <Input
+                placeholder="Email"
+                value={editOrganizerForm.email}
+                onChange={(e) =>
+                  handleEditOrganizerInput('email', e.target.value)
+                }
+                required
+              />
+              <Input
+                placeholder="Phone"
+                value={editOrganizerForm.phone_number}
+                onChange={(e) =>
+                  handleEditOrganizerInput('phone_number', e.target.value)
+                }
+              />
+              <Input
+                placeholder="Location"
+                value={editOrganizerForm.location}
+                onChange={(e) =>
+                  handleEditOrganizerInput('location', e.target.value)
+                }
+              />
+              <Input
+                placeholder="TIN Number"
+                value={editOrganizerForm.tin_number}
+                onChange={(e) =>
+                  handleEditOrganizerInput('tin_number', e.target.value)
+                }
+              />
+              <DialogFooter>
+                <Button type="submit" disabled={editOrganizerLoading}>
+                  {editOrganizerLoading ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>

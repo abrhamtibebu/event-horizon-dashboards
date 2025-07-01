@@ -184,6 +184,9 @@ function TrashCategoryDetails({
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
 
+  // Only show the action bar if we are inside a category (selectedCategory is truthy)
+  const showActionBar = !!selectedCategory && selectedItems.length > 0
+
   useEffect(() => {
     fetchCategoryItems()
     // eslint-disable-next-line
@@ -225,213 +228,286 @@ function TrashCategoryDetails({
   }
 
   return (
-    <div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header with Back Button */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onBack}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Categories
-              </Button>
-              <Separator orientation="vertical" className="h-6" />
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  {iconMap[categoryInfo?.icon || ''] || (
-                    <Trash2 className="h-5 w-5" />
-                  )}
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">
-                    {categoryInfo?.title || 'Category Details'}
-                  </h1>
-                  <p className="text-sm text-gray-500">
-                    {items.length} item{items.length !== 1 ? 's' : ''} in this
-                    category
-                  </p>
-                </div>
-              </div>
-            </div>
-            <Badge variant="secondary" className="text-sm">
-              {items.length} items
-            </Badge>
-          </div>
-        </div>
-
-        {/* Search and Actions Section */}
-        <div className="mb-6 space-y-4">
-          {/* Search Bar */}
+    <div className="p-4 sm:p-6 lg:p-8">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Categories
+          </Button>
+          <Separator orientation="vertical" className="h-6" />
           <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search items..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
+            <div className="p-2 bg-primary/10 rounded-lg">
+              {iconMap[categoryInfo?.icon || ''] || (
+                <Trash2 className="h-5 w-5" />
+              )}
             </div>
-            {search && (
-              <Button variant="outline" size="sm" onClick={() => setSearch('')}>
-                Clear
-              </Button>
-            )}
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">
+                {categoryInfo?.title}
+              </h1>
+              <p className="text-sm text-gray-500">
+                {categoryInfo?.count} items in this category
+              </p>
+            </div>
           </div>
-
-          {/* Action Bar for Selected Items */}
-          {selectedItems.length > 0 && (
-            <div
-              className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 shadow-md"
-              style={{ minHeight: '64px' }}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1">
-                <span className="text-sm font-medium text-blue-900">
-                  {selectedItems.length} item
-                  {selectedItems.length !== 1 ? 's' : ''} selected
-                </span>
-                <div className="flex flex-col xs:flex-row gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full xs:w-auto"
-                  >
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    <span className="hidden xs:inline">Restore</span>
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="w-full xs:w-auto"
-                  >
-                    <Trash className="h-4 w-4 mr-2" />
-                    <span className="hidden xs:inline">Delete Permanently</span>
-                  </Button>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearSelection}
-                className="w-full sm:w-auto mt-2 sm:mt-0"
-              >
-                Clear Selection
-              </Button>
-            </div>
-          )}
         </div>
-
-        {/* Items List */}
-        <div className="space-y-3">
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="mt-2 text-gray-500">Loading items...</p>
-            </div>
-          ) : items.length === 0 ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Trash2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  {search ? 'No items found' : 'No items in this category'}
-                </h3>
-                <p className="text-gray-500">
-                  {search
-                    ? 'Try adjusting your search terms.'
-                    : 'All items in this category have been restored or permanently deleted.'}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              {/* Select All Bar */}
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                <div className="flex items-center gap-3">
-                  <Checkbox
-                    checked={
-                      selectedItems.length === items.length && items.length > 0
-                    }
-                    onCheckedChange={handleSelectAll}
-                  />
-                  <span className="text-sm font-medium text-gray-700">
-                    Select all ({items.length} items)
-                  </span>
-                </div>
-                {selectedItems.length > 0 && (
-                  <span className="text-sm text-gray-500">
-                    {selectedItems.length} selected
-                  </span>
-                )}
-              </div>
-
-              {/* Items */}
-              {items.map((item) => (
-                <Card
-                  key={item.id}
-                  className={`transition-all duration-200 ${
-                    selectedItems.includes(item.id)
-                      ? 'ring-2 ring-primary bg-primary/5 border-primary/20'
-                      : 'hover:shadow-md'
-                  }`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <Checkbox
-                          checked={selectedItems.includes(item.id)}
-                          onCheckedChange={() => handleSelectItem(item.id)}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-gray-900 truncate">
-                            {item.name || item.email || `Item #${item.id}`}
-                          </h4>
-                          <p className="text-sm text-gray-500 truncate">
-                            {item.email || item.location || item.company || ''}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            Deleted{' '}
-                            {formatDistanceToNow(new Date(item.deleted_at), {
-                              addSuffix: true,
-                            })}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <RotateCcw className="h-4 w-4 mr-2" />
-                              Restore
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">
-                              <Trash className="h-4 w-4 mr-2" />
-                              Delete Permanently
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </>
-          )}
+        <div className="w-full sm:w-auto sm:max-w-xs">
+          <Input
+            placeholder="Search items..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
       </div>
+
+      {/* Selection Action Bar */}
+      {showActionBar && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-blue-800">
+              {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} selected
+            </span>
+            <Separator orientation="vertical" className="h-6 bg-blue-300" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearSelection}
+              className="text-blue-700 hover:text-blue-900"
+            >
+              Clear Selection
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Restore ({selectedItems.length})
+            </Button>
+            <Button variant="destructive" size="sm">
+              <Trash className="h-4 w-4 mr-2" />
+              Delete Permanently ({selectedItems.length})
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="p-4">
+                    <Checkbox
+                      checked={
+                        items.length > 0 && selectedItems.length === items.length
+                      }
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Item Details
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Deleted Date
+                  </th>
+                  <th scope="col" className="relative px-6 py-3">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {loading ? (
+                  <tr>
+                    <td colSpan={4} className="p-6 text-center text-gray-500">
+                      Loading...
+                    </td>
+                  </tr>
+                ) : items.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="p-6 text-center text-gray-500">
+                      No items found.
+                    </td>
+                  </tr>
+                ) : (
+                  items.map((item) => (
+                    <ItemRow
+                      key={item.id}
+                      item={item}
+                      isSelected={selectedItems.includes(item.id)}
+                      onSelect={() => handleSelectItem(item.id)}
+                      category={selectedCategory}
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
+  )
+}
+
+function ItemRow({
+  item,
+  isSelected,
+  onSelect,
+  category,
+}: {
+  item: TrashItem
+  isSelected: boolean
+  onSelect: () => void
+  category: string
+}) {
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const { toast } = useToast()
+
+  const handleRestore = async () => {
+    try {
+      await api.post(`/trash/${category}/${item.id}/restore`)
+      toast({ title: 'Success', description: 'Item restored successfully.' })
+      // Here you would typically refetch the list
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to restore item.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleDelete = async () => {
+    try {
+      await api.delete(`/trash/${category}/${item.id}`)
+      toast({ title: 'Success', description: 'Item permanently deleted.' })
+      // Here you would typically refetch the list
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete item.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const getItemPrimaryText = (item: TrashItem) => {
+    return (
+      item.name ||
+      item.email ||
+      item.company ||
+      item.description ||
+      `Item #${item.id}`
+    )
+  }
+
+  const getItemSecondaryText = (item: TrashItem) => {
+    if (item.email && item.name) return item.email
+    if (item.location) return item.location
+    if (item.start_date)
+      return `${format(new Date(item.start_date), 'PP')} - ${format(
+        new Date(item.end_date as string),
+        'PP'
+      )}`
+    if (item.phone) return item.phone
+    return ''
+  }
+
+  return (
+    <>
+      <tr className={isSelected ? 'bg-blue-50' : ''}>
+        <td className="p-4">
+          <Checkbox checked={isSelected} onCheckedChange={onSelect} />
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="text-sm font-medium text-gray-900">
+            {getItemPrimaryText(item)}
+          </div>
+          <div className="text-sm text-gray-500">
+            {getItemSecondaryText(item)}
+          </div>
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+          {formatDistanceToNow(new Date(item.deleted_at), { addSuffix: true })}
+        </td>
+        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setIsDetailsOpen(true)}>
+                <Eye className="mr-2 h-4 w-4" /> View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleRestore}>
+                <RefreshCw className="mr-2 h-4 w-4" /> Restore
+              </DropdownMenuItem>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem
+                    onSelect={(e) => e.preventDefault()}
+                    className="text-red-600"
+                  >
+                    <Trash className="mr-2 h-4 w-4" /> Delete Permanently
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete
+                      the item from our servers.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete}>
+                      Continue
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </td>
+      </tr>
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Item Details</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            {Object.entries(item).map(([key, value]) => (
+              <div key={key} className="flex">
+                <strong className="w-1/3 capitalize">
+                  {key.replace(/_/g, ' ')}:
+                </strong>
+                <span className="w-2/3">
+                  {typeof value === 'object' && value !== null
+                    ? JSON.stringify(value, null, 2)
+                    : value?.toString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 

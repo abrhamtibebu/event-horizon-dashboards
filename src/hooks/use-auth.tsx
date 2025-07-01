@@ -10,10 +10,17 @@ import { useNavigate } from 'react-router-dom'
 
 export type Role = 'admin' | 'organizer' | 'usher' | 'attendee'
 
+interface Organizer {
+  id: number
+  name: string
+}
+
 interface User {
   id: string
   email: string
   role: Role
+  organizer_id: number | null
+  organizer: Organizer | null
 }
 
 interface AuthContextType {

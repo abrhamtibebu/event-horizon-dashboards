@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Building2,
@@ -21,6 +21,7 @@ import api from '@/lib/api'
 
 export default function AddOrganizer() {
   const navigate = useNavigate()
+  const logoInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -43,6 +44,14 @@ export default function AddOrganizer() {
       const reader = new FileReader()
       reader.onloadend = () => setLogoPreview(reader.result as string)
       reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveLogo = () => {
+    setFormData((prev) => ({ ...prev, logo: null }))
+    setLogoPreview(null)
+    if (logoInputRef.current) {
+      logoInputRef.current.value = ''
     }
   }
 
@@ -208,6 +217,7 @@ export default function AddOrganizer() {
                   <input
                     type="file"
                     id="logo"
+                    ref={logoInputRef}
                     accept="image/*"
                     onChange={handleLogoUpload}
                     className="hidden"
@@ -225,12 +235,21 @@ export default function AddOrganizer() {
                   Upload your company logo (PNG, JPG, SVG)
                 </p>
                 {logoPreview && (
-                  <div className="mt-2">
+                  <div className="mt-2 relative inline-block">
                     <img
                       src={logoPreview}
                       alt="Logo preview"
                       className="h-16 rounded shadow border"
                     />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -top-2 -right-2 rounded-full h-6 w-6"
+                      onClick={handleRemoveLogo}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
               </div>

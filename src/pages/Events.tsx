@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import api from '@/lib/api'
 import EventCategoryManager from './EventCategoryManager'
 import EventTypeManager from './EventTypeManager'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function Events() {
   const [events, setEvents] = useState<any[]>([])
@@ -32,6 +33,8 @@ export default function Events() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+
+  const { user } = useAuth()
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -150,11 +153,17 @@ export default function Events() {
                   <div className="space-y-4">
                     {/* Event Image */}
                     <div className="h-48 bg-gradient-to-r from-blue-100 to-purple-100 rounded-lg overflow-hidden">
-                      <img
-                        src={event.image}
-                        alt={event.name}
-                        className="w-full h-full object-cover"
-                      />
+                      {event.event_image ? (
+                        <img
+                          src={event.event_image.startsWith('http') ? event.event_image : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${event.event_image}`}
+                          alt={event.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          No Image
+                        </div>
+                      )}
                     </div>
 
                     {/* Event Details */}

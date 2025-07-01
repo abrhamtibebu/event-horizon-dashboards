@@ -45,6 +45,7 @@ export interface QRElement extends BaseElement {
     organization: string;
     title: string;
     email: string;
+    phone: string;
   };
 }
 
@@ -63,8 +64,7 @@ export interface BadgeTemplate {
   id: string;
   name: string;
   pageSize: PageSize;
-  frontElements: BadgeElement[];
-  backElements: BadgeElement[];
+  elements: BadgeElement[];
   backgroundColor: string;
   backgroundImage: string | null;
 } 

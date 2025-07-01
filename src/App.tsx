@@ -28,6 +28,8 @@ import CheckIn from './pages/CheckIn'
 import Tickets from './pages/Tickets'
 import OrganizerProfile from './pages/OrganizerProfile'
 import { useAuth } from './hooks/use-auth.tsx'
+import BadgePage from './pages/BadgePage'
+import BatchBadgePage from './pages/BatchBadgePage'
 
 const queryClient = new QueryClient()
 
@@ -96,6 +98,24 @@ const App = () => (
           />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
+
+          <Route
+            path="/events/:eventId/attendees/:attendeeId/badge"
+            element={
+              <ProtectedRoute>
+                <BadgePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/events/:eventId/badges/batch"
+            element={
+              <ProtectedRoute>
+                <BatchBadgePage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/dashboard"
