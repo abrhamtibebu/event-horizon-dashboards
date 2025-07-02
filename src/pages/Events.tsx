@@ -155,7 +155,13 @@ export default function Events() {
                     <div className="h-48 bg-gradient-to-r from-blue-100 to-purple-100 rounded-lg overflow-hidden">
                       {event.event_image ? (
                         <img
-                          src={event.event_image.startsWith('http') ? event.event_image : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${event.event_image}`}
+                          src={
+                            event.event_image.startsWith('http')
+                              ? event.event_image
+                              : `${
+                                  import.meta.env.VITE_API_BASE_URL || ''
+                                }/storage/${event.event_image}`
+                          }
                           alt={event.name}
                           className="w-full h-full object-cover"
                         />

@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Link } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import api from '@/lib/api'
 
 export default function AttendeeDashboard() {
@@ -35,6 +35,7 @@ export default function AttendeeDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const { searchQuery } = useOutletContext<{ searchQuery: string }>()
 
   useEffect(() => {
     const fetchAttendeeData = async () => {
@@ -91,28 +92,25 @@ export default function AttendeeDashboard() {
     return matchesSearch && matchesCategory
   })
 
+  const filteredUpcomingEvents =
+    searchQuery && upcomingEvents
+      ? upcomingEvents.filter(
+          (event: any) =>
+            event.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            event.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : upcomingEvents
+  const filteredRegisteredEvents =
+    searchQuery && myRegisteredEvents
+      ? myRegisteredEvents.filter(
+          (event: any) =>
+            event.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            event.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : myRegisteredEvents
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Welcome Back!</h1>
-          <p className="text-gray-600 mt-1">
-            Discover amazing events and connect with like-minded people
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline">
-            <Bell className="w-4 h-4 mr-2" />
-            Notifications
-          </Button>
-          <Button variant="outline">
-            <User className="w-4 h-4 mr-2" />
-            Profile
-          </Button>
-        </div>
-      </div>
-
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
@@ -260,7 +258,7 @@ export default function AttendeeDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DashboardCard title="My Registered Events">
           <div className="space-y-4">
-            {myRegisteredEvents?.map((event: any) => (
+            {filteredRegisteredEvents?.map((event: any) => (
               <div key={event.id} className="p-4 bg-gray-50 rounded-lg">
                 <div className="flex justify-between items-start mb-2">
                   <h4 className="font-medium text-gray-900">{event.name}</h4>
@@ -368,6 +366,25 @@ export default function AttendeeDashboard() {
           ))}
         </div>
       </DashboardCard>
+
+      {filteredUpcomingEvents && (
+        <DashboardCard title="Upcoming Events (Filtered)">
+          <ul>
+            {filteredUpcomingEvents.map((event: any, idx: number) => (
+              <li key={idx}>{event.name}</li>
+            ))}
+          </ul>
+        </DashboardCard>
+      )}
+      {filteredRegisteredEvents && (
+        <DashboardCard title="My Registered Events (Filtered)">
+          <ul>
+            {filteredRegisteredEvents.map((event: any, idx: number) => (
+              <li key={idx}>{event.name}</li>
+            ))}
+          </ul>
+        </DashboardCard>
+      )}
     </div>
   )
 }

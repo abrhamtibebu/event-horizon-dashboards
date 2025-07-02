@@ -1,22 +1,35 @@
-
-import { ReactNode } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { ReactNode } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 interface DashboardCardProps {
-  title: string;
-  children: ReactNode;
-  className?: string;
-  headerClassName?: string;
+  title: string
+  children: ReactNode
+  className?: string
+  headerClassName?: string
 }
 
-export function DashboardCard({ title, children, className, headerClassName }: DashboardCardProps) {
+export function DashboardCard({
+  title,
+  children,
+  className,
+  headerClassName,
+}: DashboardCardProps) {
   return (
-    <Card className={cn("hover:shadow-lg transition-shadow duration-200", className)}>
-      <CardHeader className={cn("pb-2", headerClassName)}>
-        <CardTitle className="text-lg font-semibold text-gray-900">{title}</CardTitle>
+    <Card
+      className={cn(
+        'bg-white/70 backdrop-blur-md border border-gray-200 shadow-xl rounded-2xl transition-shadow duration-200 hover:shadow-2xl',
+        className
+      )}
+    >
+      <CardHeader
+        className={cn('pb-2 border-b border-gray-100', headerClassName)}
+      >
+        <CardTitle className="text-xl font-bold text-gray-900 tracking-tight">
+          {title}
+        </CardTitle>
       </CardHeader>
-      <CardContent>{children}</CardContent>
+      <CardContent className="pt-4 pb-6 px-6">{children}</CardContent>
     </Card>
-  );
+  )
 }

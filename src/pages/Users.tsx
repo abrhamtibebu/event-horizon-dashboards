@@ -50,6 +50,7 @@ import {
   AlertDialogAction,
 } from '@/components/ui/alert-dialog'
 import { useAuth } from '@/hooks/use-auth'
+import { useSearchParams } from 'react-router-dom'
 
 export default function Users() {
   const [users, setUsers] = useState<any[]>([])
@@ -80,6 +81,13 @@ export default function Users() {
   const { user: currentUser } = useAuth()
   const [showAddPassword, setShowAddPassword] = useState(false)
   const [showAddPasswordConfirm, setShowAddPasswordConfirm] = useState(false)
+  const [searchParams] = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('add') === '1') {
+      setAddOpen(true)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const fetchUsers = async () => {

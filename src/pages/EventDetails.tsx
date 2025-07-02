@@ -123,7 +123,9 @@ export default function EventDetails() {
     guest_type_id: '',
   })
   const [addAttendeeLoading, setAddAttendeeLoading] = useState(false)
-  const [selectedAttendees, setSelectedAttendees] = useState<Set<number>>(new Set())
+  const [selectedAttendees, setSelectedAttendees] = useState<Set<number>>(
+    new Set()
+  )
   const [isImporting, setIsImporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -168,8 +170,9 @@ export default function EventDetails() {
     if (!eventId || activeTab !== 'analytics') return
     setAnalyticsLoading(true)
     setAnalyticsError(null)
-    api.get(`/events/${eventId}/report`)
-      .then(res => setAnalytics(res.data))
+    api
+      .get(`/events/${eventId}/report`)
+      .then((res) => setAnalytics(res.data))
       .catch(() => setAnalyticsError('Failed to fetch analytics.'))
       .finally(() => setAnalyticsLoading(false))
   }, [eventId, activeTab])
@@ -230,34 +233,34 @@ export default function EventDetails() {
 
   const exportCSV = () => {
     if (filteredAttendees.length === 0) {
-      toast.info('No attendees to export.');
-      return;
+      toast.info('No attendees to export.')
+      return
     }
 
-    const dataToExport = filteredAttendees.map(attendee => ({
-        Name: attendee.guest?.name,
-        Email: attendee.guest?.email,
-        Company: attendee.guest?.company,
-        'Job Title': attendee.guest?.jobtitle,
-        'Guest Type': attendee.guestType?.name,
-        'Checked In': attendee.checked_in ? 'Yes' : 'No',
-        'Check-In Time': attendee.check_in_time 
-            ? format(parseISO(attendee.check_in_time), 'MMM d, yyyy, h:mm a') 
-            : 'N/A',
-    }));
+    const dataToExport = filteredAttendees.map((attendee) => ({
+      Name: attendee.guest?.name,
+      Email: attendee.guest?.email,
+      Company: attendee.guest?.company,
+      'Job Title': attendee.guest?.jobtitle,
+      'Guest Type': attendee.guestType?.name,
+      'Checked In': attendee.checked_in ? 'Yes' : 'No',
+      'Check-In Time': attendee.check_in_time
+        ? format(parseISO(attendee.check_in_time), 'MMM d, yyyy, h:mm a')
+        : 'N/A',
+    }))
 
-    const csv = Papa.unparse(dataToExport);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${eventData.name}_attendees.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const csv = Papa.unparse(dataToExport)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `${eventData.name}_attendees.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
 
-    toast.success('Attendee data exported successfully.');
+    toast.success('Attendee data exported successfully.')
   }
 
   const generateReport = () => {
@@ -327,37 +330,48 @@ export default function EventDetails() {
         }
 
         // Map guest_type_name to guest_type_id
-        const guestTypeMap = new Map(guestTypes.map(gt => [gt.name.toLowerCase(), gt.id]));
+        const guestTypeMap = new Map(
+          guestTypes.map((gt) => [gt.name.toLowerCase(), gt.id])
+        )
         const attendeesToImport = results.data.map((row: any) => ({
           ...row,
           guest_type_id: guestTypeMap.get(row.guest_type_name?.toLowerCase()),
-        }));
+        }))
 
-        const invalidRows = attendeesToImport.filter(a => !a.guest_type_id);
+        const invalidRows = attendeesToImport.filter((a) => !a.guest_type_id)
         if (invalidRows.length > 0) {
-            toast.error(`Some rows have invalid Guest Types: ${invalidRows.map(r => r.guest_type_name).join(', ')}. Make sure they match existing guest types.`);
-            setIsImporting(false);
-            return;
+          toast.error(
+            `Some rows have invalid Guest Types: ${invalidRows
+              .map((r) => r.guest_type_name)
+              .join(', ')}. Make sure they match existing guest types.`
+          )
+          setIsImporting(false)
+          return
         }
 
         try {
-          const response = await api.post(`/events/${eventId}/attendees/batch`, { attendees: attendeesToImport });
-          const { created, errors } = response.data;
+          const response = await api.post(
+            `/events/${eventId}/attendees/batch`,
+            { attendees: attendeesToImport }
+          )
+          const { created, errors } = response.data
 
           if (created && created.length > 0) {
-            setAttendees(prev => [...prev, ...created]);
-            toast.success(`${created.length} attendees imported successfully.`);
+            setAttendees((prev) => [...prev, ...created])
+            toast.success(`${created.length} attendees imported successfully.`)
           }
           if (errors && errors.length > 0) {
             toast.warning(`${errors.length} attendees failed to import.`, {
-                description: `Reasons: ${errors.map((e: any) => `${e.email}: ${e.error}`).join('; ')}`
-            });
+              description: `Reasons: ${errors
+                .map((e: any) => `${e.email}: ${e.error}`)
+                .join('; ')}`,
+            })
           }
         } catch (err: any) {
           toast.error(err.response?.data?.error || 'Failed to import CSV.')
         } finally {
           setIsImporting(false)
-          if(fileInputRef.current) fileInputRef.current.value = '';
+          if (fileInputRef.current) fileInputRef.current.value = ''
         }
       },
       error: () => {
@@ -369,7 +383,15 @@ export default function EventDetails() {
 
   const openEditDialog = () => {
     setEditForm({ ...eventData })
-    setEditImagePreview(eventData.event_image ? (eventData.event_image.startsWith('http') ? eventData.event_image : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${eventData.event_image}`) : null)
+    setEditImagePreview(
+      eventData.event_image
+        ? eventData.event_image.startsWith('http')
+          ? eventData.event_image
+          : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${
+              eventData.event_image
+            }`
+        : null
+    )
     setEditDialogOpen(true)
   }
 
@@ -404,7 +426,8 @@ export default function EventDetails() {
       if (editForm.event_image && editForm.event_image instanceof File) {
         payload = new FormData()
         Object.entries(editForm).forEach(([key, value]) => {
-          if (key === 'event_image' && value) payload.append('event_image', value)
+          if (key === 'event_image' && value)
+            payload.append('event_image', value)
           else payload.append(key, value as any)
         })
         headers = { 'Content-Type': 'multipart/form-data' }
@@ -435,18 +458,26 @@ export default function EventDetails() {
     const payload = {
       ...addAttendeeForm,
       name: `${addAttendeeForm.first_name} ${addAttendeeForm.last_name}`.trim(),
-    };
+    }
 
     try {
       const response = await api.post(`/events/${eventId}/attendees`, payload)
-      const newAttendee = response.data;
-      
-      setAttendees(prevAttendees => [...prevAttendees, newAttendee]);
+      const newAttendee = response.data
+
+      setAttendees((prevAttendees) => [...prevAttendees, newAttendee])
 
       toast.success('Attendee added successfully!')
       setAddAttendeeDialogOpen(false)
       setAddAttendeeForm({
-        first_name: '', last_name: '', email: '', phone: '', company: '', jobtitle: '', gender: '', country: '', guest_type_id: '',
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        company: '',
+        jobtitle: '',
+        gender: '',
+        country: '',
+        guest_type_id: '',
       })
     } catch (err: any) {
       // Show a user-friendly error for duplicate phone/email
@@ -466,7 +497,13 @@ export default function EventDetails() {
       {eventData.event_image && (
         <div className="w-full h-64 rounded-lg overflow-hidden mb-4 bg-gradient-to-r from-blue-100 to-purple-100 flex items-center justify-center">
           <img
-            src={eventData.event_image.startsWith('http') ? eventData.event_image : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${eventData.event_image}`}
+            src={
+              eventData.event_image.startsWith('http')
+                ? eventData.event_image
+                : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${
+                    eventData.event_image
+                  }`
+            }
             alt={eventData.name}
             className="object-cover w-full h-full"
           />
@@ -506,7 +543,10 @@ export default function EventDetails() {
             <BarChart3 className="w-4 h-4 mr-2" />
             Generate Report
           </Button>
-          <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700" onClick={openEditDialog}>
+          <Button
+            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            onClick={openEditDialog}
+          >
             <Edit className="w-4 h-4 mr-2" />
             Edit Event
           </Button>
@@ -523,17 +563,17 @@ export default function EventDetails() {
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
         <TabsContent value="details">
-      {/* Event Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <DashboardCard title="Event Information">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <Calendar className="w-5 h-5 text-blue-600" />
-                  <div>
+          {/* Event Overview */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <DashboardCard title="Event Information">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <Calendar className="w-5 h-5 text-blue-600" />
+                      <div>
                         <p className="text-sm text-gray-600">Date & Time</p>
-                    <p className="font-medium">
+                        <p className="font-medium">
                           {eventData.start_date &&
                             format(
                               parseISO(eventData.start_date),
@@ -545,19 +585,19 @@ export default function EventDetails() {
                               parseISO(eventData.end_date),
                               'MMM d, yyyy, h:mm a'
                             )}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <MapPin className="w-5 h-5 text-red-600" />
-                  <div>
-                    <p className="text-sm text-gray-600">Location</p>
-                    <p className="font-medium">{eventData.location}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <MapPin className="w-5 h-5 text-red-600" />
+                      <div>
+                        <p className="text-sm text-gray-600">Location</p>
+                        <p className="font-medium">{eventData.location}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
                       <Tag className="w-5 h-5 text-purple-600" />
-                  <div>
+                      <div>
                         <p className="text-sm text-gray-600">Category & Type</p>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="secondary">
@@ -567,238 +607,251 @@ export default function EventDetails() {
                             {eventData.event_type?.name}
                           </Badge>
                         </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-gray-600">Description</p>
-                  <p className="font-medium text-gray-900 mt-1">
-                    {eventData.description}
-                  </p>
-                </div>
-                <div>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Description</p>
+                      <p className="font-medium text-gray-900 mt-1">
+                        {eventData.description}
+                      </p>
+                    </div>
+                    <div>
                       <p className="text-sm text-gray-600">Guest Types</p>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {eventData.guest_types?.map((gt: any) => (
                           <Badge key={gt.id} variant="outline">
                             {gt.name}
-                </Badge>
+                          </Badge>
                         ))}
                       </div>
                     </div>
-              </div>
+                  </div>
+                </div>
+              </DashboardCard>
             </div>
-          </DashboardCard>
-        </div>
 
-        <div className="space-y-4">
-          <DashboardCard title="Quick Stats" className="text-center">
             <div className="space-y-4">
-              <div>
-                <div className="text-3xl font-bold text-blue-600">
-                  {eventData.registeredAttendees}
+              <DashboardCard title="Quick Stats" className="text-center">
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-3xl font-bold text-blue-600">
+                      {eventData.registeredAttendees}
+                    </div>
+                    <div className="text-sm text-gray-600">Registered</div>
+                  </div>
+                  <div>
+                    <div className="text-3xl font-bold text-green-600">
+                      {eventData.checkedInAttendees}
+                    </div>
+                    <div className="text-sm text-gray-600">Checked In</div>
+                  </div>
+                  <div>
+                    <div className="text-3xl font-bold text-gray-600">
+                      {eventData.maxGuests}
+                    </div>
+                    <div className="text-sm text-gray-600">Max Capacity</div>
+                  </div>
                 </div>
-                <div className="text-sm text-gray-600">Registered</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-green-600">
-                  {eventData.checkedInAttendees}
+              </DashboardCard>
+
+              <DashboardCard title="Quick Actions">
+                <div className="space-y-2">
+                  <Dialog
+                    open={isAssignUsherDialogOpen}
+                    onOpenChange={setIsAssignUsherDialogOpen}
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                      >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Assign Usher
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Assign Usher to Event</DialogTitle>
+                        <DialogDescription>
+                          Select an usher and assign tasks for this event.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label>Select Usher</Label>
+                          <Select>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Choose an usher" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ush_1">
+                                David Wilson
+                              </SelectItem>
+                              <SelectItem value="ush_2">Lisa Brown</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Assign Tasks</Label>
+                          <Textarea placeholder="Enter tasks separated by commas" />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsAssignUsherDialogOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
+                          Assign Usher
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog
+                    open={isNewConversationDialogOpen}
+                    onOpenChange={setIsNewConversationDialogOpen}
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                      >
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        New Conversation
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Start New Conversation</DialogTitle>
+                        <DialogDescription>
+                          Send a message to attendees or ushers.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label>Recipients</Label>
+                          <Select>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select recipients" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all-attendees">
+                                All Attendees
+                              </SelectItem>
+                              <SelectItem value="speakers">
+                                Speakers Only
+                              </SelectItem>
+                              <SelectItem value="vips">VIP Guests</SelectItem>
+                              <SelectItem value="ushers">Ushers</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Subject</Label>
+                          <Input placeholder="Message subject" />
+                        </div>
+                        <div>
+                          <Label>Message</Label>
+                          <Textarea placeholder="Type your message here..." />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsNewConversationDialogOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
+                          <Send className="w-4 h-4 mr-2" />
+                          Send Message
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog
+                    open={isCommunicationDialogOpen}
+                    onOpenChange={setIsCommunicationDialogOpen}
+                  >
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                      >
+                        <Phone className="w-4 h-4 mr-2" />
+                        Broadcast
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Communication Broadcast</DialogTitle>
+                        <DialogDescription>
+                          Send email, SMS, or voice broadcast to attendees.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label>Communication Type</Label>
+                          <Select>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="email">Email</SelectItem>
+                              <SelectItem value="sms">SMS</SelectItem>
+                              <SelectItem value="voice">
+                                Voice Broadcast
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Target Audience</Label>
+                          <Select>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select audience" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Attendees</SelectItem>
+                              <SelectItem value="checked-in">
+                                Checked-in Only
+                              </SelectItem>
+                              <SelectItem value="not-checked-in">
+                                Not Checked-in
+                              </SelectItem>
+                              <SelectItem value="speakers">Speakers</SelectItem>
+                              <SelectItem value="vips">VIPs</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Message Content</Label>
+                          <Textarea placeholder="Enter your message content..." />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsCommunicationDialogOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
+                          Send Broadcast
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
-                <div className="text-sm text-gray-600">Checked In</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-gray-600">
-                  {eventData.maxGuests}
-                </div>
-                <div className="text-sm text-gray-600">Max Capacity</div>
-              </div>
+              </DashboardCard>
             </div>
-          </DashboardCard>
-
-          <DashboardCard title="Quick Actions">
-            <div className="space-y-2">
-              <Dialog
-                open={isAssignUsherDialogOpen}
-                onOpenChange={setIsAssignUsherDialogOpen}
-              >
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Assign Usher
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Assign Usher to Event</DialogTitle>
-                    <DialogDescription>
-                      Select an usher and assign tasks for this event.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label>Select Usher</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose an usher" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ush_1">David Wilson</SelectItem>
-                          <SelectItem value="ush_2">Lisa Brown</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Assign Tasks</Label>
-                      <Textarea placeholder="Enter tasks separated by commas" />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsAssignUsherDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-                      Assign Usher
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <Dialog
-                open={isNewConversationDialogOpen}
-                onOpenChange={setIsNewConversationDialogOpen}
-              >
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    New Conversation
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Start New Conversation</DialogTitle>
-                    <DialogDescription>
-                      Send a message to attendees or ushers.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label>Recipients</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select recipients" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all-attendees">
-                            All Attendees
-                          </SelectItem>
-                          <SelectItem value="speakers">
-                            Speakers Only
-                          </SelectItem>
-                          <SelectItem value="vips">VIP Guests</SelectItem>
-                          <SelectItem value="ushers">Ushers</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Subject</Label>
-                      <Input placeholder="Message subject" />
-                    </div>
-                    <div>
-                      <Label>Message</Label>
-                      <Textarea placeholder="Type your message here..." />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsNewConversationDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-                      <Send className="w-4 h-4 mr-2" />
-                      Send Message
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <Dialog
-                open={isCommunicationDialogOpen}
-                onOpenChange={setIsCommunicationDialogOpen}
-              >
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Phone className="w-4 h-4 mr-2" />
-                    Broadcast
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Communication Broadcast</DialogTitle>
-                    <DialogDescription>
-                      Send email, SMS, or voice broadcast to attendees.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label>Communication Type</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="email">Email</SelectItem>
-                          <SelectItem value="sms">SMS</SelectItem>
-                          <SelectItem value="voice">Voice Broadcast</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Target Audience</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select audience" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Attendees</SelectItem>
-                          <SelectItem value="checked-in">
-                            Checked-in Only
-                          </SelectItem>
-                          <SelectItem value="not-checked-in">
-                            Not Checked-in
-                          </SelectItem>
-                          <SelectItem value="speakers">Speakers</SelectItem>
-                          <SelectItem value="vips">VIPs</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Message Content</Label>
-                      <Textarea placeholder="Enter your message content..." />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsCommunicationDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-                      Send Broadcast
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </DashboardCard>
-        </div>
-      </div>
+          </div>
         </TabsContent>
         <TabsContent value="badges">
           <BadgeDesignerTab eventId={eventId} />
@@ -812,16 +865,16 @@ export default function EventDetails() {
               <div className="flex gap-2">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
+                  <Input
                     type="search"
                     placeholder="Search by name, email, company..."
                     className="pl-8 sm:w-[300px]"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
                 {/* Add filter dropdowns here if needed */}
-          </div>
+              </div>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
@@ -859,9 +912,9 @@ export default function EventDetails() {
                 </Button>
               </div>
             </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
+            <Table>
+              <TableHeader>
+                <TableRow>
                   <TableHead className="w-12">
                     <Checkbox
                       checked={
@@ -872,18 +925,16 @@ export default function EventDetails() {
                       aria-label="Select all attendees"
                     />
                   </TableHead>
-                <TableHead>Attendee</TableHead>
+                  <TableHead>Attendee</TableHead>
                   <TableHead className="hidden md:table-cell">
                     Company
                   </TableHead>
-                  <TableHead>
-                    Guest Type
-                  </TableHead>
+                  <TableHead>Guest Type</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {attendeesLoading ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center">
@@ -898,8 +949,8 @@ export default function EventDetails() {
                   </TableRow>
                 ) : (
                   filteredAttendees.map((attendee) => (
-                <TableRow key={attendee.id}>
-                  <TableCell>
+                    <TableRow key={attendee.id}>
+                      <TableCell>
                         <Checkbox
                           checked={selectedAttendees.has(attendee.id)}
                           onCheckedChange={() =>
@@ -907,8 +958,8 @@ export default function EventDetails() {
                           }
                           aria-label={`Select ${attendee.guest?.name}`}
                         />
-                  </TableCell>
-                  <TableCell>
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center space-x-3">
                           <img
                             src={
@@ -920,19 +971,19 @@ export default function EventDetails() {
                             alt={attendee.guest?.name}
                             className="w-10 h-10 rounded-full"
                           />
-                    <div>
+                          <div>
                             <div className="font-medium">
                               {attendee.guest?.name}
-                      </div>
+                            </div>
                             <div className="text-sm text-muted-foreground">
                               {attendee.guest?.email}
-                      </div>
-                      </div>
-                    </div>
-                  </TableCell>
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {attendee.guest?.company || 'N/A'}
-                  </TableCell>
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant="outline"
@@ -943,9 +994,9 @@ export default function EventDetails() {
                           {getGuestTypeIcon(attendee.guestType?.name)}
                           <span className="ml-1">
                             {attendee.guestType?.name || 'N/A'}
-                      </span>
+                          </span>
                         </Badge>
-                  </TableCell>
+                      </TableCell>
                       <TableCell className="text-center">
                         <Badge
                           variant={
@@ -961,26 +1012,28 @@ export default function EventDetails() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                      <Button
+                        <Button
                           variant="ghost"
                           size="icon"
-                        onClick={() => generateBadge(attendee)}
-                      >
+                          onClick={() => generateBadge(attendee)}
+                        >
                           <Printer className="h-4 w-4" />
-                      </Button>
+                        </Button>
                         <Button variant="ghost" size="icon">
                           <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                  </TableCell>
-                </TableRow>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
                   ))
                 )}
-            </TableBody>
-          </Table>
-      </DashboardCard>
+              </TableBody>
+            </Table>
+          </DashboardCard>
         </TabsContent>
         <TabsContent value="checkins">
-          <div className="p-6 text-center text-gray-500">Check-ins content coming soon.</div>
+          <div className="p-6 text-center text-gray-500">
+            Check-ins content coming soon.
+          </div>
         </TabsContent>
         <TabsContent value="analytics">
           <DashboardCard title="Event Analytics">
@@ -992,27 +1045,45 @@ export default function EventDetails() {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
                   <div className="bg-blue-50 rounded p-4 text-center">
-                    <div className="text-2xl font-bold text-blue-600">{analytics.total_attendees}</div>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {analytics.total_attendees}
+                    </div>
                     <div className="text-sm text-gray-600">Total Attendees</div>
                   </div>
                   <div className="bg-green-50 rounded p-4 text-center">
-                    <div className="text-2xl font-bold text-green-600">{analytics.checked_in_attendees}</div>
+                    <div className="text-2xl font-bold text-green-600">
+                      {analytics.checked_in_attendees}
+                    </div>
                     <div className="text-sm text-gray-600">Checked In</div>
                   </div>
                   <div className="bg-yellow-50 rounded p-4 text-center">
-                    <div className="text-2xl font-bold text-yellow-600">{analytics.no_show_attendees}</div>
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {analytics.no_show_attendees}
+                    </div>
                     <div className="text-sm text-gray-600">No Show</div>
                   </div>
                   <div className="bg-purple-50 rounded p-4 text-center">
-                    <div className="text-2xl font-bold text-purple-600">{Object.keys(analytics.by_guest_type || {}).length}</div>
+                    <div className="text-2xl font-bold text-purple-600">
+                      {Object.keys(analytics.by_guest_type || {}).length}
+                    </div>
                     <div className="text-sm text-gray-600">Guest Types</div>
                   </div>
                   <div className="bg-green-50 rounded p-4 text-center">
-                    <div className="text-2xl font-bold text-green-600">{Object.values(analytics.country_breakdown || {}).reduce((a, b) => a + b, 0)}</div>
+                    <div className="text-2xl font-bold text-green-600">
+                      {Object.values(analytics.country_breakdown || {}).reduce(
+                        (a, b) => a + b,
+                        0
+                      )}
+                    </div>
                     <div className="text-sm text-gray-600">Countries</div>
                   </div>
                   <div className="bg-yellow-50 rounded p-4 text-center">
-                    <div className="text-2xl font-bold text-yellow-600">{Object.values(analytics.gender_breakdown || {}).reduce((a, b) => a + b, 0)}</div>
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {Object.values(analytics.gender_breakdown || {}).reduce(
+                        (a, b) => a + b,
+                        0
+                      )}
+                    </div>
                     <div className="text-sm text-gray-600">Genders</div>
                   </div>
                 </div>
@@ -1022,8 +1093,14 @@ export default function EventDetails() {
                       <PieChart>
                         <Pie
                           data={[
-                            { name: 'Checked In', value: analytics.checked_in_attendees },
-                            { name: 'No Show', value: analytics.no_show_attendees },
+                            {
+                              name: 'Checked In',
+                              value: analytics.checked_in_attendees,
+                            },
+                            {
+                              name: 'No Show',
+                              value: analytics.no_show_attendees,
+                            },
                           ]}
                           dataKey="value"
                           nameKey="name"
@@ -1043,7 +1120,9 @@ export default function EventDetails() {
                     <ResponsiveContainer width="100%" height={250}>
                       <PieChart>
                         <Pie
-                          data={Object.entries(analytics.by_guest_type || {}).map(([name, value]) => ({ name, value }))}
+                          data={Object.entries(
+                            analytics.by_guest_type || {}
+                          ).map(([name, value]) => ({ name, value }))}
                           dataKey="value"
                           nameKey="name"
                           cx="50%"
@@ -1051,9 +1130,27 @@ export default function EventDetails() {
                           outerRadius={80}
                           label
                         >
-                          {Object.entries(analytics.by_guest_type || {}).map(([name], idx) => (
-                            <Cell key={name} fill={["#3b82f6", "#8b5cf6", "#06d6a0", "#f59e0b", "#ef4444"][idx % 5]} />
-                          ))}
+                          {Object.entries(analytics.by_guest_type || {})
+                            .filter(
+                              (type) =>
+                                type.id !== undefined &&
+                                type.id !== null &&
+                                type.id !== ''
+                            )
+                            .map(([name], idx) => (
+                              <Cell
+                                key={name}
+                                fill={
+                                  [
+                                    '#3b82f6',
+                                    '#8b5cf6',
+                                    '#06d6a0',
+                                    '#f59e0b',
+                                    '#ef4444',
+                                  ][idx % 5]
+                                }
+                              />
+                            ))}
                         </Pie>
                         <RechartsTooltip />
                       </PieChart>
@@ -1063,18 +1160,31 @@ export default function EventDetails() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <DashboardCard title="Registration Timeline">
                     <ResponsiveContainer width="100%" height={250}>
-                      <LineChart data={Object.entries(analytics.registration_timeline || {}).map(([date, value]) => ({ date, value }))}>
+                      <LineChart
+                        data={Object.entries(
+                          analytics.registration_timeline || {}
+                        ).map(([date, value]) => ({ date, value }))}
+                      >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" />
                         <YAxis allowDecimals={false} />
                         <RechartsTooltip />
-                        <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} />
+                        <Line
+                          type="monotone"
+                          dataKey="value"
+                          stroke="#3b82f6"
+                          strokeWidth={3}
+                        />
                       </LineChart>
                     </ResponsiveContainer>
                   </DashboardCard>
                   <DashboardCard title="Country Breakdown">
                     <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={Object.entries(analytics.country_breakdown || {}).map(([country, value]) => ({ country, value }))}>
+                      <BarChart
+                        data={Object.entries(
+                          analytics.country_breakdown || {}
+                        ).map(([country, value]) => ({ country, value }))}
+                      >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="country" />
                         <YAxis allowDecimals={false} />
@@ -1087,7 +1197,11 @@ export default function EventDetails() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <DashboardCard title="Gender Breakdown">
                     <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={Object.entries(analytics.gender_breakdown || {}).map(([gender, value]) => ({ gender, value }))}>
+                      <BarChart
+                        data={Object.entries(
+                          analytics.gender_breakdown || {}
+                        ).map(([gender, value]) => ({ gender, value }))}
+                      >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="gender" />
                         <YAxis allowDecimals={false} />
@@ -1098,7 +1212,11 @@ export default function EventDetails() {
                   </DashboardCard>
                   <DashboardCard title="Most Active Ushers">
                     <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={Object.entries(analytics.most_active_ushers || {}).map(([usher, value]) => ({ usher, value }))}>
+                      <BarChart
+                        data={Object.entries(
+                          analytics.most_active_ushers || {}
+                        ).map(([usher, value]) => ({ usher, value }))}
+                      >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="usher" />
                         <YAxis allowDecimals={false} />
@@ -1121,7 +1239,9 @@ export default function EventDetails() {
         <DialogContent className="max-w-lg w-full">
           <DialogHeader>
             <DialogTitle>Edit Event</DialogTitle>
-            <DialogDescription>Update the event details below.</DialogDescription>
+            <DialogDescription>
+              Update the event details below.
+            </DialogDescription>
           </DialogHeader>
           {editForm && (
             <form onSubmit={handleEditEvent} className="space-y-4">
@@ -1141,7 +1261,9 @@ export default function EventDetails() {
                   type="date"
                   placeholder="Start Date"
                   value={editForm.start_date?.slice(0, 10) || ''}
-                  onChange={(e) => handleEditInput('start_date', e.target.value)}
+                  onChange={(e) =>
+                    handleEditInput('start_date', e.target.value)
+                  }
                   required
                 />
                 <Input
@@ -1150,8 +1272,8 @@ export default function EventDetails() {
                   value={editForm.end_date?.slice(0, 10) || ''}
                   onChange={(e) => handleEditInput('end_date', e.target.value)}
                   required
-              />
-            </div>
+                />
+              </div>
               <Input
                 placeholder="Location"
                 value={editForm.location}
@@ -1170,30 +1292,38 @@ export default function EventDetails() {
                   type="date"
                   placeholder="Registration Start Date"
                   value={editForm.registration_start_date?.slice(0, 10) || ''}
-                  onChange={(e) => handleEditInput('registration_start_date', e.target.value)}
+                  onChange={(e) =>
+                    handleEditInput('registration_start_date', e.target.value)
+                  }
                   required
                 />
                 <Input
                   type="date"
                   placeholder="Registration End Date"
                   value={editForm.registration_end_date?.slice(0, 10) || ''}
-                  onChange={(e) => handleEditInput('registration_end_date', e.target.value)}
+                  onChange={(e) =>
+                    handleEditInput('registration_end_date', e.target.value)
+                  }
                   required
                 />
-          </div>
+              </div>
               <Input
                 placeholder="Event Type ID"
                 value={editForm.event_type_id}
-                onChange={(e) => handleEditInput('event_type_id', e.target.value)}
+                onChange={(e) =>
+                  handleEditInput('event_type_id', e.target.value)
+                }
                 required
               />
               <Input
                 placeholder="Event Category ID"
                 value={editForm.event_category_id}
-                onChange={(e) => handleEditInput('event_category_id', e.target.value)}
+                onChange={(e) =>
+                  handleEditInput('event_category_id', e.target.value)
+                }
                 required
-                      />
-                      <div>
+              />
+              <div>
                 <Label htmlFor="edit_event_image">Event Image</Label>
                 <Input
                   id="edit_event_image"
@@ -1209,16 +1339,16 @@ export default function EventDetails() {
                       alt="Event image preview"
                       className="h-24 rounded shadow border"
                     />
-            <Button
+                    <Button
                       type="button"
                       variant="destructive"
                       size="icon"
                       className="absolute -top-2 -right-2 rounded-full h-6 w-6"
                       onClick={handleRemoveEditImage}
-            >
+                    >
                       <X className="h-4 w-4" />
-            </Button>
-          </div>
+                    </Button>
+                  </div>
                 )}
               </div>
               <Input
@@ -1238,7 +1368,10 @@ export default function EventDetails() {
       </Dialog>
 
       {/* Add Attendee Dialog */}
-      <Dialog open={addAttendeeDialogOpen} onOpenChange={setAddAttendeeDialogOpen}>
+      <Dialog
+        open={addAttendeeDialogOpen}
+        onOpenChange={setAddAttendeeDialogOpen}
+      >
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Add New Attendee</DialogTitle>
@@ -1278,7 +1411,9 @@ export default function EventDetails() {
                   id="email"
                   type="email"
                   value={addAttendeeForm.email}
-                  onChange={(e) => handleAddAttendeeInput('email', e.target.value)}
+                  onChange={(e) =>
+                    handleAddAttendeeInput('email', e.target.value)
+                  }
                   required
                 />
               </div>
@@ -1287,7 +1422,9 @@ export default function EventDetails() {
                 <Input
                   id="phone"
                   value={addAttendeeForm.phone}
-                  onChange={(e) => handleAddAttendeeInput('phone', e.target.value)}
+                  onChange={(e) =>
+                    handleAddAttendeeInput('phone', e.target.value)
+                  }
                 />
               </div>
             </div>
@@ -1349,11 +1486,18 @@ export default function EventDetails() {
                     <SelectValue placeholder="Select a guest type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {guestTypes.map((type) => (
-                      <SelectItem key={type.id} value={String(type.id)}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
+                    {guestTypes
+                      .filter(
+                        (type) =>
+                          type.id !== undefined &&
+                          type.id !== null &&
+                          type.id !== ''
+                      )
+                      .map((type) => (
+                        <SelectItem key={type.id} value={String(type.id)}>
+                          {type.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

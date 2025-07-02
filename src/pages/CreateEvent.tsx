@@ -30,6 +30,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
+// Utility to filter valid select options
+function filterValidOptions<T extends { id?: any }>(arr: T[]) {
+  return arr.filter(
+    (item) => item.id !== undefined && item.id !== null && item.id !== ''
+  )
+}
+
 export default function CreateEvent() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -172,7 +179,9 @@ export default function CreateEvent() {
               .split(',')
               .map((s: string) => s.trim())
               .filter(Boolean)
-            guestTypesArr.forEach((type) => payload.append('guest_types[]', type))
+            guestTypesArr.forEach((type) =>
+              payload.append('guest_types[]', type)
+            )
           } else {
             payload.append(key, value as any)
           }
@@ -272,7 +281,8 @@ export default function CreateEvent() {
                   htmlFor="name"
                   className="flex items-center gap-2 text-gray-700"
                 >
-                  <Tag className="w-4 h-4" /> Event Name
+                  {' '}
+                  <Tag className="w-4 h-4" /> Event Name{' '}
                 </Label>
                 <Input
                   id="name"
@@ -288,7 +298,8 @@ export default function CreateEvent() {
                   htmlFor="organizer_id"
                   className="flex items-center gap-2 text-gray-700"
                 >
-                  <Tag className="w-4 h-4" /> Organizer
+                  {' '}
+                  <Tag className="w-4 h-4" /> Organizer{' '}
                 </Label>
                 {user?.role === 'organizer' ? (
                   <Input
@@ -299,7 +310,9 @@ export default function CreateEvent() {
                 ) : (
                   <Select
                     value={formData.organizer_id}
-                    onValueChange={(value) => handleInputChange('organizer_id', value)}
+                    onValueChange={(value) =>
+                      handleInputChange('organizer_id', value)
+                    }
                     disabled={loading.organizers}
                     required
                   >
@@ -307,12 +320,20 @@ export default function CreateEvent() {
                       <SelectValue placeholder="Select an organizer" />
                     </SelectTrigger>
                     <SelectContent>
-                      {loading.organizers && <SelectItem value="" disabled>Loading...</SelectItem>}
-                      {error.organizers && <SelectItem value="" disabled>Error loading organizers</SelectItem>}
+                      {loading.organizers && (
+                        <SelectItem value="__loading" disabled>
+                          Loading...
+                        </SelectItem>
+                      )}
+                      {error.organizers && (
+                        <SelectItem value="__error" disabled>
+                          Error loading organizers
+                        </SelectItem>
+                      )}
                       {!loading.organizers &&
                         !error.organizers &&
-                        organizers.map((org) => (
-                          <SelectItem key={org.id} value={org.id.toString()}>
+                        filterValidOptions(organizers).map((org) => (
+                          <SelectItem key={org.id} value={String(org.id)}>
                             {org.name}
                           </SelectItem>
                         ))}
@@ -325,7 +346,8 @@ export default function CreateEvent() {
                   htmlFor="description"
                   className="flex items-center gap-2 text-gray-700"
                 >
-                  <FileText className="w-4 h-4" /> Description
+                  {' '}
+                  <FileText className="w-4 h-4" /> Description{' '}
                 </Label>
                 <Textarea
                   id="description"
@@ -343,11 +365,14 @@ export default function CreateEvent() {
                   htmlFor="event_type_id"
                   className="flex items-center gap-2 text-gray-700"
                 >
-                  <Tag className="w-4 h-4" /> Event Type
+                  {' '}
+                  <Tag className="w-4 h-4" /> Event Type{' '}
                 </Label>
                 <Select
                   value={formData.event_type_id}
-                  onValueChange={(value) => handleInputChange('event_type_id', value)}
+                  onValueChange={(value) =>
+                    handleInputChange('event_type_id', value)
+                  }
                   disabled={loading.eventTypes}
                   required
                 >
@@ -355,8 +380,8 @@ export default function CreateEvent() {
                     <SelectValue placeholder="Select event type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {eventTypes.map((type: any) => (
-                      <SelectItem key={type.id} value={type.id}>
+                    {filterValidOptions(eventTypes).map((type: any) => (
+                      <SelectItem key={type.id} value={String(type.id)}>
                         {type.name}
                       </SelectItem>
                     ))}
@@ -373,11 +398,14 @@ export default function CreateEvent() {
                   htmlFor="event_category_id"
                   className="flex items-center gap-2 text-gray-700"
                 >
-                  <Tag className="w-4 h-4" /> Event Category
+                  {' '}
+                  <Tag className="w-4 h-4" /> Event Category{' '}
                 </Label>
                 <Select
                   value={formData.event_category_id}
-                  onValueChange={(value) => handleInputChange('event_category_id', value)}
+                  onValueChange={(value) =>
+                    handleInputChange('event_category_id', value)
+                  }
                   disabled={loading.eventCategories}
                   required
                 >
@@ -385,8 +413,8 @@ export default function CreateEvent() {
                     <SelectValue placeholder="Select event category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {eventCategories.map((cat: any) => (
-                      <SelectItem key={cat.id} value={cat.id}>
+                    {filterValidOptions(eventCategories).map((cat: any) => (
+                      <SelectItem key={cat.id} value={String(cat.id)}>
                         {cat.name}
                       </SelectItem>
                     ))}
@@ -403,7 +431,8 @@ export default function CreateEvent() {
                   htmlFor="location"
                   className="flex items-center gap-2 text-gray-700"
                 >
-                  <MapPin className="w-4 h-4" /> Location
+                  {' '}
+                  <MapPin className="w-4 h-4" /> Location{' '}
                 </Label>
                 <Input
                   id="location"
@@ -420,7 +449,8 @@ export default function CreateEvent() {
                   htmlFor="max_guests"
                   className="flex items-center gap-2 text-gray-700"
                 >
-                  <Users className="w-4 h-4" /> Max Guests
+                  {' '}
+                  <Users className="w-4 h-4" /> Max Guests{' '}
                 </Label>
                 <Input
                   id="max_guests"
@@ -438,7 +468,8 @@ export default function CreateEvent() {
                   htmlFor="guest_types"
                   className="flex items-center gap-2 text-gray-700"
                 >
-                  <Users className="w-4 h-4" /> Guest Types
+                  {' '}
+                  <Users className="w-4 h-4" /> Guest Types{' '}
                 </Label>
                 <Input
                   id="guest_types"
@@ -458,7 +489,8 @@ export default function CreateEvent() {
                   htmlFor="event_image"
                   className="flex items-center gap-2 text-gray-700"
                 >
-                  <Image className="w-4 h-4" /> Event Image
+                  {' '}
+                  <Image className="w-4 h-4" /> Event Image{' '}
                 </Label>
                 <div className="flex items-center gap-3 mt-1">
                   <input
@@ -502,9 +534,25 @@ export default function CreateEvent() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Date Ranges */}
+          <div>
+            <div className="flex items-center gap-2 mb-4 mt-6">
+              <Calendar className="w-5 h-5 text-purple-500" />
+              <h3 className="font-semibold text-lg text-gray-900">
+                Event & Registration Dates
+              </h3>
+              <span className="text-gray-400 text-sm ml-2">
+                Set event and registration periods
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label className="flex items-center gap-2 text-gray-700">
-                  <Calendar className="w-4 h-4" /> Event Date Range
+                  {' '}
+                  <Calendar className="w-4 h-4" /> Event Date Range{' '}
                 </Label>
                 <Button
                   type="button"
@@ -570,7 +618,8 @@ export default function CreateEvent() {
               </div>
               <div>
                 <Label className="flex items-center gap-2 text-gray-700">
-                  <Calendar className="w-4 h-4" /> Registration Date Range
+                  {' '}
+                  <Calendar className="w-4 h-4" /> Registration Date Range{' '}
                 </Label>
                 <Button
                   type="button"
@@ -655,7 +704,8 @@ export default function CreateEvent() {
                   htmlFor="requirements"
                   className="flex items-center gap-2 text-gray-700"
                 >
-                  <FileText className="w-4 h-4" /> Requirements & Prerequisites
+                  {' '}
+                  <FileText className="w-4 h-4" /> Requirements & Prerequisites{' '}
                 </Label>
                 <Textarea
                   id="requirements"
@@ -673,7 +723,8 @@ export default function CreateEvent() {
                   htmlFor="agenda"
                   className="flex items-center gap-2 text-gray-700"
                 >
-                  <FileText className="w-4 h-4" /> Event Agenda
+                  {' '}
+                  <FileText className="w-4 h-4" /> Event Agenda{' '}
                 </Label>
                 <Textarea
                   id="agenda"

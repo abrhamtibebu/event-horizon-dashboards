@@ -25,17 +25,24 @@ export function MetricCard({
 }: MetricCardProps) {
   const cardContent = (
     <Card
-      className={cn('hover:shadow-md transition-all duration-200', className)}
+      className={cn(
+        'bg-white/80 backdrop-blur-md border border-gray-200 shadow-xl rounded-2xl hover:shadow-2xl transition-all duration-200',
+        className
+      )}
     >
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-600">{title}</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
+            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              {title}
+            </p>
+            <p className="text-4xl font-extrabold text-gray-900 mb-1 leading-tight">
+              {value}
+            </p>
             {trend && (
               <p
                 className={cn(
-                  'text-sm mt-1',
+                  'text-sm mt-1 font-medium',
                   trend.isPositive ? 'text-green-600' : 'text-red-600'
                 )}
               >
@@ -43,7 +50,7 @@ export function MetricCard({
               </p>
             )}
           </div>
-          <div className="p-3 bg-gradient-to-r from-blue-100 to-purple-100 rounded-lg">
+          <div className="p-3 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl shadow flex items-center justify-center">
             {icon}
           </div>
         </div>

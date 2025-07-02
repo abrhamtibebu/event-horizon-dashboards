@@ -27,6 +27,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import api from '@/lib/api'
+import { useOutletContext } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 
 export default function UsherDashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null)
@@ -34,6 +36,7 @@ export default function UsherDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [selectedEvent, setSelectedEvent] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const { searchQuery } = useOutletContext<{ searchQuery: string }>()
 
   useEffect(() => {
     const fetchUsherData = async () => {
@@ -103,27 +106,27 @@ export default function UsherDashboard() {
   const { keyMetrics, assignedEvents, recentCheckIns, pendingIssues } =
     dashboardData
 
+  // Example: filter assignedEvents and recentCheckIns by searchQuery
+  const filteredAssignedEvents =
+    searchQuery && assignedEvents
+      ? assignedEvents.filter(
+          (event: any) =>
+            event.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            event.location?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : assignedEvents
+  const filteredCheckIns =
+    searchQuery && recentCheckIns
+      ? recentCheckIns.filter(
+          (checkIn: any) =>
+            checkIn.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            checkIn.company?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : recentCheckIns
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Usher Dashboard</h1>
-          <p className="text-gray-600 mt-1">
-            Manage attendee check-ins and event support
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-            <QrCode className="w-4 h-4 mr-2" />
-            QR Scanner
-          </Button>
-          <Button variant="outline">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      {/* Removed duplicate <Header onSearch={setSearchQuery} /> */}
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -154,7 +157,7 @@ export default function UsherDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DashboardCard title="My Assigned Events">
           <div className="space-y-4">
-            {assignedEvents?.map((event: any) => (
+            {filteredAssignedEvents?.map((event: any) => (
               <div key={event.id} className="p-4 bg-gray-50 rounded-lg">
                 <div className="flex justify-between items-start mb-3">
                   <div>
@@ -210,6 +213,11 @@ export default function UsherDashboard() {
                     }
                     className="h-2"
                   />
+                  <Link to={`/dashboard/events/${event.id}/messages`}>
+                    <Button className="mt-2 w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                      Message Organizer
+                    </Button>
+                  </Link>
                 </div>
 
                 <div className="flex items-center justify-between mt-3">
@@ -276,7 +284,7 @@ export default function UsherDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DashboardCard title="Recent Check-ins">
           <div className="space-y-3">
-            {recentCheckIns?.map((checkIn: any) => (
+            {filteredCheckIns?.map((checkIn: any) => (
               <div key={checkIn.id} className="flex items-center gap-3">
                 <div className="p-2 bg-gray-100 rounded-full">
                   <UserCheck className="w-4 h-4 text-green-600" />
@@ -322,6 +330,26 @@ export default function UsherDashboard() {
           </Button>
         </DashboardCard>
       </div>
+
+      {/* Example usage of filteredAssignedEvents and filteredCheckIns */}
+      {filteredAssignedEvents && (
+        <DashboardCard title="Assigned Events (Filtered)">
+          <ul>
+            {filteredAssignedEvents.map((event: any, idx: number) => (
+              <li key={idx}>{event.name}</li>
+            ))}
+          </ul>
+        </DashboardCard>
+      )}
+      {filteredCheckIns && (
+        <DashboardCard title="Recent Check-ins (Filtered)">
+          <ul>
+            {filteredCheckIns.map((checkIn: any, idx: number) => (
+              <li key={idx}>{checkIn.name}</li>
+            ))}
+          </ul>
+        </DashboardCard>
+      )}
     </div>
   )
 }

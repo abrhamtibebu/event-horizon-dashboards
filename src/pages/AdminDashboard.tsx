@@ -32,7 +32,7 @@ import {
   BarChart,
   Bar,
 } from 'recharts'
-import { Link } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import api from '@/lib/api'
 
 export default function AdminDashboard() {
@@ -40,6 +40,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [trashCount, setTrashCount] = useState(0)
+  const { searchQuery } = useOutletContext<{ searchQuery: string }>()
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -103,6 +104,18 @@ export default function AdminDashboard() {
     }
   }
 
+  // Example: filter recentActivities by searchQuery
+  const filteredActivities =
+    searchQuery && stats?.recentActivities
+      ? stats.recentActivities.filter(
+          (activity: any) =>
+            activity.description
+              ?.toLowerCase()
+              .includes(searchQuery.toLowerCase()) ||
+            activity.type?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : stats?.recentActivities
+
   if (loading) {
     return <div>Loading dashboard...</div>
   }
@@ -127,29 +140,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-600 mt-1">
-            System overview and management center
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Link to="/dashboard/events/create">
-            <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Event
-            </Button>
-          </Link>
-          <Link to="/dashboard/settings">
-            <Button variant="outline">
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
-            </Button>
-          </Link>
-        </div>
-      </div>
+      {/* Removed duplicate <Header onSearch={setSearchQuery} /> */}
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -158,18 +149,21 @@ export default function AdminDashboard() {
           value={keyMetrics?.totalEvents?.value || 'N/A'}
           icon={<Calendar className="w-6 h-6 text-blue-600" />}
           trend={keyMetrics?.totalEvents?.trend}
+          className="min-h-[170px]"
         />
         <MetricCard
           title="Total Users"
           value={keyMetrics?.totalUsers?.value || 'N/A'}
           icon={<Users className="w-6 h-6 text-purple-600" />}
           trend={keyMetrics?.totalUsers?.trend}
+          className="min-h-[170px]"
         />
         <MetricCard
           title="Active Organizers"
           value={keyMetrics?.activeOrganizers?.value || 'N/A'}
           icon={<Building2 className="w-6 h-6 text-green-600" />}
           trend={keyMetrics?.activeOrganizers?.trend}
+          className="min-h-[170px]"
         />
         <MetricCard
           title="Items in Trash"
@@ -177,6 +171,7 @@ export default function AdminDashboard() {
           icon={<Trash2 className="w-6 h-6 text-red-600" />}
           trend={null}
           link="/dashboard/trash"
+          className="min-h-[170px]"
         />
       </div>
 
@@ -297,7 +292,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DashboardCard title="Recent Activity">
           <div className="space-y-4">
-            {recentActivities?.map((activity: any) => (
+            {filteredActivities?.map((activity: any) => (
               <div key={activity.id} className="flex items-center gap-3">
                 <div className="p-2 bg-gray-100 rounded-full">
                   {getActivityIcon(activity.type)}
@@ -317,28 +312,28 @@ export default function AdminDashboard() {
         <DashboardCard title="Quick Actions">
           <div className="grid grid-cols-2 gap-4">
             <Link
-              to="/users/add"
+              to="/dashboard/users?add=1"
               className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
             >
               <Users className="w-8 h-8 mx-auto mb-2 text-gray-600" />
               <span className="font-medium">Add User</span>
             </Link>
             <Link
-              to="/organizers/add"
+              to="/dashboard/organizers/add"
               className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
             >
               <Building2 className="w-8 h-8 mx-auto mb-2 text-gray-600" />
               <span className="font-medium">Add Organizer</span>
             </Link>
             <Link
-              to="/reports"
+              to="/dashboard/reports"
               className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
             >
               <BarChart3 className="w-8 h-8 mx-auto mb-2 text-gray-600" />
               <span className="font-medium">View Reports</span>
             </Link>
             <Link
-              to="/audit-logs"
+              to="/dashboard/audit-logs"
               className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
             >
               <Shield className="w-8 h-8 mx-auto mb-2 text-gray-600" />

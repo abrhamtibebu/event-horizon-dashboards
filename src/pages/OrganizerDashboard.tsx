@@ -29,13 +29,14 @@ import {
   AreaChart,
   Area,
 } from 'recharts'
-import { Link } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import api from '@/lib/api'
 
 export default function OrganizerDashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { searchQuery } = useOutletContext<{ searchQuery: string }>()
 
   useEffect(() => {
     const fetchOrganizerData = async () => {
@@ -100,33 +101,27 @@ export default function OrganizerDashboard() {
     upcomingTasks,
   } = dashboardData
 
+  // Example: filter recentMessages and myEvents by searchQuery
+  const filteredMessages =
+    searchQuery && recentMessages
+      ? recentMessages.filter(
+          (msg: any) =>
+            msg.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            msg.body?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : recentMessages
+  const filteredEvents =
+    searchQuery && myEvents
+      ? myEvents.filter(
+          (event: any) =>
+            event.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            event.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      : myEvents
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Organizer Dashboard
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Manage your events and engage with attendees
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Link to="/events/create">
-            <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Event
-            </Button>
-          </Link>
-          <Link to="/messages">
-            <Button variant="outline">
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Messages
-            </Button>
-          </Link>
-        </div>
-      </div>
+      {/* Removed duplicate <Header onSearch={setSearchQuery} /> */}
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -189,7 +184,7 @@ export default function OrganizerDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DashboardCard title="My Upcoming Events">
           <div className="space-y-4">
-            {myEvents?.map((event: any) => (
+            {filteredEvents?.map((event: any) => (
               <div key={event.id} className="p-4 bg-gray-50 rounded-lg">
                 <div className="flex justify-between items-start mb-3">
                   <div>
@@ -274,29 +269,44 @@ export default function OrganizerDashboard() {
       </div>
 
       {/* Recent Messages */}
-      <DashboardCard title="Recent Messages">
-        <div className="space-y-4">
-          {recentMessages?.map((message: any) => (
-            <div key={message.id} className="flex items-start gap-4">
-              {message.unread && (
-                <div className="w-2.5 h-2.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>
-              )}
-              <div className={!message.unread ? 'ml-5' : ''}>
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold text-gray-900">{message.from}</p>
-                  <p className="text-xs text-gray-500">{message.time}</p>
+      {filteredMessages && (
+        <DashboardCard title="Recent Messages (Filtered)">
+          <div className="space-y-4">
+            {filteredMessages.map((message: any) => (
+              <div key={message.id} className="flex items-start gap-4">
+                {message.unread && (
+                  <div className="w-2.5 h-2.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>
+                )}
+                <div className={!message.unread ? 'ml-5' : ''}>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-gray-900">
+                      {message.from}
+                    </p>
+                    <p className="text-xs text-gray-500">{message.time}</p>
+                  </div>
+                  <p className="text-sm text-gray-600">{message.message}</p>
                 </div>
-                <p className="text-sm text-gray-600">{message.message}</p>
               </div>
-            </div>
-          ))}
-        </div>
-        <Link to="/messages" className="block mt-4">
-          <Button variant="outline" size="sm" className="w-full">
-            View All Messages
-          </Button>
-        </Link>
-      </DashboardCard>
+            ))}
+          </div>
+          <Link to="/messages" className="block mt-4">
+            <Button variant="outline" size="sm" className="w-full">
+              View All Messages
+            </Button>
+          </Link>
+        </DashboardCard>
+      )}
+
+      {/* Example usage of filteredEvents */}
+      {filteredEvents && (
+        <DashboardCard title="My Events (Filtered)">
+          <ul>
+            {filteredEvents.map((event: any, idx: number) => (
+              <li key={idx}>{event.name}</li>
+            ))}
+          </ul>
+        </DashboardCard>
+      )}
     </div>
   )
 }

@@ -135,9 +135,6 @@ export function AppSidebar() {
       }
 
       fetchTrashCount()
-      // Refresh trash count every 30 seconds
-      const interval = setInterval(fetchTrashCount, 30000)
-      return () => clearInterval(interval)
     }
   }, [user?.role])
 
