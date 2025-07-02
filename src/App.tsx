@@ -30,6 +30,7 @@ import OrganizerProfile from './pages/OrganizerProfile'
 import { useAuth } from './hooks/use-auth.tsx'
 import BadgePage from './pages/BadgePage'
 import BatchBadgePage from './pages/BatchBadgePage'
+import Guests from './pages/Guests'
 
 const queryClient = new QueryClient()
 
@@ -144,6 +145,7 @@ const App = () => (
             <Route path="trash" element={<Trash />} />
             <Route path="check-in" element={<CheckIn />} />
             <Route path="tickets" element={<Tickets />} />
+            <Route path="guests" element={<Guests />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

@@ -1,4 +1,4 @@
-import { useLocation, NavLink } from 'react-router-dom'
+import { useLocation, NavLink, Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import {
   Calendar,
@@ -54,6 +54,12 @@ const allItems = [
     title: 'Organizers',
     url: '/dashboard/organizers',
     icon: Building2,
+    roles: ['admin'],
+  },
+  {
+    title: 'Guests',
+    url: '/dashboard/guests',
+    icon: Users,
     roles: ['admin'],
   },
   {

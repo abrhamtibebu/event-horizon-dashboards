@@ -15,6 +15,7 @@ import {
   PlayCircle,
   PauseCircle,
   UserPlus,
+  Eye,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,6 +45,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import api from '@/lib/api'
@@ -78,6 +80,10 @@ export default function Organizers() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [contactsMap, setContactsMap] = useState<Record<string, any[]>>({})
   const [viewUsersDialogOpen, setViewUsersDialogOpen] = useState(false)
+  const [viewEventsDialogOpen, setViewEventsDialogOpen] = useState(false)
+  const [selectedEvents, setSelectedEvents] = useState<any[]>([])
+  const [eventsLoading, setEventsLoading] = useState(false)
+  const [eventsError, setEventsError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchOrganizers = async () => {
@@ -239,7 +245,11 @@ export default function Organizers() {
     if (!editOrganizer) return
     setEditLoading(true)
     try {
-      await api.put(`/organizer/profile`, editForm) // If admin endpoint is different, adjust here
+      if (editOrganizer.role === 'admin') {
+        await api.put(`/organizers/${editOrganizer.id}`, editForm)
+      } else {
+        await api.put(`/organizer/profile`, editForm)
+      }
       toast({ title: 'Organizer updated successfully!' })
       setEditDialogOpen(false)
       // Refresh organizers
@@ -317,6 +327,21 @@ export default function Organizers() {
   const openViewUsersDialog = (organizer: any) => {
     setSelectedOrganizer(organizer)
     setViewUsersDialogOpen(true)
+  }
+
+  const openViewEventsDialog = async (organizer: any) => {
+    setViewEventsDialogOpen(true)
+    setEventsLoading(true)
+    setEventsError(null)
+    try {
+      const res = await api.get(`/admin/organizers/${organizer.id}/events`)
+      setSelectedEvents(res.data)
+    } catch (err: any) {
+      setEventsError('Failed to fetch events for this organizer.')
+      setSelectedEvents([])
+    } finally {
+      setEventsLoading(false)
+    }
   }
 
   return (
@@ -588,6 +613,19 @@ export default function Organizers() {
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>Delete Organizer</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => openViewEventsDialog(organizer)}
+                                className="mb-1"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>View Events</TooltipContent>
                           </Tooltip>
                         </div>
                       </TableCell>
@@ -889,6 +927,51 @@ export default function Organizers() {
                 Close
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* View Events Dialog */}
+        <Dialog
+          open={viewEventsDialogOpen}
+          onOpenChange={setViewEventsDialogOpen}
+        >
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Events for Organizer</DialogTitle>
+            </DialogHeader>
+            {eventsLoading ? (
+              <div className="py-8 text-center">Loading events...</div>
+            ) : eventsError ? (
+              <div className="py-8 text-center text-red-500">{eventsError}</div>
+            ) : selectedEvents.length === 0 ? (
+              <div className="py-8 text-center text-gray-500">No events found for this organizer.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedEvents.map((event: any) => (
+                      <TableRow key={event.id}>
+                        <TableCell>{event.name}</TableCell>
+                        <TableCell>{event.event_type?.name || '-'}</TableCell>
+                        <TableCell>{event.event_category?.name || '-'}</TableCell>
+                        <TableCell>{event.status || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <DialogClose asChild>
+              <Button variant="outline" className="mt-4 w-full">Close</Button>
+            </DialogClose>
           </DialogContent>
         </Dialog>
       </div>

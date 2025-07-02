@@ -26,6 +26,7 @@ import api from '@/lib/api'
 import EventCategoryManager from './EventCategoryManager'
 import EventTypeManager from './EventTypeManager'
 import { useAuth } from '@/hooks/use-auth'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 export default function Events() {
   const [events, setEvents] = useState<any[]>([])
@@ -33,6 +34,7 @@ export default function Events() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   const { user } = useAuth()
 
@@ -143,128 +145,52 @@ export default function Events() {
 
           {/* Events Grid */}
           {!loading && !error && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-              {filteredEvents.map((event) => (
-                <DashboardCard
-                  key={event.id}
-                  title=""
-                  className="overflow-hidden"
-                >
-                  <div className="space-y-4">
-                    {/* Event Image */}
-                    <div className="h-48 bg-gradient-to-r from-blue-100 to-purple-100 rounded-lg overflow-hidden">
-                      {event.event_image ? (
-                        <img
-                          src={
-                            event.event_image.startsWith('http')
-                              ? event.event_image
-                              : `${
-                                  import.meta.env.VITE_API_BASE_URL || ''
-                                }/storage/${event.event_image}`
-                          }
-                          alt={event.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
-                          No Image
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Event Details */}
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {event.name}
-                        </h3>
-                        <Badge className={getStatusColor(event.status)}>
-                          {event.status}
-                        </Badge>
-                      </div>
-
-                      <p className="text-gray-600 text-sm line-clamp-2">
-                        {event.description}
-                      </p>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Calendar className="w-4 h-4" />
-                          <span>
-                            {event.date} at {event.time}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <MapPin className="w-4 h-4" />
-                          <span>{event.location}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Users className="w-4 h-4" />
-                          <span>
-                            {event.attendees}/{event.maxAttendees} attendees
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs text-gray-500">
-                          <span>Registration Progress</span>
-                          <span>
-                            {event.maxAttendees
-                              ? Math.round(
-                                  (event.attendees / event.maxAttendees) * 100
-                                )
-                              : 0}
-                            %
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300"
-                            style={{
-                              width: `${
-                                event.maxAttendees
-                                  ? (event.attendees / event.maxAttendees) * 100
-                                  : 0
-                              }%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t">
-                        <p className="text-xs text-gray-500">
-                          Organized by {event.organizer}
-                        </p>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex gap-2 pt-2">
-                        <Link
-                          to={`/dashboard/events/${event.id}`}
-                          className="flex-1"
-                        >
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                          >
-                            <Eye className="w-4 h-4 mr-1" />
-                            View Details
-                          </Button>
-                        </Link>
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600"
-                        >
-                          Manage
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </DashboardCard>
-              ))}
+            <div className="mt-6">
+              <div className="bg-white shadow-lg rounded-xl overflow-x-auto p-4">
+                <Table className="min-w-full">
+                  <TableHeader className="sticky top-0 bg-white z-10">
+                    <TableRow>
+                      <TableHead className="font-bold text-gray-700 text-base">Name</TableHead>
+                      <TableHead className="font-bold text-gray-700 text-base">Type</TableHead>
+                      <TableHead className="font-bold text-gray-700 text-base">Category</TableHead>
+                      <TableHead className="font-bold text-gray-700 text-base">Organizer</TableHead>
+                      <TableHead className="font-bold text-gray-700 text-base">Status</TableHead>
+                      <TableHead className="font-bold text-gray-700 text-base">Date</TableHead>
+                      <TableHead className="font-bold text-gray-700 text-base">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredEvents.map((event) => (
+                      <TableRow
+                        key={event.id}
+                        className="hover:bg-blue-50 transition-colors group text-gray-900"
+                      >
+                        <TableCell className="font-semibold text-base group-hover:text-blue-700 transition-colors">{event.name}</TableCell>
+                        <TableCell>{event.event_type?.name || '-'}</TableCell>
+                        <TableCell>{event.event_category?.name || '-'}</TableCell>
+                        <TableCell>{event.organizer?.name || '-'}</TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(event.status)}>{event.status}</Badge>
+                        </TableCell>
+                        <TableCell>{event.date} {event.time}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Link to={`/dashboard/events/${event.id}`}>
+                              <Button size="sm" variant="outline">
+                                <Eye className="w-4 h-4" /> View Details
+                              </Button>
+                            </Link>
+                            {/* Future admin actions: force delete, restore, report, etc. */}
+                            {/* <Button size="sm" variant="destructive" disabled>Force Delete</Button> */}
+                            {/* <Button size="sm" variant="outline" disabled>Restore</Button> */}
+                            {/* <Button size="sm" variant="outline" disabled>View Report</Button> */}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
 
