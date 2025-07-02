@@ -76,6 +76,7 @@ export default function Settings() {
       await api.put('/user/password', {
         current_password: passwordData.currentPassword,
         new_password: passwordData.newPassword,
+        new_password_confirmation: passwordData.confirmPassword,
       })
       toast.success('Password updated successfully!')
       setPasswordData({
@@ -296,86 +297,92 @@ export default function Settings() {
                         <Label htmlFor="currentPassword">
                           Current Password
                         </Label>
-                        <Input
-                          id="currentPassword"
-                          type={showCurrentPassword ? 'text' : 'password'}
-                          value={passwordData.currentPassword}
-                          onChange={(e) =>
-                            handlePasswordChange(
-                              'currentPassword',
-                              e.target.value
-                            )
-                          }
-                          className="pr-10"
-                        />
-                        <button
-                          type="button"
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                          tabIndex={-1}
-                          onClick={() => setShowCurrentPassword((v) => !v)}
-                          style={{ marginLeft: '-2.5rem' }}
-                        >
-                          {showCurrentPassword ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </button>
+                        <div className="relative">
+                          <Input
+                            id="currentPassword"
+                            type={showCurrentPassword ? 'text' : 'password'}
+                            value={passwordData.currentPassword}
+                            onChange={(e) =>
+                              handlePasswordChange(
+                                'currentPassword',
+                                e.target.value
+                              )
+                            }
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                            tabIndex={-1}
+                            onClick={() => setShowCurrentPassword((v) => !v)}
+                          >
+                            {showCurrentPassword ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="newPassword">New Password</Label>
-                        <Input
-                          id="newPassword"
-                          type={showNewPassword ? 'text' : 'password'}
-                          value={passwordData.newPassword}
-                          onChange={(e) =>
-                            handlePasswordChange('newPassword', e.target.value)
-                          }
-                          className="pr-10"
-                        />
-                        <button
-                          type="button"
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                          tabIndex={-1}
-                          onClick={() => setShowNewPassword((v) => !v)}
-                          style={{ marginLeft: '-2.5rem' }}
-                        >
-                          {showNewPassword ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </button>
+                        <div className="relative">
+                          <Input
+                            id="newPassword"
+                            type={showNewPassword ? 'text' : 'password'}
+                            value={passwordData.newPassword}
+                            onChange={(e) =>
+                              handlePasswordChange(
+                                'newPassword',
+                                e.target.value
+                              )
+                            }
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                            tabIndex={-1}
+                            onClick={() => setShowNewPassword((v) => !v)}
+                          >
+                            {showNewPassword ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="confirmPassword">
                           Confirm New Password
                         </Label>
-                        <Input
-                          id="confirmPassword"
-                          type={showConfirmPassword ? 'text' : 'password'}
-                          value={passwordData.confirmPassword}
-                          onChange={(e) =>
-                            handlePasswordChange(
-                              'confirmPassword',
-                              e.target.value
-                            )
-                          }
-                          className="pr-10"
-                        />
-                        <button
-                          type="button"
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                          tabIndex={-1}
-                          onClick={() => setShowConfirmPassword((v) => !v)}
-                          style={{ marginLeft: '-2.5rem' }}
-                        >
-                          {showConfirmPassword ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </button>
+                        <div className="relative">
+                          <Input
+                            id="confirmPassword"
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            value={passwordData.confirmPassword}
+                            onChange={(e) =>
+                              handlePasswordChange(
+                                'confirmPassword',
+                                e.target.value
+                              )
+                            }
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                            tabIndex={-1}
+                            onClick={() => setShowConfirmPassword((v) => !v)}
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
