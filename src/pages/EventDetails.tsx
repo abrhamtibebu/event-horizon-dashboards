@@ -82,6 +82,9 @@ import {
   Bar,
 } from 'recharts'
 import { BadgeDesignerTab } from '@/components/BadgeDesignerTab'
+import React from 'react'
+import { useReactToPrint } from 'react-to-print'
+import BadgePrint from '@/components/Badge'
 
 export default function EventDetails() {
   const { eventId } = useParams()
@@ -132,6 +135,19 @@ export default function EventDetails() {
   const [analytics, setAnalytics] = useState<any>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [analyticsError, setAnalyticsError] = useState<string | null>(null)
+
+  const [singlePrintAttendee, setSinglePrintAttendee] = useState<any>(null)
+  const singlePrintRef = useRef<HTMLDivElement>(null)
+  const handleSinglePrint = useReactToPrint({
+    content: () => singlePrintRef.current,
+    onAfterPrint: () => setSinglePrintAttendee(null),
+  })
+  const [printing, setPrinting] = useState(false)
+  const printRef = useRef<HTMLDivElement>(null)
+  const handlePrintBadges = useReactToPrint({
+    content: () => printRef.current,
+    onAfterPrint: () => setPrinting(false),
+  })
 
   // Fetch event details
   useEffect(() => {
@@ -228,7 +244,10 @@ export default function EventDetails() {
   })
 
   const generateBadge = (attendee: (typeof attendees)[0]) => {
-    window.open(`/events/${eventId}/attendees/${attendee.id}/badge`, '_blank')
+    setSinglePrintAttendee(attendee)
+    setTimeout(() => {
+      handleSinglePrint()
+    }, 100)
   }
 
   const exportCSV = () => {
@@ -294,12 +313,10 @@ export default function EventDetails() {
   }
 
   const handleBatchPrintBadges = () => {
-    if (selectedAttendees.size === 0) {
-      toast.info('Please select at least one attendee to print badges.')
-      return
-    }
-    const selectedIds = Array.from(selectedAttendees).join(',')
-    window.open(`/events/${eventId}/badges/batch?ids=${selectedIds}`, '_blank')
+    setPrinting(true)
+    setTimeout(() => {
+      handlePrintBadges()
+    }, 100) // Give time for badges to render
   }
 
   const handleImportClick = () => {
@@ -854,7 +871,106 @@ export default function EventDetails() {
           </div>
         </TabsContent>
         <TabsContent value="badges">
-          <BadgeDesignerTab eventId={eventId} />
+          <DashboardCard title="Print Badges for Attendees">
+            <div className="mb-4 flex justify-between items-center">
+              <div className="flex gap-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search by name, email, company..."
+                    className="pl-8 sm:w-[300px]"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleBatchPrintBadges}
+                  disabled={selectedAttendees.size === 0}
+                >
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print Badges ({selectedAttendees.size})
+                </Button>
+              </div>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={filteredAttendees.length > 0 && selectedAttendees.size === filteredAttendees.length}
+                      onCheckedChange={handleSelectAllAttendees}
+                      aria-label="Select all attendees"
+                    />
+                  </TableHead>
+                  <TableHead>Attendee</TableHead>
+                  <TableHead className="hidden md:table-cell">Company</TableHead>
+                  <TableHead>Guest Type</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {attendeesLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center">
+                      Loading attendees...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredAttendees.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center">
+                      No attendees found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredAttendees.map((attendee) => (
+                    <TableRow key={attendee.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedAttendees.has(attendee.id)}
+                          onCheckedChange={() => handleSelectAttendee(attendee.id)}
+                          aria-label={`Select ${attendee.guest?.name}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <img
+                            src={
+                              attendee.guest?.profile_image_url ||
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(attendee.guest?.name || 'A')}&background=random`
+                            }
+                            alt={attendee.guest?.name}
+                            className="w-10 h-10 rounded-full"
+                          />
+                          <div>
+                            <div className="font-medium">{attendee.guest?.name}</div>
+                            <div className="text-sm text-muted-foreground">{attendee.guest?.email}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">{attendee.guest?.company || 'N/A'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={getGuestTypeColor(attendee.guestType?.name)}>
+                          {getGuestTypeIcon(attendee.guestType?.name)}
+                          <span className="ml-1">{attendee.guestType?.name || 'N/A'}</span>
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {attendee.checked_in ? (
+                          <span className="text-green-600 font-semibold">Checked In</span>
+                        ) : (
+                          <span className="text-gray-400">Not Checked In</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </DashboardCard>
         </TabsContent>
         <TabsContent value="attendees">
           <DashboardCard
@@ -1544,6 +1660,32 @@ export default function EventDetails() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Hidden single badge print area */}
+      {singlePrintAttendee && (
+        <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+          <div ref={singlePrintRef}>
+            <div className="printable-badge-batch">
+              <BadgePrint attendee={singlePrintAttendee} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden batch badge print area */}
+      {printing && (
+        <div style={{ position: 'absolute', left: '-9999px', top: 0 }}>
+          <div ref={printRef}>
+            {attendees
+              .filter((attendee) => selectedAttendees.has(attendee.id))
+              .map((attendee) => (
+                <div key={attendee.id} className="printable-badge-batch">
+                  <BadgePrint attendee={attendee} />
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

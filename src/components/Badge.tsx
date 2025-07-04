@@ -1,114 +1,42 @@
 import React from 'react';
 import * as QRCodeReact from 'qrcode.react';
-import { BadgeTemplate, BadgeElement, PAGE_SIZES } from '../types/badge';
-import { Attendee } from '@/types/attendee'; // Assuming an attendee type exists
+import { Attendee } from '@/types/attendee';
 
-const QRCode = QRCodeReact.default || QRCodeReact;
-
-// Convert mm to px for display (assuming 96 DPI)
-const mmToPx = (mm: number) => (mm / 25.4) * 96;
-
-interface BadgeProps {
-  template: BadgeTemplate;
-  attendee: Attendee;
-}
-
-const ElementRenderer: React.FC<{ element: BadgeElement; attendee: Attendee }> = ({ element, attendee }) => {
-  const style = {
-    position: 'absolute' as 'absolute',
-    left: `${element.x}px`,
-    top: `${element.y}px`,
-    width: `${element.width}px`,
-    height: `${element.height}px`,
-    transform: `rotate(${element.rotation}deg)`,
-    zIndex: element.zIndex,
-  };
-
-  switch (element.type) {
-    case 'text':
-      const nameParts = attendee.guest?.name?.split(' ') || ['', ''];
-      const content = element.content
-        .replace('{firstName}', nameParts[0])
-        .replace('{lastName}', nameParts.slice(1).join(' '))
-        .replace('{fullName}', attendee.guest?.name || '')
-        .replace('{jobTitle}', attendee.guest?.jobtitle || '')
-        .replace('{company}', attendee.guest?.company || '')
-        .replace('{guestType}', attendee.guestType?.name || '')
-        .replace('{email}', attendee.guest?.email || '')
-        .replace('{phone}', attendee.guest?.phone || '')
-        .replace('{profileImage}', attendee.guest?.profile_image_url || '');
-
-      return (
-        <div
-          style={{
-            ...style,
-            fontFamily: element.fontFamily,
-            fontSize: `${element.fontSize}px`,
-            fontWeight: element.fontWeight,
-            color: element.color,
-            textAlign: element.textAlign,
-          }}
-        >
-          {content}
-        </div>
-      );
-    case 'image':
-      // For now, only handles attendee profile pictures
-      let imageUrl = element.src;
-      if (element.src === '{profilePicture}' || element.src === '{profileImage}') {
-        imageUrl = attendee.guest?.profile_image_url || 'https://via.placeholder.com/150';
-      } else if (element.src?.includes('{profileImage}')) {
-        imageUrl = element.src.replace('{profileImage}', attendee.guest?.profile_image_url || 'https://via.placeholder.com/150');
-      }
-      return <img src={imageUrl} alt="badge element" style={style} />;
-    case 'qr':
-      const qrNameParts = attendee.guest?.name?.split(' ') || ['', ''];
-      const vCard = `BEGIN:VCARD
-VERSION:3.0
-N:${qrNameParts.slice(1).join(' ')};${qrNameParts[0]}
-FN:${attendee.guest?.name || ''}
-ORG:${attendee.guest?.company || ''}
-TITLE:${attendee.guest?.jobtitle || ''}
-EMAIL:${attendee.guest?.email || ''}
-TEL:${attendee.guest?.phone || ''}
-END:VCARD`;
-      return (
-        <div style={style}>
-          <QRCode value={vCard} size={element.width} />
-        </div>
-      );
-    case 'shape':
-      return (
-        <div
-          style={{
-            ...style,
-            backgroundColor: element.backgroundColor,
-            borderColor: element.borderColor,
-            borderWidth: `${element.borderWidth}px`,
-            borderStyle: 'solid',
-            borderRadius: element.shapeType === 'ellipse' ? '50%' : '0',
-          }}
-        />
-      );
-    default:
-      return null;
-  }
+const guestTypeColors: Record<string, string> = {
+  Guest: 'bg-blue-700',
+  VIP: 'bg-yellow-500',
+  Speaker: 'bg-purple-700',
+  Staff: 'bg-green-700',
+  // Add more types as needed
 };
 
-const Badge: React.FC<BadgeProps> = ({ template, attendee }) => {
-  const dimensions = PAGE_SIZES[template.pageSize];
-  const badgeStyle = {
-    width: `${mmToPx(dimensions.width)}px`,
-    height: `${mmToPx(dimensions.height)}px`,
-    backgroundColor: template.backgroundColor,
-    backgroundImage: template.backgroundImage ? `url(${template.backgroundImage})` : 'none',
-    position: 'relative' as 'relative',
-    overflow: 'hidden',
-  };
+const Badge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
+  console.log('Badge attendee:', attendee);
+  const name = attendee.guest?.name || '';
+  const company = attendee.guest?.company || '';
+  const jobtitle = attendee.guest?.jobtitle || '';
+  const country = attendee.guest?.country || '';
+  const guestType = attendee.guestType?.name || 'Guest';
+  const uuid = attendee.guest?.uuid || attendee.guest?.id || '';
+  const barColor = guestTypeColors[guestType] || 'bg-gray-700';
 
   return (
-    <div className="shadow-lg bg-cover bg-center" style={badgeStyle}>
-      {template.elements.map(element => <ElementRenderer key={element.id} element={element} attendee={attendee} />)}
+    <div
+      className="flex flex-col items-center justify-between border rounded-xl shadow-lg bg-white relative"
+      style={{ width: 320, height: 480, padding: 24 }}
+    >
+      <div className="flex-1 w-full flex flex-col items-center justify-center">
+        <div className="text-4xl font-bold text-center leading-tight mt-2 mb-4" style={{ wordBreak: 'break-word' }}>{name}</div>
+        <div className="text-xl text-center mt-2 mb-1">{company}</div>
+        <div className="text-lg text-center mb-1">{jobtitle}</div>
+        <div className="text-lg text-center mb-4">{country}</div>
+        <div className="flex justify-center my-4">
+          <QRCodeReact.QRCode value={String(uuid)} size={128} />
+        </div>
+      </div>
+      <div className={`w-full py-3 text-center text-white text-2xl font-bold rounded-b-xl ${barColor}`} style={{ position: 'absolute', left: 0, bottom: 0 }}>
+        {guestType.toUpperCase()}
+      </div>
     </div>
   );
 };
