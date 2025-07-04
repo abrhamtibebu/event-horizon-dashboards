@@ -29,6 +29,7 @@ import {
 import api from '@/lib/api'
 import { useOutletContext } from 'react-router-dom'
 import { Link } from 'react-router-dom'
+import { Checkbox } from '@/components/ui/checkbox'
 
 export default function UsherDashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null)
@@ -37,6 +38,8 @@ export default function UsherDashboard() {
   const [selectedEvent, setSelectedEvent] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
   const { searchQuery } = useOutletContext<{ searchQuery: string }>()
+  const [taskCompletion, setTaskCompletion] = useState<{ [eventId: string]: { [task: string]: boolean } }>({})
+  const [completingTask, setCompletingTask] = useState<{ [eventId: string]: boolean }>({})
 
   useEffect(() => {
     const fetchUsherData = async () => {
@@ -57,6 +60,31 @@ export default function UsherDashboard() {
 
     fetchUsherData()
   }, [])
+
+  // Helper to parse tasks from event
+  const getTasks = (event: any) => {
+    if (!event.pivot || !event.pivot.tasks) return []
+    try {
+      const tasks = typeof event.pivot.tasks === 'string' ? JSON.parse(event.pivot.tasks) : event.pivot.tasks
+      return Array.isArray(tasks) ? tasks : []
+    } catch {
+      return []
+    }
+  }
+
+  // Initialize taskCompletion state when dashboardData changes
+  useEffect(() => {
+    if (!dashboardData?.assignedEvents) return
+    const initial: { [eventId: string]: { [task: string]: boolean } } = {}
+    dashboardData.assignedEvents.forEach((event: any) => {
+      const tasks = getTasks(event)
+      initial[event.id] = {}
+      tasks.forEach((task: string) => {
+        initial[event.id][task] = false
+      })
+    })
+    setTaskCompletion(initial)
+  }, [dashboardData])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -157,83 +185,127 @@ export default function UsherDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DashboardCard title="My Assigned Events">
           <div className="space-y-4">
-            {filteredAssignedEvents?.map((event: any) => (
-              <div key={event.id} className="p-4 bg-gray-50 rounded-lg">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h4 className="font-semibold text-gray-900">
-                      {event.name}
-                    </h4>
-                    <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>{event.date}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        <span>{event.time}</span>
+            {filteredAssignedEvents?.map((event: any) => {
+              const tasks = getTasks(event)
+              return (
+                <div key={event.id} className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h4 className="font-semibold text-gray-900">
+                        {event.name}
+                      </h4>
+                      <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4" />
+                          <span>{event.date}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          <span>{event.time}</span>
+                        </div>
                       </div>
                     </div>
+                    <Badge className={getStatusColor(event.status)}>
+                      {event.status}
+                    </Badge>
                   </div>
-                  <Badge className={getStatusColor(event.status)}>
-                    {event.status}
-                  </Badge>
-                </div>
 
-                <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
-                  <div className="flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    <span>{event.location}</span>
+                  <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-4 h-4" />
+                      <span>{event.location}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users className="w-4 h-4" />
+                      <span>
+                        {event.checkedIn}/{event.totalAttendees}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Users className="w-4 h-4" />
-                    <span>
-                      {event.checkedIn}/{event.totalAttendees}
-                    </span>
-                  </div>
-                </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span>Check-in Progress</span>
-                    <span>
-                      {event.totalAttendees
-                        ? Math.round(
-                            (event.checkedIn / event.totalAttendees) * 100
-                          )
-                        : 0}
-                      %
-                    </span>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span>Check-in Progress</span>
+                      <span>
+                        {event.totalAttendees
+                          ? Math.round(
+                              (event.checkedIn / event.totalAttendees) * 100
+                            )
+                          : 0}
+                        %
+                      </span>
+                    </div>
+                    <Progress
+                      value={
+                        event.totalAttendees
+                          ? (event.checkedIn / event.totalAttendees) * 100
+                          : 0
+                      }
+                      className="h-2"
+                    />
+                    <Link to={`/dashboard/events/${event.id}/messages`}>
+                      <Button className="mt-2 w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                        Message Organizer
+                      </Button>
+                    </Link>
                   </div>
-                  <Progress
-                    value={
-                      event.totalAttendees
-                        ? (event.checkedIn / event.totalAttendees) * 100
-                        : 0
-                    }
-                    className="h-2"
-                  />
-                  <Link to={`/dashboard/events/${event.id}/messages`}>
-                    <Button className="mt-2 w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                      Message Organizer
+
+                  <div className="mt-4">
+                    <h5 className="font-semibold mb-2">Assigned Tasks</h5>
+                    {tasks.length === 0 ? (
+                      <div className="text-gray-500 text-sm">No tasks assigned.</div>
+                    ) : (
+                      <ul className="space-y-2">
+                        {tasks.map((task: string) => (
+                          <li key={task} className="flex items-center gap-2">
+                            <Checkbox
+                              checked={taskCompletion[event.id]?.[task] || false}
+                              onCheckedChange={async (checked) => {
+                                setTaskCompletion((prev) => ({
+                                  ...prev,
+                                  [event.id]: {
+                                    ...prev[event.id],
+                                    [task]: checked,
+                                  },
+                                }))
+                                if (checked) {
+                                  setCompletingTask((prev) => ({ ...prev, [event.id]: true }))
+                                  try {
+                                    await api.post(`/events/${event.id}/usher/tasks/complete`, {
+                                      completed_tasks: [task],
+                                    })
+                                    // Optionally show a toast or refresh data
+                                  } catch {
+                                    // Optionally handle error
+                                  } finally {
+                                    setCompletingTask((prev) => ({ ...prev, [event.id]: false }))
+                                  }
+                                }
+                              }}
+                              disabled={completingTask[event.id]}
+                            />
+                            <span className={taskCompletion[event.id]?.[task] ? 'line-through text-gray-400' : ''}>{task}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between mt-3">
+                    <span className="text-sm text-gray-600">
+                      Zone: {event.zone}
+                    </span>
+                    <Button
+                      size="sm"
+                      className="bg-gradient-to-r from-blue-600 to-purple-600"
+                    >
+                      <UserCheck className="w-4 h-4 mr-1" />
+                      Check-in
                     </Button>
-                  </Link>
+                  </div>
                 </div>
-
-                <div className="flex items-center justify-between mt-3">
-                  <span className="text-sm text-gray-600">
-                    Zone: {event.zone}
-                  </span>
-                  <Button
-                    size="sm"
-                    className="bg-gradient-to-r from-blue-600 to-purple-600"
-                  >
-                    <UserCheck className="w-4 h-4 mr-1" />
-                    Check-in
-                  </Button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </DashboardCard>
 
