@@ -64,3 +64,7 @@ export const getEventUshers = (eventId: string) =>
 export const getEventById = (eventId: string) => api.get(`/events/${eventId}`)
 
 export const getAllGuests = () => api.get('/guests')
+
+export const getAvailableUshers = () => api.get('/ushers/available')
+
+export const getUshers = () => api.get('/users/ushers')
