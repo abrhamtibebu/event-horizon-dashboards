@@ -64,3 +64,16 @@ export const getEventUshers = (eventId: string) =>
 export const getEventById = (eventId: string) => api.get(`/events/${eventId}`)
 
 export const getAllGuests = () => api.get('/guests')
+
+// Fetch all organizers (admin)
+export const getAllOrganizers = () => api.get('/organizers')
+
+// Fetch events for a specific organizer (admin)
+export const getEventsForOrganizer = (
+  organizerId: number,
+  status: string = 'draft,active'
+) => api.get(`/admin/organizers/${organizerId}/events`, { params: { status } })
+
+// Fetch events for the current organizer (organizer)
+export const getMyEvents = (status: string = 'draft,active') =>
+  api.get('/organizer/events', { params: { status } })

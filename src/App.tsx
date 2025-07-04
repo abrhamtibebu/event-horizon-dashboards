@@ -31,6 +31,7 @@ import { useAuth } from './hooks/use-auth.tsx'
 import BadgePage from './pages/BadgePage'
 import BatchBadgePage from './pages/BatchBadgePage'
 import Guests from './pages/Guests'
+import BadgeDesignerTab from './pages/BadgeDesignerTab'
 
 const queryClient = new QueryClient()
 
@@ -114,6 +115,15 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <BatchBadgePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/apps/badge-designer"
+            element={
+              <ProtectedRoute>
+                <BadgeDesignerTab eventId={1} />
               </ProtectedRoute>
             }
           />

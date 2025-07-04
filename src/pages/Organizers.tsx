@@ -245,11 +245,8 @@ export default function Organizers() {
     if (!editOrganizer) return
     setEditLoading(true)
     try {
-      if (editOrganizer.role === 'admin') {
-        await api.put(`/organizers/${editOrganizer.id}`, editForm)
-      } else {
-        await api.put(`/organizer/profile`, editForm)
-      }
+      // Always use the admin endpoint for editing as admin/superadmin
+      await api.put(`/organizers/${editOrganizer.id}`, editForm)
       toast({ title: 'Organizer updated successfully!' })
       setEditDialogOpen(false)
       // Refresh organizers
@@ -944,7 +941,9 @@ export default function Organizers() {
             ) : eventsError ? (
               <div className="py-8 text-center text-red-500">{eventsError}</div>
             ) : selectedEvents.length === 0 ? (
-              <div className="py-8 text-center text-gray-500">No events found for this organizer.</div>
+              <div className="py-8 text-center text-gray-500">
+                No events found for this organizer.
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
@@ -961,7 +960,9 @@ export default function Organizers() {
                       <TableRow key={event.id}>
                         <TableCell>{event.name}</TableCell>
                         <TableCell>{event.event_type?.name || '-'}</TableCell>
-                        <TableCell>{event.event_category?.name || '-'}</TableCell>
+                        <TableCell>
+                          {event.event_category?.name || '-'}
+                        </TableCell>
                         <TableCell>{event.status || '-'}</TableCell>
                       </TableRow>
                     ))}
@@ -970,7 +971,9 @@ export default function Organizers() {
               </div>
             )}
             <DialogClose asChild>
-              <Button variant="outline" className="mt-4 w-full">Close</Button>
+              <Button variant="outline" className="mt-4 w-full">
+                Close
+              </Button>
             </DialogClose>
           </DialogContent>
         </Dialog>

@@ -265,6 +265,7 @@ export default function OrganizerProfile() {
     e.preventDefault()
     setEditOrganizerLoading(true)
     try {
+      // Always use the admin endpoint for editing as admin/superadmin
       await api.put(`/organizers/${organizerId}`, editOrganizerForm)
       toast.success('Organizer updated successfully!')
       setEditOrganizerDialogOpen(false)
@@ -471,7 +472,10 @@ export default function OrganizerProfile() {
                       placeholder="Registration End Date"
                       value={createForm.registration_end_date}
                       onChange={(e) =>
-                        handleCreateInput('registration_end_date', e.target.value)
+                        handleCreateInput(
+                          'registration_end_date',
+                          e.target.value
+                        )
                       }
                       required
                     />
