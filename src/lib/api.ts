@@ -58,8 +58,19 @@ export const getUnreadMessages = () => api.get('/messages/unread')
 
 export const getAllUsers = () => api.get('/users')
 
-export const getEventUshers = (eventId: string) =>
+export const getEventUshers = (eventId: number) =>
   api.get(`/events/${eventId}/ushers`)
+
+export const assignUshersToEvent = (
+  eventId: number,
+  ushers: { id: number; tasks: string[] }[]
+) => api.post(`/events/${eventId}/assign-usher`, { ushers })
+
+export const updateUsherTasks = (
+  eventId: number,
+  usherId: number,
+  tasks: string[]
+) => api.put(`/events/${eventId}/ushers/${usherId}`, { tasks })
 
 export const getEventById = (eventId: string) => api.get(`/events/${eventId}`)
 
@@ -71,6 +82,10 @@ export const getAllOrganizers = () => api.get('/organizers')
 // Fetch events for the current organizer (organizer)
 export const getMyEvents = (status: string = 'draft,active') =>
   api.get('/organizer/events', { params: { status } })
+
+// Fetch events for a specific organizer (admin only)
+export const getEventsForOrganizer = (organizerId: number) =>
+  api.get(`/admin/organizers/${organizerId}/events`)
 
 export const getAvailableUshers = () => api.get('/ushers/available')
 

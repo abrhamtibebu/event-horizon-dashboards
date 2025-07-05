@@ -327,9 +327,16 @@ const BadgeDesignerTab: React.FC<BadgeDesignerTabProps> = ({
   useEffect(() => {
     if (user?.role === 'admin') {
       setLoadingOrganizers(true)
+      console.log('Fetching organizers for admin...')
       api
         .getAllOrganizers()
-        .then((res) => setOrganizers(res.data))
+        .then((res) => {
+          console.log('Organizers fetched:', res.data)
+          setOrganizers(res.data)
+        })
+        .catch((err) => {
+          console.error('Error fetching organizers:', err)
+        })
         .finally(() => setLoadingOrganizers(false))
     }
   }, [user])
@@ -338,15 +345,29 @@ const BadgeDesignerTab: React.FC<BadgeDesignerTabProps> = ({
   useEffect(() => {
     if (user?.role === 'admin' && selectedOrganizer) {
       setLoadingEvents(true)
+      console.log('Fetching events for organizer:', selectedOrganizer)
       api
         .getEventsForOrganizer(selectedOrganizer)
-        .then((res) => setEvents(res.data))
+        .then((res) => {
+          console.log('Events fetched for organizer:', res.data)
+          setEvents(res.data)
+        })
+        .catch((err) => {
+          console.error('Error fetching events for organizer:', err)
+        })
         .finally(() => setLoadingEvents(false))
     } else if (user?.role === 'organizer') {
       setLoadingEvents(true)
+      console.log('Fetching events for organizer user...')
       api
         .getMyEvents()
-        .then((res) => setEvents(res.data))
+        .then((res) => {
+          console.log('Events fetched for organizer user:', res.data)
+          setEvents(res.data)
+        })
+        .catch((err) => {
+          console.error('Error fetching events for organizer user:', err)
+        })
         .finally(() => setLoadingEvents(false))
     }
   }, [user, selectedOrganizer])

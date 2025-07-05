@@ -111,6 +111,12 @@ const allItems = [
     icon: Settings,
     roles: ['admin', 'organizer'],
   },
+  {
+    title: 'My Team',
+    url: '/dashboard/team',
+    icon: Users,
+    roles: ['organizer'],
+  },
 ]
 
 export function AppSidebar() {

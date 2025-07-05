@@ -26,7 +26,14 @@ import api from '@/lib/api'
 import EventCategoryManager from './EventCategoryManager'
 import EventTypeManager from './EventTypeManager'
 import { useAuth } from '@/hooks/use-auth'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 
 export default function Events() {
@@ -151,12 +158,12 @@ export default function Events() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                   {filteredEvents.map((event) => {
                     // Calculate registration progress
-                    const attendeeCount = event.attendee_count || 0;
-                    const attendeeLimit = event.attendee_limit || 500;
+                    const attendeeCount = event.attendee_count || 0
+                    const attendeeLimit = event.attendee_limit || 500
                     const registrationProgress = Math.min(
                       Math.round((attendeeCount / attendeeLimit) * 100),
                       100
-                    );
+                    )
                     return (
                       <div key={event.id} className="">
                         <Card className="h-full flex flex-col justify-between shadow-xl border-0 hover:shadow-2xl transition-shadow duration-300 bg-white/90 backdrop-blur-md">
@@ -177,7 +184,12 @@ export default function Events() {
                           <div className="flex flex-col flex-1 p-4 gap-2">
                             {/* Name and Status */}
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-2 gap-1">
-                              <h3 className="text-base sm:text-lg font-bold text-gray-900 truncate" title={event.name}>{event.name}</h3>
+                              <h3
+                                className="text-base sm:text-lg font-bold text-gray-900 truncate"
+                                title={event.name}
+                              >
+                                {event.name}
+                              </h3>
                               <span className="sm:ml-2">
                                 <Badge className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
                                   {event.status}
@@ -192,15 +204,24 @@ export default function Events() {
                             <div className="flex flex-col gap-1 text-gray-500 text-xs sm:text-sm">
                               <div className="flex items-center gap-2">
                                 <Calendar className="w-4 h-4" />
-                                <span>{event.date} {event.time}</span>
+                                <span>
+                                  {event.date} {event.time}
+                                </span>
                               </div>
                               <div className="flex items-center gap-2">
                                 <MapPin className="w-4 h-4" />
-                                <span className="truncate" title={event.location || 'Convention Center'}>{event.location || 'Convention Center'}</span>
+                                <span
+                                  className="truncate"
+                                  title={event.location || 'Convention Center'}
+                                >
+                                  {event.location || 'Convention Center'}
+                                </span>
                               </div>
                               <div className="flex items-center gap-2">
                                 <Users className="w-4 h-4" />
-                                <span>{attendeeCount}/{attendeeLimit} attendees</span>
+                                <span>
+                                  {attendeeCount}/{attendeeLimit} attendees
+                                </span>
                               </div>
                             </div>
                             {/* Registration Progress */}
@@ -218,25 +239,29 @@ export default function Events() {
                             </div>
                             {/* Organizer */}
                             <div className="text-xs text-gray-500 mt-2">
-                              Organized by <span className="font-semibold text-gray-700">{event.organizer?.name || 'John Smith'}</span>
+                              Organized by{' '}
+                              <span className="font-semibold text-gray-700">
+                                {event.organizer?.name || 'John Smith'}
+                              </span>
                             </div>
                           </div>
                           {/* Action Buttons */}
                           <div className="flex flex-col sm:flex-row gap-2 p-4 pt-0">
-                            <Link to={`/dashboard/events/${event.id}`} className="flex-1">
-                              <Button variant="outline" className="w-full flex items-center justify-center gap-2">
+                            <Link
+                              to={`/dashboard/events/${event.id}`}
+                              className="flex-1"
+                            >
+                              <Button
+                                variant="outline"
+                                className="w-full flex items-center justify-center gap-2"
+                              >
                                 <Eye className="w-4 h-4" /> View Details
-                              </Button>
-                            </Link>
-                            <Link to={`/dashboard/events/${event.id}/manage`} className="flex-1">
-                              <Button className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold shadow hover:from-blue-700 hover:to-purple-700 transition-colors">
-                                Manage
                               </Button>
                             </Link>
                           </div>
                         </Card>
                       </div>
-                    );
+                    )
                   })}
                 </div>
               ) : (
@@ -244,13 +269,27 @@ export default function Events() {
                   <Table className="min-w-full">
                     <TableHeader className="sticky top-0 bg-white z-10">
                       <TableRow>
-                        <TableHead className="font-bold text-gray-700 text-base">Name</TableHead>
-                        <TableHead className="font-bold text-gray-700 text-base">Type</TableHead>
-                        <TableHead className="font-bold text-gray-700 text-base">Category</TableHead>
-                        <TableHead className="font-bold text-gray-700 text-base">Organizer</TableHead>
-                        <TableHead className="font-bold text-gray-700 text-base">Status</TableHead>
-                        <TableHead className="font-bold text-gray-700 text-base">Date</TableHead>
-                        <TableHead className="font-bold text-gray-700 text-base">Actions</TableHead>
+                        <TableHead className="font-bold text-gray-700 text-base">
+                          Name
+                        </TableHead>
+                        <TableHead className="font-bold text-gray-700 text-base">
+                          Type
+                        </TableHead>
+                        <TableHead className="font-bold text-gray-700 text-base">
+                          Category
+                        </TableHead>
+                        <TableHead className="font-bold text-gray-700 text-base">
+                          Organizer
+                        </TableHead>
+                        <TableHead className="font-bold text-gray-700 text-base">
+                          Status
+                        </TableHead>
+                        <TableHead className="font-bold text-gray-700 text-base">
+                          Date
+                        </TableHead>
+                        <TableHead className="font-bold text-gray-700 text-base">
+                          Actions
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -259,14 +298,22 @@ export default function Events() {
                           key={event.id}
                           className="hover:bg-blue-50 transition-colors group text-gray-900"
                         >
-                          <TableCell className="font-semibold text-base group-hover:text-blue-700 transition-colors">{event.name}</TableCell>
+                          <TableCell className="font-semibold text-base group-hover:text-blue-700 transition-colors">
+                            {event.name}
+                          </TableCell>
                           <TableCell>{event.event_type?.name || '-'}</TableCell>
-                          <TableCell>{event.event_category?.name || '-'}</TableCell>
+                          <TableCell>
+                            {event.event_category?.name || '-'}
+                          </TableCell>
                           <TableCell>{event.organizer?.name || '-'}</TableCell>
                           <TableCell>
-                            <Badge className={getStatusColor(event.status)}>{event.status}</Badge>
+                            <Badge className={getStatusColor(event.status)}>
+                              {event.status}
+                            </Badge>
                           </TableCell>
-                          <TableCell>{event.date} {event.time}</TableCell>
+                          <TableCell>
+                            {event.date} {event.time}
+                          </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
                               <Link to={`/dashboard/events/${event.id}`}>

@@ -32,6 +32,7 @@ import BadgePage from './pages/BadgePage'
 import BatchBadgePage from './pages/BatchBadgePage'
 import Guests from './pages/Guests'
 import BadgeDesignerTab from './pages/BadgeDesignerTab'
+import Team from '@/pages/Team'
 
 const queryClient = new QueryClient()
 
@@ -56,7 +57,12 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <Routes>
           <Route
             path="/"
@@ -140,6 +146,7 @@ const App = () => (
             <Route path="events" element={<Events />} />
             <Route path="events/create" element={<CreateEvent />} />
             <Route path="events/:eventId" element={<EventDetails />} />
+            <Route path="team" element={<Team />} />
             <Route path="users" element={<Users />} />
             <Route path="organizers" element={<Organizers />} />
             <Route path="organizers/add" element={<AddOrganizer />} />

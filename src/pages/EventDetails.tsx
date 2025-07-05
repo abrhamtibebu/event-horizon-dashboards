@@ -29,6 +29,10 @@ import {
   Award,
   Tag,
   X,
+  Pencil,
+  Trash2,
+  User,
+  UserCog,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -57,11 +61,17 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import api, { getUshers } from '@/lib/api'
+import api, {
+  getUshers,
+  getEventUshers,
+  assignUshersToEvent,
+  updateUsherTasks,
+} from '@/lib/api'
 import { format, parseISO } from 'date-fns'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useAuth } from '@/hooks/use-auth'
@@ -149,14 +159,31 @@ export default function EventDetails() {
     onAfterPrint: () => setPrinting(false),
   })
 
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([])
   const [usherAssignments, setUsherAssignments] = useState([
-    { usherId: '', tasks: '' }
-  ]);
-  const [assigningUsher, setAssigningUsher] = useState(false);
-  const [createUsherDialogOpen, setCreateUsherDialogOpen] = useState(false);
-  const [newUsher, setNewUsher] = useState({ name: '', email: '', password: '' });
-  const [creatingUsher, setCreatingUsher] = useState(false);
+    { usherId: '', tasks: '' },
+  ])
+  const [assigningUsher, setAssigningUsher] = useState(false)
+  const [createUsherDialogOpen, setCreateUsherDialogOpen] = useState(false)
+  const [newUsher, setNewUsher] = useState({
+    name: '',
+    email: '',
+    password: '',
+  })
+  const [creatingUsher, setCreatingUsher] = useState(false)
+  const [addUsherDialogOpen, setAddUsherDialogOpen] = useState(false)
+  const [addingUsher, setAddingUsher] = useState(false)
+
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [teamLoading, setTeamLoading] = useState(false)
+  const [editMember, setEditMember] = useState<any>(null)
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
+  const [removeMember, setRemoveMember] = useState<any>(null)
+  const [removeLoading, setRemoveLoading] = useState(false)
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false)
+  const [roleMember, setRoleMember] = useState<any>(null)
+  const [roleLoading, setRoleLoading] = useState(false)
+  const [newRole, setNewRole] = useState('usher')
 
   // Fetch event details
   useEffect(() => {
@@ -205,12 +232,22 @@ export default function EventDetails() {
   // Fetch all ushers for assigning ushers
   const fetchUsers = () => {
     getUshers()
-      .then(res => setUsers(res.data))
-      .catch(() => toast.error('Failed to fetch ushers'));
-  };
+      .then((res) => setUsers(res.data))
+      .catch(() => toast.error('Failed to fetch ushers'))
+  }
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    fetchUsers()
+  }, [])
+
+  useEffect(() => {
+    if (!user?.organizer_id) return
+    setTeamLoading(true)
+    api
+      .get(`/organizers/${user.organizer_id}/contacts`)
+      .then((res) => setTeamMembers(res.data))
+      .catch(() => setTeamMembers([]))
+      .finally(() => setTeamLoading(false))
+  }, [user?.organizer_id])
 
   if (eventLoading) {
     return <div className="text-center py-12">Loading event details...</div>
@@ -527,6 +564,115 @@ export default function EventDetails() {
     }
   }
 
+  const handleEditMember = (member: any) => {
+    setEditMember({ ...member })
+    setEditDialogOpen(true)
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setEditLoading(true)
+    try {
+      await api.put(`/users/${editMember.id}`, {
+        name: editMember.name,
+        email: editMember.email,
+        status: editMember.status,
+      })
+      toast.success('Team member updated!')
+      setEditDialogOpen(false)
+      setEditMember(null)
+      // Refresh team list
+      const res = await api.get(`/organizers/${user.organizer_id}/contacts`)
+      setTeamMembers(res.data)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update team member')
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
+  const handleRemoveMember = (member: any) => {
+    setRemoveMember(member)
+    setRemoveDialogOpen(true)
+  }
+
+  const handleRemoveConfirm = async () => {
+    setRemoveLoading(true)
+    try {
+      await api.delete(
+        `/organizers/${user.organizer_id}/contacts/${removeMember.id}`
+      )
+      toast.success('Team member removed!')
+      setRemoveDialogOpen(false)
+      setRemoveMember(null)
+      // Refresh team list
+      const res = await api.get(`/organizers/${user.organizer_id}/contacts`)
+      setTeamMembers(res.data)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to remove team member')
+    } finally {
+      setRemoveLoading(false)
+    }
+  }
+
+  const handleRoleMember = (member: any) => {
+    setRoleMember(member)
+    setNewRole(member.role)
+    setRoleDialogOpen(true)
+  }
+
+  const handleRoleChange = async () => {
+    setRoleLoading(true)
+    try {
+      await api.put(`/users/${roleMember.id}`, { role: newRole })
+      toast.success('Role updated!')
+      setRoleDialogOpen(false)
+      setRoleMember(null)
+      // Refresh team list
+      const res = await api.get(`/organizers/${user.organizer_id}/contacts`)
+      setTeamMembers(res.data)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update role')
+    } finally {
+      setRoleLoading(false)
+    }
+  }
+
+  const handleSetPrimary = async (member: any) => {
+    try {
+      await api.post(
+        `/organizers/${user.organizer_id}/contacts/${member.id}/primary`
+      )
+      toast.success('Primary contact updated!')
+      // Refresh team list
+      const res = await api.get(`/organizers/${user.organizer_id}/contacts`)
+      setTeamMembers(res.data)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to set primary contact')
+    }
+  }
+
+  const handleAddUsher = async () => {
+    setAddingUsher(true)
+    try {
+      await api.post('/organizer/ushers', { ...newUsher, role: 'usher' })
+      toast.success('Usher added!')
+      setAddUsherDialogOpen(false)
+      setNewUsher({ name: '', email: '', password: '' })
+      // Refresh ushers list
+      const [allRes, eventRes] = await Promise.all([
+        getUshers(),
+        getEventUshers(Number(eventId)),
+      ])
+      setAllUshers(allRes.data)
+      setEventUshers(eventRes.data)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to add usher')
+    } finally {
+      setAddingUsher(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Event Image */}
@@ -595,6 +741,8 @@ export default function EventDetails() {
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="badges">Badges</TabsTrigger>
           <TabsTrigger value="attendees">Attendees</TabsTrigger>
+          <TabsTrigger value="ushers">Ushers & Tasks</TabsTrigger>
+          <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="checkins">Check-ins</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
@@ -679,7 +827,7 @@ export default function EventDetails() {
                   </div>
                   <div>
                     <div className="text-3xl font-bold text-green-600">
-                      {attendees.filter(a => a.checked_in).length}
+                      {attendees.filter((a) => a.checked_in).length}
                     </div>
                     <div className="text-sm text-gray-600">Checked In</div>
                   </div>
@@ -711,36 +859,52 @@ export default function EventDetails() {
                       <DialogHeader>
                         <DialogTitle>Assign Ushers to Event</DialogTitle>
                         <DialogDescription>
-                          Select ushers and assign tasks for this event. You can add multiple ushers.
+                          Select ushers and assign tasks for this event. You can
+                          add multiple ushers.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
                         {usherAssignments.map((assignment, idx) => (
-                          <div key={idx} className="flex flex-col gap-2 border-b pb-4 mb-2">
+                          <div
+                            key={idx}
+                            className="flex flex-col gap-2 border-b pb-4 mb-2"
+                          >
                             <div className="flex items-center gap-2">
                               <Label>Select Usher</Label>
                               <Select
                                 value={assignment.usherId}
-                                onValueChange={val => {
-                                  const updated = [...usherAssignments];
-                                  updated[idx].usherId = val;
-                                  setUsherAssignments(updated);
+                                onValueChange={(val) => {
+                                  const updated = [...usherAssignments]
+                                  updated[idx].usherId = val
+                                  setUsherAssignments(updated)
                                 }}
                               >
                                 <SelectTrigger>
                                   <SelectValue placeholder="Choose an usher" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {users.filter(user => user.role === 'usher').map(user => (
-                                    <SelectItem key={user.id} value={String(user.id)}>
-                                      {user.name} ({user.email})
-                                    </SelectItem>
-                                  ))}
+                                  {users
+                                    .filter((user) => user.role === 'usher')
+                                    .map((user) => (
+                                      <SelectItem
+                                        key={user.id}
+                                        value={String(user.id)}
+                                      >
+                                        {user.name} ({user.email})
+                                      </SelectItem>
+                                    ))}
                                 </SelectContent>
                               </Select>
-                              <Button size="icon" variant="ghost" onClick={() => {
-                                setUsherAssignments(assignments => assignments.filter((_, i) => i !== idx));
-                              }} disabled={usherAssignments.length === 1}>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => {
+                                  setUsherAssignments((assignments) =>
+                                    assignments.filter((_, i) => i !== idx)
+                                  )
+                                }}
+                                disabled={usherAssignments.length === 1}
+                              >
                                 <X className="w-4 h-4 text-red-500" />
                               </Button>
                             </div>
@@ -749,10 +913,10 @@ export default function EventDetails() {
                               <Textarea
                                 placeholder="Enter tasks separated by commas"
                                 value={assignment.tasks}
-                                onChange={e => {
-                                  const updated = [...usherAssignments];
-                                  updated[idx].tasks = e.target.value;
-                                  setUsherAssignments(updated);
+                                onChange={(e) => {
+                                  const updated = [...usherAssignments]
+                                  updated[idx].tasks = e.target.value
+                                  setUsherAssignments(updated)
                                 }}
                               />
                             </div>
@@ -760,7 +924,12 @@ export default function EventDetails() {
                         ))}
                         <Button
                           variant="outline"
-                          onClick={() => setUsherAssignments(assignments => [...assignments, { usherId: '', tasks: '' }])}
+                          onClick={() =>
+                            setUsherAssignments((assignments) => [
+                              ...assignments,
+                              { usherId: '', tasks: '' },
+                            ])
+                          }
                         >
                           + Add Another Usher
                         </Button>
@@ -775,22 +944,29 @@ export default function EventDetails() {
                         </Button>
                         <Button
                           className="bg-gradient-to-r from-blue-600 to-purple-600"
-                          disabled={usherAssignments.some(a => !a.usherId || !a.tasks) || assigningUsher}
+                          disabled={
+                            usherAssignments.some(
+                              (a) => !a.usherId || !a.tasks
+                            ) || assigningUsher
+                          }
                           onClick={async () => {
-                            setAssigningUsher(true);
+                            setAssigningUsher(true)
                             try {
-                              const ushers = usherAssignments.map(a => ({
+                              const ushers = usherAssignments.map((a) => ({
                                 id: Number(a.usherId),
-                                tasks: a.tasks.split(',').map(t => t.trim()).filter(Boolean)
-                              }));
-                              await api.post(`/events/${eventId}/ushers`, { ushers });
-                              toast.success('Ushers assigned successfully!');
-                              setIsAssignUsherDialogOpen(false);
-                              setUsherAssignments([{ usherId: '', tasks: '' }]);
+                                tasks: a.tasks
+                                  .split(',')
+                                  .map((t) => t.trim())
+                                  .filter(Boolean),
+                              }))
+                              await assignUshersToEvent(Number(eventId), ushers)
+                              toast.success('Ushers assigned successfully!')
+                              setIsAssignUsherDialogOpen(false)
+                              setUsherAssignments([{ usherId: '', tasks: '' }])
                             } catch (err) {
-                              toast.error('Failed to assign ushers');
+                              toast.error('Failed to assign ushers')
                             } finally {
-                              setAssigningUsher(false);
+                              setAssigningUsher(false)
                             }
                           }}
                         >
@@ -972,13 +1148,18 @@ export default function EventDetails() {
                 <TableRow>
                   <TableHead className="w-12">
                     <Checkbox
-                      checked={filteredAttendees.length > 0 && selectedAttendees.size === filteredAttendees.length}
+                      checked={
+                        filteredAttendees.length > 0 &&
+                        selectedAttendees.size === filteredAttendees.length
+                      }
                       onCheckedChange={handleSelectAllAttendees}
                       aria-label="Select all attendees"
                     />
                   </TableHead>
                   <TableHead>Attendee</TableHead>
-                  <TableHead className="hidden md:table-cell">Company</TableHead>
+                  <TableHead className="hidden md:table-cell">
+                    Company
+                  </TableHead>
                   <TableHead>Guest Type</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                 </TableRow>
@@ -1002,7 +1183,9 @@ export default function EventDetails() {
                       <TableCell>
                         <Checkbox
                           checked={selectedAttendees.has(attendee.id)}
-                          onCheckedChange={() => handleSelectAttendee(attendee.id)}
+                          onCheckedChange={() =>
+                            handleSelectAttendee(attendee.id)
+                          }
                           aria-label={`Select ${attendee.guest?.name}`}
                         />
                       </TableCell>
@@ -1011,27 +1194,44 @@ export default function EventDetails() {
                           <img
                             src={
                               attendee.guest?.profile_image_url ||
-                              `https://ui-avatars.com/api/?name=${encodeURIComponent(attendee.guest?.name || 'A')}&background=random`
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                attendee.guest?.name || 'A'
+                              )}&background=random`
                             }
                             alt={attendee.guest?.name}
                             className="w-10 h-10 rounded-full"
                           />
                           <div>
-                            <div className="font-medium">{attendee.guest?.name}</div>
-                            <div className="text-sm text-muted-foreground">{attendee.guest?.email}</div>
+                            <div className="font-medium">
+                              {attendee.guest?.name}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {attendee.guest?.email}
+                            </div>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">{attendee.guest?.company || 'N/A'}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {attendee.guest?.company || 'N/A'}
+                      </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={getGuestTypeColor(attendee.guestType?.name)}>
+                        <Badge
+                          variant="outline"
+                          className={getGuestTypeColor(
+                            attendee.guestType?.name
+                          )}
+                        >
                           {getGuestTypeIcon(attendee.guestType?.name)}
-                          <span className="ml-1">{attendee.guestType?.name || 'N/A'}</span>
+                          <span className="ml-1">
+                            {attendee.guestType?.name || 'N/A'}
+                          </span>
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
                         {attendee.checked_in ? (
-                          <span className="text-green-600 font-semibold">Checked In</span>
+                          <span className="text-green-600 font-semibold">
+                            Checked In
+                          </span>
                         ) : (
                           <span className="text-gray-400">Not Checked In</span>
                         )}
@@ -1216,6 +1416,132 @@ export default function EventDetails() {
               </TableBody>
             </Table>
           </DashboardCard>
+        </TabsContent>
+        <TabsContent value="ushers">
+          <DashboardCard title="Ushers & Task Assignment">
+            <UshersTasksSection eventId={eventId} />
+          </DashboardCard>
+        </TabsContent>
+        <TabsContent value="team">
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold mb-4">Team Members</h3>
+            {teamLoading ? (
+              <div>Loading team members...</div>
+            ) : teamMembers.length === 0 ? (
+              <div className="text-gray-400">No team members found.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border text-sm">
+                  <thead>
+                    <tr>
+                      <th className="px-4 py-2 border">Name</th>
+                      <th className="px-4 py-2 border">Email</th>
+                      <th className="px-4 py-2 border">Role</th>
+                      <th className="px-4 py-2 border">Status</th>
+                      <th className="px-4 py-2 border">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teamMembers.map((member) => (
+                      <tr key={member.id}>
+                        <td className="px-4 py-2 border">
+                          {member.name}
+                          {member.is_primary_contact &&
+                            member.role === 'organizer' && (
+                              <span className="ml-2 text-yellow-600 font-bold">
+                                (Primary)
+                              </span>
+                            )}
+                        </td>
+                        <td className="px-4 py-2 border">{member.email}</td>
+                        <td className="px-4 py-2 border">{member.role}</td>
+                        <td className="px-4 py-2 border">{member.status}</td>
+                        <td className="px-4 py-2 border">
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            onClick={() => handleEditMember(member)}
+                          >
+                            <Pencil className="w-4 h-4" /> Edit
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            onClick={() => handleRemoveMember(member)}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" /> Remove
+                          </Button>
+                          {!(
+                            member.is_primary_contact &&
+                            member.role === 'organizer'
+                          ) && (
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              onClick={() => handleRoleMember(member)}
+                            >
+                              <UserCog className="w-4 h-4 text-blue-500" />{' '}
+                              Change Role
+                            </Button>
+                          )}
+                          {member.role === 'organizer' &&
+                            !member.is_primary_contact && (
+                              <Button
+                                size="xs"
+                                variant="ghost"
+                                onClick={() => handleSetPrimary(member)}
+                              >
+                                <Star className="w-4 h-4 text-yellow-500" /> Set
+                                Primary
+                              </Button>
+                            )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Change Role</DialogTitle>
+                </DialogHeader>
+                {roleMember && (
+                  <div className="space-y-4">
+                    <div>
+                      <span className="font-semibold">{roleMember.name}</span> (
+                      {roleMember.email})
+                    </div>
+                    <Select value={newRole} onValueChange={setNewRole}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="usher">Usher</SelectItem>
+                        <SelectItem value="organizer">Organizer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setRoleDialogOpen(false)}
+                        disabled={roleLoading}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleRoleChange}
+                        disabled={roleLoading || newRole === roleMember.role}
+                      >
+                        {roleLoading ? 'Saving...' : 'Save Role'}
+                      </Button>
+                    </DialogFooter>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+          </div>
         </TabsContent>
         <TabsContent value="checkins">
           <div className="p-6 text-center text-gray-500">
@@ -1733,7 +2059,10 @@ export default function EventDetails() {
       </Dialog>
 
       {/* Create Usher Dialog */}
-      <Dialog open={createUsherDialogOpen} onOpenChange={setCreateUsherDialogOpen}>
+      <Dialog
+        open={createUsherDialogOpen}
+        onOpenChange={setCreateUsherDialogOpen}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Usher</DialogTitle>
@@ -1746,7 +2075,9 @@ export default function EventDetails() {
               <Label>Name</Label>
               <Input
                 value={newUsher.name}
-                onChange={e => setNewUsher({ ...newUsher, name: e.target.value })}
+                onChange={(e) =>
+                  setNewUsher({ ...newUsher, name: e.target.value })
+                }
                 placeholder="Full Name"
               />
             </div>
@@ -1754,7 +2085,9 @@ export default function EventDetails() {
               <Label>Email</Label>
               <Input
                 value={newUsher.email}
-                onChange={e => setNewUsher({ ...newUsher, email: e.target.value })}
+                onChange={(e) =>
+                  setNewUsher({ ...newUsher, email: e.target.value })
+                }
                 placeholder="Email Address"
                 type="email"
               />
@@ -1763,35 +2096,46 @@ export default function EventDetails() {
               <Label>Password</Label>
               <Input
                 value={newUsher.password}
-                onChange={e => setNewUsher({ ...newUsher, password: e.target.value })}
+                onChange={(e) =>
+                  setNewUsher({ ...newUsher, password: e.target.value })
+                }
                 placeholder="Password"
                 type="password"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateUsherDialogOpen(false)} disabled={creatingUsher}>
+            <Button
+              variant="outline"
+              onClick={() => setCreateUsherDialogOpen(false)}
+              disabled={creatingUsher}
+            >
               Cancel
             </Button>
             <Button
               className="bg-gradient-to-r from-blue-600 to-purple-600"
-              disabled={creatingUsher || !newUsher.name || !newUsher.email || !newUsher.password}
+              disabled={
+                creatingUsher ||
+                !newUsher.name ||
+                !newUsher.email ||
+                !newUsher.password
+              }
               onClick={async () => {
-                setCreatingUsher(true);
+                setCreatingUsher(true)
                 try {
                   await api.post('/users', {
                     name: newUsher.name,
                     email: newUsher.email,
                     password: newUsher.password,
                     role: 'usher',
-                  });
-                  toast.success('Usher account created!');
-                  setCreateUsherDialogOpen(false);
-                  setNewUsher({ name: '', email: '', password: '' });
+                  })
+                  toast.success('Usher account created!')
+                  setCreateUsherDialogOpen(false)
+                  setNewUsher({ name: '', email: '', password: '' })
                 } catch (err) {
-                  toast.error('Failed to create usher');
+                  toast.error('Failed to create usher')
                 } finally {
-                  setCreatingUsher(false);
+                  setCreatingUsher(false)
                 }
               }}
             >
@@ -1826,6 +2170,214 @@ export default function EventDetails() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function UshersTasksSection({ eventId }: { eventId: string | undefined }) {
+  const [allUshers, setAllUshers] = useState<any[]>([])
+  const [eventUshers, setEventUshers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState<{ [usherId: number]: boolean }>({})
+  const [taskInputs, setTaskInputs] = useState<{ [usherId: number]: string }>(
+    {}
+  )
+  const [assigning, setAssigning] = useState(false)
+  const { user } = useAuth()
+
+  useEffect(() => {
+    if (!eventId) return
+    setLoading(true)
+    Promise.all([getUshers(), getEventUshers(Number(eventId))])
+      .then(([allRes, eventRes]) => {
+        setAllUshers(allRes.data)
+        setEventUshers(eventRes.data)
+        // Initialize task inputs for assigned ushers
+        const taskMap: { [usherId: number]: string } = {}
+        eventRes.data.forEach((usher: any) => {
+          taskMap[usher.id] = Array.isArray(usher.pivot?.tasks)
+            ? usher.pivot.tasks.join(', ')
+            : usher.pivot?.tasks
+            ? JSON.parse(usher.pivot.tasks).join(', ')
+            : ''
+        })
+        setTaskInputs(taskMap)
+      })
+      .catch(() => toast.error('Failed to fetch ushers'))
+      .finally(() => setLoading(false))
+  }, [eventId])
+
+  const assignedUsherIds = new Set(eventUshers.map((u: any) => u.id))
+  const organizerUshers = allUshers.filter(
+    (u) => u.organizer_id === user?.organizer_id
+  )
+
+  const handleAssign = async (usherId: number) => {
+    setAssigning(true)
+    try {
+      await assignUshersToEvent(Number(eventId), [
+        {
+          id: usherId,
+          tasks: (taskInputs[usherId] || '')
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean),
+        },
+      ])
+      toast.success('Usher assigned!')
+      // Refresh event ushers
+      const eventRes = await getEventUshers(Number(eventId))
+      setEventUshers(eventRes.data)
+      setEditing((prev) => ({ ...prev, [usherId]: false }))
+    } catch {
+      toast.error('Failed to assign usher')
+    } finally {
+      setAssigning(false)
+    }
+  }
+
+  const handleUpdateTasks = async (usherId: number) => {
+    setAssigning(true)
+    try {
+      await updateUsherTasks(
+        Number(eventId),
+        usherId,
+        (taskInputs[usherId] || '')
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean)
+      )
+      toast.success('Tasks updated!')
+      // Refresh event ushers
+      const eventRes = await getEventUshers(Number(eventId))
+      setEventUshers(eventRes.data)
+      setEditing((prev) => ({ ...prev, [usherId]: false }))
+    } catch {
+      toast.error('Failed to update tasks')
+    } finally {
+      setAssigning(false)
+    }
+  }
+
+  if (loading) return <div>Loading ushers...</div>
+  if (organizerUshers.length === 0)
+    return <div>No ushers registered to your organizer.</div>
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end mb-2">
+        <Button onClick={() => setAddUsherDialogOpen(true)} variant="outline">
+          Add Usher
+        </Button>
+      </div>
+      <Dialog open={addUsherDialogOpen} onOpenChange={setAddUsherDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Usher</DialogTitle>
+            <DialogDescription>
+              Fill in the details to add a new usher to your team.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Full Name"
+              value={newUsher.name}
+              onChange={(e) =>
+                setNewUsher({ ...newUsher, name: e.target.value })
+              }
+            />
+            <Input
+              placeholder="Email Address"
+              type="email"
+              value={newUsher.email}
+              onChange={(e) =>
+                setNewUsher({ ...newUsher, email: e.target.value })
+              }
+            />
+            <Input
+              placeholder="Password"
+              type="password"
+              value={newUsher.password}
+              onChange={(e) =>
+                setNewUsher({ ...newUsher, password: e.target.value })
+              }
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAddUsherDialogOpen(false)}
+              disabled={addingUsher}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddUsher}
+              disabled={
+                addingUsher ||
+                !newUsher.name ||
+                !newUsher.email ||
+                !newUsher.password
+              }
+            >
+              {addingUsher ? 'Adding...' : 'Add Usher'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <div className="space-y-4">
+        {organizerUshers.map((usher) => (
+          <div
+            key={usher.id}
+            className="border rounded p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+          >
+            <div>
+              <div className="font-semibold">
+                {usher.name}{' '}
+                <span className="text-xs text-gray-500">({usher.email})</span>
+              </div>
+              <div className="text-xs text-gray-500">Usher ID: {usher.id}</div>
+            </div>
+            <div className="flex-1 flex flex-col md:flex-row md:items-center gap-2">
+              <input
+                className="border rounded px-2 py-1 w-full md:w-64"
+                placeholder="Enter tasks, comma separated"
+                value={taskInputs[usher.id] || ''}
+                onChange={(e) =>
+                  setTaskInputs((prev) => ({
+                    ...prev,
+                    [usher.id]: e.target.value,
+                  }))
+                }
+                disabled={
+                  assigning ||
+                  (!assignedUsherIds.has(usher.id) &&
+                    editing[usher.id] !== true)
+                }
+              />
+              {assignedUsherIds.has(usher.id) ? (
+                <>
+                  <Button
+                    variant="outline"
+                    disabled={assigning}
+                    onClick={() => handleUpdateTasks(usher.id)}
+                  >
+                    Update Tasks
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  disabled={assigning}
+                  onClick={() => handleAssign(usher.id)}
+                >
+                  Assign to Event
+                </Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
