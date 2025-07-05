@@ -52,8 +52,12 @@ export default function SignIn() {
 
       <div className="relative w-full max-w-md animate-fade-in">
         <div className="text-center mb-8 animate-scale-in">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-lg mb-4 transform hover:scale-105 transition-transform duration-200">
-            <Activity className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 mb-4 transform hover:scale-105 transition-transform duration-200">
+            <img 
+              src="/Validity_logo.png" 
+              alt="VEMS Logo" 
+              className="w-16 h-16 object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Welcome back to VEMS
