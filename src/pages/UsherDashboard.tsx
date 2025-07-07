@@ -295,13 +295,25 @@ export default function UsherDashboard() {
                     <span className="text-sm text-gray-600">
                       Zone: {event.zone}
                     </span>
-                    <Button
-                      size="sm"
-                      className="bg-gradient-to-r from-blue-600 to-purple-600"
-                    >
-                      <UserCheck className="w-4 h-4 mr-1" />
-                      Check-in
-                    </Button>
+                    <div className="flex gap-2">
+                      <Link to={`/dashboard/events/${event.id}`}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="bg-gradient-to-r from-green-600 to-blue-600 text-white hover:from-green-700 hover:to-blue-700"
+                        >
+                          <Users className="w-4 h-4 mr-1" />
+                          Manage
+                        </Button>
+                      </Link>
+                      <Button
+                        size="sm"
+                        className="bg-gradient-to-r from-blue-600 to-purple-600"
+                      >
+                        <UserCheck className="w-4 h-4 mr-1" />
+                        Check-in
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )

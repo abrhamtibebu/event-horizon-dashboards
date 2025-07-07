@@ -33,6 +33,10 @@ import BatchBadgePage from './pages/BatchBadgePage'
 import Guests from './pages/Guests'
 import BadgeDesignerTab from './pages/BadgeDesignerTab'
 import Team from '@/pages/Team'
+import UsherManagement from '@/pages/UsherManagement'
+import UsherEventManagement from '@/pages/UsherEventManagement'
+import UsherEvents from '@/pages/UsherEvents'
+import PublicEventRegister from './pages/PublicEventRegister'
 
 const queryClient = new QueryClient()
 
@@ -163,7 +167,12 @@ const App = () => (
             <Route path="check-in" element={<CheckIn />} />
             <Route path="tickets" element={<Tickets />} />
             <Route path="guests" element={<Guests />} />
+            <Route path="usher-management" element={<UsherManagement />} />
+            <Route path="usher/events" element={<UsherEvents />} />
+            <Route path="usher/events/:eventId" element={<UsherEventManagement />} />
           </Route>
+
+          <Route path="/register/:eventUuid" element={<PublicEventRegister />} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

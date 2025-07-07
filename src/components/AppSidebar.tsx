@@ -14,6 +14,7 @@ import {
   Ticket,
   UserCheck,
   Trash2,
+  UserPlus,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -63,6 +64,12 @@ const allItems = [
     roles: ['admin'],
   },
   {
+    title: 'Usher Management',
+    url: '/dashboard/usher-management',
+    icon: UserPlus,
+    roles: ['admin', 'organizer', 'user'],
+  },
+  {
     title: 'Locate Badges',
     url: '/dashboard/locate-badges',
     icon: MapPin,
@@ -90,6 +97,12 @@ const allItems = [
     title: 'Attendee Check-in',
     url: '/dashboard/check-in',
     icon: UserCheck,
+    roles: ['usher'],
+  },
+  {
+    title: 'Event Management',
+    url: '/dashboard/usher/events',
+    icon: Calendar,
     roles: ['usher'],
   },
   {

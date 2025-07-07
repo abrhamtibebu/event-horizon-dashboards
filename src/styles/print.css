@@ -1,0 +1,51 @@
+/* Print styles for badges */
+@media print {
+  .printable-badge-container {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    visibility: visible !important;
+    z-index: auto !important;
+    background: white !important;
+  }
+  
+  .printable-badge-batch {
+    page-break-inside: avoid;
+    margin: 10px 0;
+    display: block !important;
+  }
+  
+  /* Ensure badge elements are visible and properly sized for printing */
+  .printable-badge-batch > div {
+    visibility: visible !important;
+    display: block !important;
+    page-break-inside: avoid;
+  }
+  
+  /* Hide everything else when printing */
+  body * {
+    visibility: hidden;
+  }
+  
+  .printable-badge-container,
+  .printable-badge-container * {
+    visibility: visible !important;
+  }
+  
+  /* Ensure proper badge sizing for printing */
+  .printable-badge-batch img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+}
+
+/* Non-print styles */
+.printable-badge-container {
+  background: white;
+  padding: 20px;
+}
+
+.printable-badge-batch {
+  display: inline-block;
+  margin: 10px;
+} 

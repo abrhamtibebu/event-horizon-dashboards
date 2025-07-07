@@ -18,14 +18,14 @@ export function DashboardCard({
   return (
     <Card
       className={cn(
-        'bg-white/70 backdrop-blur-md border border-gray-200 shadow-xl rounded-2xl transition-shadow duration-200 hover:shadow-2xl',
+        'bg-white border border-gray-200 rounded-lg p-0',
         className
       )}
     >
       <CardHeader
-        className={cn('pb-2 border-b border-gray-100', headerClassName)}
+        className={cn('pb-2 border-b border-gray-100 bg-white', headerClassName)}
       >
-        <CardTitle className="text-xl font-bold text-gray-900 tracking-tight">
+        <CardTitle className="text-lg font-semibold text-gray-900 tracking-tight">
           {title}
         </CardTitle>
       </CardHeader>

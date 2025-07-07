@@ -51,6 +51,7 @@ export default function Events() {
       setLoading(true)
       setError(null)
       try {
+        // All users now use the same endpoint, but the backend handles role-based filtering
         const res = await api.get('/events')
         setEvents(res.data)
       } catch (err: any) {
@@ -60,7 +61,7 @@ export default function Events() {
       }
     }
     fetchEvents()
-  }, [])
+  }, [user?.role])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -91,30 +92,43 @@ export default function Events() {
       <Tabs defaultValue="all-events" className="space-y-4">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Events</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {user?.role === 'usher' ? 'My Assigned Events' : 'Events'}
+            </h1>
             <p className="text-gray-600 mt-1">
-              Manage and monitor all your events
+              {user?.role === 'usher' 
+                ? 'View and manage events you are assigned to as an usher'
+                : 'Manage and monitor all your events'
+              }
             </p>
           </div>
           <TabsList>
-            <TabsTrigger value="all-events">All Events</TabsTrigger>
-            <TabsTrigger value="settings">
-              <SettingsIcon className="w-4 h-4 mr-2" />
-              Settings
+            <TabsTrigger value="all-events">
+              {user?.role === 'usher' ? 'Assigned Events' : 'All Events'}
             </TabsTrigger>
+            {user?.role !== 'usher' && (
+              <TabsTrigger value="settings">
+                <SettingsIcon className="w-4 h-4 mr-2" />
+                Settings
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
         <TabsContent value="all-events">
           {/* Header */}
           <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold">All Events</h2>
-            <Link to="/dashboard/events/create">
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Event
-              </Button>
-            </Link>
+            <h2 className="text-2xl font-bold">
+              {user?.role === 'usher' ? 'Assigned Events' : 'All Events'}
+            </h2>
+            {user?.role !== 'usher' && (
+              <Link to="/dashboard/events/create">
+                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Event
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Filters */}
@@ -154,7 +168,7 @@ export default function Events() {
           {/* Events Grid or List */}
           {!loading && !error && (
             <div className="mt-6">
-              {user?.role === 'organizer' ? (
+              {(user?.role === 'organizer' || user?.role === 'usher') ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                   {filteredEvents.map((event) => {
                     // Calculate registration progress
@@ -244,6 +258,17 @@ export default function Events() {
                                 {event.organizer?.name || 'John Smith'}
                               </span>
                             </div>
+                            {/* Usher Tasks */}
+                            {user?.role === 'usher' && event.pivot?.tasks && (
+                              <div className="text-xs text-gray-500 mt-2">
+                                <span className="font-semibold text-gray-700">Your Tasks:</span>
+                                <div className="mt-1">
+                                  {JSON.parse(event.pivot.tasks).map((task: string, index: number) => (
+                                    <div key={index} className="text-gray-600">• {task}</div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                           {/* Action Buttons */}
                           <div className="flex flex-col sm:flex-row gap-2 p-4 pt-0">
@@ -255,7 +280,8 @@ export default function Events() {
                                 variant="outline"
                                 className="w-full flex items-center justify-center gap-2"
                               >
-                                <Eye className="w-4 h-4" /> View Details
+                                <Eye className="w-4 h-4" /> 
+                                {user?.role === 'usher' ? 'Manage Event' : 'View Details'}
                               </Button>
                             </Link>
                           </div>

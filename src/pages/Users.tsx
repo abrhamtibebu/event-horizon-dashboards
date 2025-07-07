@@ -51,6 +51,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useAuth } from '@/hooks/use-auth'
 import { useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
 export default function Users() {
   const [users, setUsers] = useState<any[]>([])
@@ -82,6 +83,11 @@ export default function Users() {
   const [showAddPassword, setShowAddPassword] = useState(false)
   const [showAddPasswordConfirm, setShowAddPasswordConfirm] = useState(false)
   const [searchParams] = useSearchParams()
+  const [resetUserId, setResetUserId] = useState<string | null>(null)
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetPasswordConfirm, setResetPasswordConfirm] = useState('')
+  const [resetError, setResetError] = useState<string | null>(null)
 
   useEffect(() => {
     if (searchParams.get('add') === '1') {
@@ -266,6 +272,31 @@ export default function Users() {
     currentUser?.role === 'admin' && currentUser?.id === 1
   // Helper to check if current user is admin
   const isCurrentAdmin = currentUser?.role === 'admin'
+
+  const handleResetPassword = async () => {
+    if (!resetUserId) return
+    setResetLoading(true)
+    setResetError(null)
+    if (resetPassword !== resetPasswordConfirm) {
+      setResetError('Passwords do not match')
+      setResetLoading(false)
+      return
+    }
+    try {
+      await api.post(`/admin/users/${resetUserId}/reset-password`, {
+        new_password: resetPassword,
+        new_password_confirmation: resetPasswordConfirm,
+      })
+      toast.success('Password reset successfully!')
+      setResetUserId(null)
+      setResetPassword('')
+      setResetPasswordConfirm('')
+    } catch (err: any) {
+      setResetError(err.response?.data?.error || 'Failed to reset password')
+    } finally {
+      setResetLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -541,6 +572,54 @@ export default function Users() {
                           >
                             <Pencil className="w-4 h-4" />
                           </Button>
+                        )}
+                        {isCurrentSuperAdmin && (
+                          <Dialog open={resetUserId === String(user.id)} onOpenChange={(open) => {
+                            if (!open) {
+                              setResetUserId(null)
+                              setResetPassword('')
+                              setResetPasswordConfirm('')
+                              setResetError(null)
+                            }
+                          }}>
+                            <DialogTrigger asChild>
+                              <Button size="sm" variant="outline" onClick={() => setResetUserId(String(user.id))}>
+                                Reset Password
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Reset Password for {user.name}</DialogTitle>
+                              </DialogHeader>
+                              <form onSubmit={e => { e.preventDefault(); handleResetPassword(); }} className="space-y-4">
+                                <Input
+                                  type="password"
+                                  placeholder="New Password"
+                                  value={resetPassword}
+                                  onChange={e => setResetPassword(e.target.value)}
+                                  required
+                                />
+                                <Input
+                                  type="password"
+                                  placeholder="Confirm New Password"
+                                  value={resetPasswordConfirm}
+                                  onChange={e => setResetPasswordConfirm(e.target.value)}
+                                  required
+                                />
+                                {resetError && <div className="text-red-500 text-sm">{resetError}</div>}
+                                <DialogFooter>
+                                  <Button type="submit" disabled={resetLoading}>
+                                    {resetLoading ? 'Resetting...' : 'Reset Password'}
+                                  </Button>
+                                  <DialogClose asChild>
+                                    <Button type="button" variant="outline" onClick={() => setResetUserId(null)}>
+                                      Cancel
+                                    </Button>
+                                  </DialogClose>
+                                </DialogFooter>
+                              </form>
+                            </DialogContent>
+                          </Dialog>
                         )}
                         {canDelete && (
                           <AlertDialog>

@@ -27,7 +27,127 @@ const createDefaultTemplate = (name = 'Custom Badge'): BadgeTemplate => ({
   pageSize: 'A6',
   backgroundColor: '#FFFFFF',
   backgroundImage: null,
-  elements: [],
+  elements: [
+    // Name (large, bold, centered)
+    {
+      id: uuidv4(),
+      type: 'text',
+      content: '{fullName}',
+      fontFamily: 'Arial',
+      fontSize: 38,
+      fontWeight: 'bold',
+      color: '#111111',
+      textAlign: 'center',
+      x: 0,
+      y: 20,
+      width: 396,
+      height: 60,
+      rotation: 0,
+      zIndex: 1,
+    },
+    // Company (centered)
+    {
+      id: uuidv4(),
+      type: 'text',
+      content: '{company}',
+      fontFamily: 'Arial',
+      fontSize: 24,
+      fontWeight: 'normal',
+      color: '#222222',
+      textAlign: 'center',
+      x: 0,
+      y: 90,
+      width: 396,
+      height: 32,
+      rotation: 0,
+      zIndex: 2,
+    },
+    // Job Title (centered)
+    {
+      id: uuidv4(),
+      type: 'text',
+      content: '{jobTitle}',
+      fontFamily: 'Arial',
+      fontSize: 22,
+      fontWeight: 'normal',
+      color: '#222222',
+      textAlign: 'center',
+      x: 0,
+      y: 122,
+      width: 396,
+      height: 28,
+      rotation: 0,
+      zIndex: 3,
+    },
+    // Country (centered)
+    {
+      id: uuidv4(),
+      type: 'text',
+      content: '{country}',
+      fontFamily: 'Arial',
+      fontSize: 22,
+      fontWeight: 'normal',
+      color: '#222222',
+      textAlign: 'center',
+      x: 0,
+      y: 150,
+      width: 396,
+      height: 28,
+      rotation: 0,
+      zIndex: 4,
+    },
+    // QR Code (centered)
+    {
+      id: uuidv4(),
+      type: 'qr',
+      vCardData: {
+        firstName: '{firstName}',
+        lastName: '{lastName}',
+        organization: '{company}',
+        title: '{jobTitle}',
+        email: '{email}',
+        phone: '{phone}',
+      },
+      x: 98,
+      y: 200,
+      width: 200,
+      height: 200,
+      rotation: 0,
+      zIndex: 5,
+    },
+    // Blue bottom bar (rounded bottom corners)
+    {
+      id: uuidv4(),
+      type: 'shape',
+      shapeType: 'rectangle',
+      backgroundColor: '#1769aa',
+      borderColor: '#1769aa',
+      borderWidth: 0,
+      x: 0,
+      y: 480,
+      width: 396,
+      height: 80,
+      rotation: 0,
+      zIndex: 6,
+    },
+    // GUEST text (centered on blue bar)
+    {
+      id: uuidv4(),
+      type: 'text',
+      content: 'GUEST',
+      fontFamily: 'Arial',
+      fontSize: 38,
+      fontWeight: 'bold',
+      color: '#FFFFFF',
+      textAlign: 'center',
+      x: 0,
+      y: 500,
+      width: 396,
+      height: 60,
+      rotation: 0,
+      zIndex: 7,
+    },
+  ],
 });
 
 export const BadgeDesignerTab: React.FC<{ eventId?: string }> = ({ eventId }) => {
@@ -269,6 +389,17 @@ export const BadgeDesignerTab: React.FC<{ eventId?: string }> = ({ eventId }) =>
       {/* Properties Panel */}
       <div className="w-full md:w-1/4 space-y-2">
         <h3 className="font-bold mb-2">Properties</h3>
+        {/* Badge Name Input */}
+        <div className="mb-4 p-2 border rounded bg-yellow-50">
+          <label className="block text-xs font-semibold text-yellow-900 mb-1">Badge Design Name</label>
+          <input
+            type="text"
+            value={activeTemplate?.name || ''}
+            onChange={e => updateActiveTemplate({ ...activeTemplate, name: e.target.value })}
+            className="w-full border px-2 py-1 rounded font-bold text-lg bg-white focus:ring-2 focus:ring-yellow-300"
+            placeholder="Enter badge design name..."
+          />
+        </div>
         {/* Template properties */}
         <div className="mb-4 p-2 border rounded">
           <div>

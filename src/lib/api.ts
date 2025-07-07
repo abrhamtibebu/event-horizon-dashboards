@@ -64,7 +64,7 @@ export const getEventUshers = (eventId: number) =>
 export const assignUshersToEvent = (
   eventId: number,
   ushers: { id: number; tasks: string[] }[]
-) => api.post(`/events/${eventId}/assign-usher`, { ushers })
+) => api.post(`/events/${eventId}/ushers`, { ushers })
 
 export const updateUsherTasks = (
   eventId: number,
@@ -90,3 +90,13 @@ export const getEventsForOrganizer = (organizerId: number) =>
 export const getAvailableUshers = () => api.get('/ushers/available')
 
 export const getUshers = () => api.get('/users/ushers')
+
+// Get available ushers for a specific event
+export const getAvailableUshersForEvent = (eventId: number) =>
+  api.get(`/events/${eventId}/available-ushers`)
+
+// Alternative endpoint for assigning ushers (for backward compatibility)
+export const assignUshersToEventAlt = (
+  eventId: number,
+  ushers: { id: number; tasks: string[] }[]
+) => api.post(`/events/${eventId}/assign-ushers`, { ushers })
