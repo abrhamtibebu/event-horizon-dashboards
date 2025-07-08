@@ -95,10 +95,10 @@ export default function UsherManagement() {
         getUshers(),
         user?.role === 'admin' ? getAllOrganizers() : getMyEvents(),
       ])
-      
+
       setUshers(ushersRes.data)
       setEvents(eventsRes.data)
-      
+
       if (eventId) {
         setSelectedEvent(eventId)
       } else if (eventsRes.data.length > 0) {
@@ -133,14 +133,14 @@ export default function UsherManagement() {
 
   const handleUpdateTasks = async (usherId: number) => {
     if (!selectedEvent || !editingTasks.trim()) return
-    
+
     setUpdating(true)
     try {
       const tasks = editingTasks
         .split(',')
         .map((task) => task.trim())
         .filter(Boolean)
-      
+
       await updateUsherTasks(Number(selectedEvent), usherId, tasks)
       toast.success('Tasks updated successfully!')
       setEditDialogOpen(false)
@@ -157,7 +157,7 @@ export default function UsherManagement() {
 
   const handleRemoveUsher = async (usherId: number) => {
     if (!selectedEvent) return
-    
+
     try {
       await api.delete(`/events/${selectedEvent}/ushers/${usherId}`)
       toast.success('Usher removed from event')
@@ -182,9 +182,10 @@ export default function UsherManagement() {
   }
 
   const filteredUshers = ushers.filter((usher) => {
-    const matchesSearch = usher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         usher.email.toLowerCase().includes(searchTerm.toLowerCase())
-    
+    const matchesSearch =
+      usher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      usher.email.toLowerCase().includes(searchTerm.toLowerCase())
+
     if (filterStatus === 'all') return matchesSearch
     if (filterStatus === 'assigned') {
       return matchesSearch && eventUshers.some((eu) => eu.id === usher.id)
@@ -192,7 +193,7 @@ export default function UsherManagement() {
     if (filterStatus === 'available') {
       return matchesSearch && !eventUshers.some((eu) => eu.id === usher.id)
     }
-    
+
     return matchesSearch
   })
 
@@ -246,7 +247,9 @@ export default function UsherManagement() {
                     <div className="flex flex-col">
                       <span className="font-medium">{event.name}</span>
                       <span className="text-sm text-gray-500">
-                        {format(parseISO(event.start_date), 'MMM dd, yyyy')}
+                        {event.start_date
+                          ? format(parseISO(event.start_date), 'MMM dd, yyyy')
+                          : 'No date'}
                       </span>
                     </div>
                   </SelectItem>
@@ -254,13 +257,15 @@ export default function UsherManagement() {
               </SelectContent>
             </Select>
           </div>
-          
+
           {currentEvent && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-gray-500" />
                 <span className="text-sm">
-                  {format(parseISO(currentEvent.start_date), 'MMM dd, yyyy')}
+                  {currentEvent.start_date
+                    ? format(parseISO(currentEvent.start_date), 'MMM dd, yyyy')
+                    : 'No date'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -326,32 +331,68 @@ export default function UsherManagement() {
                   </TableRow>
                 ) : (
                   filteredUshers.map((usher) => {
-                    const isAssigned = eventUshers.some((eu) => eu.id === usher.id)
-                    const assignedUsher = eventUshers.find((eu) => eu.id === usher.id)
+                    const isAssigned = eventUshers.some(
+                      (eu) => eu.id === usher.id
+                    )
+                    const assignedUsher = eventUshers.find(
+                      (eu) => eu.id === usher.id
+                    )
                     const tasks = assignedUsher?.pivot?.tasks
-                      ? (Array.isArray(assignedUsher.pivot.tasks)
-                          ? assignedUsher.pivot.tasks
-                          : JSON.parse(assignedUsher.pivot.tasks))
+                      ? Array.isArray(assignedUsher.pivot.tasks)
+                        ? assignedUsher.pivot.tasks
+                        : JSON.parse(assignedUsher.pivot.tasks)
                       : []
                     let statusBadge = null
                     if (isAssigned) {
-                      const usherStatus = usherTaskStatuses.find((u: any) => u.usher_id === usher.id)
+                      const usherStatus = usherTaskStatuses.find(
+                        (u: any) => u.usher_id === usher.id
+                      )
                       if (usherStatus && usherStatus.tasks.length > 0) {
                         const completion = usherStatus.task_completion || {}
-                        const allComplete = usherStatus.tasks.length > 0 && Object.values(completion).length > 0 && Object.values(completion).every((v: any) => v)
-                        const anyComplete = Object.values(completion).some((v: any) => v)
+                        const allComplete =
+                          usherStatus.tasks.length > 0 &&
+                          Object.values(completion).length > 0 &&
+                          Object.values(completion).every((v: any) => v)
+                        const anyComplete = Object.values(completion).some(
+                          (v: any) => v
+                        )
                         if (allComplete) {
-                          statusBadge = <Badge className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />All Tasks Complete</Badge>
+                          statusBadge = (
+                            <Badge className="bg-green-100 text-green-800">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              All Tasks Complete
+                            </Badge>
+                          )
                         } else if (anyComplete) {
-                          statusBadge = <Badge className="bg-yellow-100 text-yellow-800"><Clock className="w-3 h-3 mr-1" />In Progress</Badge>
+                          statusBadge = (
+                            <Badge className="bg-yellow-100 text-yellow-800">
+                              <Clock className="w-3 h-3 mr-1" />
+                              In Progress
+                            </Badge>
+                          )
                         } else {
-                          statusBadge = <Badge className="bg-blue-100 text-blue-800"><UserCheck className="w-3 h-3 mr-1" />Assigned</Badge>
+                          statusBadge = (
+                            <Badge className="bg-blue-100 text-blue-800">
+                              <UserCheck className="w-3 h-3 mr-1" />
+                              Assigned
+                            </Badge>
+                          )
                         }
                       } else {
-                        statusBadge = <Badge className="bg-gray-100 text-gray-800"><UserCheck className="w-3 h-3 mr-1" />No Tasks Assigned</Badge>
+                        statusBadge = (
+                          <Badge className="bg-gray-100 text-gray-800">
+                            <UserCheck className="w-3 h-3 mr-1" />
+                            No Tasks Assigned
+                          </Badge>
+                        )
                       }
                     } else {
-                      statusBadge = <Badge className="bg-gray-100 text-gray-800"><UserCheck className="w-3 h-3 mr-1" />Available</Badge>
+                      statusBadge = (
+                        <Badge className="bg-gray-100 text-gray-800">
+                          <UserCheck className="w-3 h-3 mr-1" />
+                          Available
+                        </Badge>
+                      )
                     }
                     return (
                       <TableRow key={usher.id}>
@@ -362,7 +403,9 @@ export default function UsherManagement() {
                             </div>
                             <div>
                               <div className="font-medium">{usher.name}</div>
-                              <div className="text-sm text-gray-500">ID: {usher.id}</div>
+                              <div className="text-sm text-gray-500">
+                                ID: {usher.id}
+                              </div>
                             </div>
                           </div>
                         </TableCell>
@@ -372,13 +415,19 @@ export default function UsherManagement() {
                           {isAssigned && tasks.length > 0 ? (
                             <div className="space-y-1">
                               {tasks.map((task: string, index: number) => (
-                                <Badge key={index} variant="outline" className="text-xs">
+                                <Badge
+                                  key={index}
+                                  variant="outline"
+                                  className="text-xs"
+                                >
                                   {task}
                                 </Badge>
                               ))}
                             </div>
                           ) : (
-                            <span className="text-gray-500 text-sm">No tasks assigned</span>
+                            <span className="text-gray-500 text-sm">
+                              No tasks assigned
+                            </span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -435,19 +484,19 @@ export default function UsherManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {selectedUsher && eventUshers.some((eu) => eu.id === selectedUsher.id)
+              {selectedUsher &&
+              eventUshers.some((eu) => eu.id === selectedUsher.id)
                 ? 'Edit Usher Tasks'
-                : 'Assign Usher to Event'
-              }
+                : 'Assign Usher to Event'}
             </DialogTitle>
             <DialogDescription>
-              {selectedUsher && eventUshers.some((eu) => eu.id === selectedUsher.id)
+              {selectedUsher &&
+              eventUshers.some((eu) => eu.id === selectedUsher.id)
                 ? `Update tasks for ${selectedUsher.name}`
-                : `Assign ${selectedUsher?.name} to ${currentEvent?.name}`
-              }
+                : `Assign ${selectedUsher?.name} to ${currentEvent?.name}`}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4">
             <div>
               <Label>Tasks</Label>
@@ -459,7 +508,7 @@ export default function UsherManagement() {
               />
             </div>
           </div>
-          
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -480,4 +529,4 @@ export default function UsherManagement() {
       </Dialog>
     </div>
   )
-} 
+}

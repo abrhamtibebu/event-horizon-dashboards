@@ -36,62 +36,68 @@ const allItems = [
     title: 'Dashboard',
     url: '/dashboard',
     icon: Activity,
-    roles: ['admin', 'organizer', 'usher'],
+    roles: ['superadmin', 'admin', 'organizer', 'usher'],
   },
   {
     title: 'Events',
     url: '/dashboard/events',
     icon: Calendar,
-    roles: ['admin', 'organizer'],
+    roles: ['superadmin', 'admin', 'organizer'],
   },
   {
     title: 'Create Event',
     url: '/dashboard/events/create',
     icon: ClipboardList,
-    roles: ['organizer'],
+    roles: ['superadmin', 'organizer'],
   },
   { title: 'Users', url: '/dashboard/users', icon: Users, roles: ['admin'] },
+  {
+    title: 'Users',
+    url: '/dashboard/users',
+    icon: Users,
+    roles: ['superadmin', 'admin'],
+  },
   {
     title: 'Organizers',
     url: '/dashboard/organizers',
     icon: Building2,
-    roles: ['admin'],
+    roles: ['superadmin', 'admin'],
   },
   {
     title: 'Guests',
     url: '/dashboard/guests',
     icon: Users,
-    roles: ['admin'],
+    roles: ['superadmin', 'admin'],
   },
   {
     title: 'Usher Management',
     url: '/dashboard/usher-management',
     icon: UserPlus,
-    roles: ['admin', 'organizer', 'user'],
+    roles: ['superadmin', 'admin', 'organizer', 'user'],
   },
   {
     title: 'Locate Badges',
     url: '/dashboard/locate-badges',
     icon: MapPin,
-    roles: ['admin', 'usher'],
+    roles: ['superadmin', 'admin', 'usher'],
   },
   {
     title: 'Badge Designer',
     url: '/apps/badge-designer',
     icon: ClipboardList,
-    roles: ['admin', 'organizer'],
+    roles: ['superadmin', 'admin', 'organizer'],
   },
   {
     title: 'Messages',
     url: '/dashboard/messages',
     icon: MessageSquare,
-    roles: ['admin', 'organizer'],
+    roles: ['superadmin', 'admin', 'organizer'],
   },
   {
     title: 'Event Analytics',
     url: '/dashboard/reports',
     icon: BarChart,
-    roles: ['organizer'],
+    roles: ['superadmin', 'organizer'],
   },
   {
     title: 'Attendee Check-in',
@@ -115,20 +121,26 @@ const allItems = [
     title: 'System Logs',
     url: '/dashboard/audit-logs',
     icon: Shield,
-    roles: ['admin'],
+    roles: ['superadmin', 'admin'],
   },
   { title: 'Trash', url: '/dashboard/trash', icon: Trash2, roles: ['admin'] },
+  {
+    title: 'Trash',
+    url: '/dashboard/trash',
+    icon: Trash2,
+    roles: ['superadmin', 'admin'],
+  },
   {
     title: 'Settings',
     url: '/dashboard/settings',
     icon: Settings,
-    roles: ['admin', 'organizer'],
+    roles: ['superadmin', 'admin', 'organizer'],
   },
   {
     title: 'My Team',
     url: '/dashboard/team',
     icon: Users,
-    roles: ['organizer'],
+    roles: ['superadmin', 'organizer'],
   },
 ]
 
@@ -173,9 +185,9 @@ export function AppSidebar() {
       <div className="p-4 border-b border-slate-200">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 flex items-center justify-center">
-            <img 
-              src="/Validity_logo.png" 
-              alt="VEMS Logo" 
+            <img
+              src="/Validity_logo.png"
+              alt="VEMS Logo"
               className="w-10 h-10 object-contain"
             />
           </div>

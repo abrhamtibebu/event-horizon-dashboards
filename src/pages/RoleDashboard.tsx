@@ -1,11 +1,11 @@
-import AdminDashboard from "./AdminDashboard";
-import OrganizerDashboard from "./OrganizerDashboard";
-import UsherDashboard from "./UsherDashboard";
-import AttendeeDashboard from "./AttendeeDashboard";
-import { useAuth } from "@/hooks/use-auth.tsx";
+import AdminDashboard from './AdminDashboard'
+import OrganizerDashboard from './OrganizerDashboard'
+import UsherDashboard from './UsherDashboard'
+import AttendeeDashboard from './AttendeeDashboard'
+import { useAuth } from '@/hooks/use-auth.tsx'
 
 export default function RoleDashboard() {
-  const { user } = useAuth();
+  const { user } = useAuth()
 
   if (!user) {
     return (
@@ -15,15 +15,17 @@ export default function RoleDashboard() {
           <p className="text-gray-600">Loading dashboard...</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div>
-      {user.role === "admin" && <AdminDashboard />}
-      {user.role === "organizer" && <OrganizerDashboard />}
-      {user.role === "usher" && <UsherDashboard />}
-      {user.role === "attendee" && <AttendeeDashboard />}
+      {(user.role === 'admin' || user.role === 'superadmin') && (
+        <AdminDashboard />
+      )}
+      {user.role === 'organizer' && <OrganizerDashboard />}
+      {user.role === 'usher' && <UsherDashboard />}
+      {user.role === 'attendee' && <AttendeeDashboard />}
     </div>
-  );
+  )
 }
