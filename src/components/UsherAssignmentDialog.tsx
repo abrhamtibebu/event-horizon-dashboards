@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select'
 import { UserPlus, X, Plus } from 'lucide-react'
 import { toast } from 'sonner'
-import api, { getEventUshers, updateUsherTasks, assignUshersToEvent } from '@/lib/api'
+import api, { getEventUshers, updateUsherTasks, assignUshersToEvent, getUshers } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
 
 interface UsherAssignmentDialogProps {
@@ -63,7 +63,7 @@ export function UsherAssignmentDialog({
   const loadAllUshers = async () => {
     setLoading(true)
     try {
-      const response = await api.get('/ushers')
+      const response = await getUshers()
       setAvailableUshers(response.data)
     } catch (error) {
       console.error('Failed to load ushers:', error)

@@ -50,13 +50,7 @@ const allItems = [
     icon: ClipboardList,
     roles: ['superadmin', 'organizer'],
   },
-  { title: 'Users', url: '/dashboard/users', icon: Users, roles: ['admin'] },
-  {
-    title: 'Users',
-    url: '/dashboard/users',
-    icon: Users,
-    roles: ['superadmin', 'admin'],
-  },
+  { title: 'Users', url: '/dashboard/users', icon: Users, roles: ['superadmin', 'admin'] },
   {
     title: 'Organizers',
     url: '/dashboard/organizers',
@@ -123,13 +117,7 @@ const allItems = [
     icon: Shield,
     roles: ['superadmin', 'admin'],
   },
-  { title: 'Trash', url: '/dashboard/trash', icon: Trash2, roles: ['admin'] },
-  {
-    title: 'Trash',
-    url: '/dashboard/trash',
-    icon: Trash2,
-    roles: ['superadmin', 'admin'],
-  },
+  { title: 'Trash', url: '/dashboard/trash', icon: Trash2, roles: ['superadmin', 'admin'] },
   {
     title: 'Settings',
     url: '/dashboard/settings',

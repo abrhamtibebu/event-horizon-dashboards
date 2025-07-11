@@ -66,7 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const apiKey = import.meta.env.VITE_API_KEY || ''
     const res = await api.post('/login', credentials, {
       headers: {
-        'x-api-key': apiKey,
+        'X-API-KEY': apiKey,
       },
     })
     const { token, user } = res.data

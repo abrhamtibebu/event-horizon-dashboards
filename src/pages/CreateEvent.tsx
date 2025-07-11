@@ -50,9 +50,9 @@ export default function CreateEvent() {
     max_guests: '',
     registration_start_date: null as Date | null,
     registration_end_date: null as Date | null,
-    event_type_id: '',
-    event_category_id: '',
-    organizer_id: '',
+    event_type_id: '', // Remove default '1'
+    event_category_id: '', // Remove default '1'
+    organizer_id: '', // Remove default '1'
     status: 'draft',
     event_image: null as File | null,
     requirements: '',
@@ -94,7 +94,7 @@ export default function CreateEvent() {
 
   useEffect(() => {
     if (user && user.role === 'organizer' && user.organizer_id) {
-      handleInputChange('organizer_id', user.organizer_id)
+      handleInputChange('organizer_id', String(user.organizer_id))
     }
 
     const fetchData = async (
@@ -168,6 +168,8 @@ export default function CreateEvent() {
         end_date: eventRange[0].endDate.toISOString(),
         registration_start_date: regRange[0].startDate.toISOString(),
         registration_end_date: regRange[0].endDate.toISOString(),
+        // Always use the logged-in organizer's ID if available
+        organizer_id: user?.role === 'organizer' && user.organizer_id ? String(user.organizer_id) : formData.organizer_id,
       }
       if (formData.event_image) {
         payload = new FormData()
@@ -175,6 +177,7 @@ export default function CreateEvent() {
           if (key === 'event_image' && value) {
             payload.append('event_image', value)
           } else if (key === 'guest_types') {
+            // Always send guest_types as array
             const guestTypesArr = (value as string)
               .split(',')
               .map((s: string) => s.trim())

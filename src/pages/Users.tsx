@@ -264,12 +264,11 @@ export default function Users() {
   }
 
   // Helper to check if a user is super admin
-  const isSuperAdmin = (u: any) => u.role === 'admin' && u.id === 1
+  const isSuperAdmin = (u: any) => u.role === 'superadmin';
   // Helper to check if a user is admin (not super admin)
   const isAdmin = (u: any) => u.role === 'admin' && u.id !== 1
   // Helper to check if current user is super admin
-  const isCurrentSuperAdmin =
-    currentUser?.role === 'admin' && currentUser?.id === 1
+  const isCurrentSuperAdmin = currentUser && currentUser.role === 'superadmin';
   // Helper to check if current user is admin
   const isCurrentAdmin = currentUser?.role === 'admin'
 
@@ -323,7 +322,7 @@ export default function Users() {
               <Input
                 name="name"
                 placeholder="Name"
-                value={addForm.name}
+                value={addForm.name ?? ''}
                 onChange={handleAddChange}
                 required
               />
@@ -331,7 +330,7 @@ export default function Users() {
                 name="email"
                 type="email"
                 placeholder="Email"
-                value={addForm.email}
+                value={addForm.email ?? ''}
                 onChange={handleAddChange}
                 required
               />
@@ -340,7 +339,7 @@ export default function Users() {
                   name="password"
                   type={showAddPassword ? 'text' : 'password'}
                   placeholder="Password"
-                  value={addForm.password}
+                  value={addForm.password ?? ''}
                   onChange={handleAddChange}
                   required
                   className="pr-10"
@@ -363,7 +362,7 @@ export default function Users() {
                   name="password_confirmation"
                   type={showAddPasswordConfirm ? 'text' : 'password'}
                   placeholder="Confirm Password"
-                  value={addForm.password_confirmation}
+                  value={addForm.password_confirmation ?? ''}
                   onChange={handleAddChange}
                   required
                   className="pr-10"
@@ -394,13 +393,13 @@ export default function Users() {
               <Input
                 name="phone"
                 placeholder="Phone (optional)"
-                value={addForm.phone}
+                value={addForm.phone ?? ''}
                 onChange={handleAddChange}
               />
               <Input
                 name="bio"
                 placeholder="Bio (optional)"
-                value={addForm.bio}
+                value={addForm.bio ?? ''}
                 onChange={handleAddChange}
               />
               {addError && (
@@ -456,7 +455,7 @@ export default function Users() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
             placeholder="Search users..."
-            value={searchTerm}
+            value={searchTerm ?? ''}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
@@ -564,7 +563,7 @@ export default function Users() {
                     <TableCell>{user.eventsManaged || '-'}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        {canEdit && (
+                        {(canEdit || isCurrentSuperAdmin) && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -595,14 +594,14 @@ export default function Users() {
                                 <Input
                                   type="password"
                                   placeholder="New Password"
-                                  value={resetPassword}
+                                  value={resetPassword ?? ''}
                                   onChange={e => setResetPassword(e.target.value)}
                                   required
                                 />
                                 <Input
                                   type="password"
                                   placeholder="Confirm New Password"
-                                  value={resetPasswordConfirm}
+                                  value={resetPasswordConfirm ?? ''}
                                   onChange={e => setResetPasswordConfirm(e.target.value)}
                                   required
                                 />
@@ -689,7 +688,7 @@ export default function Users() {
               <Input
                 name="name"
                 placeholder="Name"
-                value={editForm.name}
+                value={editForm.name ?? ''}
                 onChange={handleEditChange}
                 required
               />
@@ -697,7 +696,7 @@ export default function Users() {
                 name="email"
                 type="email"
                 placeholder="Email"
-                value={editForm.email}
+                value={editForm.email ?? ''}
                 onChange={handleEditChange}
                 required
               />
@@ -714,13 +713,13 @@ export default function Users() {
               <Input
                 name="phone"
                 placeholder="Phone (optional)"
-                value={editForm.phone}
+                value={editForm.phone ?? ''}
                 onChange={handleEditChange}
               />
               <Input
                 name="bio"
                 placeholder="Bio (optional)"
-                value={editForm.bio}
+                value={editForm.bio ?? ''}
                 onChange={handleEditChange}
               />
               {editError && (

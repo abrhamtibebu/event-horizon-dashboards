@@ -323,9 +323,9 @@ const BadgeDesignerTab: React.FC<BadgeDesignerTabProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [draftToDelete, setDraftToDelete] = useState<null | number>(null)
 
-  // Fetch organizers if admin
+  // Fetch organizers if admin or superadmin
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (user?.role === 'admin' || user?.role === 'superadmin') {
       setLoadingOrganizers(true)
       console.log('Fetching organizers for admin...')
       api
@@ -341,9 +341,9 @@ const BadgeDesignerTab: React.FC<BadgeDesignerTabProps> = ({
     }
   }, [user])
 
-  // Fetch events for selected organizer (admin) or own events (organizer)
+  // Fetch events for selected organizer (admin or superadmin) or own events (organizer)
   useEffect(() => {
-    if (user?.role === 'admin' && selectedOrganizer) {
+    if ((user?.role === 'admin' || user?.role === 'superadmin') && selectedOrganizer) {
       setLoadingEvents(true)
       console.log('Fetching events for organizer:', selectedOrganizer)
       api
@@ -755,7 +755,7 @@ const BadgeDesignerTab: React.FC<BadgeDesignerTabProps> = ({
           <div className="font-bold text-2xl tracking-tight">
             Badge Designer
           </div>
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.role === 'superadmin') && (
             <span className="ml-4 text-gray-500 text-sm">
               Organizer:{' '}
               {organizers.find((o) => o.id === selectedOrganizer)?.name || '—'}
@@ -822,7 +822,7 @@ const BadgeDesignerTab: React.FC<BadgeDesignerTabProps> = ({
       </div>
       {/* Event Mapping UI - now beside Save/Publish buttons */}
       <div className="flex items-center gap-4 px-8 py-2 bg-white border-b border-gray-100">
-        {user?.role === 'admin' && (
+        {(user?.role === 'admin' || user?.role === 'superadmin') && (
           <>
             <div>
               <label className="block text-xs font-medium mb-0.5">

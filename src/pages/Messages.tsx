@@ -58,7 +58,7 @@ export default function Messages() {
 
   // Fetch conversations (for demo, use event participants as conversations)
   useEffect(() => {
-    if (user?.role === 'admin' && !eventId) {
+    if (user?.role === 'admin' || user?.role === 'superadmin' && !eventId) {
       // Fetch all events for admin event selector
       api
         .get('/events')
@@ -72,7 +72,7 @@ export default function Messages() {
     const effectiveEventId = eventId || adminEventId
     if (!effectiveEventId || !user) return
     setLoading(true)
-    if (user.role === 'admin') {
+    if (user.role === 'admin' || user.role === 'superadmin') {
       Promise.all([
         getEventUshers(effectiveEventId),
         getEventById(effectiveEventId),
@@ -226,7 +226,7 @@ export default function Messages() {
 
   // For admin: fetch messages for selected pair
   useEffect(() => {
-    if (user.role !== 'admin' || !eventId || !selectedAdminPair) return
+    if (user.role !== 'admin' && user.role !== 'superadmin' || !eventId || !selectedAdminPair) return
     setLoading(true)
     getEventMessages(eventId)
       .then((res) => {
@@ -265,7 +265,7 @@ export default function Messages() {
       </div>
 
       {/* Admin Event Selector */}
-      {user.role === 'admin' && !eventId && (
+      {user.role === 'admin' || user.role === 'superadmin' ? (
         <div className="mb-4 max-w-md">
           <Select value={adminEventId || ''} onValueChange={setAdminEventId}>
             <SelectTrigger className="w-full">
@@ -280,7 +280,7 @@ export default function Messages() {
             </SelectContent>
           </Select>
         </div>
-      )}
+      ) : null}
 
       {/* Unread Messages Section */}
       {unreadMessages.length > 0 && (
@@ -321,12 +321,12 @@ export default function Messages() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
-                disabled={user.role === 'admin'}
+                disabled={user.role === 'admin' || user.role === 'superadmin'}
               />
             </div>
             <ScrollArea className="h-[480px]">
               <div className="space-y-2">
-                {user.role === 'admin'
+                {user.role === 'admin' || user.role === 'superadmin'
                   ? adminPairs
                       .filter(
                         (pair) =>
@@ -390,7 +390,7 @@ export default function Messages() {
         {/* Message Thread */}
         <DashboardCard
           title={
-            user.role === 'admin'
+            user.role === 'admin' || user.role === 'superadmin'
               ? selectedAdminPair
                 ? `Organizer: ${selectedAdminPair.organizer.name} / Usher: ${selectedAdminPair.usher.name}`
                 : 'Select a conversation'
@@ -398,7 +398,7 @@ export default function Messages() {
           }
           className="lg:col-span-2"
         >
-          {user.role === 'admin' ? (
+          {user.role === 'admin' || user.role === 'superadmin' ? (
             selectedAdminPair ? (
               <div className="flex flex-col h-[480px]">
                 {/* Participants */}

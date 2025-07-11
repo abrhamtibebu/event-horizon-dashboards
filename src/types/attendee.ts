@@ -6,6 +6,8 @@ export interface Guest {
   company?: string;
   jobtitle?: string;
   profile_image_url?: string;
+  uuid?: string;
+  profile_picture?: string;
 }
 
 export interface GuestType {
