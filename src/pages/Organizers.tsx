@@ -56,6 +56,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function Organizers() {
   const [organizers, setOrganizers] = useState<any[]>([])
@@ -84,6 +85,9 @@ export default function Organizers() {
   const [selectedEvents, setSelectedEvents] = useState<any[]>([])
   const [eventsLoading, setEventsLoading] = useState(false)
   const [eventsError, setEventsError] = useState<string | null>(null)
+  const { user: currentUser } = useAuth()
+  const isCurrentSuperAdmin = currentUser && currentUser.role === 'superadmin';
+  const canDelete = isCurrentSuperAdmin;
 
   useEffect(() => {
     const fetchOrganizers = async () => {
@@ -273,17 +277,15 @@ export default function Organizers() {
     setDeleteLoading(true)
     try {
       await api.delete(`/organizers/${deleteOrganizer.id}`)
-      toast({ title: 'Organizer deleted successfully!' })
+      toast({ title: 'Organizer moved to trash!' })
       setDeleteDialogOpen(false)
-      // Refresh organizers
+      setDeleteOrganizer(null)
+      setLoading(true)
       const res = await api.get('/organizers')
       setOrganizers(res.data)
-    } catch (err: any) {
-      toast({
-        title: 'Failed to delete organizer',
-        description: err.response?.data?.error || 'Unknown error',
-        variant: 'destructive',
-      })
+      setLoading(false)
+    } catch (err) {
+      toast({ title: 'Failed to delete organizer', variant: 'destructive' })
     } finally {
       setDeleteLoading(false)
     }
@@ -605,6 +607,7 @@ export default function Organizers() {
                                 variant="outline"
                                 size="icon"
                                 onClick={() => openDeleteDialog(organizer)}
+                                disabled={!canDelete}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -725,6 +728,7 @@ export default function Organizers() {
                           variant="outline"
                           size="icon"
                           onClick={() => openDeleteDialog(organizer)}
+                          disabled={!canDelete}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>

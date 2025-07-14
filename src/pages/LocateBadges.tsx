@@ -318,6 +318,7 @@ export default function LocateBadges() {
                   <TableHead>Organization</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Badge Type</TableHead>
+                  <TableHead>Guest Type</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -335,6 +336,11 @@ export default function LocateBadges() {
                     <TableCell>
                       <Badge className={getGuestTypeColor(row.badgeType)}>
                         {row.badgeType}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getGuestTypeColor(row.guestType || row.badgeType)}>
+                        {row.guestType || row.badgeType}
                       </Badge>
                     </TableCell>
                     <TableCell>

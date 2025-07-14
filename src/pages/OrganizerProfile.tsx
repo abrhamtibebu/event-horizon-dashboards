@@ -148,26 +148,60 @@ export default function OrganizerProfile() {
 
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Frontend validation for required fields (match CreateEvent.tsx)
+    const requiredFields = [
+      'name', 'start_date', 'end_date', 'location', 'max_guests',
+      'registration_start_date', 'registration_end_date', 'event_type_id', 'event_category_id'
+    ];
+    for (const field of requiredFields) {
+      if (!createForm[field] || (typeof createForm[field] === 'string' && createForm[field].trim() === '')) {
+        toast.error(`Please fill in the required field: ${field.replace(/_/g, ' ')}`);
+        return;
+      }
+    }
+    if (isNaN(Number(createForm.max_guests)) || parseInt(createForm.max_guests, 10) < 1) {
+      toast.error('Max Guests must be a positive integer.');
+      return;
+    }
+    const guestTypesArr = createForm.guest_types
+      .split(',')
+      .map((s: string) => s.trim())
+      .filter(Boolean)
+    if (guestTypesArr.length === 0) {
+      toast.error('Please provide at least one guest type.');
+      return;
+    }
     setCreateLoading(true)
     try {
       let payload
       let headers = {}
-      const guestTypesArr = createForm.guest_types
-        .split(',')
-        .map((s: string) => s.trim())
-        .filter(Boolean)
+      // Format dates and max_guests
+      const processedForm = {
+        ...createForm,
+        start_date: new Date(createForm.start_date).toISOString(),
+        end_date: new Date(createForm.end_date).toISOString(),
+        registration_start_date: new Date(createForm.registration_start_date).toISOString(),
+        registration_end_date: new Date(createForm.registration_end_date).toISOString(),
+        max_guests: parseInt(createForm.max_guests, 10),
+        // Only include organizer_id if not organizer
+        ...(user?.role !== 'organizer' && { organizer_id: createForm.organizer_id }),
+        guest_types: guestTypesArr,
+      }
       if (createForm.event_image) {
         payload = new FormData()
-        Object.entries(createForm).forEach(([key, value]) => {
+        Object.entries(processedForm).forEach(([key, value]) => {
           if (key === 'event_image' && value)
             payload.append('event_image', value)
           else if (key === 'guest_types')
-            payload.append('guest_types', JSON.stringify(guestTypesArr))
-          else payload.append(key, value as any)
+            (Array.isArray(value) ? value : [value]).forEach((type: string) =>
+              payload.append('guest_types[]', type)
+            )
+          else
+            payload.append(key, value as any)
         })
         headers = { 'Content-Type': 'multipart/form-data' }
       } else {
-        payload = { ...createForm, guest_types: guestTypesArr }
+        payload = processedForm
       }
       await api.post(`/events`, payload, { headers })
       toast.success('Event created successfully!')

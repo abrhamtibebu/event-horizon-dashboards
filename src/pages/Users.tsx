@@ -241,8 +241,9 @@ export default function Users() {
       const res = await api.get('/users')
       setUsers(res.data)
       setLoading(false)
+      toast.success('User moved to trash!')
     } catch (err) {
-      // Optionally show error
+      toast.error('Failed to delete user')
     } finally {
       setDeleteLoading(false)
     }
@@ -508,8 +509,7 @@ export default function Users() {
                 const showActions = isCurrentAdmin && !isSuperAdmin(user)
                 const canEdit =
                   showActions && (isCurrentSuperAdmin || !isAdmin(user))
-                const canDelete =
-                  showActions && (isCurrentSuperAdmin || !isAdmin(user))
+                const canDelete = isCurrentSuperAdmin && user.id !== currentUser.id;
                 const canChangeStatus =
                   showActions && (isCurrentSuperAdmin || !isAdmin(user))
                 return (

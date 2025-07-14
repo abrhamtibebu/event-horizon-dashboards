@@ -227,6 +227,27 @@ function TrashCategoryDetails({
     setSelectedItems([])
   }
 
+  async function handleBulkRestore() {
+    try {
+      await api.post(`/trash/${selectedCategory}/bulk-restore`, { ids: selectedItems })
+      toast({ title: 'Success', description: `${selectedItems.length} items restored.` })
+      fetchCategoryItems()
+      clearSelection()
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to restore items.', variant: 'destructive' })
+    }
+  }
+  async function handleBulkDelete() {
+    try {
+      await api.post(`/trash/${selectedCategory}/bulk-force-delete`, { ids: selectedItems })
+      toast({ title: 'Success', description: `${selectedItems.length} items permanently deleted.` })
+      fetchCategoryItems()
+      clearSelection()
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to delete items.', variant: 'destructive' })
+    }
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
@@ -285,14 +306,30 @@ function TrashCategoryDetails({
             </Button>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleBulkRestore} disabled={selectedItems.length === 0}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Restore ({selectedItems.length})
             </Button>
-            <Button variant="destructive" size="sm">
-              <Trash className="h-4 w-4 mr-2" />
-              Delete Permanently ({selectedItems.length})
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={selectedItems.length === 0}>
+                  <Trash className="h-4 w-4 mr-2" />
+                  Delete Permanently ({selectedItems.length})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the selected items from our servers.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleBulkDelete}>Continue</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       )}

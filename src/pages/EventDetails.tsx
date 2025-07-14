@@ -108,6 +108,7 @@ import 'react-date-range/dist/theme/default.css'
 import { useInterval } from '@/hooks/use-interval'
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 
 export default function EventDetails() {
   const { eventId } = useParams()
@@ -164,6 +165,10 @@ export default function EventDetails() {
   const [attendeesError, setAttendeesError] = useState<string | null>(null)
   const [guestTypes, setGuestTypes] = useState<any[]>([])
 
+  // Badge template state
+  const [badgeTemplate, setBadgeTemplate] = useState<BadgeTemplate | null>(null)
+  const [badgeTemplateLoading, setBadgeTemplateLoading] = useState(false)
+
   const { user } = useAuth()
   const [isUsherAssigned, setIsUsherAssigned] = useState(false)
 
@@ -219,6 +224,15 @@ export default function EventDetails() {
   const [roleLoading, setRoleLoading] = useState(false)
   const [newRole, setNewRole] = useState('usher')
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [forceDeleteDialogOpen, setForceDeleteDialogOpen] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+
+  // Edit attendee dialog state
+  const [editAttendeeDialogOpen, setEditAttendeeDialogOpen] = useState(false)
+  const [editAttendeeForm, setEditAttendeeForm] = useState<any>(null)
+  const [editAttendeeLoading, setEditAttendeeLoading] = useState(false)
+
   // Check if usher is assigned to this event
   useEffect(() => {
     if (!eventId || !user || user.role !== 'usher') return
@@ -257,7 +271,14 @@ export default function EventDetails() {
     setAttendeesError(null)
     api
       .get(`/events/${eventId}/attendees`)
-      .then((res) => setAttendees(res.data))
+      .then((res) => {
+        console.log('DEBUG - Fetched attendees:', res.data);
+        if (res.data && res.data.length > 0) {
+          console.log('DEBUG - First attendee:', res.data[0]);
+          console.log('DEBUG - First attendee guestType:', res.data[0]?.guestType);
+        }
+        setAttendees(res.data)
+      })
       .catch((err) => setAttendeesError('Failed to fetch attendees.'))
       .finally(() => setAttendeesLoading(false))
   }, [eventId])
@@ -269,6 +290,28 @@ export default function EventDetails() {
       .get(`/events/${eventId}/guest-types`)
       .then((res) => setGuestTypes(res.data))
       .catch((err) => toast.error('Failed to fetch guest types.'))
+  }, [eventId])
+
+  // Fetch badge template
+  useEffect(() => {
+    if (!eventId) return
+    setBadgeTemplateLoading(true)
+    getOfficialBadgeTemplate(eventId)
+      .then((res) => setBadgeTemplate(res.data))
+      .catch(() => {
+        // If no official template, try to get any template
+        getBadgeTemplates(eventId)
+          .then((res) => {
+            if (res.data && res.data.length > 0) {
+              setBadgeTemplate(res.data[0])
+            }
+          })
+          .catch(() => {
+            // No templates available, that's okay
+            setBadgeTemplate(null)
+          })
+      })
+      .finally(() => setBadgeTemplateLoading(false))
   }, [eventId])
 
   useEffect(() => {
@@ -367,9 +410,23 @@ export default function EventDetails() {
       attendee.guest?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       attendee.guest?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       attendee.guest?.company?.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    // Handle guest type filtering properly
+    let guestTypeName = '';
+    if (attendee.guestType) {
+      if (typeof attendee.guestType === 'object' && attendee.guestType !== null) {
+        guestTypeName = (attendee.guestType.name || attendee.guestType.id || '').toLowerCase();
+      } else if (typeof attendee.guestType === 'string') {
+        guestTypeName = attendee.guestType.toLowerCase();
+      } else {
+        guestTypeName = String(attendee.guestType).toLowerCase();
+      }
+    }
+    
     const matchesGuestType =
       guestTypeFilter === 'all' ||
-      attendee.guestType?.name?.toLowerCase() === guestTypeFilter
+      guestTypeName === guestTypeFilter
+    
     const matchesCheckedIn =
       checkedInFilter === 'all' ||
       (checkedInFilter === 'checked-in' && attendee.checked_in) ||
@@ -378,9 +435,8 @@ export default function EventDetails() {
   })
 
   const testBadge = (attendee: (typeof attendees)[0]) => {
-    console.log('Testing badge for:', attendee)
-    setTestAttendee(attendee)
-    setShowTestBadge(true)
+    setSinglePrintAttendee(attendee)
+    setSinglePrintDialogOpen(true)
   }
 
   const exportCSV = () => {
@@ -389,24 +445,38 @@ export default function EventDetails() {
       return
     }
 
-    const dataToExport = filteredAttendees.map((attendee) => ({
-      'Attendee ID': attendee.id,
-      'Name': attendee.guest?.name || 'N/A',
-      'Email': attendee.guest?.email || 'N/A',
-      'Phone': attendee.guest?.phone || 'N/A',
-      'Company': attendee.guest?.company || 'N/A',
-      'Job Title': attendee.guest?.jobtitle || 'N/A',
-      'Gender': attendee.guest?.gender || 'N/A',
-      'Country': attendee.guest?.country || 'N/A',
-      'Guest Type': attendee.guestType?.name || 'N/A',
-      'Registration Date': attendee.created_at 
-        ? format(parseISO(attendee.created_at), 'MMM d, yyyy, h:mm a')
-        : 'N/A',
-      'Checked In': attendee.checked_in ? 'Yes' : 'No',
-      'Check-In Time': attendee.check_in_time
-        ? format(parseISO(attendee.check_in_time), 'MMM d, yyyy, h:mm a')
-        : 'N/A',
-    }))
+    const dataToExport = filteredAttendees.map((attendee) => {
+      // Handle guest type display properly for CSV export
+      let guestTypeName = 'N/A';
+      if (attendee.guestType) {
+        if (typeof attendee.guestType === 'object' && attendee.guestType !== null) {
+          guestTypeName = attendee.guestType.name || attendee.guestType.id || 'N/A';
+        } else if (typeof attendee.guestType === 'string') {
+          guestTypeName = attendee.guestType;
+        } else {
+          guestTypeName = String(attendee.guestType);
+        }
+      }
+      
+      return {
+        'Attendee ID': attendee.id,
+        'Name': attendee.guest?.name || 'N/A',
+        'Email': attendee.guest?.email || 'N/A',
+        'Phone': attendee.guest?.phone || 'N/A',
+        'Company': attendee.guest?.company || 'N/A',
+        'Job Title': attendee.guest?.jobtitle || 'N/A',
+        'Gender': attendee.guest?.gender || 'N/A',
+        'Country': attendee.guest?.country || 'N/A',
+        'Guest Type': guestTypeName,
+        'Registration Date': attendee.created_at 
+          ? format(parseISO(attendee.created_at), 'MMM d, yyyy, h:mm a')
+          : 'N/A',
+        'Checked In': attendee.checked_in ? 'Yes' : 'No',
+        'Check-In Time': attendee.check_in_time
+          ? format(parseISO(attendee.check_in_time), 'MMM d, yyyy, h:mm a')
+          : 'N/A',
+      };
+    })
 
     const csv = Papa.unparse(dataToExport)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -897,22 +967,13 @@ export default function EventDetails() {
   }
 
   // Check-in attendee function
-  const handleCheckIn = async (attendeeId: number, checkedIn: boolean) => {
+  const handleCheckIn = async (attendeeId: number) => {
     try {
-      const response = await api.post(`/events/${eventId}/attendees/${attendeeId}/check-in`, {
-        checked_in: !checkedIn
-      })
-      
-      // Update the attendee in the local state
-      setAttendees(prev => prev.map(attendee => 
-        attendee.id === attendeeId 
-          ? { ...attendee, checked_in: !checkedIn }
-          : attendee
-      ))
-      
-      toast.success(checkedIn ? 'Attendee checked out successfully!' : 'Attendee checked in successfully!')
+      await api.post(`/events/${eventId}/attendees/${attendeeId}/check-in`, { checked_in: true })
+      setAttendees(prev => prev.map(attendee => attendee.id === attendeeId ? { ...attendee, checked_in: true } : attendee))
+      toast.success('Attendee checked in successfully!')
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to update check-in status.')
+      toast.error(err.response?.data?.error || 'Failed to check in attendee.')
     }
   }
 
@@ -931,6 +992,53 @@ export default function EventDetails() {
       toast.success('Attendee updated successfully!')
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to update attendee.')
+    }
+  }
+
+  // Open edit attendee dialog
+  const openEditAttendeeDialog = (attendee: any) => {
+    setEditAttendeeForm({
+      id: attendee.id,
+      name: attendee.guest?.name || '',
+      email: attendee.guest?.email || '',
+      phone: attendee.guest?.phone || '',
+      company: attendee.guest?.company || '',
+      jobtitle: attendee.guest?.jobtitle || '',
+      gender: attendee.guest?.gender || '',
+      country: attendee.guest?.country || '',
+      guest_type_id: attendee.guest_type_id || attendee.guestType?.id || '',
+    })
+    setEditAttendeeDialogOpen(true)
+  }
+
+  // Handle edit attendee input changes
+  const handleEditAttendeeInput = (field: string, value: any) => {
+    setEditAttendeeForm((prev: any) => ({ ...prev, [field]: value }))
+  }
+
+  // Handle edit attendee form submission
+  const handleEditAttendeeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setEditAttendeeLoading(true)
+    try {
+      const updatedData = {
+        name: editAttendeeForm.name,
+        email: editAttendeeForm.email,
+        phone: editAttendeeForm.phone,
+        company: editAttendeeForm.company,
+        jobtitle: editAttendeeForm.jobtitle,
+        gender: editAttendeeForm.gender,
+        country: editAttendeeForm.country,
+        guest_type_id: editAttendeeForm.guest_type_id,
+      }
+      
+      await handleEditAttendee(editAttendeeForm.id, updatedData)
+      setEditAttendeeDialogOpen(false)
+      setEditAttendeeForm(null)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update attendee.')
+    } finally {
+      setEditAttendeeLoading(false)
     }
   }
 
@@ -979,7 +1087,7 @@ export default function EventDetails() {
         .catch((err) => setAnalyticsError('Failed to fetch analytics.'))
         .finally(() => setAnalyticsLoading(false));
     }
-  }, 15000); // Poll every 15 seconds
+  }, 10000); // Poll every 10 seconds
 
   useEffect(() => {
     if (printing && printRef.current) {
@@ -1034,6 +1142,35 @@ export default function EventDetails() {
   // Move this state declaration to the top, before any useEffect or code that uses it:
   const [singlePrintAttendee, setSinglePrintAttendee] = useState<any>(null)
 
+  // Soft delete (move to trash)
+  const handleDeleteEvent = async () => {
+    setDeleteLoading(true)
+    try {
+      await api.delete(`/events/${eventId}`)
+      toast.success('Event moved to trash!')
+      setDeleteDialogOpen(false)
+      // Optionally redirect or refresh
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to delete event')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+  // Force delete (permanent)
+  const handleForceDeleteEvent = async () => {
+    setDeleteLoading(true)
+    try {
+      await api.delete(`/events/${eventId}/force`)
+      toast.success('Event permanently deleted!')
+      setForceDeleteDialogOpen(false)
+      // Optionally redirect or refresh
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to permanently delete event')
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
   return (
     <>
       <div
@@ -1054,7 +1191,7 @@ export default function EventDetails() {
             .filter(attendee => selectedAttendees.has(attendee.id))
             .map(attendee => (
               <div key={attendee.id} className="printable-badge-batch">
-                <BadgePrint attendee={attendee} />
+                <BadgePrint attendee={attendee} template={badgeTemplate} />
               </div>
             ))
         ) : (
@@ -1148,7 +1285,6 @@ export default function EventDetails() {
                   </Link>
                 </div>
                 <h1 className="text-3xl font-bold text-gray-900">{eventData.name}</h1>
-                <p className="text-gray-600 mt-1">Event ID: {eventData.id}</p>
                 <p className="text-gray-600 mt-1">
                   Organized by{' '}
                   <span className="font-semibold text-blue-600">
@@ -1244,6 +1380,51 @@ export default function EventDetails() {
                     <UserCheck className="w-4 h-4 mr-2" />
                     Manage Attendees
                 </Button>
+                )}
+                {/* Event Delete/Trash Actions */}
+                {(user?.role === 'admin' || (user?.role === 'organizer' && eventData.organizer_id === user.organizer_id)) && (
+                  <div className="flex gap-2 mt-2">
+                    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive">Move to Trash</Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Move Event to Trash</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to move this event to trash? You can restore it later from the Trash page.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleDeleteEvent} disabled={deleteLoading} className="bg-red-600 text-white">
+                            {deleteLoading ? 'Deleting...' : 'Move to Trash'}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                    {user?.role === 'admin' && (
+                      <AlertDialog open={forceDeleteDialogOpen} onOpenChange={setForceDeleteDialogOpen}>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive">Delete Permanently</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Permanently Delete Event</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. Are you sure you want to permanently delete this event?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleForceDeleteEvent} disabled={deleteLoading} className="bg-red-700 text-white">
+                              {deleteLoading ? 'Deleting...' : 'Delete Permanently'}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -1345,17 +1526,14 @@ export default function EventDetails() {
                     <div className="flex-1 bg-white rounded-xl shadow p-6 min-w-[320px]">
                       <div className="flex items-center justify-between mb-2">
                         <h2 className="text-2xl font-bold">{eventData.name}</h2>
-                        <span className="text-xs text-gray-500">Event ID: {eventData.id}</span>
+
                       </div>
                       <div className="flex flex-wrap gap-4 items-center mb-4">
                         <div className="flex items-center gap-2 text-gray-700">
                           <Calendar className="w-5 h-5 text-blue-500" />
                           <span>{format(parseISO(eventData.start_date), 'yyyy-MM-dd')} - {format(parseISO(eventData.end_date), 'yyyy-MM-dd')}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <Clock className="w-5 h-5 text-green-500" />
-                          <span>{format(parseISO(eventData.start_date), 'HH:mm')} - {format(parseISO(eventData.end_date), 'HH:mm')}</span>
-                        </div>
+                       
                         <div className="flex items-center gap-2 text-gray-700">
                           <MapPin className="w-5 h-5 text-pink-500" />
                           <span>{eventData.location}</span>
@@ -1366,9 +1544,7 @@ export default function EventDetails() {
                         <p className="text-gray-700 mt-1">{eventData.description}</p>
                       </div>
                       <div className="flex items-center gap-2 mt-2">
-                        <span className="font-semibold">Organizer:</span>
-                        <span>{eventData.organizer?.name || user?.organizer?.name}</span>
-                        <Badge className="ml-2 bg-green-100 text-green-700 lowercase">{eventData.status}</Badge>
+                        <Badge className="ml-1 bg-green-300 text-green-700 uppercase">{eventData.status}</Badge>
                       </div>
                     </div>
                     {/* Right: Quick Stats & Actions */}
@@ -1385,10 +1561,6 @@ export default function EventDetails() {
                         </div>
                       </div>
                       <div className="bg-white rounded-xl shadow p-4 flex flex-col gap-2">
-                        <div className="text-sm text-gray-500 mb-2">Quick Actions</div>
-                        <Button variant="outline" className="w-full flex items-center gap-2" onClick={() => setIsAssignUsherDialogOpen(true)}>
-                          <UserCheck className="w-4 h-4" /> Assign Usher
-                        </Button>
                         <Button variant="outline" className="w-full flex items-center gap-2" onClick={() => setIsNewConversationDialogOpen(true)}>
                           <MessageSquare className="w-4 h-4" /> New Conversation
                         </Button>
@@ -1442,12 +1614,27 @@ export default function EventDetails() {
                                 <TableCell><Checkbox checked={selectedAttendees.has(attendee.id)} onCheckedChange={() => handleSelectAttendee(attendee.id)} /></TableCell>
                                 <TableCell>{attendee.guest?.name}</TableCell>
                                 <TableCell>{attendee.guest?.email}</TableCell>
-                                <TableCell>{attendee.guestType?.name}</TableCell>
+                                <TableCell>
+                                  {(() => {
+                                    // Handle guest type display properly
+                                    const guestType = attendee.guestType;
+                                    if (guestType) {
+                                      if (typeof guestType === 'object' && guestType !== null) {
+                                        return guestType.name || guestType.id || 'Unknown';
+                                      } else if (typeof guestType === 'string') {
+                                        return guestType;
+                                      } else {
+                                        return String(guestType);
+                                      }
+                                    }
+                                    return 'Unknown';
+                                  })()}
+                                </TableCell>
                                 <TableCell>{attendee.checked_in ? <Badge className="bg-green-100 text-green-700">Checked In</Badge> : <Badge className="bg-gray-100 text-gray-700">Not Checked In</Badge>}</TableCell>
                                 <TableCell>
                                   <div className="w-32 h-20 bg-gray-50 border rounded flex items-center justify-center overflow-hidden">
                                     <div style={{ transform: 'scale(0.2)', transformOrigin: 'top left', width: 400, height: 600 }}>
-                                      <BadgePrint attendee={attendee} />
+                                      <BadgePrint attendee={attendee} template={badgeTemplate} />
                                     </div>
                                   </div>
                                 </TableCell>
@@ -1540,7 +1727,29 @@ export default function EventDetails() {
                                   attendee.guestType?.name?.toLowerCase() === 'visitor' ? 'bg-gray-100 text-gray-700' :
                                   'bg-blue-100 text-blue-700'
                                 }>
-                                  {attendee.guestType?.name}
+                                  {(() => {
+                                    console.log('DEBUG Table - attendee:', attendee);
+                                    console.log('DEBUG Table - attendee.guestType:', attendee.guestType);
+                                    
+                                    // Handle guest type display properly
+                                    const guestType = attendee.guestType;
+                                    if (guestType) {
+                                      if (typeof guestType === 'object' && guestType !== null) {
+                                        const result = guestType.name || guestType.id || 'Unknown';
+                                        console.log('DEBUG Table - extracted from object:', result);
+                                        return result;
+                                      } else if (typeof guestType === 'string') {
+                                        console.log('DEBUG Table - is string:', guestType);
+                                        return guestType;
+                                      } else {
+                                        const result = String(guestType);
+                                        console.log('DEBUG Table - converted to string:', result);
+                                        return result;
+                                      }
+                                    }
+                                    console.log('DEBUG Table - no guest type, returning Unknown');
+                                    return 'Unknown';
+                                  })()}
                                 </Badge>
                               </TableCell>
                               <TableCell>
@@ -1549,7 +1758,7 @@ export default function EventDetails() {
                               <TableCell className="flex flex-wrap gap-1">
                                 <Button size="sm" variant="outline" onClick={() => handleSingleBadgePrint(attendee)}><Printer className="w-4 h-4" /></Button>
                                 <Button size="sm" variant="outline" onClick={() => testBadge(attendee)}><Eye className="w-4 h-4" /></Button>
-                                <Button size="sm" variant="outline" onClick={() => { setEditForm(attendee); setEditDialogOpen(true); }}><Edit className="w-4 h-4" /></Button>
+                                <Button size="sm" variant="outline" onClick={() => openEditAttendeeDialog(attendee)}><Edit className="w-4 h-4" /></Button>
                                 <Button size="sm" variant="destructive" onClick={() => handleRemoveMember(attendee)}><Trash2 className="w-4 h-4" /></Button>
                               </TableCell>
                             </TableRow>
@@ -1737,11 +1946,11 @@ export default function EventDetails() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredCheckinAttendees.length > 0 ? filteredCheckinAttendees.map(attendee => (
+                          {attendees.length > 0 ? attendees.map(attendee => (
                             <TableRow key={attendee.id}>
-                              <TableCell>{attendee.first_name} {attendee.last_name}</TableCell>
-                              <TableCell>{attendee.email}</TableCell>
-                              <TableCell>{attendee.phone}</TableCell>
+                              <TableCell>{attendee.guest?.name}</TableCell>
+                              <TableCell>{attendee.guest?.email}</TableCell>
+                              <TableCell>{attendee.guest?.phone}</TableCell>
                               <TableCell>
                                 <Badge className={attendee.checked_in ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}>
                                   {attendee.checked_in ? 'Checked In' : 'Not Checked In'}
@@ -1751,9 +1960,10 @@ export default function EventDetails() {
                                 <Button
                                   size="sm"
                                   variant={attendee.checked_in ? 'outline' : 'default'}
-                                  onClick={() => handleCheckIn(attendee.id, !attendee.checked_in)}
+                                  onClick={() => handleCheckIn(attendee.id)}
+                                  disabled={attendee.checked_in}
                                 >
-                                  {attendee.checked_in ? 'Undo Check-in' : 'Check In'}
+                                  {attendee.checked_in ? 'Checked In' : 'Check In'}
                                 </Button>
                               </TableCell>
                             </TableRow>
@@ -1775,7 +1985,7 @@ export default function EventDetails() {
                       <div className="flex justify-center items-center h-40 text-lg text-red-500">{analyticsError}</div>
                     ) : analytics ? (
                       <>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                           <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
                             <div className="text-xs text-gray-500 mb-1">Registered</div>
                             <div className="text-3xl font-bold text-blue-700">{analytics.total_registered}</div>
@@ -1785,17 +1995,21 @@ export default function EventDetails() {
                             <div className="text-3xl font-bold text-green-700">{analytics.total_checked_in}</div>
                           </div>
                           <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
+                            <div className="text-xs text-gray-500 mb-1">Check-in Rate</div>
+                            <div className="text-3xl font-bold text-indigo-700">{analytics.total_registered ? Math.round((analytics.total_checked_in / analytics.total_registered) * 100) : 0}%</div>
+                          </div>
+                          <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
                             <div className="text-xs text-gray-500 mb-1">Not Checked In</div>
                             <div className="text-3xl font-bold text-gray-700">{analytics.total_registered - analytics.total_checked_in}</div>
                           </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="bg-white rounded-xl shadow p-6">
-                            <div className="font-semibold mb-2">Check-in Trend</div>
+                            <div className="font-semibold mb-2">Hourly Check-in Trend</div>
                             <ResponsiveContainer width="100%" height={220}>
-                              <LineChart data={analytics.checkin_trend || []}>
+                              <LineChart data={analytics.hourly_checkin_trend || analytics.checkin_trend || []}>
                                 <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" />
+                                <XAxis dataKey="hour" />
                                 <YAxis allowDecimals={false} />
                                 <RechartsTooltip />
                                 <Line type="monotone" dataKey="checked_in" stroke="#22c55e" strokeWidth={2} />
@@ -1803,25 +2017,41 @@ export default function EventDetails() {
                             </ResponsiveContainer>
                           </div>
                           <div className="bg-white rounded-xl shadow p-6">
-                            <div className="font-semibold mb-2">Guest Type Distribution</div>
+                            <div className="font-semibold mb-2">Registration Timeline</div>
                             <ResponsiveContainer width="100%" height={220}>
-                              <PieChart>
-                                <Pie
-                                  data={analytics.guest_type_distribution || []}
-                                  dataKey="count"
-                                  nameKey="type"
-                                  cx="50%"
-                                  cy="50%"
-                                  outerRadius={70}
-                                  fill="#6366f1"
-                                  label
-                                >
-                                  {(analytics.guest_type_distribution || []).map((entry, idx) => (
-                                    <Cell key={`cell-${idx}`} fill={['#6366f1', '#f59e42', '#22c55e', '#f43f5e', '#a21caf'][idx % 5]} />
-                                  ))}
-                                </Pie>
+                              <LineChart data={analytics.registration_timeline || []}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="date" />
+                                <YAxis allowDecimals={false} />
                                 <RechartsTooltip />
-                              </PieChart>
+                                <Line type="monotone" dataKey="registered" stroke="#6366f1" strokeWidth={2} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="bg-white rounded-xl shadow p-6">
+                            <div className="font-semibold mb-2">Top Companies</div>
+                            <ResponsiveContainer width="100%" height={220}>
+                              <BarChart data={analytics.top_companies || []}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="company" />
+                                <YAxis allowDecimals={false} />
+                                <RechartsTooltip />
+                                <Bar dataKey="count" fill="#f59e42" />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                          <div className="bg-white rounded-xl shadow p-6">
+                            <div className="font-semibold mb-2">Top Guest Types</div>
+                            <ResponsiveContainer width="100%" height={220}>
+                              <BarChart data={analytics.top_guest_types || analytics.guest_type_distribution || []}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="type" />
+                                <YAxis allowDecimals={false} />
+                                <RechartsTooltip />
+                                <Bar dataKey="count" fill="#a21caf" />
+                              </BarChart>
                             </ResponsiveContainer>
                           </div>
                         </div>
@@ -1869,6 +2099,34 @@ export default function EventDetails() {
                                 <RechartsTooltip />
                               </PieChart>
                             </ResponsiveContainer>
+                          </div>
+                        </div>
+                        <div className="bg-white rounded-xl shadow p-6">
+                          <div className="font-semibold mb-2">Attendee List Summary</div>
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Name</TableHead>
+                                  <TableHead>Email</TableHead>
+                                  <TableHead>Company</TableHead>
+                                  <TableHead>Guest Type</TableHead>
+                                  <TableHead>Status</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {attendees.slice(0, 10).map(attendee => (
+                                  <TableRow key={attendee.id}>
+                                    <TableCell>{attendee.guest?.name}</TableCell>
+                                    <TableCell>{attendee.guest?.email}</TableCell>
+                                    <TableCell>{attendee.guest?.company}</TableCell>
+                                    <TableCell>{attendee.guestType?.name}</TableCell>
+                                    <TableCell>{attendee.checked_in ? 'Checked In' : 'Not Checked In'}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                            {attendees.length > 10 && <div className="text-xs text-gray-500 mt-2">Showing first 10 attendees.</div>}
                           </div>
                         </div>
                       </>
@@ -2641,6 +2899,308 @@ export default function EventDetails() {
             </DialogContent>
           </Dialog>
 
+          {/* Edit Attendee Dialog */}
+          <Dialog open={editAttendeeDialogOpen} onOpenChange={setEditAttendeeDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Edit Attendee</DialogTitle>
+                <DialogDescription>
+                  Update the attendee information below.
+                </DialogDescription>
+              </DialogHeader>
+              {editAttendeeForm && (
+                <form onSubmit={handleEditAttendeeSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit_attendee_name">Name</Label>
+                      <Input
+                        id="edit_attendee_name"
+                        value={editAttendeeForm.name}
+                        onChange={(e) => handleEditAttendeeInput('name', e.target.value)}
+                        placeholder="Full Name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_attendee_email">Email</Label>
+                      <Input
+                        id="edit_attendee_email"
+                        value={editAttendeeForm.email}
+                        onChange={(e) => handleEditAttendeeInput('email', e.target.value)}
+                        placeholder="Email Address"
+                        type="email"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_attendee_phone">Phone</Label>
+                      <Input
+                        id="edit_attendee_phone"
+                        value={editAttendeeForm.phone}
+                        onChange={(e) => handleEditAttendeeInput('phone', e.target.value)}
+                        placeholder="Phone Number"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_attendee_company">Company</Label>
+                      <Input
+                        id="edit_attendee_company"
+                        value={editAttendeeForm.company}
+                        onChange={(e) => handleEditAttendeeInput('company', e.target.value)}
+                        placeholder="Company Name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_attendee_jobtitle">Job Title</Label>
+                      <Input
+                        id="edit_attendee_jobtitle"
+                        value={editAttendeeForm.jobtitle}
+                        onChange={(e) => handleEditAttendeeInput('jobtitle', e.target.value)}
+                        placeholder="Job Title"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_attendee_gender">Gender</Label>
+                      <Select
+                        value={editAttendeeForm.gender}
+                        onValueChange={(value) => handleEditAttendeeInput('gender', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Male">Male</SelectItem>
+                          <SelectItem value="Female">Female</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                          <SelectItem value="Prefer not to say">Prefer not to say</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit_attendee_country">Country</Label>
+                      <Select
+                        value={editAttendeeForm.country}
+                        onValueChange={(value) => handleEditAttendeeInput('country', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select country" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Ethiopia">Ethiopia</SelectItem>
+                          <SelectItem value="United States">United States</SelectItem>
+                          <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                          <SelectItem value="Canada">Canada</SelectItem>
+                          <SelectItem value="Australia">Australia</SelectItem>
+                          <SelectItem value="Germany">Germany</SelectItem>
+                          <SelectItem value="France">France</SelectItem>
+                          <SelectItem value="Italy">Italy</SelectItem>
+                          <SelectItem value="Spain">Spain</SelectItem>
+                          <SelectItem value="Netherlands">Netherlands</SelectItem>
+                          <SelectItem value="Belgium">Belgium</SelectItem>
+                          <SelectItem value="Switzerland">Switzerland</SelectItem>
+                          <SelectItem value="Austria">Austria</SelectItem>
+                          <SelectItem value="Sweden">Sweden</SelectItem>
+                          <SelectItem value="Norway">Norway</SelectItem>
+                          <SelectItem value="Denmark">Denmark</SelectItem>
+                          <SelectItem value="Finland">Finland</SelectItem>
+                          <SelectItem value="Poland">Poland</SelectItem>
+                          <SelectItem value="Czech Republic">Czech Republic</SelectItem>
+                          <SelectItem value="Hungary">Hungary</SelectItem>
+                          <SelectItem value="Romania">Romania</SelectItem>
+                          <SelectItem value="Bulgaria">Bulgaria</SelectItem>
+                          <SelectItem value="Greece">Greece</SelectItem>
+                          <SelectItem value="Portugal">Portugal</SelectItem>
+                          <SelectItem value="Ireland">Ireland</SelectItem>
+                          <SelectItem value="New Zealand">New Zealand</SelectItem>
+                          <SelectItem value="Japan">Japan</SelectItem>
+                          <SelectItem value="South Korea">South Korea</SelectItem>
+                          <SelectItem value="China">China</SelectItem>
+                          <SelectItem value="India">India</SelectItem>
+                          <SelectItem value="Brazil">Brazil</SelectItem>
+                          <SelectItem value="Argentina">Argentina</SelectItem>
+                          <SelectItem value="Mexico">Mexico</SelectItem>
+                          <SelectItem value="Chile">Chile</SelectItem>
+                          <SelectItem value="Colombia">Colombia</SelectItem>
+                          <SelectItem value="Peru">Peru</SelectItem>
+                          <SelectItem value="Venezuela">Venezuela</SelectItem>
+                          <SelectItem value="Ecuador">Ecuador</SelectItem>
+                          <SelectItem value="Bolivia">Bolivia</SelectItem>
+                          <SelectItem value="Paraguay">Paraguay</SelectItem>
+                          <SelectItem value="Uruguay">Uruguay</SelectItem>
+                          <SelectItem value="Guyana">Guyana</SelectItem>
+                          <SelectItem value="Suriname">Suriname</SelectItem>
+                          <SelectItem value="French Guiana">French Guiana</SelectItem>
+                          <SelectItem value="South Africa">South Africa</SelectItem>
+                          <SelectItem value="Egypt">Egypt</SelectItem>
+                          <SelectItem value="Nigeria">Nigeria</SelectItem>
+                          <SelectItem value="Kenya">Kenya</SelectItem>
+                          <SelectItem value="Ghana">Ghana</SelectItem>
+                          <SelectItem value="Uganda">Uganda</SelectItem>
+                          <SelectItem value="Tanzania">Tanzania</SelectItem>
+                          <SelectItem value="Morocco">Morocco</SelectItem>
+                          <SelectItem value="Algeria">Algeria</SelectItem>
+                          <SelectItem value="Tunisia">Tunisia</SelectItem>
+                          <SelectItem value="Libya">Libya</SelectItem>
+                          <SelectItem value="Sudan">Sudan</SelectItem>
+                          <SelectItem value="Ethiopia">Ethiopia</SelectItem>
+                          <SelectItem value="Somalia">Somalia</SelectItem>
+                          <SelectItem value="Djibouti">Djibouti</SelectItem>
+                          <SelectItem value="Eritrea">Eritrea</SelectItem>
+                          <SelectItem value="Saudi Arabia">Saudi Arabia</SelectItem>
+                          <SelectItem value="United Arab Emirates">United Arab Emirates</SelectItem>
+                          <SelectItem value="Qatar">Qatar</SelectItem>
+                          <SelectItem value="Kuwait">Kuwait</SelectItem>
+                          <SelectItem value="Bahrain">Bahrain</SelectItem>
+                          <SelectItem value="Oman">Oman</SelectItem>
+                          <SelectItem value="Yemen">Yemen</SelectItem>
+                          <SelectItem value="Jordan">Jordan</SelectItem>
+                          <SelectItem value="Lebanon">Lebanon</SelectItem>
+                          <SelectItem value="Syria">Syria</SelectItem>
+                          <SelectItem value="Iraq">Iraq</SelectItem>
+                          <SelectItem value="Iran">Iran</SelectItem>
+                          <SelectItem value="Afghanistan">Afghanistan</SelectItem>
+                          <SelectItem value="Pakistan">Pakistan</SelectItem>
+                          <SelectItem value="Bangladesh">Bangladesh</SelectItem>
+                          <SelectItem value="Sri Lanka">Sri Lanka</SelectItem>
+                          <SelectItem value="Nepal">Nepal</SelectItem>
+                          <SelectItem value="Bhutan">Bhutan</SelectItem>
+                          <SelectItem value="Maldives">Maldives</SelectItem>
+                          <SelectItem value="Myanmar">Myanmar</SelectItem>
+                          <SelectItem value="Thailand">Thailand</SelectItem>
+                          <SelectItem value="Laos">Laos</SelectItem>
+                          <SelectItem value="Cambodia">Cambodia</SelectItem>
+                          <SelectItem value="Vietnam">Vietnam</SelectItem>
+                          <SelectItem value="Malaysia">Malaysia</SelectItem>
+                          <SelectItem value="Singapore">Singapore</SelectItem>
+                          <SelectItem value="Indonesia">Indonesia</SelectItem>
+                          <SelectItem value="Philippines">Philippines</SelectItem>
+                          <SelectItem value="Brunei">Brunei</SelectItem>
+                          <SelectItem value="East Timor">East Timor</SelectItem>
+                          <SelectItem value="Papua New Guinea">Papua New Guinea</SelectItem>
+                          <SelectItem value="Fiji">Fiji</SelectItem>
+                          <SelectItem value="Solomon Islands">Solomon Islands</SelectItem>
+                          <SelectItem value="Vanuatu">Vanuatu</SelectItem>
+                          <SelectItem value="New Caledonia">New Caledonia</SelectItem>
+                          <SelectItem value="French Polynesia">French Polynesia</SelectItem>
+                          <SelectItem value="Samoa">Samoa</SelectItem>
+                          <SelectItem value="Tonga">Tonga</SelectItem>
+                          <SelectItem value="Kiribati">Kiribati</SelectItem>
+                          <SelectItem value="Tuvalu">Tuvalu</SelectItem>
+                          <SelectItem value="Nauru">Nauru</SelectItem>
+                          <SelectItem value="Palau">Palau</SelectItem>
+                          <SelectItem value="Micronesia">Micronesia</SelectItem>
+                          <SelectItem value="Marshall Islands">Marshall Islands</SelectItem>
+                          <SelectItem value="Cook Islands">Cook Islands</SelectItem>
+                          <SelectItem value="Niue">Niue</SelectItem>
+                          <SelectItem value="Tokelau">Tokelau</SelectItem>
+                          <SelectItem value="American Samoa">American Samoa</SelectItem>
+                          <SelectItem value="Guam">Guam</SelectItem>
+                          <SelectItem value="Northern Mariana Islands">Northern Mariana Islands</SelectItem>
+                          <SelectItem value="Puerto Rico">Puerto Rico</SelectItem>
+                          <SelectItem value="U.S. Virgin Islands">U.S. Virgin Islands</SelectItem>
+                          <SelectItem value="British Virgin Islands">British Virgin Islands</SelectItem>
+                          <SelectItem value="Anguilla">Anguilla</SelectItem>
+                          <SelectItem value="Montserrat">Montserrat</SelectItem>
+                          <SelectItem value="Saint Kitts and Nevis">Saint Kitts and Nevis</SelectItem>
+                          <SelectItem value="Antigua and Barbuda">Antigua and Barbuda</SelectItem>
+                          <SelectItem value="Dominica">Dominica</SelectItem>
+                          <SelectItem value="Saint Lucia">Saint Lucia</SelectItem>
+                          <SelectItem value="Saint Vincent and the Grenadines">Saint Vincent and the Grenadines</SelectItem>
+                          <SelectItem value="Barbados">Barbados</SelectItem>
+                          <SelectItem value="Grenada">Grenada</SelectItem>
+                          <SelectItem value="Trinidad and Tobago">Trinidad and Tobago</SelectItem>
+                          <SelectItem value="Jamaica">Jamaica</SelectItem>
+                          <SelectItem value="Haiti">Haiti</SelectItem>
+                          <SelectItem value="Dominican Republic">Dominican Republic</SelectItem>
+                          <SelectItem value="Cuba">Cuba</SelectItem>
+                          <SelectItem value="Bahamas">Bahamas</SelectItem>
+                          <SelectItem value="Belize">Belize</SelectItem>
+                          <SelectItem value="Guatemala">Guatemala</SelectItem>
+                          <SelectItem value="El Salvador">El Salvador</SelectItem>
+                          <SelectItem value="Honduras">Honduras</SelectItem>
+                          <SelectItem value="Nicaragua">Nicaragua</SelectItem>
+                          <SelectItem value="Costa Rica">Costa Rica</SelectItem>
+                          <SelectItem value="Panama">Panama</SelectItem>
+                          <SelectItem value="Vatican City">Vatican City</SelectItem>
+                          <SelectItem value="Venezuela">Venezuela</SelectItem>
+                          <SelectItem value="Vietnam">Vietnam</SelectItem>
+                          <SelectItem value="Yemen">Yemen</SelectItem>
+                          <SelectItem value="Zambia">Zambia</SelectItem>
+                          <SelectItem value="Zimbabwe">Zimbabwe</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label htmlFor="edit_attendee_guest_type">Guest Type</Label>
+                      <Select
+                        value={editAttendeeForm.guest_type_id}
+                        onValueChange={(value) => handleEditAttendeeInput('guest_type_id', value)}
+                        required
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a guest type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {guestTypes
+                            .filter(
+                              (type) =>
+                                type.id !== undefined &&
+                                type.id !== null &&
+                                type.id !== ''
+                            )
+                            .map((type) => (
+                              <SelectItem key={type.id} value={String(type.id)}>
+                                {type.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setEditAttendeeDialogOpen(false)}
+                      disabled={editAttendeeLoading}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={editAttendeeLoading}>
+                      {editAttendeeLoading ? (
+                        <>
+                          <svg
+                            className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                          Updating...
+                        </>
+                      ) : (
+                        'Update Attendee'
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              )}
+            </DialogContent>
+          </Dialog>
+
           {/* Create Usher Dialog */}
           <Dialog
             open={createUsherDialogOpen}
@@ -2744,7 +3304,7 @@ export default function EventDetails() {
           >
           {singlePrintAttendee && (
             <div className="printable-badge-batch">
-              <BadgePrint attendee={singlePrintAttendee} />
+              <BadgePrint attendee={singlePrintAttendee} template={badgeTemplate} />
             </div>
           )}
           </div>
@@ -2760,8 +3320,8 @@ export default function EventDetails() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="flex justify-center">
-                  <BadgeTest attendee={testAttendee} />
-          </div>
+                  <BadgePrint attendee={singlePrintAttendee} template={badgeTemplate} />
+                </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setShowTestBadge(false)}>
                       Close
@@ -2922,7 +3482,6 @@ export default function EventDetails() {
                   setEventUshers(res.data)
                 }
               }}
-              onOpenChange={setIsAssignUsherDialogOpen}
             />
 
             {/* Add a hidden badge area for PDF generation */}

@@ -23,6 +23,8 @@ interface Guest {
   jobtitle?: string;
   gender?: string;
   country?: string;
+  guestType?: { name: string };
+  guest_type?: string;
   [key: string]: any;
 }
 
@@ -149,6 +151,7 @@ export default function Guests() {
                   <TableHead>Job Title</TableHead>
                   <TableHead>Gender</TableHead>
                   <TableHead>Country</TableHead>
+                  <TableHead>Guest Type</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -186,6 +189,7 @@ export default function Guests() {
                     <TableCell>{guest.jobtitle || '-'}</TableCell>
                     <TableCell>{guest.gender || '-'}</TableCell>
                     <TableCell>{guest.country || '-'}</TableCell>
+                    <TableCell>{guest.guestType?.name || guest.guest_type || '-'}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button

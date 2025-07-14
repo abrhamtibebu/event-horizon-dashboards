@@ -746,7 +746,7 @@ export default function UsherEventManagement() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
-                              {attendee.guestType?.name || 'N/A'}
+                              {attendee.guestType?.name || attendee.guest_type || 'N/A'}
                             </Badge>
                           </TableCell>
                           <TableCell>

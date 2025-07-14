@@ -92,6 +92,12 @@ export default function CreateEvent() {
     eventCategories: null,
   })
 
+  // Add predefined guest types
+  const PREDEFINED_GUEST_TYPES = [
+    'VIP', 'Speaker', 'Staff', 'Exhibitor', 'Media', 'Regular', 'Visitor', 'Sponsor', 'Organizer', 'Volunteer', 'Partner', 'Vendor', 'Press', 'Student', 'Other'
+  ];
+  const [selectedGuestTypes, setSelectedGuestTypes] = useState<string[]>([]);
+
   useEffect(() => {
     if (user && user.role === 'organizer' && user.organizer_id) {
       handleInputChange('organizer_id', String(user.organizer_id))
@@ -157,6 +163,26 @@ export default function CreateEvent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Frontend validation for required fields
+    const requiredFields = [
+      'name', 'start_date', 'end_date', 'location', 'max_guests',
+      'registration_start_date', 'registration_end_date', 'event_type_id', 'event_category_id'
+    ];
+    for (const field of requiredFields) {
+      if (!formData[field] || (typeof formData[field] === 'string' && formData[field].trim() === '')) {
+        toast.error(`Please fill in the required field: ${field.replace(/_/g, ' ')}`);
+        return;
+      }
+    }
+    // Validate max_guests is a positive integer
+    if (isNaN(Number(formData.max_guests)) || parseInt(formData.max_guests, 10) < 1) {
+      toast.error('Max Guests must be a positive integer.');
+      return;
+    }
+    if (selectedGuestTypes.length === 0) {
+      toast.error('Please select at least one guest type.');
+      return;
+    }
     setIsSubmitting(true)
     try {
       let payload
@@ -168,8 +194,11 @@ export default function CreateEvent() {
         end_date: eventRange[0].endDate.toISOString(),
         registration_start_date: regRange[0].startDate.toISOString(),
         registration_end_date: regRange[0].endDate.toISOString(),
-        // Always use the logged-in organizer's ID if available
-        organizer_id: user?.role === 'organizer' && user.organizer_id ? String(user.organizer_id) : formData.organizer_id,
+        // Ensure max_guests is sent as an integer
+        max_guests: parseInt(formData.max_guests, 10),
+        // Only include organizer_id if not an organizer (backend sets it for organizers)
+        ...(user?.role !== 'organizer' && { organizer_id: formData.organizer_id }),
+        guest_types: selectedGuestTypes,
       }
       if (formData.event_image) {
         payload = new FormData()
@@ -177,12 +206,7 @@ export default function CreateEvent() {
           if (key === 'event_image' && value) {
             payload.append('event_image', value)
           } else if (key === 'guest_types') {
-            // Always send guest_types as array
-            const guestTypesArr = (value as string)
-              .split(',')
-              .map((s: string) => s.trim())
-              .filter(Boolean)
-            guestTypesArr.forEach((type) =>
+            (Array.isArray(value) ? value : [value]).forEach((type: string) =>
               payload.append('guest_types[]', type)
             )
           } else {
@@ -191,17 +215,20 @@ export default function CreateEvent() {
         })
         headers = { 'Content-Type': 'multipart/form-data' }
       } else {
-        const guestTypesArr = (processedFormData.guest_types as string)
-          .split(',')
-          .map((s: string) => s.trim())
-          .filter(Boolean)
-        payload = { ...processedFormData, guest_types: guestTypesArr }
+        payload = processedFormData
       }
       await api.post('/events', payload, { headers })
       toast.success('Event created successfully!')
       navigate('/events')
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to create event.')
+      if (error.response?.status === 422 && error.response?.data) {
+        // Show the first validation error
+        const firstKey = Object.keys(error.response.data)[0]
+        const firstError = Array.isArray(error.response.data[firstKey]) ? error.response.data[firstKey][0] : error.response.data[firstKey]
+        toast.error(firstError || 'Validation error')
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to create event.')
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -474,18 +501,24 @@ export default function CreateEvent() {
                   {' '}
                   <Users className="w-4 h-4" /> Guest Types{' '}
                 </Label>
-                <Input
-                  id="guest_types"
-                  value={formData.guest_types}
-                  onChange={(e) =>
-                    handleInputChange('guest_types', e.target.value)
-                  }
-                  placeholder="e.g. VIP, Regular, Staff"
-                  className="mt-1"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Comma-separated list of guest types.
-                </p>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {PREDEFINED_GUEST_TYPES.map(type => (
+                    <Button
+                      key={type}
+                      type="button"
+                      variant={selectedGuestTypes.includes(type) ? 'default' : 'outline'}
+                      className={selectedGuestTypes.includes(type) ? 'bg-blue-600 text-white' : ''}
+                      onClick={() => {
+                        setSelectedGuestTypes(prev => prev.includes(type)
+                          ? prev.filter(t => t !== type)
+                          : [...prev, type]);
+                      }}
+                    >
+                      {type}
+                    </Button>
+                  ))}
+                </div>
+                {selectedGuestTypes.length === 0 && <div className="text-xs text-red-500 mb-2">Select at least one guest type.</div>}
               </div>
               <div className="md:col-span-2">
                 <Label
@@ -752,7 +785,21 @@ export default function CreateEvent() {
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting ||
+                loading.eventTypes ||
+                loading.eventCategories ||
+                (user?.role !== 'organizer' && loading.organizers) ||
+                !formData.name.trim() ||
+                !formData.location.trim() ||
+                !formData.max_guests.trim() ||
+                !formData.event_type_id ||
+                !formData.event_category_id ||
+                (user?.role !== 'organizer' && !formData.organizer_id) ||
+                !filterValidOptions(eventTypes).some(et => String(et.id) === formData.event_type_id) ||
+                !filterValidOptions(eventCategories).some(ec => String(ec.id) === formData.event_category_id) ||
+                (user?.role !== 'organizer' && !filterValidOptions(organizers).some(org => String(org.id) === formData.organizer_id))
+              }
               className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold px-6 py-2 rounded-lg shadow"
             >
               {isSubmitting ? (
