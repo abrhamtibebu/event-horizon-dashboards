@@ -7,10 +7,7 @@ interface MetricCardProps {
   title: string
   value: string | number
   icon: ReactNode
-  trend?: {
-    value: number
-    isPositive: boolean
-  }
+  trend?: { value: number; isPositive: boolean } | string
   className?: string
   link?: string
 }
@@ -39,7 +36,13 @@ export function MetricCard({
             <p className="text-4xl font-extrabold text-gray-900 mb-1 leading-tight">
               {value}
             </p>
-            {trend && (
+            {/* Show trend as string if provided, else fallback to old logic */}
+            {typeof trend === 'string' && (
+              <p className={cn('text-sm mt-1 font-medium', trend.startsWith('+') ? 'text-green-600' : 'text-red-600')}>
+                {trend.startsWith('+') ? '↗' : '↘'} {trend.replace(/^\+|^-/, '')}
+              </p>
+            )}
+            {typeof trend === 'object' && trend && (
               <p
                 className={cn(
                   'text-sm mt-1 font-medium',

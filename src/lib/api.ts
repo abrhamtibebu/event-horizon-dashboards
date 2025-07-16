@@ -128,6 +128,8 @@ export const deleteBadgeTemplate = (eventId: string, templateId: string) =>
 
 export const getGlobalReport = () => api.get('/reports/summary')
 
+export const getOrganizerReport = () => api.get('/reports/summary')
+
 export const getEventMessages = (eventId: string) =>
   api.get(`/events/${eventId}/messages`)
 
@@ -179,7 +181,7 @@ export const getEventsForOrganizer = (organizerId: number) =>
 
 export const getAvailableUshers = () => api.get('/ushers/available')
 
-export const getUshers = () => api.get('/users/ushers')
+export const getUshers = () => api.get('/ushers')
 
 // Get available ushers for a specific event
 export const getAvailableUshersForEvent = (eventId: number) =>

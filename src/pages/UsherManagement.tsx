@@ -118,6 +118,7 @@ export default function UsherManagement() {
       let ushersRes, eventsRes
       
       try {
+        // Always fetch all ushers, regardless of role
         ushersRes = await getUshers()
         console.log('Ushers loaded:', ushersRes.data)
       } catch (error) {

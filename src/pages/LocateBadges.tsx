@@ -32,20 +32,60 @@ import {
 } from '@/components/ui/table'
 import Papa from 'papaparse'
 import { toast } from 'sonner'
+import { useAuth } from '@/hooks/use-auth'
 
+// --- Data Model ---
 interface BadgeData {
   name: string
   badgeId: string
+  registrationId: string
+  qrCode: string
   badgeType: string
+  guestType: string
   zone: string
   section: string
   tray: string
   organization: string
   email: string
   notes: string
+  status: 'pre-printed' | 'not printed' | 'reprint requested'
+  collected: boolean
+  printHistory: Array<{
+    status: string
+    timestamp: string
+    staff: string
+    note?: string
+  }>
+}
+
+// --- Components ---
+function SearchBarWithAutocomplete({ badges, onSelect }: { badges: BadgeData[], onSelect: (badge: BadgeData) => void }) {
+  // ... implement search bar with auto-complete for name, QR, reg ID, company ...
+  return <div>TODO: SearchBarWithAutocomplete</div>;
+}
+
+function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: any, onAction: (action: string) => void }) {
+  // ... show badge details, print status, tray, action buttons ...
+  return <div>TODO: BadgeResultPanel</div>;
+}
+
+function TrayLayoutView({ badges }: { badges: BadgeData[] }) {
+  // ... optional visual tray layout or list view ...
+  return <div>TODO: TrayLayoutView</div>;
+}
+
+function ActionControls({ badge, user, onAction }: { badge: BadgeData, user: any, onAction: (action: string) => void }) {
+  // ... mark as collected, reprint, update location (admin/supervisor only) ...
+  return <div>TODO: ActionControls</div>;
+}
+
+function HistoryLog({ history }: { history: BadgeData['printHistory'] }) {
+  // ... show print status changes and staff notes ...
+  return <div>TODO: HistoryLog</div>;
 }
 
 export default function LocateBadges() {
+  const { user } = useAuth();
   const [data, setData] = useState<BadgeData[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedGuest, setSelectedGuest] = useState<BadgeData | null>(null)

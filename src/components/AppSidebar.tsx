@@ -73,7 +73,7 @@ const allItems = [
     title: 'Locate Badges',
     url: '/dashboard/locate-badges',
     icon: MapPin,
-    roles: ['superadmin', 'admin', 'usher'],
+    roles: ['admin', 'organizer', 'usher'],
   },
   {
     title: 'Badge Designer',

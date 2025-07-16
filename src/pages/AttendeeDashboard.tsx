@@ -137,6 +137,17 @@ export default function AttendeeDashboard() {
         />
       </div>
 
+      {/* Locate Badges Quick Action */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-4">
+        <Link
+          to="/dashboard/locate-badges"
+          className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
+        >
+          <MapPin className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+          <span className="font-medium">Locate Badges</span>
+        </Link>
+      </div>
+
       {/* Event Discovery */}
       <DashboardCard title="Discover Events">
         {/* Search and Filters */}

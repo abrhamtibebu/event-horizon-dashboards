@@ -364,6 +364,19 @@ export default function UsherDashboard() {
         </DashboardCard>
       </div>
 
+      {/* Quick Actions */}
+      <DashboardCard title="Quick Actions">
+        <div className="grid grid-cols-2 gap-4">
+          <Link
+            to="/dashboard/locate-badges"
+            className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
+          >
+            <MapPin className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+            <span className="font-medium">Locate Badges</span>
+          </Link>
+        </div>
+      </DashboardCard>
+
       {/* Recent Activity & Support Issues */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DashboardCard title="Recent Check-ins">

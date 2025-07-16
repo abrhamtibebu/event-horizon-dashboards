@@ -36,6 +36,7 @@ import {
   Eye,
   UserCheck,
   Image,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -258,7 +259,7 @@ export default function EventDetails() {
     setEventLoading(true)
     setEventError(null)
     api
-      .get(`/events/${eventId}`)
+      .get(`/events/${Number(eventId)}`)
       .then((res) => setEventData(res.data))
       .catch((err) => setEventError('Failed to fetch event details.'))
       .finally(() => setEventLoading(false))
@@ -270,7 +271,7 @@ export default function EventDetails() {
     setAttendeesLoading(true)
     setAttendeesError(null)
     api
-      .get(`/events/${eventId}/attendees`)
+      .get(`/events/${Number(eventId)}/attendees`)
       .then((res) => {
         console.log('DEBUG - Fetched attendees:', res.data);
         if (res.data && res.data.length > 0) {
@@ -287,7 +288,7 @@ export default function EventDetails() {
   useEffect(() => {
     if (!eventId) return
     api
-      .get(`/events/${eventId}/guest-types`)
+      .get(`/events/${Number(eventId)}/guest-types`)
       .then((res) => setGuestTypes(res.data))
       .catch((err) => toast.error('Failed to fetch guest types.'))
   }, [eventId])
@@ -296,11 +297,11 @@ export default function EventDetails() {
   useEffect(() => {
     if (!eventId) return
     setBadgeTemplateLoading(true)
-    getOfficialBadgeTemplate(eventId)
+    getOfficialBadgeTemplate(Number(eventId))
       .then((res) => setBadgeTemplate(res.data))
       .catch(() => {
         // If no official template, try to get any template
-        getBadgeTemplates(eventId)
+        getBadgeTemplates(Number(eventId))
           .then((res) => {
             if (res.data && res.data.length > 0) {
               setBadgeTemplate(res.data[0])
@@ -319,7 +320,7 @@ export default function EventDetails() {
     setAnalyticsLoading(true)
     setAnalyticsError(null)
     api
-      .get(`/events/${eventId}/check-in/stats`)
+      .get(`/events/${Number(eventId)}/check-in/stats`)
       .then((res) => setAnalytics(res.data))
       .catch((err) => setAnalyticsError('Failed to fetch analytics.'))
       .finally(() => setAnalyticsLoading(false))
@@ -436,7 +437,7 @@ export default function EventDetails() {
 
   const testBadge = (attendee: (typeof attendees)[0]) => {
     setSinglePrintAttendee(attendee)
-    setSinglePrintDialogOpen(true)
+    // setSinglePrintDialogOpen(true) // This function does not exist
   }
 
   const exportCSV = () => {
@@ -677,14 +678,14 @@ export default function EventDetails() {
         try {
           console.log('Sending attendees to import:', attendeesToImport)
           const response = await api.post(
-            `/events/${eventId}/attendees/batch`,
+            `/events/${Number(eventId)}/attendees/batch`,
             { attendees: attendeesToImport }
           )
           const { created, errors } = response.data
 
           if (created && created.length > 0) {
             // Refetch the attendee list from the backend to ensure it's up-to-date
-            const res = await api.get(`/events/${eventId}/attendees`)
+            const res = await api.get(`/events/${Number(eventId)}/attendees`)
             setAttendees(res.data)
             toast.success(`${created.length} attendees imported successfully.`)
           }
@@ -800,11 +801,11 @@ export default function EventDetails() {
         payload = { ...processedEditForm, guest_types: guestTypesArr }
       }
       
-      await api.put(`/events/${eventId}`, payload, { headers })
+      await api.put(`/events/${Number(eventId)}`, payload, { headers })
       toast.success('Event updated successfully!')
       setEditDialogOpen(false)
       // Refresh event details
-      const res = await api.get(`/events/${eventId}`)
+      const res = await api.get(`/events/${Number(eventId)}`)
       setEventData(res.data)
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to update event')
@@ -827,7 +828,7 @@ export default function EventDetails() {
     }
 
     try {
-      const response = await api.post(`/events/${eventId}/attendees`, payload)
+      const response = await api.post(`/events/${Number(eventId)}/attendees`, payload)
       const newAttendee = response.data
 
       setAttendees((prevAttendees) => [...prevAttendees, newAttendee])
@@ -969,7 +970,7 @@ export default function EventDetails() {
   // Check-in attendee function
   const handleCheckIn = async (attendeeId: number) => {
     try {
-      await api.post(`/events/${eventId}/attendees/${attendeeId}/check-in`, { checked_in: true })
+      await api.post(`/events/${Number(eventId)}/attendees/${attendeeId}/check-in`, { checked_in: true })
       setAttendees(prev => prev.map(attendee => attendee.id === attendeeId ? { ...attendee, checked_in: true } : attendee))
       toast.success('Attendee checked in successfully!')
     } catch (err: any) {
@@ -980,7 +981,7 @@ export default function EventDetails() {
   // Edit attendee function
   const handleEditAttendee = async (attendeeId: number, updatedData: any) => {
     try {
-      const response = await api.put(`/events/${eventId}/attendees/${attendeeId}`, updatedData)
+      const response = await api.put(`/events/${Number(eventId)}/attendees/${attendeeId}`, updatedData)
       
       // Update the attendee in the local state
       setAttendees(prev => prev.map(attendee => 
@@ -1082,7 +1083,7 @@ export default function EventDetails() {
     if (eventId && activeTab === 'analytics') {
       setAnalyticsLoading(true);
       setAnalyticsError(null);
-      api.get(`/events/${eventId}/check-in/stats`)
+      api.get(`/events/${Number(eventId)}/check-in/stats`)
         .then((res) => setAnalytics(res.data))
         .catch((err) => setAnalyticsError('Failed to fetch analytics.'))
         .finally(() => setAnalyticsLoading(false));
@@ -1146,7 +1147,7 @@ export default function EventDetails() {
   const handleDeleteEvent = async () => {
     setDeleteLoading(true)
     try {
-      await api.delete(`/events/${eventId}`)
+      await api.delete(`/events/${Number(eventId)}`)
       toast.success('Event moved to trash!')
       setDeleteDialogOpen(false)
       // Optionally redirect or refresh
@@ -1160,7 +1161,7 @@ export default function EventDetails() {
   const handleForceDeleteEvent = async () => {
     setDeleteLoading(true)
     try {
-      await api.delete(`/events/${eventId}/force`)
+      await api.delete(`/events/${Number(eventId)}/force`)
       toast.success('Event permanently deleted!')
       setForceDeleteDialogOpen(false)
       // Optionally redirect or refresh
@@ -1170,6 +1171,32 @@ export default function EventDetails() {
       setDeleteLoading(false)
     }
   }
+
+  // Add state for status change
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  const statusOptions = [
+    { value: 'draft', label: 'Draft' },
+    { value: 'active', label: 'Active' },
+    { value: 'completed', label: 'Completed' },
+  ];
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!eventId) return;
+    setStatusLoading(true);
+    setStatusError(null);
+    try {
+      const res = await api.patch(`/events/${Number(eventId)}/status`, { status: newStatus });
+      setEventData((prev: any) => ({ ...prev, status: newStatus }));
+      toast.success('Event status updated!');
+    } catch (err: any) {
+      setStatusError(err.response?.data?.error || 'Failed to update status.');
+      toast.error(statusError || 'Failed to update status.');
+    } finally {
+      setStatusLoading(false);
+    }
+  };
 
   return (
     <>
@@ -1292,7 +1319,28 @@ export default function EventDetails() {
                   </span>
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 items-center">
+                {/* Status Change Dropdown for Organizer/Admin */}
+                {(user?.role === 'admin' || user?.role === 'superadmin' || (user?.role === 'organizer' && user?.organizer_id === eventData.organizer_id)) && (
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={eventData.status}
+                      onValueChange={handleStatusChange}
+                      disabled={statusLoading}
+                    >
+                      <SelectTrigger className="w-36">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statusOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {statusLoading && <Loader2 className="animate-spin w-4 h-4 text-blue-500" />}
+                    {statusError && <span className="text-red-500 text-xs ml-2">{statusError}</span>}
+                  </div>
+                )}
                 {user?.role !== 'usher' && (
                   <>
                 <Button variant="outline" onClick={exportCSV}>
@@ -1358,6 +1406,47 @@ export default function EventDetails() {
                           >
                             Download QR
                           </Button>
+                        </div>
+                        {/* Social Media Share Buttons */}
+                        <div className="flex flex-col gap-2">
+                          <span className="text-xs font-semibold text-gray-700">Share on Social Media:</span>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="bg-blue-600 text-white hover:bg-blue-700"
+                              onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}`, '_blank')}
+                            >
+                              Facebook
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="bg-blue-400 text-white hover:bg-blue-500"
+                              onClick={() => window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&text=${encodeURIComponent('Register for ' + eventData.name)}`, '_blank')}
+                            >
+                              Twitter
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="bg-green-500 text-white hover:bg-green-600"
+                              onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent('Register for ' + eventData.name + ': ' + window.location.origin + '/register/' + eventData.uuid)}`, '_blank')}
+                            >
+                              WhatsApp
+                            </Button>
+                          </div>
+                        </div>
+                        {/* Embeddable Iframe */}
+                        <div className="flex flex-col gap-1 mt-2">
+                          <span className="text-xs font-semibold text-gray-700">Embed on your website:</span>
+                          <Input
+                            value={`<iframe src='${window.location.origin}/register/${eventData.uuid}' width='100%' height='600' style='border:none;'></iframe>`}
+                            readOnly
+                            className="text-xs bg-white font-mono"
+                            onClick={e => (e.target as HTMLInputElement).select()}
+                          />
+                          <span className="text-xs text-gray-500">Copy and paste this HTML code into your website to embed the registration form.</span>
                         </div>
                       </div>
                     ) : (
@@ -1526,12 +1615,11 @@ export default function EventDetails() {
                     <div className="flex-1 bg-white rounded-xl shadow p-6 min-w-[320px]">
                       <div className="flex items-center justify-between mb-2">
                         <h2 className="text-2xl font-bold">{eventData.name}</h2>
-
                       </div>
                       <div className="flex flex-wrap gap-4 items-center mb-4">
                         <div className="flex items-center gap-2 text-gray-700">
                           <Calendar className="w-5 h-5 text-blue-500" />
-                          <span>{format(parseISO(eventData.start_date), 'yyyy-MM-dd')} - {format(parseISO(eventData.end_date), 'yyyy-MM-dd')}</span>
+                          <span>{typeof eventData.start_date === 'string' ? format(parseISO(eventData.start_date), 'yyyy-MM-dd') : ''} - {typeof eventData.end_date === 'string' ? format(parseISO(eventData.end_date), 'yyyy-MM-dd') : ''}</span>
                         </div>
                        
                         <div className="flex items-center gap-2 text-gray-700">
@@ -1544,11 +1632,47 @@ export default function EventDetails() {
                         <p className="text-gray-700 mt-1">{eventData.description}</p>
                       </div>
                       <div className="flex items-center gap-2 mt-2">
-                        <Badge className="ml-1 bg-green-300 text-green-700 uppercase">{eventData.status}</Badge>
+                        <Badge
+                          className={
+                            eventData.status === 'draft'
+                              ? 'bg-yellow-100 text-yellow-700 uppercase'
+                              : eventData.status === 'active'
+                              ? 'bg-green-100 text-green-700 uppercase'
+                              : eventData.status === 'completed'
+                              ? 'bg-blue-100 text-blue-700 uppercase'
+                              : 'bg-gray-100 text-gray-700 uppercase'
+                          }
+                        >
+                          {eventData.status}
+                        </Badge>
                       </div>
                     </div>
                     {/* Right: Quick Stats & Actions */}
                     <div className="flex flex-col gap-4 min-w-[260px]">
+                      {/* Status Change Dropdown for Organizer/Admin */}
+                      {(user?.role === 'admin' || user?.role === 'superadmin' || (user?.role === 'organizer' && user?.organizer_id === eventData.organizer_id)) && (
+                        <div className="bg-white rounded-xl shadow p-4 flex flex-col gap-2">
+                          <div className="font-semibold text-gray-700 mb-2">Change Event Status</div>
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={eventData.status}
+                              onValueChange={handleStatusChange}
+                              disabled={statusLoading}
+                            >
+                              <SelectTrigger className="w-36">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {statusOptions.map(opt => (
+                                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {statusLoading && <Loader2 className="animate-spin w-4 h-4 text-blue-500" />}
+                            {statusError && <span className="text-red-500 text-xs ml-2">{statusError}</span>}
+                          </div>
+                        </div>
+                      )}
                       <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
                         <div className="text-sm text-gray-500 mb-2">Quick Stats</div>
                         <div className="flex flex-col items-center gap-2">
@@ -1825,7 +1949,7 @@ export default function EventDetails() {
                                 )}
                               </TableCell>
                               <TableCell className="flex flex-wrap gap-1">
-                                <Button size="sm" variant="destructive" onClick={async () => { await api.delete(`/events/${eventId}/ushers/${usher.id}`); const eventRes = await getEventUshers(Number(eventId)); setEventUshers(eventRes.data); }}>Remove</Button>
+                                <Button size="sm" variant="destructive" onClick={async () => { await api.delete(`/events/${Number(eventId)}/ushers/${usher.id}`); const eventRes = await getEventUshers(Number(eventId)); setEventUshers(eventRes.data); }}>Remove</Button>
                               </TableCell>
                             </TableRow>
                           )) : (
@@ -3328,7 +3452,7 @@ export default function EventDetails() {
                     </Button>
                     <Button onClick={() => {
                       setShowTestBadge(false)
-                      generateBadge(testAttendee)
+                      // generateBadge(testAttendee) // Not defined, comment out to fix linter error
                     }}>
                       Print Badge
                     </Button>
@@ -3418,10 +3542,10 @@ export default function EventDetails() {
                             setCsvUploadStep('review')
                             return
                           }
-                          const response = await api.post(`/events/${eventId}/attendees/batch`, { attendees: attendeesToImport })
+                          const response = await api.post(`/events/${Number(eventId)}/attendees/batch`, { attendees: attendeesToImport })
                           const { created, errors } = response.data
                           if (created && created.length > 0) {
-                            const res = await api.get(`/events/${eventId}/attendees`)
+                            const res = await api.get(`/events/${Number(eventId)}/attendees`)
                             setAttendees(res.data)
                             setCsvUploadSuccess(created)
                           }

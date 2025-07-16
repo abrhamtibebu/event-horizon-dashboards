@@ -17,7 +17,7 @@ import {
   Cell,
 } from "recharts";
 import React, { useEffect, useState } from 'react';
-import { getGlobalReport } from '@/lib/api';
+import { getOrganizerReport } from '@/lib/api';
 
 const monthlyData = [
   { month: "Jan", revenue: 12500, events: 8, attendees: 850 },
@@ -43,7 +43,7 @@ export default function Reports() {
 
   useEffect(() => {
     setLoading(true);
-    getGlobalReport()
+    getOrganizerReport()
       .then((res) => {
         setMetrics(res.data);
         // Fetch top events by attendance (IDs), you may want to fetch event names in a real app
