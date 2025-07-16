@@ -23,5 +23,5 @@ export interface Attendee {
   checked_in: boolean;
   check_in_time?: string;
   guest?: Guest;
-  guestType?: GuestType;
+  guest_type?: GuestType;
 } 

@@ -18,8 +18,8 @@ import { DashboardCard } from '@/components/DashboardCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
-import { Link, useOutletContext } from 'react-router-dom'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts'
+import { Link, useOutletContext, useNavigate } from 'react-router-dom'
 import api from '@/lib/api'
 import { Calendar } from '@/components/ui/calendar'
 import { useInterval } from '@/hooks/use-interval'
@@ -27,6 +27,8 @@ import { useToast } from '@/hooks/use-toast'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/hooks/use-auth'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 
 export default function OrganizerDashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null)
@@ -46,51 +48,72 @@ export default function OrganizerDashboard() {
   const [assigning, setAssigning] = useState(false)
   const toast = useToast()
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Real-time chart data state
+  const [guestTypeDistribution, setGuestTypeDistribution] = useState<any[]>([]);
+  const [eventPopularity, setEventPopularity] = useState<any[]>([]);
+
+  // Add edit event dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState<any>(null);
+  const [editLoading, setEditLoading] = useState(false);
+
+  // Handler to open edit dialog with event data
+  const openEditDialog = (event: any) => {
+    setEditForm({ ...event });
+    setEditDialogOpen(true);
+  };
+
+  // Handler to update edit form fields
+  const handleEditInput = (field: string, value: any) => {
+    setEditForm((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  // Handler to submit edit event
+  const handleEditEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditLoading(true);
+    try {
+      await api.put(`/events/${editForm.id}`, editForm);
+      toast.toast({ title: 'Success', description: 'Event updated successfully!', variant: 'default' });
+      setEditDialogOpen(false);
+      fetchDashboardData();
+    } catch (err: any) {
+      toast.toast({ title: 'Error', description: err.response?.data?.error || 'Failed to update event', variant: 'destructive' });
+    } finally {
+      setEditLoading(false);
+    }
+  };
 
   // Fetch dashboard data
-  useEffect(() => {
-    const fetchOrganizerData = async () => {
-      try {
-        setLoading(true)
-        const response = await api.get('/dashboard/organizer')
-        setDashboardData(response.data)
-        setError(null)
-      } catch (err: any) {
-        let message = 'Failed to fetch organizer dashboard data.'
-        if (err.response && err.response.data && err.response.data.error) {
-          message = err.response.data.error
-        } else if (err.message) {
-          message = err.message
-        }
-        setError(message)
-        toast.toast({ title: 'Error', description: message, variant: 'destructive' })
-      } finally {
-        setLoading(false)
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      const response = await api.get('/dashboard/organizer')
+      setDashboardData(response.data)
+      setError(null)
+    } catch (err: any) {
+      let message = 'Failed to fetch organizer dashboard data.'
+      if (err.response && err.response.data && err.response.data.error) {
+        message = err.response.data.error
+      } else if (err.message) {
+        message = err.message
       }
+      setError(message)
+      toast.toast({ title: 'Error', description: message, variant: 'destructive' })
+    } finally {
+      setLoading(false)
     }
-    fetchOrganizerData()
+  }
+  useEffect(() => {
+    fetchDashboardData()
   }, [])
 
-  // Real-time polling for dashboard data (every 10 seconds)
-  useInterval(() => {
-    const fetchOrganizerData = async () => {
-      try {
-        const response = await api.get('/dashboard/organizer')
-        setDashboardData(response.data)
-        setError(null)
-      } catch (err: any) {
-        let message = 'Failed to fetch organizer dashboard data.'
-        if (err.response && err.response.data && err.response.data.error) {
-          message = err.response.data.error
-        } else if (err.message) {
-          message = err.message
-        }
-        setError(message)
-        toast.toast({ title: 'Error', description: message, variant: 'destructive' })
-      }
-    }
-    fetchOrganizerData()
-  }, 10000)
+  // Remove the useInterval for dashboard refresh
+  // useInterval(() => {
+  //   fetchDashboardData()
+  // }, 10000)
 
   // Fetch all events for the visible month (for calendar markers)
   useEffect(() => {
@@ -203,8 +226,9 @@ export default function OrganizerDashboard() {
       await api.post(`/events/${selectedEventId}/ushers`, {
         ushers: selectedUshers.map(id => ({ id, tasks: [] })),
       })
-      toast.toast({ title: 'Success', description: 'Ushers assigned successfully!', variant: 'success' })
+      toast.toast({ title: 'Success', description: 'Ushers assigned successfully!', variant: 'default' })
       setAssignDialogOpen(false)
+      fetchDashboardData() // Refresh after assigning ushers
     } catch (err: any) {
       toast.toast({ title: 'Error', description: err.response?.data?.error || 'Failed to assign ushers', variant: 'destructive' })
     } finally {
@@ -217,12 +241,51 @@ export default function OrganizerDashboard() {
     if (!window.confirm('Are you sure you want to delete this event?')) return
     try {
       await api.delete(`/events/${eventId}`)
-      toast.toast({ title: 'Success', description: 'Event deleted!', variant: 'success' })
-      // Optionally, refresh dashboardData/myEvents if needed
+      toast.toast({ title: 'Success', description: 'Event deleted!', variant: 'default' })
+      fetchDashboardData() // Refresh after deleting event
     } catch (err) {
       toast.toast({ title: 'Error', description: 'Failed to delete event.', variant: 'destructive' })
     }
   }
+
+  // Fetch real-time chart data from backend
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const [summaryRes, eventsRes] = await Promise.all([
+          api.get('/reports/summary'),
+          api.get('/events'),
+        ]);
+        // Guest type distribution
+        if (summaryRes.data.guest_type_breakdown) {
+          setGuestTypeDistribution(
+            Object.entries(summaryRes.data.guest_type_breakdown).map(([name, value]) => ({ name, value }))
+          );
+        } else {
+          setGuestTypeDistribution([]);
+        }
+        // Event popularity (top events by attendance)
+        if (summaryRes.data.top_events_by_attendance && Array.isArray(eventsRes.data)) {
+          const eventIdToName: Record<string, string> = {};
+          eventsRes.data.forEach((event: any) => {
+            eventIdToName[String(event.id)] = event.name;
+          });
+          setEventPopularity(
+            Object.entries(summaryRes.data.top_events_by_attendance).map(([id, attendees]) => ({
+              name: eventIdToName[id] || `Event #${id}`,
+              attendees,
+            }))
+          );
+        } else {
+          setEventPopularity([]);
+        }
+      } catch (err) {
+        setGuestTypeDistribution([]);
+        setEventPopularity([]);
+      }
+    };
+    fetchAnalytics();
+  }, []);
 
   // Loading skeletons
   if (loading) {
@@ -259,7 +322,7 @@ export default function OrganizerDashboard() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-1">
-            Welcome{user?.name ? `, ${user.name}` : ''}!
+            Welcome{user && (user as any).name ? `, ${(user as any).name}` : ''}!
           </h1>
           <p className="text-gray-500">Today is {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
@@ -320,8 +383,7 @@ export default function OrganizerDashboard() {
                     <Progress value={event.registrationProgress} className="h-2" />
                   </div>
                   <div className="flex gap-2 mt-2">
-                    <Link to={`/events/${event.id}`}><Button size="sm" variant="outline"><Eye className="w-4 h-4 mr-1" />View</Button></Link>
-                    <Link to={`/events/${event.id}/edit`}><Button size="sm" variant="outline"><Edit className="w-4 h-4 mr-1" />Edit</Button></Link>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/dashboard/events/${event.id}`)}><Eye className="w-4 h-4 mr-1" />View</Button>
                     <Button size="sm" variant="outline" onClick={() => openAssignDialog(event.id)}><UserPlus className="w-4 h-4 mr-1" />Assign Ushers</Button>
                     <Button size="sm" variant="destructive" onClick={() => handleDeleteEvent(event.id)}><Trash2 className="w-4 h-4 mr-1" />Delete</Button>
                   </div>
@@ -360,73 +422,39 @@ export default function OrganizerDashboard() {
         </div>
         {/* Right: Calendar, Recent Activity */}
         <div className="flex flex-col gap-8">
-          {/* --- Calendar Redesign --- */}
-          {/* Replace the DashboardCard for Calendar with a new design */}
-          <DashboardCard title={null} className="p-0 bg-white rounded-2xl shadow-none border-none">
-            <div className="flex flex-col items-center p-4">
-              {/* Calendar Header */}
-              <div className="flex items-center justify-between w-full mb-2">
-                <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))} className="p-2 rounded-full hover:bg-gray-100">
-                  <span className="sr-only">Previous month</span>
-                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </button>
-                <div className="text-lg font-semibold text-gray-900">{calendarMonth.toLocaleString('default', { month: 'long', year: 'numeric' })}</div>
-                <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))} className="p-2 rounded-full hover:bg-gray-100">
-                  <span className="sr-only">Next month</span>
-                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </button>
-              </div>
-              {/* Calendar Grid */}
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                month={calendarMonth}
-                onMonthChange={setCalendarMonth}
-                dayContent={date => {
-                  const events = getEventsForDay(date)
-                  return (
-                    <div className="relative flex flex-col items-center justify-center w-8 h-8">
-                      <span>{date.getDate()}</span>
-                      {events.length > 0 && (
-                        <div className="flex gap-0.5 absolute bottom-1 left-1/2 -translate-x-1/2">
-                          {events.slice(0,3).map((ev, i) => (
-                            <span key={i} className={`w-1.5 h-1.5 rounded-full ${['bg-green-500','bg-blue-500','bg-red-500'][i%3]}`}></span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                }}
-                className="rounded-xl bg-gray-50 p-2"
-                classNames={{
-                  day_selected: "bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold shadow-md"
-                }}
-              />
-              {/* Event List for Selected Day */}
-              <div className="w-full mt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-500">Showing all {eventsForDate.length} events</span>
-                  <input type="text" placeholder="Search for events ..." className="border rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" onChange={e => {
-                    const q = e.target.value.toLowerCase();
-                    setEventsForDate(monthEvents.filter(ev => ev.name.toLowerCase().includes(q) && new Date(ev.start_date || ev.date).toDateString() === (selectedDate?.toDateString() || '')))
-                  }} />
-                </div>
-                <div className="bg-white rounded-xl divide-y divide-gray-100 shadow-sm">
-                  {eventsForDate.length === 0 ? (
-                    <div className="text-gray-400 text-center py-6">No events for this day.</div>
-                  ) : eventsForDate.map((event, idx) => (
-                    <div key={event.id} className={`flex items-center gap-3 px-4 py-3 ${selectedDate && new Date(event.start_date || event.date).toDateString() === selectedDate.toDateString() ? 'bg-red-50' : ''}`}>
-                      <span className={`w-2 h-2 rounded-full ${['bg-green-500','bg-blue-500','bg-red-500'][idx%3]}`}></span>
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900">{event.name}</div>
-                        <div className="text-xs text-gray-500">{new Date(event.start_date || event.date).toLocaleString([], { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}{event.end_date ? ` - ${new Date(event.end_date).toLocaleString([], { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}</div>
-                      </div>
-                    </div>
+          {/* Pie Chart for Guest Type Distribution */}
+          <DashboardCard title="Guest Type Distribution">
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={guestTypeDistribution.length > 0 ? guestTypeDistribution : []}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label
+                >
+                  {['#3b82f6', '#10b981', '#f59e42', '#a21caf', '#ef4444', '#6366f1'].map((color, idx) => (
+                    <Cell key={idx} fill={color} />
                   ))}
-                </div>
-              </div>
-            </div>
+                </Pie>
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </DashboardCard>
+          {/* Bar Chart for Event Popularity */}
+          <DashboardCard title="Event Popularity">
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={eventPopularity.length > 0 ? eventPopularity : []}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <RechartsTooltip />
+                <Legend />
+                <Bar dataKey="attendees" fill="#3b82f6" name="Attendees" />
+              </BarChart>
+            </ResponsiveContainer>
           </DashboardCard>
           {/* Recent Activity / Messages */}
           <DashboardCard title="Recent Activity">
@@ -445,8 +473,8 @@ export default function OrganizerDashboard() {
                 </div>
               ))}
             </div>
-            <Link to="/messages" className="block mt-4">
-              <Button variant="outline" size="sm" className="w-full">View All Messages</Button>
+            <Link to="/messages" className="block mt-4" tabIndex={-1} aria-disabled="true" title="Coming Soon!" onClick={e => e.preventDefault()}>
+              <Button variant="outline" size="sm" className="w-full">Messages (Coming Soon)</Button>
             </Link>
           </DashboardCard>
           {/* Quick Actions */}
@@ -522,6 +550,7 @@ export default function OrganizerDashboard() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Edit Event Dialog removed */}
     </div>
   )
 }

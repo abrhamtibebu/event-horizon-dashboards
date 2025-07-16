@@ -1650,7 +1650,7 @@ export default function EventDetails() {
                     {/* Right: Quick Stats & Actions */}
                     <div className="flex flex-col gap-4 min-w-[260px]">
                       {/* Status Change Dropdown for Organizer/Admin */}
-                      {(user?.role === 'admin' || user?.role === 'superadmin' || (user?.role === 'organizer' && user?.organizer_id === eventData.organizer_id)) && (
+                      {/* {(user?.role === 'admin' || user?.role === 'superadmin' || (user?.role === 'organizer' && user?.organizer_id === eventData.organizer_id)) && (
                         <div className="bg-white rounded-xl shadow p-4 flex flex-col gap-2">
                           <div className="font-semibold text-gray-700 mb-2">Change Event Status</div>
                           <div className="flex items-center gap-2">
@@ -1672,7 +1672,7 @@ export default function EventDetails() {
                             {statusError && <span className="text-red-500 text-xs ml-2">{statusError}</span>}
                           </div>
                         </div>
-                      )}
+                      )} */}
                       <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center">
                         <div className="text-sm text-gray-500 mb-2">Quick Stats</div>
                         <div className="flex flex-col items-center gap-2">
@@ -1741,7 +1741,7 @@ export default function EventDetails() {
                                 <TableCell>
                                   {(() => {
                                     // Handle guest type display properly
-                                    const guestType = attendee.guestType;
+                                    const guestType = attendee.guest_type;
                                     if (guestType) {
                                       if (typeof guestType === 'object' && guestType !== null) {
                                         return guestType.name || guestType.id || 'Unknown';
@@ -1785,9 +1785,14 @@ export default function EventDetails() {
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
                       <h3 className="text-xl font-bold">Attendee Management</h3>
-                      <Button variant="default" onClick={() => setAddAttendeeDialogOpen(true)} className="flex items-center gap-2">
-                        <Plus className="w-4 h-4" /> Add Attendee
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="default" onClick={() => setAddAttendeeDialogOpen(true)} className="flex items-center gap-2">
+                          <Plus className="w-4 h-4" /> Add Attendee
+                        </Button>
+                        <Button variant="outline" onClick={() => setCsvUploadDialogOpen(true)} className="flex items-center gap-2">
+                          <Upload className="w-4 h-4" /> Upload CSV
+                        </Button>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-2 mb-2">
                       <Input
@@ -1846,17 +1851,17 @@ export default function EventDetails() {
                               </TableCell>
                               <TableCell>
                                 <Badge className={
-                                  attendee.guestType?.name?.toLowerCase() === 'speaker' ? 'bg-purple-100 text-purple-700' :
-                                  attendee.guestType?.name?.toLowerCase() === 'vip' ? 'bg-yellow-100 text-yellow-700' :
-                                  attendee.guestType?.name?.toLowerCase() === 'visitor' ? 'bg-gray-100 text-gray-700' :
+                                  attendee.guest_type?.name?.toLowerCase() === 'speaker' ? 'bg-purple-100 text-purple-700' :
+                                  attendee.guest_type?.name?.toLowerCase() === 'vip' ? 'bg-yellow-100 text-yellow-700' :
+                                  attendee.guest_type?.name?.toLowerCase() === 'visitor' ? 'bg-gray-100 text-gray-700' :
                                   'bg-blue-100 text-blue-700'
                                 }>
                                   {(() => {
                                     console.log('DEBUG Table - attendee:', attendee);
-                                    console.log('DEBUG Table - attendee.guestType:', attendee.guestType);
+                                    console.log('DEBUG Table - attendee.guest_type:', attendee.guest_type);
                                     
                                     // Handle guest type display properly
-                                    const guestType = attendee.guestType;
+                                    const guestType = attendee.guest_type;
                                     if (guestType) {
                                       if (typeof guestType === 'object' && guestType !== null) {
                                         const result = guestType.name || guestType.id || 'Unknown';

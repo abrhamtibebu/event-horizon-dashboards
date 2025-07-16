@@ -12,13 +12,14 @@ interface BadgeProps {
 // Helper function to replace template placeholders with actual data
 const replaceTemplateFields = (content: string, attendee: Attendee): string => {
   const guest = attendee.guest;
-  const guestType = attendee.guestType;
+  // Use guest_type instead of guestType
+  const guestType = attendee.guest_type;
   
   // Handle guest type properly - extract name from object or use string directly
   let guestTypeName = '';
   if (guestType) {
     if (typeof guestType === 'object' && guestType !== null) {
-      guestTypeName = guestType.name || guestType.id || '';
+      guestTypeName = guestType.name || String(guestType.id) || '';
     } else if (typeof guestType === 'string') {
       guestTypeName = guestType;
     } else {
@@ -34,9 +35,9 @@ const replaceTemplateFields = (content: string, attendee: Attendee): string => {
     .replace(/{jobTitle}/g, guest?.jobtitle || '')
     .replace(/{email}/g, guest?.email || '')
     .replace(/{phone}/g, guest?.phone || '')
-    .replace(/{country}/g, guest?.country || '')
+    .replace(/{country}/g, '')
     .replace(/{guestType}/g, guestTypeName)
-    .replace(/{uuid}/g, guest?.uuid || guest?.id?.toString() || '')
+    .replace(/{uuid}/g, guest?.uuid || (guest?.id ? String(guest.id) : '') || '')
     .replace(/{profilePicture}/g, guest?.profile_picture || '');
 };
 
@@ -45,22 +46,19 @@ const LegacyBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
   const name = attendee.guest?.name || '';
   const company = attendee.guest?.company || '';
   const jobtitle = attendee.guest?.jobtitle || '';
-  const country = attendee.guest?.country || '';
+  const country = '';
   
   console.log('DEBUG - LegacyBadge attendee:', attendee);
-  console.log('DEBUG - LegacyBadge attendee.guestType:', attendee.guestType);
+  console.log('DEBUG - LegacyBadge attendee.guest_type:', attendee.guest_type);
   
-  // Fix: fallback to guestType?.name or guest_type if guestType is missing
+  // Use guest_type instead of guestType
   let guestType = '';
-  if (attendee.guestType && typeof attendee.guestType === 'object' && attendee.guestType !== null) {
-    guestType = attendee.guestType.name || attendee.guestType.id || '';
+  if (attendee.guest_type && typeof attendee.guest_type === 'object' && attendee.guest_type !== null) {
+    guestType = attendee.guest_type.name || String(attendee.guest_type.id) || '';
     console.log('DEBUG - LegacyBadge extracted from object:', guestType);
-  } else if (typeof attendee.guestType === 'string') {
-    guestType = attendee.guestType;
+  } else if (typeof attendee.guest_type === 'string') {
+    guestType = attendee.guest_type;
     console.log('DEBUG - LegacyBadge is string:', guestType);
-  } else if (attendee.guest_type) {
-    guestType = String(attendee.guest_type);
-    console.log('DEBUG - LegacyBadge from guest_type:', guestType);
   }
   
   console.log('DEBUG - LegacyBadge final guestType:', guestType);
@@ -89,7 +87,7 @@ const LegacyBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
         </div>
         {/* Guest type below QR code */}
         <div className="w-full text-center text-3xl font-extrabold tracking-widest mt-2" style={{ letterSpacing: 2, color: '#111' }}>
-          {guestType ? guestType.toUpperCase() : ''}
+          {guestType ? guestType.toUpperCase(): ''}
         </div>
       </div>
     </div>

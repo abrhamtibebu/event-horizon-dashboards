@@ -243,10 +243,8 @@ export default function UsherDashboard() {
                       }
                       className="h-2"
                     />
-                    <Link to={`/dashboard/events/${event.id}/messages`}>
-                      <Button className="mt-2 w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                        Message Organizer
-                      </Button>
+                    <Link to={`/dashboard/events/${event.id}/messages`} tabIndex={-1} aria-disabled="true" title="Coming Soon!" onClick={e => e.preventDefault()}>
+                      <Button className="mt-2 w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">Message (Coming Soon)</Button>
                     </Link>
                   </div>
 

@@ -219,7 +219,7 @@ export default function CreateEvent() {
       }
       await api.post('/events', payload, { headers })
       toast.success('Event created successfully!')
-      navigate('/events')
+      navigate('/dashboard/events')
     } catch (error: any) {
       if (error.response?.status === 422 && error.response?.data) {
         // Show the first validation error

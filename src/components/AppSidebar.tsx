@@ -86,6 +86,7 @@ const allItems = [
     url: '/dashboard/messages',
     icon: MessageSquare,
     roles: ['superadmin', 'admin', 'organizer'],
+    comingSoon: true,
   },
   {
     title: 'Event Analytics',
@@ -204,6 +205,7 @@ export function AppSidebar() {
                       to={item.url}
                       end={item.url === '/dashboard'}
                       className={getNavCls}
+                      title={item.comingSoon ? 'Coming Soon!' : undefined}
                     >
                       <div className="flex items-center justify-between w-full">
                         <div className="flex items-center">
@@ -211,6 +213,9 @@ export function AppSidebar() {
                           {!isCollapsed && (
                             <span className="ml-3 font-medium">
                               {item.title}
+                              {item.comingSoon && (
+                                <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-200 text-yellow-800 text-xs font-semibold animate-pulse">Soon</span>
+                              )}
                             </span>
                           )}
                         </div>
