@@ -952,11 +952,13 @@ export default function UsherEventManagement() {
                           <TableCell>{a.guest?.company}</TableCell>
                           <TableCell>
                             {a.checked_in ? (
-                              <span className="text-green-600 font-semibold">
+                              <Badge className="bg-green-100 text-green-700">
                                 Present
-                              </span>
+                              </Badge>
                             ) : (
-                              <span className="text-gray-400">Absent</span>
+                              <Badge className="bg-gray-100 text-gray-700">
+                                Absent
+                              </Badge>
                             )}
                           </TableCell>
                           <TableCell>

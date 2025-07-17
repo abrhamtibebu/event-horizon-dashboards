@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Calendar,
   Users,
@@ -45,6 +45,7 @@ export default function Events() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   const { user } = useAuth()
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -61,6 +62,11 @@ export default function Events() {
       }
     }
     fetchEvents()
+    // Polling for real-time updates
+    intervalRef.current = setInterval(fetchEvents, 150000)
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
   }, [user?.role])
 
   const getStatusColor = (status: string) => {
@@ -70,7 +76,7 @@ export default function Events() {
       case 'completed':
         return 'bg-blue-100 text-blue-800'
       case 'draft':
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-yellow-100 text-yellow-800'
       case 'cancelled':
         return 'bg-red-100 text-red-800'
       default:
@@ -183,9 +189,11 @@ export default function Events() {
                         <Card className="h-full flex flex-col justify-between shadow-xl border-0 hover:shadow-2xl transition-shadow duration-300 bg-white/90 backdrop-blur-md">
                           {/* Event Image */}
                           <div className="relative h-40 sm:h-48 w-full rounded-t-2xl overflow-hidden">
-                            {event.image ? (
+                            {event.event_image ? (
                               <img
-                                src={event.image}
+                                src={event.event_image.startsWith('http')
+                                  ? event.event_image
+                                  : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${event.event_image}`}
                                 alt={event.name}
                                 className="object-cover w-full h-full"
                               />
@@ -204,10 +212,8 @@ export default function Events() {
                               >
                                 {event.name}
                               </h3>
-                              <span className="sm:ml-2">
-                                <Badge className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                                  {event.status}
-                                </Badge>
+                              <span className={getStatusColor(event.status) + ' px-3 py-1 rounded-full text-xs font-semibold'}>
+                                {event.status}
                               </span>
                             </div>
                             {/* Description */}
@@ -255,7 +261,7 @@ export default function Events() {
                             <div className="text-xs text-gray-500 mt-2">
                               Organized by{' '}
                               <span className="font-semibold text-gray-700">
-                                {event.organizer?.name || 'John Smith'}
+                                {user?.name || event.organizer?.name || 'John Smith'}
                               </span>
                             </div>
                             {/* Usher Tasks */}

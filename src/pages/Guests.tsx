@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Search, Users as UsersIcon, Mail, MessageSquare } from 'lucide-react';
 import { getAllGuests } from '@/lib/api';
+import { Badge } from '@/components/ui/badge';
 
 interface Guest {
   id: string;
@@ -25,6 +26,7 @@ interface Guest {
   country?: string;
   guestType?: { name: string };
   guest_type?: string;
+  checked_in?: boolean;
   [key: string]: any;
 }
 
@@ -152,6 +154,7 @@ export default function Guests() {
                   <TableHead>Gender</TableHead>
                   <TableHead>Country</TableHead>
                   <TableHead>Guest Type</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -190,6 +193,13 @@ export default function Guests() {
                     <TableCell>{guest.gender || '-'}</TableCell>
                     <TableCell>{guest.country || '-'}</TableCell>
                     <TableCell>{guest.guestType?.name || guest.guest_type || '-'}</TableCell>
+                    <TableCell>
+                      {guest.checked_in ? (
+                        <Badge className="bg-green-100 text-green-700">Checked In</Badge>
+                      ) : (
+                        <Badge className="bg-gray-100 text-gray-700">Not Checked In</Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button

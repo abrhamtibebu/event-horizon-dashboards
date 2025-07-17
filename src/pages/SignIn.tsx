@@ -182,6 +182,8 @@ export default function SignIn() {
                 )}
               </Button>
 
+              {/* Remove or comment out the section that renders the Register/Create Account button or link. */}
+              {/*
               <div className="text-center text-sm text-gray-600">
                 Don't have an account?{' '}
                 <Link
@@ -191,6 +193,7 @@ export default function SignIn() {
                   Create account
                 </Link>
               </div>
+              */}
             </CardFooter>
           </form>
         </Card>

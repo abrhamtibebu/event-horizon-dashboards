@@ -111,6 +111,11 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 
+// Add predefined guest types at the top, after imports
+const PREDEFINED_GUEST_TYPES = [
+  'VIP', 'Speaker', 'Staff', 'Exhibitor', 'Media', 'Regular', 'Visitor', 'Sponsor', 'Organizer', 'Volunteer', 'Partner', 'Vendor', 'Press', 'Student', 'Other'
+];
+
 export default function EventDetails() {
   const { eventId } = useParams()
   const [searchTerm, setSearchTerm] = useState('')
@@ -760,12 +765,11 @@ export default function EventDetails() {
   }
 
   const handleEditEvent = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setEditLoading(true)
+    e.preventDefault();
+    setEditLoading(true);
     try {
-      let payload
-      let headers = {}
-      
+      let payload;
+      let headers = {};
       // Convert date objects to ISO strings for API
       const processedEditForm = {
         ...editForm,
@@ -773,46 +777,39 @@ export default function EventDetails() {
         end_date: editEventRange[0].endDate.toISOString(),
         registration_start_date: editRegRange[0].startDate.toISOString(),
         registration_end_date: editRegRange[0].endDate.toISOString(),
-      }
-      
+        max_guests: parseInt(editForm.max_guests, 10),
+        guest_types: Array.isArray(editForm.guest_types)
+          ? editForm.guest_types
+          : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).filter(Boolean),
+      };
       if (processedEditForm.event_image && processedEditForm.event_image instanceof File) {
-        payload = new FormData()
+        payload = new FormData();
         Object.entries(processedEditForm).forEach(([key, value]) => {
           if (key === 'event_image' && value) {
-            payload.append('event_image', value)
+            payload.append('event_image', value);
           } else if (key === 'guest_types') {
-            const guestTypesArr = (value as string)
-              .split(',')
-              .map((s: string) => s.trim())
-              .filter(Boolean)
-            guestTypesArr.forEach((type) =>
+            (Array.isArray(value) ? value : [value]).forEach((type: string) =>
               payload.append('guest_types[]', type)
-            )
+            );
           } else {
-            payload.append(key, value as any)
+            payload.append(key, value as any);
           }
-        })
-        headers = { 'Content-Type': 'multipart/form-data' }
+        });
+        headers = { 'Content-Type': 'multipart/form-data' };
       } else {
-        const guestTypesArr = (processedEditForm.guest_types as string)
-          .split(',')
-          .map((s: string) => s.trim())
-          .filter(Boolean)
-        payload = { ...processedEditForm, guest_types: guestTypesArr }
+        payload = processedEditForm;
       }
-      
-      await api.put(`/events/${Number(eventId)}`, payload, { headers })
-      toast.success('Event updated successfully!')
-      setEditDialogOpen(false)
+      await api.put(`/events/${Number(eventId)}`, payload, { headers });
+      toast.success('Event updated successfully!');
+      setEditDialogOpen(false);
       // Refresh event details
-      const res = await api.get(`/events/${Number(eventId)}`)
-      setEventData(res.data)
+      const res = await api.get(`/events/${Number(eventId)}`);
+      setEventData(res.data);
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to update event')
-    } finally {
-      setEditLoading(false)
+      toast.error(err.response?.data?.error || 'Failed to update event');
     }
-  }
+    setEditLoading(false);
+  };
 
   const handleAddAttendeeInput = (field: string, value: any) => {
     setAddAttendeeForm((prev: any) => ({ ...prev, [field]: value }))
@@ -1079,17 +1076,6 @@ export default function EventDetails() {
     return matchesSearch && matchesStatus
   })
 
-  useInterval(() => {
-    if (eventId && activeTab === 'analytics') {
-      setAnalyticsLoading(true);
-      setAnalyticsError(null);
-      api.get(`/events/${Number(eventId)}/check-in/stats`)
-        .then((res) => setAnalytics(res.data))
-        .catch((err) => setAnalyticsError('Failed to fetch analytics.'))
-        .finally(() => setAnalyticsLoading(false));
-    }
-  }, 10000); // Poll every 10 seconds
-
   useEffect(() => {
     if (printing && printRef.current) {
       handleBatchPrintBadges();
@@ -1179,7 +1165,7 @@ export default function EventDetails() {
   const statusOptions = [
     { value: 'draft', label: 'Draft' },
     { value: 'active', label: 'Active' },
-    { value: 'completed', label: 'Completed' },
+    { value: 'cancelled', label: 'Cancelled' },
   ];
 
   const handleStatusChange = async (newStatus: string) => {
@@ -1640,6 +1626,8 @@ export default function EventDetails() {
                               ? 'bg-green-100 text-green-700 uppercase'
                               : eventData.status === 'completed'
                               ? 'bg-blue-100 text-blue-700 uppercase'
+                              : eventData.status === 'cancelled'
+                              ? 'bg-red-100 text-red-700 uppercase'
                               : 'bg-gray-100 text-gray-700 uppercase'
                           }
                         >
@@ -1754,7 +1742,13 @@ export default function EventDetails() {
                                     return 'Unknown';
                                   })()}
                                 </TableCell>
-                                <TableCell>{attendee.checked_in ? <Badge className="bg-green-100 text-green-700">Checked In</Badge> : <Badge className="bg-gray-100 text-gray-700">Not Checked In</Badge>}</TableCell>
+                                <TableCell>
+                                  {attendee.checked_in ? (
+                                    <Badge className="bg-green-100 text-green-700">Checked In</Badge>
+                                  ) : (
+                                    <Badge className="bg-gray-100 text-gray-700">Not Checked In</Badge>
+                                  )}
+                                </TableCell>
                                 <TableCell>
                                   <div className="w-32 h-20 bg-gray-50 border rounded flex items-center justify-center overflow-hidden">
                                     <div style={{ transform: 'scale(0.2)', transformOrigin: 'top left', width: 400, height: 600 }}>
@@ -1879,7 +1873,11 @@ export default function EventDetails() {
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                {attendee.checked_in ? <Badge className="bg-green-100 text-green-700">Checked In</Badge> : <Badge className="bg-gray-100 text-gray-700">Not Checked In</Badge>}
+                                {attendee.checked_in ? (
+                                  <Badge className="bg-green-100 text-green-700">Checked In</Badge>
+                                ) : (
+                                  <Badge className="bg-gray-100 text-gray-700">Not Checked In</Badge>
+                                )}
                               </TableCell>
                               <TableCell className="flex flex-wrap gap-1">
                                 <Button size="sm" variant="outline" onClick={() => {
@@ -2081,9 +2079,11 @@ export default function EventDetails() {
                               <TableCell>{attendee.guest?.email}</TableCell>
                               <TableCell>{attendee.guest?.phone}</TableCell>
                               <TableCell>
-                                <Badge className={attendee.checked_in ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}>
-                                  {attendee.checked_in ? 'Checked In' : 'Not Checked In'}
-                                </Badge>
+                                {attendee.checked_in ? (
+                                  <Badge className="bg-green-100 text-green-700">Checked In</Badge>
+                                ) : (
+                                  <Badge className="bg-gray-100 text-gray-700">Not Checked In</Badge>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <Button
@@ -2250,7 +2250,13 @@ export default function EventDetails() {
                                     <TableCell>{attendee.guest?.email}</TableCell>
                                     <TableCell>{attendee.guest?.company}</TableCell>
                                     <TableCell>{attendee.guestType?.name}</TableCell>
-                                    <TableCell>{attendee.checked_in ? 'Checked In' : 'Not Checked In'}</TableCell>
+                                    <TableCell>
+                                      {attendee.checked_in ? (
+                                        <Badge className="bg-green-100 text-green-700">Checked In</Badge>
+                                      ) : (
+                                        <Badge className="bg-gray-100 text-gray-700">Not Checked In</Badge>
+                                      )}
+                                    </TableCell>
                                   </TableRow>
                                 ))}
                               </TableBody>
@@ -2401,17 +2407,52 @@ export default function EventDetails() {
                         <Label htmlFor="edit_guest_types" className="flex items-center gap-2 text-gray-700">
                           <Users className="w-4 h-4" /> Guest Types
                         </Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {PREDEFINED_GUEST_TYPES.map(type => {
+                        const isSelected = Array.isArray(editForm.guest_types)
+                          ? editForm.guest_types.includes(type)
+                          : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).includes(type);
+                        return (
+                          <Button
+                            key={type}
+                            type="button"
+                            variant={isSelected ? 'default' : 'outline'}
+                            className={isSelected ? 'bg-blue-600 text-white' : ''}
+                            onClick={() => {
+                              let current = Array.isArray(editForm.guest_types)
+                                ? editForm.guest_types
+                                : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                              if (current.includes(type)) {
+                                current = current.filter((t: string) => t !== type);
+                              } else {
+                                current = [...current, type];
+                              }
+                              handleEditInput('guest_types', current);
+                            }}
+                          >
+                            {type}
+                          </Button>
+                        );
+                      })}
+                    </div>
                     <Input
-                          id="edit_guest_types"
-                          value={editForm.guest_types || ''}
-                          onChange={(e) => handleEditInput('guest_types', e.target.value)}
-                          placeholder="e.g. VIP, Regular, Staff"
-                          className="mt-1"
-                        />
-                        <p className="text-xs text-gray-400 mt-1">
-                          Comma-separated list of guest types.
-                        </p>
-                      </div>
+                      id="edit_guest_types_custom"
+                      value={Array.isArray(editForm.guest_types) ? editForm.guest_types.filter((t: string) => !PREDEFINED_GUEST_TYPES.includes(t)).join(', ') : ''}
+                      onChange={e => {
+                        // Keep selected predefined types, add custom types from input
+                        let custom = e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean);
+                        let current = Array.isArray(editForm.guest_types)
+                          ? editForm.guest_types.filter((t: string) => PREDEFINED_GUEST_TYPES.includes(t))
+                          : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).filter(t => PREDEFINED_GUEST_TYPES.includes(t));
+                        handleEditInput('guest_types', [...current, ...custom]);
+                      }}
+                      placeholder="Add custom guest types, comma separated"
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Select from predefined or add custom guest types.
+                    </p>
+                  </div>
                       <div className="md:col-span-2">
                         <Label htmlFor="edit_event_image" className="flex items-center gap-2 text-gray-700">
                           <Image className="w-4 h-4" /> Event Image

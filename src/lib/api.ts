@@ -70,7 +70,7 @@ api.interceptors.response.use(
       try {
         // Try to refresh the token
         const response = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/refresh`,
+          `${import.meta.env.VITE_API_URL || 'http://api.validity.et//api'}/refresh`,
           {},
           {
             headers: {
