@@ -68,18 +68,18 @@ const LegacyBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
       {/* Company, Job Title, Country */}
       <div className="w-full text-center" style={{ fontSize: 22, marginBottom: 4 }}>{company}</div>
       <div className="w-full text-center" style={{ fontSize: 20, marginBottom: 4 }}>{jobtitle}</div>
-      <div className="w-full text-center" style={{ fontSize: 20, marginBottom: 4 }}>{country}</div>
+      <div className="w-full text-center" style={{ fontSize: 20, marginBottom: 20 }}>{country}</div>
       {/* QR code */}
-      <div className="flex justify-center" style={{ marginBottom: -4 }}>
+      <div className="flex justify-center" style={{ marginBottom: 0 }}>
         <QRCode value={String(uuid)} size={140} />
       </div>
       {/* Guest type at the bottom, no background */}
       <div style={{
         position: 'absolute',
-        bottom: 0,
+        bottom: 24,
         left: 0,
         width: '100%',
-        height: 56,
+        height: 100,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
