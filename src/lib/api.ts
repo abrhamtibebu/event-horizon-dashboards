@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://api.validity.et/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -192,3 +192,121 @@ export const assignUshersToEventAlt = (
   eventId: number,
   ushers: { id: number; tasks: string[] }[]
 ) => api.post(`/events/${eventId}/assign-ushers`, { ushers })
+
+// --- Vendor Mock API ---
+let mockVendors = [
+  {
+    id: 1,
+    name: 'Acme Catering',
+    company: 'Acme Inc.',
+    category: 'Catering',
+    status: 'active',
+    rating: 4.5,
+    assignedEvents: ['Annual Gala', 'Tech Expo'],
+    email: 'contact@acme.com',
+    phone: '+1234567890',
+    services: ['Buffet', 'Cocktail', 'Custom Menus'],
+    documents: [],
+    contracts: [],
+    notes: '',
+  },
+  {
+    id: 2,
+    name: 'Bright Lights AV',
+    company: 'Bright AV',
+    category: 'AV',
+    status: 'inactive',
+    rating: 3.8,
+    assignedEvents: ['Tech Expo'],
+    email: 'info@brightav.com',
+    phone: '+1987654321',
+    services: ['Audio', 'Video', 'Lighting'],
+    documents: [],
+    contracts: [],
+    notes: '',
+  },
+];
+let mockVendorTasks = [
+  {
+    id: 1,
+    vendorId: 1,
+    event: 'Annual Gala',
+    description: 'Provide catering for 200 guests',
+    deadline: '2025-08-01',
+    deliverables: 'Menu, Staff, Setup',
+    status: 'In Progress',
+    files: [],
+  },
+];
+let mockVendorReviews = [
+  // { vendorId: 1, event: 'Annual Gala', rating: 5, review: 'Great service!', reviewer: 'Alice', date: '2024-08-02' }
+];
+
+export function getVendors() {
+  return Promise.resolve([...mockVendors]);
+}
+
+export function getVendorById(id) {
+  return Promise.resolve(mockVendors.find(v => v.id === Number(id)));
+}
+
+export function createVendor(data) {
+  const newVendor = { ...data, id: Date.now(), documents: data.documents || [] };
+  mockVendors.push(newVendor);
+  return Promise.resolve(newVendor);
+}
+
+export function updateVendor(id, data) {
+  mockVendors = mockVendors.map(v => (v.id === Number(id) ? { ...v, ...data, documents: data.documents || v.documents || [] } : v));
+  return Promise.resolve(mockVendors.find(v => v.id === Number(id)));
+}
+
+export function deleteVendor(id) {
+  mockVendors = mockVendors.filter(v => v.id !== Number(id));
+  return Promise.resolve();
+}
+
+export function assignVendorsToEvents(vendorIds, eventIds, task) {
+  // For mock: just return success
+  return Promise.resolve({ vendorIds, eventIds, task });
+}
+
+export function uploadVendorFile(vendorId, file) {
+  // For mock: add file to vendor's documents array
+  const vendor = mockVendors.find(v => v.id === Number(vendorId));
+  if (vendor) {
+    vendor.documents = vendor.documents || [];
+    vendor.documents.push({ name: file.name, url: '#' });
+  }
+  return Promise.resolve({ vendorId, fileName: file.name });
+}
+
+export function getVendorDocuments(vendorId) {
+  const vendor = mockVendors.find(v => v.id === Number(vendorId));
+  return Promise.resolve(vendor ? vendor.documents || [] : []);
+}
+
+export function getVendorTasks() {
+  return Promise.resolve([...mockVendorTasks]);
+}
+
+export function updateVendorTaskStatus(taskId, status) {
+  mockVendorTasks = mockVendorTasks.map(t => (t.id === Number(taskId) ? { ...t, status } : t));
+  return Promise.resolve(mockVendorTasks.find(t => t.id === Number(taskId)));
+}
+
+export function getVendorReviews(vendorId) {
+  return Promise.resolve(mockVendorReviews.filter(r => r.vendorId === Number(vendorId)));
+}
+
+export function addVendorReview(vendorId, review) {
+  mockVendorReviews.push({ ...review, vendorId: Number(vendorId) });
+  return Promise.resolve();
+}
+
+export function getVendorAverageRating(vendorId) {
+  const reviews = mockVendorReviews.filter(r => r.vendorId === Number(vendorId));
+  if (!reviews.length) return Promise.resolve(null);
+  const avg = reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length;
+  return Promise.resolve(avg);
+}

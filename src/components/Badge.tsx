@@ -47,54 +47,54 @@ const LegacyBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
   const company = attendee.guest?.company || '';
   const jobtitle = attendee.guest?.jobtitle || '';
   const country = '';
-  
-  console.log('DEBUG - LegacyBadge attendee:', attendee);
-  console.log('DEBUG - LegacyBadge attendee.guest_type:', attendee.guest_type);
-  
   // Use guest_type instead of guestType
   let guestType = '';
   if (attendee.guest_type && typeof attendee.guest_type === 'object' && attendee.guest_type !== null) {
     guestType = attendee.guest_type.name || String(attendee.guest_type.id) || '';
-    console.log('DEBUG - LegacyBadge extracted from object:', guestType);
   } else if (typeof attendee.guest_type === 'string') {
     guestType = attendee.guest_type;
-    console.log('DEBUG - LegacyBadge is string:', guestType);
   }
-  
-  console.log('DEBUG - LegacyBadge final guestType:', guestType);
-  
   const uuid = (attendee.guest?.uuid || '').slice(0, 12);
-  // Color code the bar based on guest type
-  // const barColor = guestTypeColors[guestType] || 'bg-gray-700';
 
   return (
     <div
-      className="flex flex-col items-center justify-between border rounded-xl shadow-lg bg-white relative"
-      style={{ width: 320, height: 480, padding: 24 }}
+      className="flex flex-col items-center border rounded-xl shadow-lg bg-white relative"
+      style={{ width: 320, height: 480, padding: 0 }}
     >
-      <div className="flex-1 w-full flex flex-col items-center justify-center">
-        {/* Name */}
-        <div className="text-4xl font-bold text-center leading-tight mt-2 mb-4" style={{ wordBreak: 'break-word' }}>{name}</div>
-        {/* Company */}
-        <div className="text-xl text-center mb-1">{company}</div>
-        {/* Title */}
-        <div className="text-lg text-center mb-1">{jobtitle}</div>
-        {/* Country */}
-        <div className="text-lg text-center mb-4">{country}</div>
-        {/* QR code with uuid */}
-        <div className="flex justify-center my-4">
-          <QRCode value={String(uuid)} size={128} />
-        </div>
-        {/* Guest type below QR code */}
-        <div className="w-full text-center text-3xl font-extrabold tracking-widest mt-2" style={{ letterSpacing: 2, color: '#111' }}>
-          {guestType ? guestType.toUpperCase(): ''}
-        </div>
+      {/* Name */}
+      <div className="w-full text-center font-bold" style={{ fontSize: 40, marginTop: 32, marginBottom: 16, lineHeight: 1.1 }}>
+        {name}
+      </div>
+      {/* Company, Job Title, Country */}
+      <div className="w-full text-center" style={{ fontSize: 22, marginBottom: 4 }}>{company}</div>
+      <div className="w-full text-center" style={{ fontSize: 20, marginBottom: 4 }}>{jobtitle}</div>
+      <div className="w-full text-center" style={{ fontSize: 20, marginBottom: 4 }}>{country}</div>
+      {/* QR code */}
+      <div className="flex justify-center" style={{ marginBottom: -4 }}>
+        <QRCode value={String(uuid)} size={140} />
+      </div>
+      {/* Guest type at the bottom, no background */}
+      <div style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        width: '100%',
+        height: 56,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderBottomLeftRadius: 12,
+        borderBottomRightRadius: 12,
+      }}>
+        <span style={{ color: '#111', fontWeight: 700, fontSize: 32, letterSpacing: 2 }}>
+          {guestType ? guestType.toUpperCase() : ''}
+        </span>
       </div>
     </div>
   );
 };
 
-const Badge: React.FC<BadgeProps> = ({ attendee, template }) => {
+const Badge: React.FC<BadgeProps> = ({ attendee }) => {
   // Validate attendee data
   if (!attendee || !attendee.guest) {
     return (
@@ -103,91 +103,8 @@ const Badge: React.FC<BadgeProps> = ({ attendee, template }) => {
       </div>
     )
   }
-
-  // If no template is provided, use the legacy badge
-  if (!template) {
-    return <LegacyBadge attendee={attendee} />;
-  }
-
-  // Extract template data - handle both direct template objects and BadgeTemplate objects
-  const templateData = template.template_json || template;
-  const { width, height, backgroundColor, backgroundImage, elements } = templateData;
-
-  // Use the template system
-  return (
-    <div
-      className="relative border rounded-xl shadow-lg bg-white"
-      style={{ 
-        width: width || 320, 
-        height: height || 480,
-        background: backgroundColor || '#FFFFFF',
-        backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
-        backgroundSize: 'cover'
-      }}
-    >
-      {elements?.map(element => {
-        const content = element.type === 'text' ? replaceTemplateFields((element as any).content, attendee) : '';
-        
-        return (
-          <div
-            key={element.id}
-            style={{
-              position: 'absolute',
-              left: element.x,
-              top: element.y,
-              width: element.width,
-              height: element.height,
-              zIndex: element.zIndex,
-              transform: `rotate(${element.rotation}deg)`,
-            }}
-          >
-            {element.type === 'text' && (
-              <span
-                style={{
-                  fontFamily: (element as any).fontFamily || 'Arial',
-                  fontSize: (element as any).fontSize || 18,
-                  color: (element as any).color || '#000',
-                  fontWeight: (element as any).fontWeight || 'normal',
-                  textAlign: (element as any).textAlign || 'left',
-                  display: 'block',
-                  width: '100%',
-                  height: '100%',
-                }}
-              >
-                {content}
-              </span>
-            )}
-            {element.type === 'image' && (
-              <img
-                src={replaceTemplateFields((element as any).src, attendee)}
-                alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            )}
-            {element.type === 'qr' && (
-              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <QRCode 
-                  value={replaceTemplateFields('{uuid}', attendee)} 
-                  size={Math.min(element.width, element.height)} 
-                />
-              </div>
-            )}
-            {element.type === 'shape' && (
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  backgroundColor: (element as any).backgroundColor || '#eee',
-                  border: `${(element as any).borderWidth || 1}px solid ${(element as any).borderColor || '#ccc'}`,
-                  borderRadius: (element as any).shapeType === 'circle' ? '50%' : undefined,
-                }}
-              />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
+  // Always use the legacy badge (basic design)
+  return <LegacyBadge attendee={attendee} />;
 };
 
 export default Badge; 

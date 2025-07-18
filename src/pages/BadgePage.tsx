@@ -94,14 +94,13 @@ const BadgePage = () => {
       });
   }, [eventId]);
 
+  // Always use the default badge design for every event
   if (loading) return <div className="p-8 text-center">Loading Badge...</div>;
   if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
   if (!attendee) return <div className="p-8 text-center">No attendee data.</div>;
-  if (!template) return <div className="p-8 text-center text-red-500">No badge template found.</div>;
 
   return (
     <div className="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
-      {templateError && <div className="mb-2 text-red-500">{templateError}</div>}
       <style type="text/css" media="print">
         {`
           @page { size: auto; margin: 0; }
@@ -122,7 +121,7 @@ const BadgePage = () => {
         </Button>
       </div>
       <div ref={badgeRef} className="printable-badge">
-        <Badge template={template} attendee={attendee} />
+        <Badge attendee={attendee} />
       </div>
     </div>
   );

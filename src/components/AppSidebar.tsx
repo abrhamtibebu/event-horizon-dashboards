@@ -15,6 +15,7 @@ import {
   UserCheck,
   Trash2,
   UserPlus,
+  Briefcase,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -79,7 +80,7 @@ const allItems = [
     title: 'Badge Designer',
     url: '/apps/badge-designer',
     icon: ClipboardList,
-    roles: ['superadmin', 'admin', 'organizer'],
+    roles: ['superadmin', 'admin', ''],
   },
   {
     title: 'Messages',
@@ -130,6 +131,24 @@ const allItems = [
     url: '/dashboard/team',
     icon: Users,
     roles: ['superadmin', 'organizer'],
+  },
+  {
+    title: 'Vendors',
+    url: '/dashboard/vendors',
+    icon: Briefcase,
+    roles: ['superadmin', 'admin', ''],
+    children: [
+      {
+        title: 'Assign Vendor',
+        url: '/dashboard/vendors/assign',
+        roles: ['superadmin', 'admin', 'organizer'],
+      },
+      {
+        title: 'Task Tracker',
+        url: '/dashboard/vendors/tasks',
+        roles: ['superadmin', 'admin', 'organizer'],
+      },
+    ],
   },
 ]
 
@@ -232,6 +251,23 @@ export function AppSidebar() {
                       </div>
                     </NavLink>
                   </SidebarMenuButton>
+                  {/* Render children if present */}
+                  {item.children && !isCollapsed && (
+                    <div className="ml-8 mt-1 space-y-1">
+                      {item.children.map((child) => (
+                        <SidebarMenuItem key={child.title} className="rounded-lg">
+                          <SidebarMenuButton asChild>
+                            <NavLink
+                              to={child.url}
+                              className={getNavCls}
+                            >
+                              <span className="ml-2 font-normal text-sm">{child.title}</span>
+                            </NavLink>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </div>
+                  )}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

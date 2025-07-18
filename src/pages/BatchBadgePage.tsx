@@ -139,7 +139,7 @@ const BatchBadgePage = () => {
       <div ref={printRef}>
         {attendees.map(attendee => (
           <div key={attendee.id} className="printable-badge-batch">
-            <Badge template={template} attendee={attendee} />
+            <Badge attendee={attendee} />
           </div>
         ))}
       </div>

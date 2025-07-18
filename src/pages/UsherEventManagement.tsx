@@ -1602,7 +1602,6 @@ export default function UsherEventManagement() {
         {singlePrintAttendee && (
           <div className="printable-badge-batch">
             <BadgePrint
-              template={badgeTemplate}
               attendee={singlePrintAttendee}
             />
           </div>
@@ -1628,7 +1627,7 @@ export default function UsherEventManagement() {
             .filter((attendee) => selectedAttendees.has(attendee.id))
             .map((attendee) => (
               <div key={attendee.id} className="printable-badge-batch">
-                <BadgePrint template={badgeTemplate} attendee={attendee} />
+                <BadgePrint attendee={attendee} />
               </div>
             ))}
       </div>
@@ -1644,7 +1643,7 @@ export default function UsherEventManagement() {
               </DialogDescription>
             </DialogHeader>
             <div className="flex justify-center">
-              <BadgeTest attendee={testAttendee} template={badgeTemplate} />
+              <BadgeTest attendee={testAttendee} />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowTestBadge(false)}>

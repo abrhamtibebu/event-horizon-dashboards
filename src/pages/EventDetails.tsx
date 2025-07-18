@@ -1204,7 +1204,7 @@ export default function EventDetails() {
             .filter(attendee => selectedAttendees.has(attendee.id))
             .map(attendee => (
               <div key={attendee.id} className="printable-badge-batch">
-                <BadgePrint attendee={attendee} template={badgeTemplate} />
+                <BadgePrint attendee={attendee} />
               </div>
             ))
         ) : (
@@ -1752,7 +1752,7 @@ export default function EventDetails() {
                                 <TableCell>
                                   <div className="w-32 h-20 bg-gray-50 border rounded flex items-center justify-center overflow-hidden">
                                     <div style={{ transform: 'scale(0.2)', transformOrigin: 'top left', width: 400, height: 600 }}>
-                                      <BadgePrint attendee={attendee} template={badgeTemplate} />
+                                      <BadgePrint attendee={attendee} />
                                     </div>
                                   </div>
                                 </TableCell>
@@ -3149,7 +3149,7 @@ export default function EventDetails() {
           >
           {singlePrintAttendee && (
             <div className="printable-badge-batch">
-              <BadgePrint attendee={singlePrintAttendee} template={badgeTemplate} />
+              <BadgePrint attendee={singlePrintAttendee} />
             </div>
           )}
           </div>
@@ -3165,7 +3165,7 @@ export default function EventDetails() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="flex justify-center">
-                  <BadgePrint attendee={singlePrintAttendee} template={badgeTemplate} />
+                  <BadgePrint attendee={singlePrintAttendee} />
                 </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setShowTestBadge(false)}>

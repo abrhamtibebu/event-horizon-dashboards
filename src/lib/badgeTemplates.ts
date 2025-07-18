@@ -30,8 +30,17 @@ export const publishBadgeTemplate = (eventId: number, templateId: number) =>
     `/events/${eventId}/badge-templates/${templateId}/publish`
   )
 
-export const getOfficialBadgeTemplate = (eventId: number) =>
-  api.get<BadgeTemplate>(`/events/${eventId}/badge-templates-official`)
+export const getOfficialBadgeTemplate = async (eventId: number) => {
+  try {
+    return await api.get<BadgeTemplate>(`/events/${eventId}/badge-templates-official`);
+  } catch (error: any) {
+    if (error?.response?.status === 404) {
+      // No official template found, return null or a default
+      return { data: null };
+    }
+    throw error;
+  }
+};
 
 export const getBadgeTemplateVersions = (eventId: number, templateId: number) =>
   api.get<BadgeTemplateVersion[]>(

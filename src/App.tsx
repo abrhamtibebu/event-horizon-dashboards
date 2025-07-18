@@ -37,6 +37,11 @@ import UsherManagement from '@/pages/UsherManagement'
 import UsherEventManagement from '@/pages/UsherEventManagement'
 import UsherEvents from '@/pages/UsherEvents'
 import PublicEventRegister from './pages/PublicEventRegister'
+import VendorDashboard from './pages/vendors/VendorDashboard';
+import VendorProfile from './pages/vendors/VendorProfile';
+import VendorForm from './pages/vendors/VendorForm';
+import AssignVendor from './pages/vendors/AssignVendor';
+import VendorTaskTracker from './pages/vendors/VendorTaskTracker';
 
 const queryClient = new QueryClient()
 
@@ -170,6 +175,14 @@ const App = () => (
             <Route path="usher-management" element={<UsherManagement />} />
             <Route path="usher/events" element={<UsherEvents />} />
             <Route path="usher/events/:eventId" element={<UsherEventManagement />} />
+            <Route path="vendors" >
+              <Route index element={<VendorDashboard />} />
+              <Route path="profile/:vendorId" element={<VendorProfile />} />
+              <Route path="add" element={<VendorForm />} />
+              <Route path="edit/:vendorId" element={<VendorForm />} />
+              <Route path="assign" element={<AssignVendor />} />
+              <Route path="tasks" element={<VendorTaskTracker />} />
+            </Route>
           </Route>
 
           <Route path="/register/:eventUuid" element={<PublicEventRegister />} />
