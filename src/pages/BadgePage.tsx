@@ -47,6 +47,9 @@ const BadgePage = () => {
   
   const handlePrint = useReactToPrint({
     content: () => badgeRef.current,
+    removeAfterPrint: false,
+    suppressErrors: true,
+    onAfterPrint: () => {},
   });
 
   useEffect(() => {

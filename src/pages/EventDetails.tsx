@@ -110,6 +110,7 @@ import { useInterval } from '@/hooks/use-interval'
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import { useReactToPrint } from 'react-to-print';
 
 // Add predefined guest types at the top, after imports
 const PREDEFINED_GUEST_TYPES = [
@@ -528,34 +529,15 @@ export default function EventDetails() {
     }
   }
 
-  const handleBatchPrintBadges = async () => {
+  const handleBatchPrintBadges = () => {
     if (selectedAttendees.size === 0) {
       toast.error('No attendees selected for printing.');
       return;
     }
     setPrinting(true);
-    // Wait for the badges to render in the hidden printRef
-    setTimeout(async () => {
-      if (printRef.current) {
-        const badgeElements = Array.from(printRef.current.querySelectorAll('.printable-badge-batch'));
-        if (badgeElements.length === 0) {
-          toast.error('No badges found to print.');
-          setPrinting(false);
-          return;
-        }
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [320, 480] });
-        for (let i = 0; i < badgeElements.length; i++) {
-          const el = badgeElements[i] as HTMLElement;
-          const canvas = await html2canvas(el, { scale: 2 });
-          const imgData = canvas.toDataURL('image/png');
-          if (i > 0) pdf.addPage([320, 480], 'portrait');
-          pdf.addImage(imgData, 'PNG', 0, 0, 320, 480);
-        }
-        pdf.autoPrint();
-        window.open(pdf.output('bloburl'));
-        setPrinting(false);
-      }
-    }, 300);
+    setTimeout(() => {
+      handlePrint();
+    }, 0);
   };
 
   const handleImportClick = () => {
@@ -1183,6 +1165,13 @@ export default function EventDetails() {
       setStatusLoading(false);
     }
   };
+
+  const handlePrint = useReactToPrint({
+    content: () => printRef.current,
+    removeAfterPrint: false,
+    suppressErrors: true,
+    onAfterPrint: () => setPrinting(false),
+  });
 
   return (
     <>

@@ -47,6 +47,9 @@ const BatchBadgePage = () => {
   
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
+    removeAfterPrint: false,
+    suppressErrors: true,
+    onAfterPrint: () => {},
   });
 
   useEffect(() => {
