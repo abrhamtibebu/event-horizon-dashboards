@@ -138,10 +138,10 @@ export default function AttendeeDashboard() {
       </div>
 
       {/* Locate Badges Quick Action */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-4">
         <Link
           to="/dashboard/locate-badges"
-          className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
+          className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg w-full"
         >
           <MapPin className="w-8 h-8 mx-auto mb-2 text-blue-600" />
           <span className="font-medium">Locate Badges</span>
@@ -178,7 +178,7 @@ export default function AttendeeDashboard() {
         </div>
 
         {/* Events Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {filteredEvents?.map((event: any) => (
             <div
               key={event.id}
@@ -257,10 +257,10 @@ export default function AttendeeDashboard() {
                 </div>
 
                 <div className="flex items-center justify-between mt-4">
-                  <Link to={`/events/${event.id}`}>
+                  <Link to={`/events/${event.id}`} className="w-full">
                     <Button
                       size="sm"
-                      className="bg-gradient-to-r from-blue-600 to-purple-600"
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
                       disabled={event.isRegistered}
                     >
                       {event.isRegistered ? 'Registered' : 'View Event'}
@@ -286,7 +286,7 @@ export default function AttendeeDashboard() {
                   </Badge>
                 </div>
 
-                <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm text-gray-600 mb-2">
                   <div className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
                     <span>{event.date}</span>
@@ -302,18 +302,18 @@ export default function AttendeeDashboard() {
                   <span>{event.location}</span>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <span className="text-xs text-gray-500">
                     Ticket: {event.ticket}
                   </span>
-                  <div className="flex gap-2">
-                    <Link to={`/tickets/${event.ticket}`}>
-                      <Button size="sm" variant="outline">
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <Link to={`/tickets/${event.ticket}`} className="flex-1">
+                      <Button size="sm" variant="outline" className="w-full">
                         View Ticket
                       </Button>
                     </Link>
-                    <Link to={`/events/${event.id}`}>
-                      <Button size="sm">Details</Button>
+                    <Link to={`/events/${event.id}`} className="flex-1">
+                      <Button size="sm" className="w-full">Details</Button>
                     </Link>
                   </div>
                 </div>
@@ -329,16 +329,14 @@ export default function AttendeeDashboard() {
           <div className="space-y-4">
             {networkingOpportunities?.map((group: any) => (
               <div key={group.id} className="p-4 bg-gray-50 rounded-lg">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <h4 className="font-medium text-gray-900">{group.name}</h4>
                     <p className="text-sm text-gray-600">
                       {group.members} members • {group.category}
                     </p>
                   </div>
-                  <Button size="sm" variant="outline">
-                    Join
-                  </Button>
+                  <Button size="sm" variant="outline" className="w-full sm:w-auto">Join</Button>
                 </div>
               </div>
             ))}
@@ -351,7 +349,7 @@ export default function AttendeeDashboard() {
             <p className="text-sm text-blue-700 mb-3">
               Connect with other attendees and share experiences
             </p>
-            <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+            <Button size="sm" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
               <MessageSquare className="w-4 h-4 mr-2" />
               New Conversation
             </Button>
@@ -361,14 +359,14 @@ export default function AttendeeDashboard() {
 
       {/* Recommendations */}
       <DashboardCard title="Recommended for You">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {recommendedEvents?.map((event: any) => (
             <div key={event.id} className="p-4 bg-gray-50 rounded-lg">
               <div className="flex justify-between items-start mb-2">
                 <h4 className="font-medium text-gray-900">{event.name}</h4>
                 <Badge variant="outline">{event.category}</Badge>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-4 text-sm text-gray-600">
                   <span>{event.date}</span>
                   <div className="flex items-center gap-1">
@@ -376,9 +374,9 @@ export default function AttendeeDashboard() {
                     <span>{event.rating}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                   <span className="font-medium">${event.price}</span>
-                  <Button size="sm">Register</Button>
+                  <Button size="sm" className="w-full sm:w-auto">Register</Button>
                 </div>
               </div>
             </div>

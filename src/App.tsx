@@ -42,6 +42,8 @@ import VendorProfile from './pages/vendors/VendorProfile';
 import VendorForm from './pages/vendors/VendorForm';
 import AssignVendor from './pages/vendors/AssignVendor';
 import VendorTaskTracker from './pages/vendors/VendorTaskTracker';
+import UsherJobDetails from './pages/UsherJobDetails';
+import UsherDashboard from './pages/UsherDashboard';
 
 const queryClient = new QueryClient()
 
@@ -175,6 +177,8 @@ const App = () => (
             <Route path="usher-management" element={<UsherManagement />} />
             <Route path="usher/events" element={<UsherEvents />} />
             <Route path="usher/events/:eventId" element={<UsherEventManagement />} />
+            <Route path="usher/jobs" element={<UsherDashboard />} />
+            <Route path="usher/jobs/:eventId" element={<UsherJobDetails />} />
             <Route path="vendors" >
               <Route index element={<VendorDashboard />} />
               <Route path="profile/:vendorId" element={<VendorProfile />} />

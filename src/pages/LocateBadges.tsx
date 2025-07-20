@@ -41,6 +41,7 @@ import {
 import Papa from 'papaparse'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
+import api from '@/lib/api'
 
 // --- Data Model ---
 interface BadgeData {
@@ -293,6 +294,11 @@ function HistoryLog({ history }: { history: BadgeData['printHistory'] }) {
 
 export default function LocateBadges() {
   const { user } = useAuth();
+  // --- New state for event selection ---
+  const [events, setEvents] = useState<any[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [eventError, setEventError] = useState<string | null>(null);
   // Simulated badge data for demo
   const [data, setData] = useState<BadgeData[]>([
     {
@@ -344,9 +350,36 @@ export default function LocateBadges() {
     }
   }
 
-  // CSV upload handler
+  // Fetch events on mount
+  useEffect(() => {
+    setLoadingEvents(true);
+    api.get('/events')
+      .then(res => setEvents(res.data || []))
+      .catch(() => setEventError('Failed to load events'))
+      .finally(() => setLoadingEvents(false));
+  }, []);
+
+  // Fetch badge locator data for selected event
+  useEffect(() => {
+    if (!selectedEventId) return;
+    api.get(`/events/${selectedEventId}/badge-locator`)
+      .then(res => {
+        if (res.data && res.data.data) {
+          setData(res.data.data);
+        } else {
+          setData([]);
+        }
+      })
+      .catch(() => setData([]));
+  }, [selectedEventId]);
+
+  // CSV upload handler (updated to assign to selected event)
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    if (!selectedEventId) {
+      toast.error('Please select an event before uploading CSV.');
+      return;
+    }
     if (file) {
       Papa.parse(file, {
         header: true,
@@ -370,8 +403,16 @@ export default function LocateBadges() {
             collected: row.collected === 'true' || false,
             printHistory: [],
           }));
-          setData(parsed);
-          setSelectedGuest(null);
+          // Send to backend
+          api.post(`/events/${selectedEventId}/badge-locator`, { data: parsed })
+            .then(res => {
+              setData(parsed);
+              setSelectedGuest(null);
+              toast.success('Badge locator data uploaded and assigned to event.');
+            })
+            .catch(err => {
+              toast.error(err.response?.data?.error || 'Failed to upload badge locator data.');
+            });
         },
         error: (error) => {
           alert('Error parsing CSV: ' + error.message);
@@ -455,6 +496,23 @@ export default function LocateBadges() {
       <div className="text-xs text-yellow-600 mb-2">
         Badge lookup is only available via CSV upload. Real-time badge search
         requires backend API support.
+      </div>
+      {/* --- Event Selector --- */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">Select Event</label>
+        <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+          <SelectTrigger className="w-full max-w-md">
+            <SelectValue placeholder={loadingEvents ? 'Loading events...' : 'Choose an event'} />
+          </SelectTrigger>
+          <SelectContent>
+            {events.map((event: any) => (
+              <SelectItem key={event.id} value={event.id.toString()}>
+                {event.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {eventError && <div className="text-red-600 text-xs mt-1">{eventError}</div>}
       </div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>

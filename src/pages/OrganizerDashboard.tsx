@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Calendar as CalendarIcon,
   Users,
@@ -29,6 +29,8 @@ import { useAuth } from '@/hooks/use-auth'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 export default function OrganizerDashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null)
@@ -37,7 +39,7 @@ export default function OrganizerDashboard() {
   const { searchQuery } = useOutletContext<{ searchQuery: string }>()
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [eventsForDate, setEventsForDate] = useState<any[]>([])
-  const [eventsLoading, setEventsLoading] = useState(false)
+  const [dateEventsLoading, setDateEventsLoading] = useState(false)
   const [monthEvents, setMonthEvents] = useState<any[]>([])
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date())
   const [eventDetails, setEventDetails] = useState<any | null>(null)
@@ -135,7 +137,7 @@ export default function OrganizerDashboard() {
       setEventsForDate([])
       return
     }
-    setEventsLoading(true)
+    setDateEventsLoading(true)
     api.get('/organizer/events', {
       params: {
         date: selectedDate.toISOString().slice(0, 10),
@@ -143,7 +145,7 @@ export default function OrganizerDashboard() {
     })
       .then((res) => setEventsForDate(res.data))
       .catch(() => setEventsForDate([]))
-      .finally(() => setEventsLoading(false))
+      .finally(() => setDateEventsLoading(false))
   }, [selectedDate])
 
   // Calendar event markers
@@ -198,18 +200,46 @@ export default function OrganizerDashboard() {
     )
   }
 
+  const [allEvents, setAllEvents] = useState<any[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState<string | null>(null);
+  const eventsIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const fetchEvents = async () => {
+      setEventsLoading(true);
+      setEventsError(null);
+      try {
+        const res = await api.get('/events');
+        setAllEvents(res.data);
+      } catch (err: any) {
+        setEventsError(err.response?.data?.message || 'Failed to fetch events');
+      } finally {
+        setEventsLoading(false);
+      }
+    };
+    fetchEvents();
+    eventsIntervalRef.current = setInterval(fetchEvents, 150000);
+    return () => {
+      if (eventsIntervalRef.current) clearInterval(eventsIntervalRef.current);
+    };
+  }, []);
+
+  // Helper for status color (reuse from Events page)
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
-        return 'bg-green-100 text-green-800'
-      case 'draft':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'bg-green-100 text-green-800';
       case 'completed':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-blue-100 text-blue-800';
+      case 'draft':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-100 text-gray-800';
     }
-  }
+  };
 
   // Assign ushers dialog logic
   const openAssignDialog = (eventId: number) => {
@@ -345,50 +375,123 @@ export default function OrganizerDashboard() {
         <div className="lg:col-span-2 flex flex-col gap-8">
           {/* Event Performance Chart */}
           <DashboardCard title="Event Performance (Registrations & Attendance)">
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={eventPerformance} margin={{ top: 16, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <RechartsTooltip />
-                <Area type="monotone" dataKey="registrations" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.6} name="Registrations" />
-                <Area type="monotone" dataKey="attendance" stackId="2" stroke="#10b981" fill="#10b981" fillOpacity={0.6} name="Attendance" />
-              </AreaChart>
-            </ResponsiveContainer>
+            <div className="w-full h-[250px] sm:h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={eventPerformance} margin={{ top: 16, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <RechartsTooltip />
+                  <Area type="monotone" dataKey="registrations" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.6} name="Registrations" />
+                  <Area type="monotone" dataKey="attendance" stackId="2" stroke="#10b981" fill="#10b981" fillOpacity={0.6} name="Attendance" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </DashboardCard>
 
-          {/* Upcoming Events */}
-          <DashboardCard title="Upcoming Events">
-            <div className="space-y-4">
-              {filteredEvents?.length === 0 && <div className="text-gray-400">No upcoming events.</div>}
-              {filteredEvents?.map((event: any) => (
-                <div key={event.id} className="p-4 bg-gray-50 rounded-lg shadow flex flex-col gap-2">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h4 className="font-semibold text-gray-900">{event.name}</h4>
-                      <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
-                        <span className="flex items-center gap-1"><CalendarIcon className="w-4 h-4" />{event.date}</span>
-                        <span className="flex items-center gap-1"><Clock className="w-4 h-4" />{event.time}</span>
-                        <span className="flex items-center gap-1"><MapPin className="w-4 h-4" />{event.location}</span>
+          {/* Upcoming Events (Realtime) */}
+          <DashboardCard title="Upcoming Events (Realtime)">
+            {eventsLoading && <div className="text-center py-8">Loading events...</div>}
+            {eventsError && <div className="text-center py-8 text-red-500">{eventsError}</div>}
+            {/* Table for desktop, cards for mobile */}
+            <div className="hidden lg:block bg-white shadow-lg rounded-xl overflow-x-auto p-4">
+              <Table className="min-w-full">
+                <TableHeader className="sticky top-0 bg-white z-10">
+                  <TableRow>
+                    <TableHead className="font-bold text-gray-700 text-base">Name</TableHead>
+                    <TableHead className="font-bold text-gray-700 text-base">Status</TableHead>
+                    <TableHead className="font-bold text-gray-700 text-base">Date</TableHead>
+                    <TableHead className="font-bold text-gray-700 text-base">Location</TableHead>
+                    <TableHead className="font-bold text-gray-700 text-base">Attendees</TableHead>
+                    <TableHead className="font-bold text-gray-700 text-base">Registration Progress</TableHead>
+                    <TableHead className="font-bold text-gray-700 text-base">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allEvents
+                    .filter(event => event.status === 'active' || event.status === 'upcoming')
+                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                    .map(event => {
+                      const attendeeCount = event.attendee_count || 0;
+                      const attendeeLimit = event.max_guests || 500;
+                      const registrationProgress = Math.min(
+                        Math.round((attendeeCount / attendeeLimit) * 100),
+                        100
+                      );
+                      return (
+                        <TableRow key={event.id} className="hover:bg-blue-50 transition-colors group text-gray-900">
+                          <TableCell className="font-semibold text-base group-hover:text-blue-700 transition-colors">{event.name}</TableCell>
+                          <TableCell><Badge className={getStatusColor(event.status)}>{event.status}</Badge></TableCell>
+                          <TableCell>{event.date} {event.time}</TableCell>
+                          <TableCell>{event.location || 'Convention Center'}</TableCell>
+                          <TableCell>{attendeeCount}/{attendeeLimit}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                <span>{registrationProgress}%</span>
+                              </div>
+                              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div className="h-2 bg-purple-400 rounded-full" style={{ width: `${registrationProgress}%` }}></div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Button size="sm" variant="outline" onClick={() => navigate(`/dashboard/events/${event.id}`)}>
+                              <Eye className="w-4 h-4" /> View Details
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  {allEvents.filter(event => event.status === 'active' || event.status === 'upcoming').length === 0 && !eventsLoading && !eventsError && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-gray-400">No upcoming events.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            {/* Card view for mobile/tablet */}
+            <div className="lg:hidden flex flex-col gap-4">
+              {allEvents
+                .filter(event => event.status === 'active' || event.status === 'upcoming')
+                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                .map(event => {
+                  const attendeeCount = event.attendee_count || 0;
+                  const attendeeLimit = event.max_guests || 500;
+                  const registrationProgress = Math.min(
+                    Math.round((attendeeCount / attendeeLimit) * 100),
+                    100
+                  );
+                  return (
+                    <div key={event.id} className="rounded-lg border bg-white shadow-sm p-4 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-blue-600 text-lg">{event.name}</span>
+                        <Badge className={getStatusColor(event.status)}>{event.status}</Badge>
+                      </div>
+                      <div className="text-sm text-gray-500">{event.date} {event.time} • {event.location || 'Convention Center'}</div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Users className="w-4 h-4 text-gray-400" />
+                        <span>{attendeeCount}/{attendeeLimit} Attendees</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span>Progress:</span>
+                        <span>{registrationProgress}%</span>
+                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="h-2 bg-purple-400 rounded-full" style={{ width: `${registrationProgress}%` }}></div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Button size="sm" variant="outline" className="flex-1" onClick={() => navigate(`/dashboard/events/${event.id}`)}>
+                          <Eye className="w-4 h-4" /> View
+                        </Button>
                       </div>
                     </div>
-                    <Badge className={getStatusColor(event.status)}>{event.status}</Badge>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-600 mb-1">
-                    <span className="flex items-center gap-1"><Users className="w-4 h-4" />{event.attendees}/{event.maxAttendees}</span>
-                    <span className="flex items-center gap-1"><DollarSign className="w-4 h-4" />${event.revenue}</span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs"><span>Registration Progress</span><span>{event.registrationProgress?.toFixed(0) || 0}%</span></div>
-                    <Progress value={event.registrationProgress} className="h-2" />
-                  </div>
-                  <div className="flex gap-2 mt-2">
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/dashboard/events/${event.id}`)}><Eye className="w-4 h-4 mr-1" />View</Button>
-                    <Button size="sm" variant="outline" onClick={() => openAssignDialog(event.id)}><UserPlus className="w-4 h-4 mr-1" />Assign Ushers</Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleDeleteEvent(event.id)}><Trash2 className="w-4 h-4 mr-1" />Delete</Button>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
+              {allEvents.filter(event => event.status === 'active' || event.status === 'upcoming').length === 0 && !eventsLoading && !eventsError && (
+                <div className="text-center py-8 text-gray-400">No upcoming events.</div>
+              )}
             </div>
           </DashboardCard>
 
@@ -424,37 +527,41 @@ export default function OrganizerDashboard() {
         <div className="flex flex-col gap-8">
           {/* Pie Chart for Guest Type Distribution */}
           <DashboardCard title="Guest Type Distribution">
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={guestTypeDistribution.length > 0 ? guestTypeDistribution : []}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  label
-                >
-                  {['#3b82f6', '#10b981', '#f59e42', '#a21caf', '#ef4444', '#6366f1'].map((color, idx) => (
-                    <Cell key={idx} fill={color} />
-                  ))}
-                </Pie>
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="w-full h-[200px] sm:h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={guestTypeDistribution.length > 0 ? guestTypeDistribution : []}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    label
+                  >
+                    {['#3b82f6', '#10b981', '#f59e42', '#a21caf', '#ef4444', '#6366f1'].map((color, idx) => (
+                      <Cell key={idx} fill={color} />
+                    ))}
+                  </Pie>
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           </DashboardCard>
           {/* Bar Chart for Event Popularity */}
           <DashboardCard title="Event Popularity">
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={eventPopularity.length > 0 ? eventPopularity : []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <RechartsTooltip />
-                <Legend />
-                <Bar dataKey="attendees" fill="#3b82f6" name="Attendees" />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="w-full h-[200px] sm:h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={eventPopularity.length > 0 ? eventPopularity : []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <RechartsTooltip />
+                  <Legend />
+                  <Bar dataKey="attendees" fill="#3b82f6" name="Attendees" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </DashboardCard>
           {/* Recent Activity / Messages */}
           <DashboardCard title="Recent Activity">
@@ -479,7 +586,7 @@ export default function OrganizerDashboard() {
           </DashboardCard>
           {/* Quick Actions */}
           <DashboardCard title="Quick Actions">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Link
                 to="/dashboard/locate-badges"
                 className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"

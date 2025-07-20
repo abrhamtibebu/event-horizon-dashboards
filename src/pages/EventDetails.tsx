@@ -96,7 +96,7 @@ import {
   BarChart,
   Bar,
 } from 'recharts'
-import { BadgeDesignerTab } from '@/components/BadgeDesignerTab'
+import BadgeDesignerTab from '@/pages/BadgeDesignerTab'
 import { UsherAssignmentDialog } from '@/components/UsherAssignmentDialog'
 import React from 'react'
 import BadgePrint from '@/components/Badge'
@@ -110,7 +110,6 @@ import { useInterval } from '@/hooks/use-interval'
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { useReactToPrint } from 'react-to-print';
 
 // Add predefined guest types at the top, after imports
 const PREDEFINED_GUEST_TYPES = [
@@ -279,16 +278,24 @@ export default function EventDetails() {
     api
       .get(`/events/${Number(eventId)}/attendees`)
       .then((res) => {
-        console.log('DEBUG - Fetched attendees:', res.data);
-        if (res.data && res.data.length > 0) {
-          console.log('DEBUG - First attendee:', res.data[0]);
-          console.log('DEBUG - First attendee guestType:', res.data[0]?.guestType);
+        // Patch: Ensure guestType is always an object
+        let mapped = res.data.map((attendee: any) => {
+          if (!attendee.guestType && attendee.guest_type_id && Array.isArray(guestTypes) && guestTypes.length > 0) {
+            const found = guestTypes.find(gt => String(gt.id) === String(attendee.guest_type_id));
+            return { ...attendee, guestType: found || null };
+          }
+          return attendee;
+        });
+        console.log('DEBUG - Fetched attendees:', mapped);
+        if (mapped && mapped.length > 0) {
+          console.log('DEBUG - First attendee:', mapped[0]);
+          console.log('DEBUG - First attendee guestType:', mapped[0]?.guestType);
         }
-        setAttendees(res.data)
+        setAttendees(mapped)
       })
       .catch((err) => setAttendeesError('Failed to fetch attendees.'))
       .finally(() => setAttendeesLoading(false))
-  }, [eventId])
+  }, [eventId, guestTypes])
 
   // Fetch guest types
   useEffect(() => {
@@ -529,15 +536,34 @@ export default function EventDetails() {
     }
   }
 
-  const handleBatchPrintBadges = () => {
+  const handleBatchPrintBadges = async () => {
     if (selectedAttendees.size === 0) {
       toast.error('No attendees selected for printing.');
       return;
     }
     setPrinting(true);
-    setTimeout(() => {
-      handlePrint();
-    }, 0);
+    // Wait for the badges to render in the hidden printRef
+    setTimeout(async () => {
+      if (printRef.current) {
+        const badgeElements = Array.from(printRef.current.querySelectorAll('.printable-badge-batch'));
+        if (badgeElements.length === 0) {
+          toast.error('No badges found to print.');
+          setPrinting(false);
+          return;
+        }
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [320, 480] });
+        for (let i = 0; i < badgeElements.length; i++) {
+          const el = badgeElements[i] as HTMLElement;
+          const canvas = await html2canvas(el, { scale: 2 });
+          const imgData = canvas.toDataURL('image/png');
+          if (i > 0) pdf.addPage([320, 480], 'portrait');
+          pdf.addImage(imgData, 'PNG', 0, 0, 320, 480);
+        }
+        pdf.autoPrint();
+        window.open(pdf.output('bloburl'));
+        setPrinting(false);
+      }
+    }, 300);
   };
 
   const handleImportClick = () => {
@@ -701,24 +727,26 @@ export default function EventDetails() {
 
   const openEditDialog = () => {
     const eventDataForEdit = { ...eventData }
-    
     // Set up date ranges for edit form
     const startDate = eventData.start_date ? new Date(eventData.start_date) : new Date()
     const endDate = eventData.end_date ? new Date(eventData.end_date) : new Date()
     const regStartDate = eventData.registration_start_date ? new Date(eventData.registration_start_date) : new Date()
     const regEndDate = eventData.registration_end_date ? new Date(eventData.registration_end_date) : new Date()
-    
     setEditEventRange([{ startDate, endDate, key: 'selection' }])
     setEditRegRange([{ startDate: regStartDate, endDate: regEndDate, key: 'selection' }])
-    
-    setEditForm(eventDataForEdit)
+    // Ensure guest_types is always an array of strings
+    const guestTypes = Array.isArray(eventData.guest_types)
+      ? eventData.guest_types
+      : (eventData.guest_types || '').split(',').map((s) => s.trim()).filter(Boolean);
+    setEditForm({
+      ...eventDataForEdit,
+      guest_types: guestTypes,
+    })
     setEditImagePreview(
       eventData.event_image
         ? eventData.event_image.startsWith('http')
           ? eventData.event_image
-          : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${
-              eventData.event_image
-            }`
+          : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${eventData.event_image}`
         : null
     )
     setEditDialogOpen(true)
@@ -759,10 +787,10 @@ export default function EventDetails() {
         end_date: editEventRange[0].endDate.toISOString(),
         registration_start_date: editRegRange[0].startDate.toISOString(),
         registration_end_date: editRegRange[0].endDate.toISOString(),
-        max_guests: parseInt(editForm.max_guests, 10),
+        max_guests: Number(editForm.max_guests),
         guest_types: Array.isArray(editForm.guest_types)
           ? editForm.guest_types
-          : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).filter(Boolean),
+          : (editForm.guest_types || '').split(',').map((s) => s.trim()).filter(Boolean),
       };
       if (processedEditForm.event_image && processedEditForm.event_image instanceof File) {
         payload = new FormData();
@@ -782,11 +810,11 @@ export default function EventDetails() {
         payload = processedEditForm;
       }
       await api.put(`/events/${Number(eventId)}`, payload, { headers });
-      toast.success('Event updated successfully!');
-      setEditDialogOpen(false);
-      // Refresh event details
+      // Refresh event details before closing dialog
       const res = await api.get(`/events/${Number(eventId)}`);
       setEventData(res.data);
+      toast.success('Event updated successfully!');
+      setEditDialogOpen(false);
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to update event');
     }
@@ -1166,12 +1194,87 @@ export default function EventDetails() {
     }
   };
 
-  const handlePrint = useReactToPrint({
-    content: () => printRef.current,
-    removeAfterPrint: false,
-    suppressErrors: true,
-    onAfterPrint: () => setPrinting(false),
+  // Add state for badge tab filtering
+  const [badgeSearchTerm, setBadgeSearchTerm] = useState('');
+  const [badgeGuestTypeFilter, setBadgeGuestTypeFilter] = useState('all');
+  const [badgeCheckedInFilter, setBadgeCheckedInFilter] = useState('all');
+  const [badgeSelectedAttendees, setBadgeSelectedAttendees] = useState<Set<number>>(new Set());
+
+  // Add filteredBadgesAttendees for the badges tab
+  const filteredBadgesAttendees = attendees.filter((attendee) => {
+    const matchesSearch =
+      (attendee.guest?.name?.toLowerCase() || '').includes(badgeSearchTerm.toLowerCase()) ||
+      (attendee.guest?.email?.toLowerCase() || '').includes(badgeSearchTerm.toLowerCase()) ||
+      (attendee.guest?.company?.toLowerCase() || '').includes(badgeSearchTerm.toLowerCase());
+    let guestTypeName = '';
+    // Try both guestType and guest_type for compatibility
+    const guestType = attendee.guestType || attendee.guest_type;
+    if (guestType) {
+      if (typeof guestType === 'object' && guestType !== null) {
+        guestTypeName = (guestType.name || guestType.id || '').toLowerCase();
+      } else if (typeof guestType === 'string') {
+        guestTypeName = guestType.toLowerCase();
+      } else {
+        guestTypeName = String(guestType).toLowerCase();
+      }
+    }
+    const matchesGuestType =
+      badgeGuestTypeFilter === 'all' ||
+      guestTypeName === badgeGuestTypeFilter;
+    const matchesCheckedIn =
+      badgeCheckedInFilter === 'all' ||
+      (badgeCheckedInFilter === 'checked-in' && attendee.checked_in) ||
+      (badgeCheckedInFilter === 'not-checked-in' && !attendee.checked_in);
+    return matchesSearch && matchesGuestType && matchesCheckedIn;
   });
+
+  // Add badge tab selection handlers
+  const handleBadgeSelectAttendee = (id: number) => {
+    setBadgeSelectedAttendees((prev) => {
+      const newSelected = new Set(prev)
+      if (newSelected.has(id)) {
+        newSelected.delete(id)
+      } else {
+        newSelected.add(id)
+      }
+      return newSelected
+    })
+  }
+  const handleBadgeSelectAllAttendees = () => {
+    if (badgeSelectedAttendees.size === filteredBadgesAttendees.length) {
+      setBadgeSelectedAttendees(new Set())
+    } else {
+      setBadgeSelectedAttendees(new Set(filteredBadgesAttendees.map((a) => a.id)))
+    }
+  }
+  const handleBadgeBatchPrintBadges = async () => {
+    if (badgeSelectedAttendees.size === 0) {
+      toast.error('No attendees selected for printing.');
+      return;
+    }
+    setPrinting(true);
+    setTimeout(async () => {
+      if (printRef.current) {
+        const badgeElements = Array.from(printRef.current.querySelectorAll('.printable-badge-batch'));
+        if (badgeElements.length === 0) {
+          toast.error('No badges found to print.');
+          setPrinting(false);
+          return;
+        }
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [320, 480] });
+        for (let i = 0; i < badgeElements.length; i++) {
+          const el = badgeElements[i] as HTMLElement;
+          const canvas = await html2canvas(el, { scale: 2 });
+          const imgData = canvas.toDataURL('image/png');
+          if (i > 0) pdf.addPage([320, 480], 'portrait');
+          pdf.addImage(imgData, 'PNG', 0, 0, 320, 480);
+        }
+        pdf.autoPrint();
+        window.open(pdf.output('bloburl'));
+        setPrinting(false);
+      }
+    }, 300);
+  };
 
   return (
     <>
@@ -1522,6 +1625,14 @@ export default function EventDetails() {
                   >
                     Check-ins
                   </TabsTrigger>
+                  {/* <TabsTrigger
+                    value="badge-designer"
+                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
+                      ${activeTab === 'badge-designer' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                    `}
+                  >
+                    Badge Designer
+                  </TabsTrigger> */}
                 </>
               ) : (
                 <>
@@ -1541,6 +1652,16 @@ export default function EventDetails() {
                   >
                     Badges
                   </TabsTrigger>
+                  {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'admin') && (
+                    <TabsTrigger
+                      value="badge-designer"
+                      className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
+                        ${activeTab === 'badge-designer' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                      `}
+                    >
+                      Badge Designer
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger
                     value="attendees"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
@@ -1688,77 +1809,112 @@ export default function EventDetails() {
                 </TabsContent>
                 <TabsContent value="badges">
                   <div className="flex flex-col gap-6">
-                    {/* Remove conditional on badgeTemplate, always show badge printing UI */}
-                    <>
-                      <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
-                        <h3 className="text-xl font-bold">Attendee Badges</h3>
-                        <Button variant="outline" onClick={handleBatchPrintBadges} className="flex items-center gap-2">
-                          <Printer className="w-4 h-4" /> Print Selected Badges
-                        </Button>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead><Checkbox checked={selectedAttendees.size === attendees.length && attendees.length > 0} onCheckedChange={handleSelectAllAttendees} /></TableHead>
-                              <TableHead>Attendee</TableHead>
-                              <TableHead>Email</TableHead>
-                              <TableHead>Guest Type</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Badge Preview</TableHead>
-                              <TableHead>Actions</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {attendees.map(attendee => (
-                              <TableRow key={attendee.id}>
-                                <TableCell><Checkbox checked={selectedAttendees.has(attendee.id)} onCheckedChange={() => handleSelectAttendee(attendee.id)} /></TableCell>
-                                <TableCell>{attendee.guest?.name}</TableCell>
-                                <TableCell>{attendee.guest?.email}</TableCell>
-                                <TableCell>
-                                  {(() => {
-                                    // Handle guest type display properly
-                                    const guestType = attendee.guest_type;
-                                    if (guestType) {
-                                      if (typeof guestType === 'object' && guestType !== null) {
-                                        return guestType.name || guestType.id || 'Unknown';
-                                      } else if (typeof guestType === 'string') {
-                                        return guestType;
-                                      } else {
-                                        return String(guestType);
-                                      }
-                                    }
-                                    return 'Unknown';
-                                  })()}
-                                </TableCell>
-                                <TableCell>
-                                  {attendee.checked_in ? (
-                                    <Badge className="bg-green-100 text-green-700">Checked In</Badge>
-                                  ) : (
-                                    <Badge className="bg-gray-100 text-gray-700">Not Checked In</Badge>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="w-32 h-20 bg-gray-50 border rounded flex items-center justify-center overflow-hidden">
-                                    <div style={{ transform: 'scale(0.2)', transformOrigin: 'top left', width: 400, height: 600 }}>
-                                      <BadgePrint attendee={attendee} />
-                                    </div>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      <Input
+                        placeholder="Search attendees..."
+                        value={badgeSearchTerm}
+                        onChange={e => setBadgeSearchTerm(e.target.value)}
+                        className="w-64"
+                      />
+                      <Select value={badgeGuestTypeFilter} onValueChange={setBadgeGuestTypeFilter}>
+                        <SelectTrigger className="w-40"><SelectValue placeholder="All Types" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Types</SelectItem>
+                          {guestTypes.map(type => (
+                            <SelectItem key={type.id} value={type.name.toLowerCase()}>{type.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={badgeCheckedInFilter} onValueChange={setBadgeCheckedInFilter}>
+                        <SelectTrigger className="w-40"><SelectValue placeholder="All Status" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Status</SelectItem>
+                          <SelectItem value="checked-in">Checked In</SelectItem>
+                          <SelectItem value="not-checked-in">Not Checked In</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
+                      <h3 className="text-xl font-bold">Attendee Badges</h3>
+                      <Button variant="outline" onClick={handleBadgeBatchPrintBadges} className="flex items-center gap-2">
+                        <Printer className="w-4 h-4" /> Print Selected Badges
+                      </Button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead><Checkbox checked={badgeSelectedAttendees.size === filteredBadgesAttendees.length && filteredBadgesAttendees.length > 0} onCheckedChange={handleBadgeSelectAllAttendees} /></TableHead>
+                            <TableHead>Attendee</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Guest Type</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Badge Preview</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredBadgesAttendees.map(attendee => (
+                            <TableRow key={attendee.id}>
+                              <TableCell><Checkbox checked={badgeSelectedAttendees.has(attendee.id)} onCheckedChange={() => handleBadgeSelectAttendee(attendee.id)} /></TableCell>
+                              <TableCell>{attendee.guest?.name}</TableCell>
+                              <TableCell>{attendee.guest?.email}</TableCell>
+                              <TableCell>
+                                {attendee.guestType?.name || attendee.guest_type_id || 'Unknown'}
+                              </TableCell>
+                              <TableCell>
+                                {attendee.checked_in ? (
+                                  <Badge className="bg-green-100 text-green-700">Checked In</Badge>
+                                ) : (
+                                  <Badge className="bg-gray-100 text-gray-700">Not Checked In</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="w-32 h-20 bg-gray-50 border rounded flex items-center justify-center overflow-hidden">
+                                  <div style={{ transform: 'scale(0.2)', transformOrigin: 'top left', width: 400, height: 600 }}>
+                                    <BadgePrint attendee={attendee} />
                                   </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Button size="sm" variant="outline" onClick={() => {
-                                    setSelectedAttendees(new Set([attendee.id]));
-                                    setPrinting(true);
-                                  }} className="flex items-center gap-1 mb-1">
-                                    <Printer className="w-4 h-4" /> Print
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Button size="sm" variant="outline" onClick={() => {
+                                  setBadgeSelectedAttendees(new Set([attendee.id]));
+                                  setPrinting(true);
+                                }} className="flex items-center gap-1 mb-1">
+                                  <Printer className="w-4 h-4" /> Print
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {/* Hidden print area for batch printing */}
+                    <div
+                      ref={printRef}
+                      style={{
+                        position: 'absolute',
+                        top: -9999,
+                        left: -9999,
+                        width: '1px',
+                        height: '1px',
+                        overflow: 'hidden',
+                        visibility: printing ? 'visible' : 'hidden',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      {printing && badgeSelectedAttendees.size > 0 ? (
+                        filteredBadgesAttendees
+                          .filter(attendee => badgeSelectedAttendees.has(attendee.id))
+                          .map(attendee => (
+                            <div key={attendee.id} className="printable-badge-batch">
+                              <BadgePrint attendee={attendee} />
+                            </div>
+                          ))
+                      ) : (
+                        <div>No badges selected for printing.</div>
+                      )}
+                    </div>
                   </div>
                 </TabsContent>
                 <TabsContent value="attendees">
@@ -1830,36 +1986,7 @@ export default function EventDetails() {
                                 <div className="text-xs flex items-center gap-1"><Phone className="w-3 h-3" /> {attendee.guest?.phone}</div>
                               </TableCell>
                               <TableCell>
-                                <Badge className={
-                                  attendee.guest_type?.name?.toLowerCase() === 'speaker' ? 'bg-purple-100 text-purple-700' :
-                                  attendee.guest_type?.name?.toLowerCase() === 'vip' ? 'bg-yellow-100 text-yellow-700' :
-                                  attendee.guest_type?.name?.toLowerCase() === 'visitor' ? 'bg-gray-100 text-gray-700' :
-                                  'bg-blue-100 text-blue-700'
-                                }>
-                                  {(() => {
-                                    console.log('DEBUG Table - attendee:', attendee);
-                                    console.log('DEBUG Table - attendee.guest_type:', attendee.guest_type);
-                                    
-                                    // Handle guest type display properly
-                                    const guestType = attendee.guest_type;
-                                    if (guestType) {
-                                      if (typeof guestType === 'object' && guestType !== null) {
-                                        const result = guestType.name || guestType.id || 'Unknown';
-                                        console.log('DEBUG Table - extracted from object:', result);
-                                        return result;
-                                      } else if (typeof guestType === 'string') {
-                                        console.log('DEBUG Table - is string:', guestType);
-                                        return guestType;
-                                      } else {
-                                        const result = String(guestType);
-                                        console.log('DEBUG Table - converted to string:', result);
-                                        return result;
-                                      }
-                                    }
-                                    console.log('DEBUG Table - no guest type, returning Unknown');
-                                    return 'Unknown';
-                                  })()}
-                                </Badge>
+                                {attendee.guestType?.name || attendee.guest_type_id || 'Unknown'}
                               </TableCell>
                               <TableCell>
                                 {attendee.checked_in ? (
@@ -1941,7 +2068,16 @@ export default function EventDetails() {
                                 )}
                               </TableCell>
                               <TableCell className="flex flex-wrap gap-1">
-                                <Button size="sm" variant="destructive" onClick={async () => { await api.delete(`/events/${Number(eventId)}/ushers/${usher.id}`); const eventRes = await getEventUshers(Number(eventId)); setEventUshers(eventRes.data); }}>Remove</Button>
+                                <Button size="sm" variant="destructive" onClick={async () => {
+                                  try {
+                                    await api.delete(`/events/${Number(eventId)}/ushers/${usher.id}`);
+                                    const eventRes = await getEventUshers(Number(eventId));
+                                    setEventUshers(eventRes.data);
+                                    toast.success('Usher removed from event!');
+                                  } catch (err: any) {
+                                    toast.error(err.response?.data?.error || 'Failed to remove usher.');
+                                  }
+                                }}>Remove</Button>
                               </TableCell>
                             </TableRow>
                           )) : (
@@ -2259,6 +2395,11 @@ export default function EventDetails() {
                     )}
                   </div>
                 </TabsContent>
+                {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer') && (
+                  <TabsContent value="badge-designer">
+                    <BadgeDesignerTab eventId={eventId} />
+                  </TabsContent>
+                )}
           </Tabs>
 
           {/* Edit Event Dialog */}

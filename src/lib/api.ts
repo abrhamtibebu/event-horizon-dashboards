@@ -28,6 +28,8 @@ api.interceptors.request.use(
     const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+    } else {
+      console.warn('[API] No JWT token found in localStorage or sessionStorage. Requests may fail with 401 Unauthorized.')
     }
     return config
   },

@@ -102,12 +102,6 @@ const allItems = [
     roles: ['usher'],
   },
   {
-    title: 'Event Management',
-    url: '/dashboard/usher/events',
-    icon: Calendar,
-    roles: ['usher'],
-  },
-  {
     title: 'My Tickets',
     url: '/dashboard/tickets',
     icon: Ticket,
@@ -157,6 +151,7 @@ export function AppSidebar() {
   const { user } = useAuth()
   const isCollapsed = state === 'collapsed'
   const [trashCount, setTrashCount] = useState(0)
+  const location = useLocation()
 
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
     isActive

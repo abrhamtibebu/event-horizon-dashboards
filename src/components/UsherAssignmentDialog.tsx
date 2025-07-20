@@ -33,6 +33,9 @@ interface UsherAssignmentDialogProps {
 interface UsherAssignment {
   usherId: string
   tasks: string
+  dailyRate: string
+  fromDate: string
+  toDate: string
 }
 
 export function UsherAssignmentDialog({
@@ -46,7 +49,7 @@ export function UsherAssignmentDialog({
   const [loading, setLoading] = useState(false)
   const [assigning, setAssigning] = useState(false)
   const [usherAssignments, setUsherAssignments] = useState<UsherAssignment[]>([
-    { usherId: '', tasks: '' },
+    { usherId: '', tasks: '', dailyRate: '', fromDate: '', toDate: '' },
   ])
   const [assignedUshers, setAssignedUshers] = useState<any[]>([])
   const { user } = useAuth()
@@ -83,7 +86,7 @@ export function UsherAssignmentDialog({
   }
 
   const handleAddUsher = () => {
-    setUsherAssignments([...usherAssignments, { usherId: '', tasks: '' }])
+    setUsherAssignments([...usherAssignments, { usherId: '', tasks: '', dailyRate: '', fromDate: '', toDate: '' }])
   }
 
   const handleRemoveUsher = (index: number) => {
@@ -103,15 +106,35 @@ export function UsherAssignmentDialog({
     updated[index].tasks = tasks
     setUsherAssignments(updated)
   }
+  const handleDailyRateChange = (index: number, dailyRate: string) => {
+    const updated = [...usherAssignments]
+    updated[index].dailyRate = dailyRate
+    setUsherAssignments(updated)
+  }
+  const handleFromDateChange = (index: number, fromDate: string) => {
+    const updated = [...usherAssignments]
+    updated[index].fromDate = fromDate
+    setUsherAssignments(updated)
+  }
+  const handleToDateChange = (index: number, toDate: string) => {
+    const updated = [...usherAssignments]
+    updated[index].toDate = toDate
+    setUsherAssignments(updated)
+  }
 
   const handleAssign = async () => {
     // Validate assignments
     const validAssignments = usherAssignments.filter(
-      (assignment) => assignment.usherId && assignment.tasks.trim()
+      (assignment) =>
+        assignment.usherId &&
+        assignment.tasks.trim() &&
+        assignment.dailyRate &&
+        assignment.fromDate &&
+        assignment.toDate
     )
 
     if (validAssignments.length === 0) {
-      toast.error('Please select at least one usher and assign tasks')
+      toast.error('Please fill all fields for each usher (usher, tasks, daily rate, and date range)')
       return
     }
 
@@ -123,12 +146,17 @@ export function UsherAssignmentDialog({
           .split(',')
           .map((task) => task.trim())
           .filter(Boolean),
+        daily_rate: assignment.dailyRate,
+        from_date: assignment.fromDate,
+        to_date: assignment.toDate,
       }))
+      // Debug log: show payload being sent
+      console.log('Assigning ushers payload:', ushers);
 
       await assignUshersToEvent(eventId, ushers)
       toast.success('Ushers assigned successfully!')
       setOpen(false)
-      setUsherAssignments([{ usherId: '', tasks: '' }])
+      setUsherAssignments([{ usherId: '', tasks: '', dailyRate: '', fromDate: '', toDate: '' }])
       onSuccess?.()
     } catch (error: any) {
       console.error('Failed to assign ushers:', error)
@@ -139,7 +167,7 @@ export function UsherAssignmentDialog({
   }
 
   const isFormValid = usherAssignments.some(
-    (assignment) => assignment.usherId && assignment.tasks.trim()
+    (assignment) => assignment.usherId && assignment.tasks.trim() && assignment.dailyRate && assignment.fromDate && assignment.toDate
   )
 
   return (
@@ -209,62 +237,94 @@ export function UsherAssignmentDialog({
             <div className="text-center py-4 text-gray-500">
               No available ushers found.
             </div>
-          ) : (
-            usherAssignments.map((assignment, index) => (
-              <div
-                key={index}
-                className="flex flex-col gap-3 border rounded-lg p-4"
-              >
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">
-                    Usher {index + 1}
-                  </Label>
-                  {usherAssignments.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveUsher(index)}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={`usher-${index}`}>Select Usher</Label>
+          ) : usherAssignments.map((assignment, index) => (
+            <div key={index} className="p-4 border rounded-lg mb-4 bg-gray-50 space-y-2">
+              <div className="flex flex-col md:flex-row md:items-center gap-2">
+                <div className="flex-1">
+                  <Label>Usher</Label>
                   <Select
                     value={assignment.usherId}
-                    onValueChange={(value) => handleUsherChange(index, value)}
+                    onValueChange={val => handleUsherChange(index, val)}
+                    required
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose an usher" />
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select usher" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableUshers.filter(
-                        usher => !assignedUshers.some(assigned => assigned.id === usher.id)
-                      ).map((usher) => (
-                        <SelectItem key={usher.id} value={String(usher.id)}>
+                      {availableUshers.map((usher: any) => (
+                        <SelectItem key={usher.id} value={usher.id.toString()}>
                           {usher.name} ({usher.email})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={`tasks-${index}`}>Assign Tasks</Label>
+                <div className="flex-1">
+                  <Label>Tasks</Label>
                   <Textarea
-                    id={`tasks-${index}`}
-                    placeholder="Enter tasks separated by commas (e.g., Check-in, Security, Guest assistance)"
+                    placeholder="Enter tasks separated by commas (e.g., Check-in, Security)"
                     value={assignment.tasks}
-                    onChange={(e) => handleTasksChange(index, e.target.value)}
-                    rows={3}
+                    onChange={e => handleTasksChange(index, e.target.value)}
+                    rows={2}
+                    required
+                  />
+                </div>
+                <div className="flex-1">
+                  <Label>Daily Rate (ETB)</Label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full border rounded px-2 py-1"
+                    placeholder="e.g. 500"
+                    value={assignment.dailyRate}
+                    onChange={e => handleDailyRateChange(index, e.target.value)}
+                    required
                   />
                 </div>
               </div>
-            ))
-          )}
+              <div className="flex flex-col md:flex-row gap-2">
+                <div className="flex-1">
+                  <Label>From Date</Label>
+                  <input
+                    type="date"
+                    className="w-full border rounded px-2 py-1"
+                    value={assignment.fromDate}
+                    onChange={e => handleFromDateChange(index, e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="flex-1">
+                  <Label>To Date</Label>
+                  <input
+                    type="date"
+                    className="w-full border rounded px-2 py-1"
+                    value={assignment.toDate}
+                    onChange={e => handleToDateChange(index, e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRemoveUsher(index)}
+                  disabled={usherAssignments.length === 1}
+                >
+                  <X className="w-4 h-4" /> Remove
+                </Button>
+                {index === usherAssignments.length - 1 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddUsher}
+                  >
+                    <Plus className="w-4 h-4" /> Add Another
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
 
           {availableUshers.length > 0 && (
             <Button

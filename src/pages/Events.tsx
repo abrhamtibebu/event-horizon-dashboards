@@ -179,7 +179,7 @@ export default function Events() {
                   {filteredEvents.map((event) => {
                     // Calculate registration progress
                     const attendeeCount = event.attendee_count || 0
-                    const attendeeLimit = event.attendee_limit || 500
+                    const attendeeLimit = event.max_guests || 500
                     const registrationProgress = Math.min(
                       Math.round((attendeeCount / attendeeLimit) * 100),
                       100
@@ -261,7 +261,7 @@ export default function Events() {
                             <div className="text-xs text-gray-500 mt-2">
                               Organized by{' '}
                               <span className="font-semibold text-gray-700">
-                                {user?.name || event.organizer?.name || 'John Smith'}
+                                {event.organizer?.name || 'John Smith'}
                               </span>
                             </div>
                             {/* Usher Tasks */}
@@ -297,69 +297,109 @@ export default function Events() {
                   })}
                 </div>
               ) : (
-                <div className="bg-white shadow-lg rounded-xl overflow-x-auto p-4">
-                  <Table className="min-w-full">
-                    <TableHeader className="sticky top-0 bg-white z-10">
-                      <TableRow>
-                        <TableHead className="font-bold text-gray-700 text-base">
-                          Name
-                        </TableHead>
-                        <TableHead className="font-bold text-gray-700 text-base">
-                          Type
-                        </TableHead>
-                        <TableHead className="font-bold text-gray-700 text-base">
-                          Category
-                        </TableHead>
-                        <TableHead className="font-bold text-gray-700 text-base">
-                          Organizer
-                        </TableHead>
-                        <TableHead className="font-bold text-gray-700 text-base">
-                          Status
-                        </TableHead>
-                        <TableHead className="font-bold text-gray-700 text-base">
-                          Date
-                        </TableHead>
-                        <TableHead className="font-bold text-gray-700 text-base">
-                          Actions
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredEvents.map((event) => (
-                        <TableRow
-                          key={event.id}
-                          className="hover:bg-blue-50 transition-colors group text-gray-900"
-                        >
-                          <TableCell className="font-semibold text-base group-hover:text-blue-700 transition-colors">
-                            {event.name}
-                          </TableCell>
-                          <TableCell>{event.event_type?.name || '-'}</TableCell>
-                          <TableCell>
-                            {event.event_category?.name || '-'}
-                          </TableCell>
-                          <TableCell>{event.organizer?.name || '-'}</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(event.status)}>
-                              {event.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {event.date} {event.time}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Link to={`/dashboard/events/${event.id}`}>
-                                <Button size="sm" variant="outline">
-                                  <Eye className="w-4 h-4" /> View Details
-                                </Button>
-                              </Link>
-                            </div>
-                          </TableCell>
+                <>
+                  {/* Table for desktop, cards for mobile/tablet */}
+                  <div className="hidden lg:block bg-white shadow-lg rounded-xl overflow-x-auto p-4">
+                    <Table className="min-w-full">
+                      <TableHeader className="sticky top-0 bg-white z-10">
+                        <TableRow>
+                          <TableHead className="font-bold text-gray-700 text-base">
+                            Name
+                          </TableHead>
+                          <TableHead className="font-bold text-gray-700 text-base">
+                            Type
+                          </TableHead>
+                          <TableHead className="font-bold text-gray-700 text-base">
+                            Category
+                          </TableHead>
+                          <TableHead className="font-bold text-gray-700 text-base">
+                            Organizer
+                          </TableHead>
+                          <TableHead className="font-bold text-gray-700 text-base">
+                            Status
+                          </TableHead>
+                          <TableHead className="font-bold text-gray-700 text-base">
+                            Date
+                          </TableHead>
+                          <TableHead className="font-bold text-gray-700 text-base">
+                            Actions
+                          </TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredEvents.map((event) => (
+                          <TableRow
+                            key={event.id}
+                            className="hover:bg-blue-50 transition-colors group text-gray-900"
+                          >
+                            <TableCell className="font-semibold text-base group-hover:text-blue-700 transition-colors">
+                              {event.name}
+                            </TableCell>
+                            <TableCell>{event.event_type?.name || '-'}</TableCell>
+                            <TableCell>
+                              {event.event_category?.name || '-'}
+                            </TableCell>
+                            <TableCell>{event.organizer?.name || '-'}</TableCell>
+                            <TableCell>
+                              <Badge className={getStatusColor(event.status)}>
+                                {event.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {event.date} {event.time}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Link to={`/dashboard/events/${event.id}`}>
+                                  <Button size="sm" variant="outline">
+                                    <Eye className="w-4 h-4" /> View Details
+                                  </Button>
+                                </Link>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  {/* Card view for mobile/tablet */}
+                  <div className="lg:hidden flex flex-col gap-4">
+                    {filteredEvents.map((event) => {
+                      return (
+                        <div key={event.id} className="rounded-lg border bg-white shadow-sm p-4 flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-blue-600 text-lg">{event.name}</span>
+                            <Badge className={getStatusColor(event.status)}>{event.status}</Badge>
+                          </div>
+                          <div className="text-sm text-gray-500">{event.date} {event.time} • {event.location || 'Convention Center'}</div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <Users className="w-4 h-4 text-gray-400" />
+                            <span>{event.attendee_count || 0}/{event.max_guests || 500} Attendees</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <span>Type:</span>
+                            <span>{event.event_type?.name || '-'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <span>Category:</span>
+                            <span>{event.event_category?.name || '-'}</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <span>Organizer:</span>
+                            <span>{event.organizer?.name || '-'}</span>
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <Link to={`/dashboard/events/${event.id}`} className="flex-1">
+                              <Button size="sm" variant="outline" className="w-full flex items-center justify-center gap-2">
+                                <Eye className="w-4 h-4" /> View Details
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )}
