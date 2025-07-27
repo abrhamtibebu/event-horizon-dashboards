@@ -6,9 +6,10 @@ import api from '@/lib/api';
 import Badge from '@/components/Badge';
 import { BadgeTemplate } from '@/types/badge';
 import { Attendee } from '@/types/attendee';
-import { useReactToPrint } from 'react-to-print';
 import { v4 as uuidv4 } from 'uuid';
 import { getBadgeTemplates, getOfficialBadgeTemplate } from '@/lib/badgeTemplates';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // Default template for demonstration
 const createDefaultTemplate = (): BadgeTemplate => ({
@@ -45,12 +46,33 @@ const BadgePage = () => {
   
   const badgeRef = useRef<HTMLDivElement>(null);
   
-  const handlePrint = useReactToPrint({
-    content: () => badgeRef.current,
-    removeAfterPrint: false,
-    suppressErrors: true,
-    onAfterPrint: () => {},
-  });
+  const handlePrint = async () => {
+    setTimeout(() => {
+      if (badgeRef.current) {
+        const badgeElement = badgeRef.current.querySelector('.printable-badge');
+        if (!badgeElement) {
+          console.error('No badge found to print.');
+          return;
+        }
+        // Make sure the print area is visible and positioned correctly
+        badgeRef.current.style.visibility = 'visible';
+        badgeRef.current.style.position = 'absolute';
+        badgeRef.current.style.left = '0';
+        badgeRef.current.style.top = '0';
+        badgeRef.current.style.width = '100vw';
+        badgeRef.current.style.height = '100vh';
+        badgeRef.current.style.zIndex = '9999';
+        badgeRef.current.style.background = 'white';
+        
+        // Wait a bit more for badge to render, then print
+        setTimeout(() => {
+          window.print();
+          // Reset the print area after printing
+          badgeRef.current!.style.visibility = 'hidden';
+        }, 500);
+      }
+    }, 300);
+  };
 
   useEffect(() => {
     if (!attendeeId || !eventId) return;
@@ -118,13 +140,32 @@ const BadgePage = () => {
         `}
       </style>
       <div className="no-print mb-4">
-        <Button onClick={handlePrint}>
-          <Printer className="mr-2 h-4 w-4" />
+        <Button onClick={handlePrint} className="flex items-center gap-2">
+          <Printer className="w-4 h-4" />
           Print Badge
         </Button>
       </div>
       <div ref={badgeRef} className="printable-badge">
-        <Badge attendee={attendee} />
+        <style>{`
+          @media print {
+            body * { visibility: hidden !important; }
+            #single-badge-page-print-area, #single-badge-page-print-area * { visibility: visible !important; }
+            #single-badge-page-print-area { 
+              position: absolute !important; 
+              left: 0; 
+              top: 0; 
+              width: 100vw; 
+              height: 100vh; 
+              background: white; 
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+          }
+        `}</style>
+        <div id="single-badge-page-print-area">
+          <Badge attendee={attendee} />
+        </div>
       </div>
     </div>
   );

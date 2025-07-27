@@ -293,6 +293,9 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <DashboardCard title="Recent Activity">
           <div className="space-y-4">
+            {filteredActivities?.length === 0 && (
+              <div className="text-gray-400">No recent activity.</div>
+            )}
             {filteredActivities?.map((activity: any) => (
               <div key={activity.id} className="flex items-center gap-3">
                 <div className="p-2 bg-gray-100 rounded-full">
@@ -300,10 +303,9 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm font-medium">
-                    {activity.action} by{' '}
-                    <span className="font-semibold">{activity.user}</span>
+                    {activity.description || activity.action}
                   </p>
-                  <p className="text-xs text-gray-500">{activity.time}</p>
+                  <p className="text-xs text-gray-500">{activity.timestamp || activity.time}</p>
                 </div>
               </div>
             ))}

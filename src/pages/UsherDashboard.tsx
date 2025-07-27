@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import api from '@/lib/api'
+import { getGuestTypeBadgeClasses } from '@/lib/utils'
 import { useOutletContext } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -122,18 +123,7 @@ export default function UsherDashboard() {
   }
 
   const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'VIP':
-        return 'bg-purple-100 text-purple-800'
-      case 'Speaker':
-        return 'bg-blue-100 text-blue-800'
-      case 'Staff':
-        return 'bg-green-100 text-green-800'
-      case 'Visitor':
-        return 'bg-gray-100 text-gray-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
+    return getGuestTypeBadgeClasses(type);
   }
 
   const getPriorityColor = (priority: string) => {
@@ -601,9 +591,7 @@ export default function UsherDashboard() {
                   <p className="text-xs text-gray-500">{checkIn.company}</p>
                 </div>
                 <div className="text-right">
-                  <Badge className={getTypeColor(checkIn.type)}>
-                    {checkIn.type}
-                  </Badge>
+                  <Badge className={getTypeColor(checkIn.guest_type?.name)}>{checkIn.guest_type?.name || ''}</Badge>
                   <p className="text-xs text-gray-500 mt-1">{checkIn.time}</p>
                 </div>
               </div>

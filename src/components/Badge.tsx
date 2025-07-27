@@ -13,17 +13,17 @@ interface BadgeProps {
 const replaceTemplateFields = (content: string, attendee: Attendee): string => {
   const guest = attendee.guest;
   // Use guest_type instead of guestType
-  const guestType = attendee.guest_type;
+  const guest_type = attendee.guest_type;
   
   // Handle guest type properly - extract name from object or use string directly
   let guestTypeName = '';
-  if (guestType) {
-    if (typeof guestType === 'object' && guestType !== null) {
-      guestTypeName = guestType.name || String(guestType.id) || '';
-    } else if (typeof guestType === 'string') {
-      guestTypeName = guestType;
+  if (guest_type) {
+    if (typeof guest_type === 'object' && guest_type !== null) {
+      guestTypeName = guest_type.name || String(guest_type.id) || '';
+    } else if (typeof guest_type === 'string') {
+      guestTypeName = guest_type;
     } else {
-      guestTypeName = String(guestType);
+      guestTypeName = String(guest_type);
     }
   }
   
@@ -48,11 +48,11 @@ const LegacyBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
   const jobtitle = attendee.guest?.jobtitle || '';
   const country = '';
   // Use guest_type instead of guestType
-  let guestType = '';
+  let guest_type = '';
   if (attendee.guest_type && typeof attendee.guest_type === 'object' && attendee.guest_type !== null) {
-    guestType = attendee.guest_type.name || String(attendee.guest_type.id) || '';
+    guest_type = attendee.guest_type.name || String(attendee.guest_type.id) || '';
   } else if (typeof attendee.guest_type === 'string') {
-    guestType = attendee.guest_type;
+    guest_type = attendee.guest_type;
   }
   const uuid = (attendee.guest?.uuid || '').slice(0, 12);
 
@@ -87,7 +87,7 @@ const LegacyBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
         borderBottomRightRadius: 12,
       }}>
         <span style={{ color: '#111', fontWeight: 700, fontSize: 32, letterSpacing: 2 }}>
-          {guestType ? guestType.toUpperCase() : ''}
+          {guest_type ? guest_type.toUpperCase() : ''}
         </span>
       </div>
     </div>

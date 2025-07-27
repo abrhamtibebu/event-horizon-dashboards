@@ -1974,7 +1974,7 @@ export default function EventDetails() {
                   >
                     Badges
                   </TabsTrigger>
-                  {(user?.role === 'admin' || user?.role === 'superadmin') && (
+                  {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'admin') && (
                     <TabsTrigger
                       value="badge-designer"
                       className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
@@ -4157,8 +4157,7 @@ export default function EventDetails() {
                     </div>
                   </div>
                 </div>
-            </form>
-              )}
+              </form>
             </DialogContent>
           </Dialog>
 

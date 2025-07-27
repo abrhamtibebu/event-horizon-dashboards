@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
 import api from '@/lib/api'
+import { getGuestTypeBadgeClasses } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Printer } from 'lucide-react'
 import BadgePrint from '@/components/Badge'
@@ -38,6 +39,7 @@ export default function UsherEvents() {
   const [guestTypes, setGuestTypes] = useState<any[]>([])
   const [singlePrintAttendee, setSinglePrintAttendee] = useState<any>(null)
   const singleBadgePrintRef = useRef<HTMLDivElement>(null)
+  const printRef = useRef<HTMLDivElement>(null)
   const [showPrintArea, setShowPrintArea] = useState(false)
   const [searchPerformed, setSearchPerformed] = useState(false)
   const [suggestions, setSuggestions] = useState<any[]>([])
@@ -232,13 +234,38 @@ export default function UsherEvents() {
 
   // Print badge handler (matches system)
   const handlePrintBadge = async (attendee: any) => {
-    setSinglePrintAttendee(attendee)
-    setShowPrintArea(true)
+    setSinglePrintAttendee(attendee);
     setTimeout(() => {
-      window.print()
-      setShowPrintArea(false)
-      setSinglePrintAttendee(null)
-    }, 300)
+      if (printRef.current) {
+        const badgeElement = printRef.current.querySelector('.printable-badge-batch');
+        if (!badgeElement) {
+          toast({
+            title: 'Error',
+            description: 'No badge found to print.',
+            variant: 'destructive',
+          });
+          setSinglePrintAttendee(null);
+          return;
+        }
+        // Make sure the print area is visible and positioned correctly
+        printRef.current.style.visibility = 'visible';
+        printRef.current.style.position = 'absolute';
+        printRef.current.style.left = '0';
+        printRef.current.style.top = '0';
+        printRef.current.style.width = '100vw';
+        printRef.current.style.height = '100vh';
+        printRef.current.style.zIndex = '9999';
+        printRef.current.style.background = 'white';
+        
+        // Wait a bit more for badge to render, then print
+        setTimeout(() => {
+          window.print();
+          // Reset the print area after printing
+          printRef.current!.style.visibility = 'hidden';
+          setSinglePrintAttendee(null);
+        }, 500);
+      }
+    }, 300);
   }
 
   // Handler for QR scan
@@ -456,13 +483,17 @@ export default function UsherEvents() {
                       <TableCell>{attendee.guest?.jobtitle}</TableCell>
                       <TableCell>{attendee.guest?.gender}</TableCell>
                       <TableCell>{attendee.guest?.country}</TableCell>
-                      <TableCell>{attendee.guest_type?.name || attendee.guest_type || '-'}</TableCell>
+                                                  <TableCell>
+                              <Badge className={getGuestTypeBadgeClasses(attendee.guest_type?.name)}>
+                                {attendee.guest_type?.name || '-'}
+                              </Badge>
+                            </TableCell>
                       <TableCell>{attendee.checked_in ? 'Checked In' : 'Not Checked In'}</TableCell>
                       <TableCell>
                         <Button size="sm" variant="outline" onClick={() => openEditDialog(attendee)}>
                           Edit
                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => handlePrintBadge(attendee)} className="ml-2" title="Print Badge">
+                        <Button size="sm" variant="outline" onClick={() => handlePrintBadge(attendee)} className="ml-2 flex items-center gap-1" title="Print Badge">
                       <Printer className="w-4 h-4" />
                     </Button>
                       </TableCell>
@@ -475,35 +506,44 @@ export default function UsherEvents() {
         </div>
       </div>
       {/* Hidden badge print area for single badge printing */}
-      {showPrintArea && singlePrintAttendee && (
-        <div
-          style={{
-            position: 'fixed',
-            left: 0,
-            top: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'white',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <style>{`
-            @media print {
-              body * { visibility: hidden !important; }
-              #usher-badge-print-area, #usher-badge-print-area * { visibility: visible !important; }
-              #usher-badge-print-area { position: absolute !important; left: 0; top: 0; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background: white; }
+      <div
+        ref={printRef}
+        style={{
+          position: 'absolute',
+          top: -9999,
+          left: -9999,
+          width: '1px',
+          height: '1px',
+          overflow: 'hidden',
+          visibility: singlePrintAttendee ? 'visible' : 'hidden',
+          pointerEvents: 'none',
+        }}
+      >
+        <style>{`
+          @media print {
+            body * { visibility: hidden !important; }
+            #usher-print-area, #usher-print-area * { visibility: visible !important; }
+            #usher-print-area { 
+              position: absolute !important; 
+              left: 0; 
+              top: 0; 
+              width: 100vw; 
+              height: 100vh; 
+              background: white; 
+              display: flex;
+              align-items: center;
+              justify-content: center;
             }
-          `}</style>
-          <div id="usher-badge-print-area" style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'white' }}>
-            <div style={{ width: '100vw', height: '100vh' }}>
-              <BadgePrint attendee={singlePrintAttendee} />
-            </div>
-                  </div>
+          }
+        `}</style>
+        <div id="usher-print-area">
+        {singlePrintAttendee && (
+          <div className="printable-badge-batch">
+            <BadgePrint attendee={singlePrintAttendee} />
+          </div>
+        )}
         </div>
-      )}
+      </div>
       {/* Add Attendee Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">

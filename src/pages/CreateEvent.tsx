@@ -266,53 +266,56 @@ export default function CreateEvent() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm">
       <style>{customRangeStyles}</style>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-auto p-0 animate-fade-in relative h-[90vh] flex flex-col">
+      <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl shadow-2xl w-full max-w-6xl mx-auto p-0 animate-fade-in relative h-[95vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 md:px-8 pt-6 md:pt-8 pb-2 border-b">
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-2 rounded-xl">
-              <Tag className="w-6 h-6 text-white" />
+        <div className="flex-shrink-0 bg-white rounded-t-xl p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
+                <Tag className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                  Create New Event
+                </h2>
+                <p className="text-gray-600 mt-1">
+                  Set up a new event in the system
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Create New Event
-              </h2>
-              <p className="text-gray-500 text-sm">
-                Set up a new event in the system
-              </p>
-            </div>
+            <button
+              onClick={() => navigate(-1)}
+              className="text-gray-400 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
           </div>
-          <button
-            onClick={() => navigate(-1)}
-            className="text-gray-400 hover:text-gray-700 p-2 rounded-full"
-          >
-            <X className="w-6 h-6" />
-          </button>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-8"
+          className="flex-1 overflow-y-auto p-6"
         >
+          <div className="max-w-5xl mx-auto space-y-8">
           {/* Event Information */}
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <Tag className="w-5 h-5 text-blue-500" />
-              <h3 className="font-semibold text-lg text-gray-900">
-                Event Information
-              </h3>
-              <span className="text-gray-400 text-sm ml-2">
-                Event details and logistics
-              </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                <Tag className="w-5 h-5 text-white" />
+              </div>
               <div>
-                <Label
-                  htmlFor="name"
-                  className="flex items-center gap-2 text-gray-700"
-                >
-                  {' '}
-                  <Tag className="w-4 h-4" /> Event Name{' '}
+                <h3 className="text-xl font-bold text-gray-900">
+                  Event Information
+                </h3>
+                <p className="text-gray-500 text-sm">
+                  Basic event details and logistics
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <Label htmlFor="name" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <Tag className="w-4 h-4 text-blue-500" /> Event Name
                 </Label>
                 <Input
                   id="name"
@@ -320,22 +323,18 @@ export default function CreateEvent() {
                   onChange={(e) => handleInputChange('name', e.target.value)}
                   placeholder="Enter event name"
                   required
-                  className="mt-1"
+                  className="mt-2 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
                 />
               </div>
               <div>
-                <Label
-                  htmlFor="organizer_id"
-                  className="flex items-center gap-2 text-gray-700"
-                >
-                  {' '}
-                  <Tag className="w-4 h-4" /> Organizer{' '}
+                <Label htmlFor="organizer_id" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <Tag className="w-4 h-4 text-green-500" /> Organizer
                 </Label>
                 {user?.role === 'organizer' ? (
                   <Input
                     value={user.organizer?.name || ''}
                     disabled
-                    className="mt-1"
+                    className="mt-2 h-12 border-gray-300 bg-gray-50 rounded-xl"
                   />
                 ) : (
                   <Select
@@ -346,7 +345,7 @@ export default function CreateEvent() {
                     disabled={loading.organizers}
                     required
                   >
-                    <SelectTrigger className="mt-1 w-full" id="organizer_id">
+                    <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl" id="organizer_id">
                       <SelectValue placeholder="Select an organizer" />
                     </SelectTrigger>
                     <SelectContent>
@@ -371,13 +370,9 @@ export default function CreateEvent() {
                   </Select>
                 )}
               </div>
-              <div className="md:col-span-2">
-                <Label
-                  htmlFor="description"
-                  className="flex items-center gap-2 text-gray-700"
-                >
-                  {' '}
-                  <FileText className="w-4 h-4" /> Description{' '}
+              <div className="lg:col-span-2">
+                <Label htmlFor="description" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <FileText className="w-4 h-4 text-purple-500" /> Description
                 </Label>
                 <Textarea
                   id="description"
@@ -386,17 +381,13 @@ export default function CreateEvent() {
                     handleInputChange('description', e.target.value)
                   }
                   placeholder="Describe your event..."
-                  rows={3}
-                  className="mt-1"
+                  rows={4}
+                  className="mt-2 border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-xl resize-none"
                 />
               </div>
               <div>
-                <Label
-                  htmlFor="event_type_id"
-                  className="flex items-center gap-2 text-gray-700"
-                >
-                  {' '}
-                  <Tag className="w-4 h-4" /> Event Type{' '}
+                <Label htmlFor="event_type_id" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <Tag className="w-4 h-4 text-orange-500" /> Event Type
                 </Label>
                 <Select
                   value={formData.event_type_id}
@@ -406,7 +397,7 @@ export default function CreateEvent() {
                   disabled={loading.eventTypes}
                   required
                 >
-                  <SelectTrigger className="mt-1 w-full" id="event_type_id">
+                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 rounded-xl" id="event_type_id">
                     <SelectValue placeholder="Select event type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -424,12 +415,8 @@ export default function CreateEvent() {
                 )}
               </div>
               <div>
-                <Label
-                  htmlFor="event_category_id"
-                  className="flex items-center gap-2 text-gray-700"
-                >
-                  {' '}
-                  <Tag className="w-4 h-4" /> Event Category{' '}
+                <Label htmlFor="event_category_id" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <Tag className="w-4 h-4 text-indigo-500" /> Event Category
                 </Label>
                 <Select
                   value={formData.event_category_id}
@@ -439,7 +426,7 @@ export default function CreateEvent() {
                   disabled={loading.eventCategories}
                   required
                 >
-                  <SelectTrigger className="mt-1 w-full" id="event_category_id">
+                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-xl" id="event_category_id">
                     <SelectValue placeholder="Select event category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -457,12 +444,8 @@ export default function CreateEvent() {
                 )}
               </div>
               <div>
-                <Label
-                  htmlFor="location"
-                  className="flex items-center gap-2 text-gray-700"
-                >
-                  {' '}
-                  <MapPin className="w-4 h-4" /> Location{' '}
+                <Label htmlFor="location" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <MapPin className="w-4 h-4 text-green-500" /> Location
                 </Label>
                 <Input
                   id="location"
@@ -471,16 +454,12 @@ export default function CreateEvent() {
                     handleInputChange('location', e.target.value)
                   }
                   placeholder="e.g. Grand Convention Center"
-                  className="mt-1"
+                  className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl"
                 />
               </div>
               <div>
-                <Label
-                  htmlFor="max_guests"
-                  className="flex items-center gap-2 text-gray-700"
-                >
-                  {' '}
-                  <Users className="w-4 h-4" /> Max Guests{' '}
+                <Label htmlFor="max_guests" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <Users className="w-4 h-4 text-teal-500" /> Max Guests
                 </Label>
                 <Input
                   id="max_guests"
@@ -490,24 +469,20 @@ export default function CreateEvent() {
                     handleInputChange('max_guests', e.target.value)
                   }
                   placeholder="e.g. 500"
-                  className="mt-1"
+                  className="mt-2 h-12 border-gray-300 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
                 />
               </div>
-              <div>
-                <Label
-                  htmlFor="guest_types"
-                  className="flex items-center gap-2 text-gray-700"
-                >
-                  {' '}
-                  <Users className="w-4 h-4" /> Guest Types{' '}
+              <div className="lg:col-span-2">
+                <Label htmlFor="guest_types" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <Users className="w-4 h-4 text-pink-500" /> Guest Types
                 </Label>
-                <div className="flex flex-wrap gap-2 mb-2">
+                <div className="flex flex-wrap gap-2 mb-3 mt-2">
                   {PREDEFINED_GUEST_TYPES.map(type => (
                     <Button
                       key={type}
                       type="button"
                       variant={selectedGuestTypes.includes(type) ? 'default' : 'outline'}
-                      className={selectedGuestTypes.includes(type) ? 'bg-blue-600 text-white' : ''}
+                      className={`${selectedGuestTypes.includes(type) ? 'bg-pink-600 text-white border-pink-600' : 'border-gray-300 hover:border-pink-300'} rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200`}
                       onClick={() => {
                         setSelectedGuestTypes(prev => prev.includes(type)
                           ? prev.filter(t => t !== type)
@@ -520,7 +495,9 @@ export default function CreateEvent() {
                 </div>
                 {selectedGuestTypes.length === 0 && <div className="text-xs text-red-500 mb-2">Select at least one guest type.</div>}
               </div>
-              <div className="md:col-span-2">
+            </div>
+          </div>
+              {/* <div className="md:col-span-2">
                 <Label
                   htmlFor="event_image"
                   className="flex items-center gap-2 text-gray-700"
@@ -553,38 +530,43 @@ export default function CreateEvent() {
                 </p>
                 {imagePreview && (
                   <div className="mt-2 relative inline-block">
-                    <img
-                      src={imagePreview}
-                      alt="Event image preview"
-                      className="h-24 rounded shadow border"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute -top-2 -right-2 rounded-full h-6 w-6"
-                      onClick={handleRemoveImage}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                  <img
+                    src={imagePreview}
+                    alt="Event image preview"
+                    className="h-24 rounded shadow border"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 rounded-full h-6 w-6"
+                    onClick={handleRemoveImage}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                   </div>
                 )}
+
               </div>
             </div>
           </div>
 
-          {/* Date Ranges */}
-          <div>
-            <div className="flex items-center gap-2 mb-4 mt-6">
-              <Calendar className="w-5 h-5 text-purple-500" />
-              <h3 className="font-semibold text-lg text-gray-900">
-                Event & Registration Dates
-              </h3>
-              <span className="text-gray-400 text-sm ml-2">
-                Set event and registration periods
-              </span>
+          {/* Event & Registration Dates Section */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-violet-600 rounded-xl flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  Event & Registration Dates
+                </h3>
+                <p className="text-gray-500 text-sm">
+                  Set event and registration periods
+                </p>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
                 <Label className="flex items-center gap-2 text-gray-700">
                   {' '}
@@ -723,25 +705,25 @@ export default function CreateEvent() {
             </div>
           </div>
 
-          {/* Additional Information */}
-          <div>
-            <div className="flex items-center gap-2 mb-4 mt-6">
-              <FileText className="w-5 h-5 text-green-500" />
-              <h3 className="font-semibold text-lg text-gray-900">
-                Additional Information
-              </h3>
-              <span className="text-gray-400 text-sm ml-2">
-                Requirements and agenda
-              </span>
+          {/* Additional Information Section */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  Additional Information
+                </h3>
+                <p className="text-gray-500 text-sm">
+                  Requirements, agenda, and additional details
+                </p>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <Label
-                  htmlFor="requirements"
-                  className="flex items-center gap-2 text-gray-700"
-                >
-                  {' '}
-                  <FileText className="w-4 h-4" /> Requirements & Prerequisites{' '}
+            <div className="grid grid-cols-1 gap-6">
+              <div>
+                <Label htmlFor="requirements" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <FileText className="w-4 h-4 text-amber-500" /> Requirements & Prerequisites
                 </Label>
                 <Textarea
                   id="requirements"
@@ -750,25 +732,21 @@ export default function CreateEvent() {
                     handleInputChange('requirements', e.target.value)
                   }
                   placeholder="Any requirements or prerequisites for attendees..."
-                  rows={2}
-                  className="mt-1"
+                  rows={3}
+                  className="mt-2 border-gray-300 focus:border-amber-500 focus:ring-amber-500 rounded-xl resize-none"
                 />
               </div>
-              <div className="md:col-span-2">
-                <Label
-                  htmlFor="agenda"
-                  className="flex items-center gap-2 text-gray-700"
-                >
-                  {' '}
-                  <FileText className="w-4 h-4" /> Event Agenda{' '}
+              <div>
+                <Label htmlFor="agenda" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <FileText className="w-4 h-4 text-amber-500" /> Event Agenda
                 </Label>
                 <Textarea
                   id="agenda"
                   value={formData.agenda}
                   onChange={(e) => handleInputChange('agenda', e.target.value)}
                   placeholder="Detailed event schedule and agenda..."
-                  rows={3}
-                  className="mt-1"
+                  rows={4}
+                  className="mt-2 border-gray-300 focus:border-amber-500 focus:ring-amber-500 rounded-xl resize-none"
                 />
               </div>
             </div>
@@ -780,6 +758,7 @@ export default function CreateEvent() {
               type="button"
               variant="outline"
               onClick={() => navigate(-1)}
+              className="px-6 py-2 rounded-xl"
             >
               Cancel
             </Button>
@@ -800,7 +779,7 @@ export default function CreateEvent() {
                 !filterValidOptions(eventCategories).some(ec => String(ec.id) === formData.event_category_id) ||
                 (user?.role !== 'organizer' && !filterValidOptions(organizers).some(org => String(org.id) === formData.organizer_id))
               }
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold px-6 py-2 rounded-lg shadow"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
             >
               {isSubmitting ? (
                 <span className="flex items-center">
@@ -812,6 +791,7 @@ export default function CreateEvent() {
               )}
             </Button>
           </div>
+        </div>
         </form>
       </div>
     </div>

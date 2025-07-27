@@ -7,6 +7,7 @@ import {
   Palette,
   Eye,
   EyeOff,
+  ClipboardList,
 } from 'lucide-react'
 import { DashboardCard } from '@/components/DashboardCard'
 import { Button } from '@/components/ui/button'
@@ -36,6 +37,7 @@ export default function Settings() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -48,6 +50,14 @@ export default function Settings() {
       })
     }
   }, [user])
+
+  useEffect(() => {
+    if (user?.role === 'usher') {
+      api.get('/dashboard/usher').then(res => {
+        setAssignedTasks(res.data?.assignedEvents || []);
+      });
+    }
+  }, [user]);
 
   const handleProfileChange = (field: string, value: string) => {
     setProfileData((prev) => ({ ...prev, [field]: value }))
@@ -99,6 +109,9 @@ export default function Settings() {
     { icon: Shield, label: 'Security' },
     { icon: Palette, label: 'Appearance' },
   ]
+  if (user?.role === 'usher') {
+    tabs.push({ icon: ClipboardList, label: 'Assigned Tasks' });
+  }
 
   return (
     <div className="space-y-6">
@@ -427,6 +440,28 @@ export default function Settings() {
                   Update Security Settings
                 </Button>
               </div>
+            </DashboardCard>
+          )}
+
+          {activeTab === 'Assigned Tasks' && user?.role === 'usher' && (
+            <DashboardCard title="My Assigned Tasks">
+              {assignedTasks.length === 0 ? (
+                <div className="text-gray-500">No assigned tasks.</div>
+              ) : (
+                <div className="space-y-4">
+                  {assignedTasks.map((event: any) => (
+                    <div key={event.id} className="border-b pb-2 mb-2">
+                      <div className="font-semibold text-blue-700">{event.name}</div>
+                      <div className="text-sm text-gray-600 mb-1">{event.date} at {event.location}</div>
+                      <ul className="list-disc ml-6">
+                        {(Array.isArray(event.pivot?.tasks) ? event.pivot.tasks : (event.pivot?.tasks ? JSON.parse(event.pivot.tasks) : [])).map((task: string, idx: number) => (
+                          <li key={idx}>{task}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
             </DashboardCard>
           )}
         </div>

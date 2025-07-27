@@ -51,6 +51,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
 import api from '@/lib/api'
+import { getGuestTypeBadgeClasses } from '@/lib/utils'
 import { useReactToPrint } from 'react-to-print'
 import BadgePrint from '@/components/Badge'
 import BadgeTest from '@/components/BadgeTest'
@@ -61,6 +62,10 @@ import {
 import { BadgeTemplate } from '@/types/badge'
 import dynamic from 'next/dynamic'
 import React, { Suspense } from 'react'
+import Papa from 'papaparse';
+import { postAttendeesBatch } from '@/lib/api';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const QrReader = React.lazy(() =>
   import('@blackbox-vision/react-qr-reader').then((mod) => ({
@@ -121,6 +126,138 @@ export default function UsherEventManagement() {
   const [qrScanResult, setQrScanResult] = useState<string | null>(null)
   const [qrScanStatus, setQrScanStatus] = useState<string | null>(null)
   const [qrScannerOpen, setQrScannerOpen] = useState(false)
+
+  // CSV Upload State
+  const [csvRows, setCsvRows] = useState<any[]>([]);
+  const [csvErrors, setCsvErrors] = useState<any[]>([]);
+  const [csvLoading, setCsvLoading] = useState(false);
+  const [csvSuccess, setCsvSuccess] = useState<string | null>(null);
+  const [csvFailure, setCsvFailure] = useState<string | null>(null);
+  const [csvFileName, setCsvFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const requiredHeaders = [
+    'name',
+    'email',
+    'phone',
+    'company',
+    'jobtitle',
+    'gender',
+    'country',
+    'guest_type_name',
+  ];
+
+  const handleDownloadSampleCSV = () => {
+    const sample =
+      'name,email,phone,company,jobtitle,gender,country,guest_type_name\n' +
+      'John Doe,john@example.com,1234567890,Acme Corp,Manager,Male,USA,VIP\n';
+    const blob = new Blob([sample], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sample-attendees.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const validateEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const handleCSVFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCsvSuccess(null);
+    setCsvFailure(null);
+    setCsvErrors([]);
+    setCsvRows([]);
+    setCsvFileName(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvFileName(file.name);
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const rows = results.data as any[];
+        const errors: any[] = [];
+        // Check headers
+        const headers = results.meta.fields || [];
+        const missingHeaders = requiredHeaders.filter((h) => !headers.includes(h));
+        if (missingHeaders.length > 0) {
+          setCsvErrors([
+            { row: 'Header', error: `Missing headers: ${missingHeaders.join(', ')}` },
+          ]);
+          return;
+        }
+        // Validate rows
+        const validatedRows = rows.map((row, idx) => {
+          const rowErrors: string[] = [];
+          requiredHeaders.forEach((h) => {
+            if (!row[h] && ['name', 'email', 'guest_type_name'].includes(h)) {
+              rowErrors.push(`${h} is required`);
+            }
+          });
+          if (row.email && !validateEmail(row.email)) {
+            rowErrors.push('Invalid email format');
+          }
+          // Optionally: validate phone, gender, etc.
+          if (rowErrors.length > 0) {
+            errors.push({ row: idx + 2, error: rowErrors.join('; ') });
+          }
+          return row;
+        });
+        setCsvRows(validatedRows);
+        setCsvErrors(errors);
+      },
+      error: (err) => {
+        setCsvErrors([{ row: 'File', error: err.message }]);
+      },
+    });
+  };
+
+  const handleUploadCSV = async () => {
+    setCsvLoading(true);
+    setCsvSuccess(null);
+    setCsvFailure(null);
+    // Only send valid rows
+    const validRows = csvRows.filter((row, idx) =>
+      !csvErrors.some((err) => err.row === idx + 2)
+    );
+    if (validRows.length === 0) {
+      setCsvFailure('No valid rows to upload.');
+      setCsvLoading(false);
+      return;
+    }
+    // Map guest_type_name to guest_type_id
+    const guestTypeMap: Record<string, string> = {};
+    guestTypes.forEach((gt: any) => {
+      guestTypeMap[gt.name] = gt.id;
+    });
+    const attendees = validRows.map((row) => ({
+      ...row,
+      guest_type_id: guestTypeMap[row.guest_type_name],
+    }));
+    // Remove rows with missing guest_type_id
+    const finalAttendees = attendees.filter((a) => a.guest_type_id);
+    if (finalAttendees.length === 0) {
+      setCsvFailure('No valid guest_type_name found in uploaded rows.');
+      setCsvLoading(false);
+      return;
+    }
+    try {
+      const res = await postAttendeesBatch(eventId, finalAttendees);
+      setCsvSuccess(`Successfully uploaded ${res.data.created.length} attendees.`);
+      if (res.data.errors && res.data.errors.length > 0) {
+        setCsvErrors(res.data.errors.map((err: any) => ({ row: err.email, error: err.error })));
+      } else {
+        setCsvErrors([]);
+      }
+      setAttendees((prev) => [...prev, ...res.data.created]);
+    } catch (err: any) {
+      setCsvFailure(err.response?.data?.error || 'Failed to upload attendees.');
+    } finally {
+      setCsvLoading(false);
+    }
+  };
 
   const singlePrintRef = useRef<HTMLDivElement>(null)
   const printRef = useRef<HTMLDivElement>(null)
@@ -392,7 +529,7 @@ export default function UsherEventManagement() {
   }
 
   // Generate single badge
-  const generateBadge = (attendee: any) => {
+  const generateBadge = async (attendee: any) => {
     if (!validateBadgeTemplate(badgeTemplate)) {
       return
     }
@@ -406,33 +543,38 @@ export default function UsherEventManagement() {
       return
     }
 
-    setSinglePrintAttendee(attendee)
-
+    setSinglePrintAttendee(attendee);
     setTimeout(() => {
       if (singlePrintRef.current) {
-        const badgeElement = singlePrintRef.current.querySelector(
-          '.printable-badge-batch'
-        )
-        if (badgeElement && badgeElement.children.length > 0) {
-          singlePrintRef.current.style.visibility = 'visible'
-          handleSinglePrint()
-        } else {
+        const badgeElement = singlePrintRef.current.querySelector('.printable-badge-batch');
+        if (!badgeElement) {
           toast({
             title: 'Error',
-            description: 'Failed to generate badge. Please try again.',
+            description: 'No badge found to print.',
             variant: 'destructive',
-          })
-          setSinglePrintAttendee(null)
+          });
+          setSinglePrintAttendee(null);
+          return;
         }
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to generate badge. Please try again.',
-          variant: 'destructive',
-        })
-        setSinglePrintAttendee(null)
+        // Make sure the print area is visible and positioned correctly
+        singlePrintRef.current.style.visibility = 'visible';
+        singlePrintRef.current.style.position = 'absolute';
+        singlePrintRef.current.style.left = '0';
+        singlePrintRef.current.style.top = '0';
+        singlePrintRef.current.style.width = '100vw';
+        singlePrintRef.current.style.height = '100vh';
+        singlePrintRef.current.style.zIndex = '9999';
+        singlePrintRef.current.style.background = 'white';
+        
+        // Wait a bit more for badge to render, then print
+        setTimeout(() => {
+          window.print();
+          // Reset the print area after printing
+          singlePrintRef.current!.style.visibility = 'hidden';
+          setSinglePrintAttendee(null);
+        }, 500);
       }
-    }, 1500)
+    }, 300);
   }
 
   // Test badge
@@ -442,7 +584,7 @@ export default function UsherEventManagement() {
   }
 
   // Handle batch print badges
-  const handleBatchPrintBadges = () => {
+  const handleBatchPrintBadges = async () => {
     if (!validateBadgeTemplate(badgeTemplate)) {
       return
     }
@@ -471,33 +613,38 @@ export default function UsherEventManagement() {
       return
     }
 
-    setPrinting(true)
-
+    setPrinting(true);
     setTimeout(() => {
       if (printRef.current) {
-        const badgeElements = printRef.current.querySelectorAll(
-          '.printable-badge-batch'
-        )
-        if (badgeElements.length > 0) {
-          printRef.current.style.visibility = 'visible'
-          handlePrintBadges()
-        } else {
+        const badgeElements = Array.from(printRef.current.querySelectorAll('.printable-badge-batch'));
+        if (badgeElements.length === 0) {
           toast({
             title: 'Error',
-            description: 'Failed to print badges. Please try again.',
+            description: 'No badges found to print.',
             variant: 'destructive',
-          })
-          setPrinting(false)
+          });
+          setPrinting(false);
+          return;
         }
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to print badges. Please try again.',
-          variant: 'destructive',
-        })
-        setPrinting(false)
+        // Make sure the print area is visible and positioned correctly
+        printRef.current.style.visibility = 'visible';
+        printRef.current.style.position = 'absolute';
+        printRef.current.style.left = '0';
+        printRef.current.style.top = '0';
+        printRef.current.style.width = '100vw';
+        printRef.current.style.height = '100vh';
+        printRef.current.style.zIndex = '9999';
+        printRef.current.style.background = 'white';
+        
+        // Wait a bit more for badges to render, then print
+        setTimeout(() => {
+          window.print();
+          // Reset the print area after printing
+          printRef.current!.style.visibility = 'hidden';
+          setPrinting(false);
+        }, 500);
       }
-    }, 1500)
+    }, 300);
   }
 
   // Handler for QR scan
@@ -609,6 +756,18 @@ export default function UsherEventManagement() {
 
         {/* Attendees Tab */}
         <TabsContent value="attendees" className="space-y-4">
+          {/* Upload CSV button for attendees tab */}
+          <div className="flex flex-col items-start mb-2">
+            <Button
+              variant="default"
+              onClick={() => fileInputRef.current?.click()}
+              type="button"
+              className="mb-1"
+            >
+              Upload Attendees CSV
+            </Button>
+            <span className="text-xs text-gray-500">Upload a CSV file to add multiple attendees at once.</span>
+          </div>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -621,9 +780,10 @@ export default function UsherEventManagement() {
                     variant="outline"
                     onClick={handleBatchPrintBadges}
                     disabled={selectedAttendees.size === 0 || !badgeTemplate}
+                    className="flex items-center gap-2"
                   >
-                    <Printer className="mr-2 h-4 w-4" />
-                    Print Badges ({selectedAttendees.size})
+                    <Printer className="w-4 h-4" />
+                    Print Selected Badges
                   </Button>
                 </div>
               </CardTitle>
@@ -745,8 +905,8 @@ export default function UsherEventManagement() {
                             {attendee.guest?.company || 'N/A'}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">
-                              {attendee.guestType?.name || attendee.guest_type || 'N/A'}
+                            <Badge className={getGuestTypeBadgeClasses(attendee.guest_type?.name)}>
+                              {attendee.guest_type?.name || 'N/A'}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -772,7 +932,7 @@ export default function UsherEventManagement() {
                                 size="icon"
                                 onClick={() => generateBadge(attendee)}
                                 disabled={!badgeTemplate}
-                                title="Print badge"
+                                title="Print Badge"
                               >
                                 <Printer className="h-4 w-4" />
                               </Button>
@@ -799,6 +959,78 @@ export default function UsherEventManagement() {
 
         {/* Registration Tab */}
         <TabsContent value="registration" className="space-y-4">
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="w-5 h-5" />
+                Bulk Upload Attendees (CSV)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row md:items-center gap-4 mb-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCSVFile}
+                  className="hidden"
+                  disabled={csvLoading}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  type="button"
+                  disabled={csvLoading}
+                >
+                  Upload CSV
+                </Button>
+                <Button variant="outline" onClick={handleDownloadSampleCSV} type="button">
+                  Download Sample CSV
+                </Button>
+                {csvFileName && <span className="text-sm text-gray-600">{csvFileName}</span>}
+              </div>
+              {csvErrors.length > 0 && (
+                <div className="mb-2 text-red-600 text-sm">
+                  {csvErrors.map((err, i) => (
+                    <div key={i}>Row {err.row}: {err.error}</div>
+                  ))}
+                </div>
+              )}
+              {csvRows.length > 0 && (
+                <div className="overflow-x-auto mb-2">
+                  <table className="min-w-full text-xs border">
+                    <thead>
+                      <tr>
+                        {requiredHeaders.map((h) => (
+                          <th key={h} className="border px-2 py-1">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvRows.map((row, idx) => (
+                        <tr key={idx} className={csvErrors.some((err) => err.row === idx + 2) ? 'bg-red-50' : ''}>
+                          {requiredHeaders.map((h) => (
+                            <td key={h} className="border px-2 py-1">{row[h]}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {csvRows.length > 0 && (
+                <Button
+                  onClick={handleUploadCSV}
+                  disabled={csvLoading || csvErrors.length > 0}
+                  className="mt-2"
+                >
+                  {csvLoading ? 'Uploading...' : 'Confirm Upload'}
+                </Button>
+              )}
+              {csvSuccess && <div className="text-green-600 mt-2 text-sm">{csvSuccess}</div>}
+              {csvFailure && <div className="text-red-600 mt-2 text-sm">{csvFailure}</div>}
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1599,6 +1831,24 @@ export default function UsherEventManagement() {
         }}
         className="printable-badge-container"
       >
+        <style>{`
+          @media print {
+            body * { visibility: hidden !important; }
+            #single-print-area, #single-print-area * { visibility: visible !important; }
+            #single-print-area { 
+              position: absolute !important; 
+              left: 0; 
+              top: 0; 
+              width: 100vw; 
+              height: 100vh; 
+              background: white; 
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+          }
+        `}</style>
+        <div id="single-print-area">
         {singlePrintAttendee && (
           <div className="printable-badge-batch">
             <BadgePrint
@@ -1606,6 +1856,7 @@ export default function UsherEventManagement() {
             />
           </div>
         )}
+        </div>
       </div>
 
       {/* Hidden batch badge print area */}
@@ -1622,6 +1873,31 @@ export default function UsherEventManagement() {
         }}
         className="printable-badge-container"
       >
+        <style>{`
+          @media print {
+            body * { visibility: hidden !important; }
+            #batch-print-area, #batch-print-area * { visibility: visible !important; }
+            #batch-print-area { 
+              position: absolute !important; 
+              left: 0; 
+              top: 0; 
+              width: 100vw; 
+              height: 100vh; 
+              background: white; 
+            }
+            .printable-badge-batch {
+              page-break-after: always;
+              margin: 0;
+              padding: 0;
+              border: none;
+              box-shadow: none;
+            }
+            .printable-badge-batch:last-child {
+              page-break-after: auto;
+            }
+          }
+        `}</style>
+        <div id="batch-print-area">
         {printing &&
           attendees
             .filter((attendee) => selectedAttendees.has(attendee.id))
@@ -1630,6 +1906,7 @@ export default function UsherEventManagement() {
                 <BadgePrint attendee={attendee} />
               </div>
             ))}
+        </div>
       </div>
 
       {/* Test badge display */}

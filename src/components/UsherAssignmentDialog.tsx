@@ -33,9 +33,6 @@ interface UsherAssignmentDialogProps {
 interface UsherAssignment {
   usherId: string
   tasks: string
-  dailyRate: string
-  fromDate: string
-  toDate: string
 }
 
 export function UsherAssignmentDialog({
@@ -49,7 +46,7 @@ export function UsherAssignmentDialog({
   const [loading, setLoading] = useState(false)
   const [assigning, setAssigning] = useState(false)
   const [usherAssignments, setUsherAssignments] = useState<UsherAssignment[]>([
-    { usherId: '', tasks: '', dailyRate: '', fromDate: '', toDate: '' },
+    { usherId: '', tasks: '' },
   ])
   const [assignedUshers, setAssignedUshers] = useState<any[]>([])
   const { user } = useAuth()
@@ -86,7 +83,7 @@ export function UsherAssignmentDialog({
   }
 
   const handleAddUsher = () => {
-    setUsherAssignments([...usherAssignments, { usherId: '', tasks: '', dailyRate: '', fromDate: '', toDate: '' }])
+    setUsherAssignments([...usherAssignments, { usherId: '', tasks: '' }])
   }
 
   const handleRemoveUsher = (index: number) => {
@@ -106,68 +103,53 @@ export function UsherAssignmentDialog({
     updated[index].tasks = tasks
     setUsherAssignments(updated)
   }
-  const handleDailyRateChange = (index: number, dailyRate: string) => {
-    const updated = [...usherAssignments]
-    updated[index].dailyRate = dailyRate
-    setUsherAssignments(updated)
-  }
-  const handleFromDateChange = (index: number, fromDate: string) => {
-    const updated = [...usherAssignments]
-    updated[index].fromDate = fromDate
-    setUsherAssignments(updated)
-  }
-  const handleToDateChange = (index: number, toDate: string) => {
-    const updated = [...usherAssignments]
-    updated[index].toDate = toDate
-    setUsherAssignments(updated)
-  }
 
   const handleAssign = async () => {
-    // Validate assignments
-    const validAssignments = usherAssignments.filter(
-      (assignment) =>
-        assignment.usherId &&
-        assignment.tasks.trim() &&
-        assignment.dailyRate &&
-        assignment.fromDate &&
-        assignment.toDate
-    )
-
-    if (validAssignments.length === 0) {
-      toast.error('Please fill all fields for each usher (usher, tasks, daily rate, and date range)')
-      return
+    // Validate all assignments before proceeding
+    const invalidAssignment = usherAssignments.find((assignment) => {
+      if (!assignment.usherId) return true;
+      return false;
+    });
+    if (invalidAssignment) {
+      toast.error('Please select an usher for each assignment.');
+      return;
     }
-
-    setAssigning(true)
+    setAssigning(true);
     try {
-      const ushers = validAssignments.map((assignment) => ({
-        id: Number(assignment.usherId),
-        tasks: assignment.tasks
-          .split(',')
-          .map((task) => task.trim())
-          .filter(Boolean),
-        daily_rate: assignment.dailyRate,
-        from_date: assignment.fromDate,
-        to_date: assignment.toDate,
-      }))
-      // Debug log: show payload being sent
-      console.log('Assigning ushers payload:', ushers);
-
-      await assignUshersToEvent(eventId, ushers)
-      toast.success('Ushers assigned successfully!')
-      setOpen(false)
-      setUsherAssignments([{ usherId: '', tasks: '', dailyRate: '', fromDate: '', toDate: '' }])
-      onSuccess?.()
-    } catch (error: any) {
-      console.error('Failed to assign ushers:', error)
-      toast.error(error.response?.data?.error || 'Failed to assign ushers')
+      const payload = {
+        ushers: usherAssignments.map((assignment) => ({
+          id: Number(assignment.usherId),
+          tasks: assignment.tasks
+            .split(',')
+            .map((task) => task.trim())
+            .filter(Boolean),
+        })),
+      };
+        const response = await api.post(`/events/${eventId}/ushers`, payload);
+        if (response.status >= 200 && response.status < 300) {
+          toast.success('Ushers assigned successfully!');
+          setOpen(false);
+        setUsherAssignments([{ usherId: '', tasks: '' }]);
+          onSuccess?.();
+          return;
+        }
+        throw new Error(`Unexpected response status: ${response.status}`);
+      } catch (error: any) {
+        let errorMessage = 'Failed to assign ushers';
+        if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.response?.data?.error) {
+          errorMessage = error.response.data.error;
+        }
+        toast.error(errorMessage);
+      throw error;
     } finally {
-      setAssigning(false)
+      setAssigning(false);
     }
   }
 
   const isFormValid = usherAssignments.some(
-    (assignment) => assignment.usherId && assignment.tasks.trim() && assignment.dailyRate && assignment.fromDate && assignment.toDate
+    (assignment) => assignment.usherId && assignment.tasks.trim()
   )
 
   return (
@@ -266,40 +248,6 @@ export function UsherAssignmentDialog({
                     value={assignment.tasks}
                     onChange={e => handleTasksChange(index, e.target.value)}
                     rows={2}
-                    required
-                  />
-                </div>
-                <div className="flex-1">
-                  <Label>Daily Rate (ETB)</Label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="w-full border rounded px-2 py-1"
-                    placeholder="e.g. 500"
-                    value={assignment.dailyRate}
-                    onChange={e => handleDailyRateChange(index, e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col md:flex-row gap-2">
-                <div className="flex-1">
-                  <Label>From Date</Label>
-                  <input
-                    type="date"
-                    className="w-full border rounded px-2 py-1"
-                    value={assignment.fromDate}
-                    onChange={e => handleFromDateChange(index, e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="flex-1">
-                  <Label>To Date</Label>
-                  <input
-                    type="date"
-                    className="w-full border rounded px-2 py-1"
-                    value={assignment.toDate}
-                    onChange={e => handleToDateChange(index, e.target.value)}
                     required
                   />
                 </div>

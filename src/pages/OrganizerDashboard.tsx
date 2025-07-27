@@ -11,6 +11,10 @@ import {
   Trash2,
   X,
   UserPlus,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Calendar as CalendarIcon2,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { MetricCard } from '@/components/MetricCard'
@@ -18,7 +22,7 @@ import { DashboardCard } from '@/components/DashboardCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend, Brush } from 'recharts'
 import { Link, useOutletContext, useNavigate } from 'react-router-dom'
 import api from '@/lib/api'
 import { Calendar } from '@/components/ui/calendar'
@@ -55,6 +59,11 @@ export default function OrganizerDashboard() {
   // Real-time chart data state
   const [guestTypeDistribution, setGuestTypeDistribution] = useState<any[]>([]);
   const [eventPopularity, setEventPopularity] = useState<any[]>([]);
+
+  // Event Performance Chart Zoom State
+  const [chartZoomLevel, setChartZoomLevel] = useState<'3months' | '6months' | '1year'>('3months');
+  const [showDetailedChart, setShowDetailedChart] = useState(false);
+  const [selectedTimeRange, setSelectedTimeRange] = useState<[number, number]>([0, 0]);
 
   // Add edit event dialog state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -288,9 +297,13 @@ export default function OrganizerDashboard() {
         ]);
         // Guest type distribution
         if (summaryRes.data.guest_type_breakdown) {
-          setGuestTypeDistribution(
-            Object.entries(summaryRes.data.guest_type_breakdown).map(([name, value]) => ({ name, value }))
-          );
+          const processedData = Object.entries(summaryRes.data.guest_type_breakdown)
+            .map(([name, value]) => ({ 
+              name: name || 'Unknown', 
+              value: typeof value === 'number' ? value : parseInt(value) || 0 
+            }))
+            .filter(item => item.value > 0); // Only include items with positive values
+          setGuestTypeDistribution(processedData);
         } else {
           setGuestTypeDistribution([]);
         }
@@ -337,6 +350,21 @@ export default function OrganizerDashboard() {
 
   const { keyMetrics, eventPerformance, myEvents, recentMessages, upcomingTasks, events, ushers } = dashboardData
 
+  // Helper function to get chart data based on zoom level
+  const getChartDataByZoomLevel = (data: any[], level: '3months' | '6months' | '1year') => {
+    const monthsMap = {
+      '3months': 3,
+      '6months': 6,
+      '1year': 12
+    };
+    
+    const monthsToShow = monthsMap[level];
+    return data.slice(-monthsToShow);
+  };
+
+  // Get current chart data based on zoom level
+  const currentChartData = getChartDataByZoomLevel(eventPerformance || [], chartZoomLevel);
+
   // Filtered events/messages by search
   const filteredEvents = searchQuery && myEvents
     ? myEvents.filter((event: any) => event.name?.toLowerCase().includes(searchQuery.toLowerCase()) || event.description?.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -347,26 +375,91 @@ export default function OrganizerDashboard() {
 
   // Modern dashboard layout
   return (
-    <div className="space-y-8">
-      {/* Welcome header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+      {/* Welcome Header */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+            <CalendarIcon className="w-6 h-6 text-white" />
+          </div>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
             Welcome{user && (user as any).name ? `, ${(user as any).name}` : ''}!
           </h1>
-          <p className="text-gray-500">Today is {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            <p className="text-gray-600">
+              Today is {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </p>
         </div>
-        <div className="flex gap-2 mt-2 md:mt-0">
-          <Link to="/dashboard/events/create"><Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white"><UserPlus className="w-4 h-4 mr-2" />Create New Event</Button></Link>
+        </div>
+        
+        {/* Quick Actions */}
+        <div className="flex gap-3 mt-6">
+          <Link to="/dashboard/events/create">
+            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg">
+              <UserPlus className="w-4 h-4 mr-2" />
+              Create New Event
+            </Button>
+          </Link>
         </div>
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard title="My Events" value={keyMetrics?.myEvents?.value || 'N/A'} icon={<CalendarIcon className="w-6 h-6 text-blue-600" />} trend={keyMetrics?.myEvents?.trend} />
-        <MetricCard title="Total Attendees" value={keyMetrics?.totalAttendees?.value || 'N/A'} icon={<Users className="w-6 h-6 text-purple-600" />} trend={keyMetrics?.totalAttendees?.trend} />
-        <MetricCard title="Total Revenue" value={keyMetrics?.totalRevenue?.value || 'N/A'} icon={<DollarSign className="w-6 h-6 text-green-600" />} trend={keyMetrics?.totalRevenue?.trend} />
-        <MetricCard title="Unread Messages" value={keyMetrics?.unreadMessages?.value || 'N/A'} icon={<MessageSquare className="w-6 h-6 text-orange-600" />} />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-all duration-300">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                <CalendarIcon className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-sm font-medium text-gray-600">My Events</div>
+            </div>
+            <div className="text-3xl font-bold text-gray-900 mb-1">{keyMetrics?.myEvents?.value || 'N/A'}</div>
+            <div className="text-xs text-gray-500">Organized events</div>
+          </div>
+        </div>
+
+        <div className="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-all duration-300">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <Users className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-sm font-medium text-gray-600">Total Attendees</div>
+            </div>
+            <div className="text-3xl font-bold text-gray-900 mb-1">{keyMetrics?.totalAttendees?.value || 'N/A'}</div>
+            <div className="text-xs text-gray-500">All participants</div>
+          </div>
+        </div>
+
+        <div className="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-all duration-300">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-sm font-medium text-gray-600">Total Revenue</div>
+            </div>
+            <div className="text-3xl font-bold text-gray-900 mb-1">{keyMetrics?.totalRevenue?.value || 'N/A'}</div>
+            <div className="text-xs text-gray-500">Event earnings</div>
+          </div>
+        </div>
+
+        <div className="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-all duration-300">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-orange-500 to-orange-600 opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-sm font-medium text-gray-600">Unread Messages</div>
+            </div>
+            <div className="text-3xl font-bold text-gray-900 mb-1">{keyMetrics?.unreadMessages?.value || 'N/A'}</div>
+            <div className="text-xs text-gray-500">Pending messages</div>
+          </div>
+        </div>
       </div>
 
       {/* Main content grid */}
@@ -374,37 +467,171 @@ export default function OrganizerDashboard() {
         {/* Left: Events, Tasks, Ushers */}
         <div className="lg:col-span-2 flex flex-col gap-8">
           {/* Event Performance Chart */}
-          <DashboardCard title="Event Performance (Registrations & Attendance)">
-            <div className="w-full h-[250px] sm:h-[300px]">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Event Performance</h3>
+                <p className="text-sm text-gray-600">
+                  Registrations & Attendance Trends - Last {chartZoomLevel === '3months' ? '3' : chartZoomLevel === '6months' ? '6' : '12'} months
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Zoom Controls */}
+                <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setChartZoomLevel('3months')}
+                    className={`h-8 px-3 text-xs ${chartZoomLevel === '3months' ? 'bg-white shadow-sm' : 'hover:bg-gray-100'}`}
+                  >
+                    3M
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setChartZoomLevel('6months')}
+                    className={`h-8 px-3 text-xs ${chartZoomLevel === '6months' ? 'bg-white shadow-sm' : 'hover:bg-gray-100'}`}
+                  >
+                    6M
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setChartZoomLevel('1year')}
+                    className={`h-8 px-3 text-xs ${chartZoomLevel === '1year' ? 'bg-white shadow-sm' : 'hover:bg-gray-100'}`}
+                  >
+                    1Y
+                  </Button>
+                </div>
+                
+                {/* Detailed View Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDetailedChart(true)}
+                  className="bg-white border-gray-200 hover:bg-gray-50"
+                >
+                  <Maximize2 className="w-4 h-4 mr-1" />
+                  Details
+                </Button>
+                
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                  <CalendarIcon className="w-4 h-4 text-white" />
+                </div>
+              </div>
+            </div>
+            
+            <div className="w-full h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={eventPerformance} margin={{ top: 16, right: 16, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <RechartsTooltip />
-                  <Area type="monotone" dataKey="registrations" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.6} name="Registrations" />
-                  <Area type="monotone" dataKey="attendance" stackId="2" stroke="#10b981" fill="#10b981" fillOpacity={0.6} name="Attendance" />
+                <AreaChart data={currentChartData}>
+                  <defs>
+                    <linearGradient id="registrationGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="attendanceGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="month" 
+                    stroke="#64748b"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    stroke="#64748b"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <RechartsTooltip 
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="registrations" 
+                    stackId="1" 
+                    stroke="#3b82f6" 
+                    fill="url(#registrationGradient)" 
+                    name="Registrations" 
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="attendance" 
+                    stackId="2" 
+                    stroke="#10b981" 
+                    fill="url(#attendanceGradient)" 
+                    name="Attendance" 
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-          </DashboardCard>
+            
+            {/* Chart Summary */}
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div className="bg-blue-50 rounded-lg p-3">
+                <div className="text-sm font-medium text-blue-700">Total Registrations</div>
+                <div className="text-lg font-bold text-blue-900">
+                  {currentChartData.reduce((sum, item) => sum + (item.registrations || 0), 0)}
+                </div>
+              </div>
+              <div className="bg-green-50 rounded-lg p-3">
+                <div className="text-sm font-medium text-green-700">Total Attendance</div>
+                <div className="text-lg font-bold text-green-900">
+                  {currentChartData.reduce((sum, item) => sum + (item.attendance || 0), 0)}
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Upcoming Events (Realtime) */}
-          <DashboardCard title="Upcoming Events (Realtime)">
-            {eventsLoading && <div className="text-center py-8">Loading events...</div>}
-            {eventsError && <div className="text-center py-8 text-red-500">{eventsError}</div>}
-            {/* Table for desktop, cards for mobile */}
-            <div className="hidden lg:block bg-white shadow-lg rounded-xl overflow-x-auto p-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Upcoming Events</h3>
+                <p className="text-sm text-gray-600">Real-time event monitoring</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                <Clock className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            
+            {eventsLoading && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3"></div>
+                <div className="text-sm text-gray-600">Loading events...</div>
+              </div>
+            )}
+            {eventsError && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mb-3">
+                  <Clock className="w-4 h-4 text-red-600" />
+                </div>
+                <div className="text-sm text-red-600">{eventsError}</div>
+              </div>
+            )}
+            
+            {/* Table for desktop */}
+            <div className="hidden lg:block overflow-x-auto">
               <Table className="min-w-full">
-                <TableHeader className="sticky top-0 bg-white z-10">
-                  <TableRow>
-                    <TableHead className="font-bold text-gray-700 text-base">Name</TableHead>
-                    <TableHead className="font-bold text-gray-700 text-base">Status</TableHead>
-                    <TableHead className="font-bold text-gray-700 text-base">Date</TableHead>
-                    <TableHead className="font-bold text-gray-700 text-base">Location</TableHead>
-                    <TableHead className="font-bold text-gray-700 text-base">Attendees</TableHead>
-                    <TableHead className="font-bold text-gray-700 text-base">Registration Progress</TableHead>
-                    <TableHead className="font-bold text-gray-700 text-base">Actions</TableHead>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Name</TableHead>
+                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Date</TableHead>
+                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Location</TableHead>
+                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Attendees</TableHead>
+                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Progress</TableHead>
+                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -419,25 +646,27 @@ export default function OrganizerDashboard() {
                         100
                       );
                       return (
-                        <TableRow key={event.id} className="hover:bg-blue-50 transition-colors group text-gray-900">
-                          <TableCell className="font-semibold text-base group-hover:text-blue-700 transition-colors">{event.name}</TableCell>
-                          <TableCell><Badge className={getStatusColor(event.status)}>{event.status}</Badge></TableCell>
-                          <TableCell>{event.date} {event.time}</TableCell>
-                          <TableCell>{event.location || 'Convention Center'}</TableCell>
-                          <TableCell>{attendeeCount}/{attendeeLimit}</TableCell>
-                          <TableCell>
+                        <TableRow key={event.id} className="hover:bg-gray-50 transition-colors group border-b border-gray-100">
+                          <TableCell className="font-medium text-gray-900 py-4 group-hover:text-blue-700 transition-colors">{event.name}</TableCell>
+                          <TableCell className="py-4">
+                            <Badge className={`${getStatusColor(event.status)} text-xs font-medium`}>{event.status}</Badge>
+                          </TableCell>
+                          <TableCell className="text-gray-600 py-4">{event.date} {event.time}</TableCell>
+                          <TableCell className="text-gray-600 py-4">{event.location || 'Convention Center'}</TableCell>
+                          <TableCell className="text-gray-600 py-4">{attendeeCount}/{attendeeLimit}</TableCell>
+                          <TableCell className="py-4">
                             <div className="flex flex-col gap-1">
                               <div className="flex justify-between text-xs text-gray-500 mb-1">
                                 <span>{registrationProgress}%</span>
                               </div>
                               <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div className="h-2 bg-purple-400 rounded-full" style={{ width: `${registrationProgress}%` }}></div>
+                                <div className="h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300" style={{ width: `${registrationProgress}%` }}></div>
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="outline" onClick={() => navigate(`/dashboard/events/${event.id}`)}>
-                              <Eye className="w-4 h-4" /> View Details
+                          <TableCell className="py-4">
+                            <Button size="sm" variant="outline" className="bg-white border-gray-200 hover:bg-gray-50" onClick={() => navigate(`/dashboard/events/${event.id}`)}>
+                              <Eye className="w-4 h-4 mr-2" /> View Details
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -445,14 +674,20 @@ export default function OrganizerDashboard() {
                     })}
                   {allEvents.filter(event => event.status === 'active' || event.status === 'upcoming').length === 0 && !eventsLoading && !eventsError && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-gray-400">No upcoming events.</TableCell>
+                      <TableCell colSpan={7} className="text-center py-12 text-gray-400">
+                        <div className="flex flex-col items-center">
+                          <Clock className="w-8 h-8 text-gray-300 mb-2" />
+                          <span>No upcoming events</span>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
               </Table>
             </div>
+            
             {/* Card view for mobile/tablet */}
-            <div className="lg:hidden flex flex-col gap-4">
+            <div className="lg:hidden space-y-4">
               {allEvents
                 .filter(event => event.status === 'active' || event.status === 'upcoming')
                 .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -464,114 +699,240 @@ export default function OrganizerDashboard() {
                     100
                   );
                   return (
-                    <div key={event.id} className="rounded-lg border bg-white shadow-sm p-4 flex flex-col gap-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-blue-600 text-lg">{event.name}</span>
-                        <Badge className={getStatusColor(event.status)}>{event.status}</Badge>
+                    <div key={event.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900 text-sm mb-1">{event.name}</h4>
+                          <p className="text-xs text-gray-600">{event.date} {event.time} • {event.location || 'Convention Center'}</p>
                       </div>
-                      <div className="text-sm text-gray-500">{event.date} {event.time} • {event.location || 'Convention Center'}</div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Users className="w-4 h-4 text-gray-400" />
+                        <Badge className={`${getStatusColor(event.status)} text-xs font-medium ml-3`}>{event.status}</Badge>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-600 mb-3">
+                        <div className="w-5 h-5 bg-purple-100 rounded-lg flex items-center justify-center">
+                          <Users className="w-3 h-3 text-purple-600" />
+                        </div>
                         <span>{attendeeCount}/{attendeeLimit} Attendees</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm">
+                      <div className="mb-3">
+                        <div className="flex justify-between text-xs text-gray-500 mb-1">
                         <span>Progress:</span>
                         <span>{registrationProgress}%</span>
-                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div className="h-2 bg-purple-400 rounded-full" style={{ width: `${registrationProgress}%` }}></div>
                         </div>
+                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300" style={{ width: `${registrationProgress}%` }}></div>
                       </div>
-                      <div className="flex gap-2 mt-2">
-                        <Button size="sm" variant="outline" className="flex-1" onClick={() => navigate(`/dashboard/events/${event.id}`)}>
-                          <Eye className="w-4 h-4" /> View
+                      </div>
+                      <Button size="sm" variant="outline" className="w-full bg-white border-gray-200 hover:bg-gray-50" onClick={() => navigate(`/dashboard/events/${event.id}`)}>
+                        <Eye className="w-4 h-4 mr-2" /> View Details
                         </Button>
-                      </div>
                     </div>
                   );
                 })}
               {allEvents.filter(event => event.status === 'active' || event.status === 'upcoming').length === 0 && !eventsLoading && !eventsError && (
-                <div className="text-center py-8 text-gray-400">No upcoming events.</div>
+                <div className="text-center py-12 text-gray-400">
+                  <Clock className="w-8 h-8 mx-auto mb-2" />
+                  <span>No upcoming events</span>
+                </div>
               )}
             </div>
-          </DashboardCard>
+          </div>
 
           {/* Tasks & Ushers */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <DashboardCard title="Upcoming Tasks">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Upcoming Tasks</h3>
+                  <p className="text-sm text-gray-600">Task management</p>
+                </div>
+                <div className="w-8 h-8 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
+                  <Clock className="w-4 h-4 text-white" />
+                </div>
+              </div>
               <div className="space-y-3">
-                {upcomingTasks?.length === 0 && <div className="text-gray-400">No upcoming tasks.</div>}
+                {upcomingTasks?.length === 0 && (
+                  <div className="text-center py-8 text-gray-400">
+                    <Clock className="w-8 h-8 mx-auto mb-2" />
+                    <span>No upcoming tasks</span>
+                  </div>
+                )}
                 {upcomingTasks?.map((task: any) => (
-                  <div key={task.id} className="flex justify-between items-center p-3 rounded-lg bg-gray-50">
-                    <span className="font-medium">{task.title}</span>
-                    <Badge variant="secondary">{task.dueDate}</Badge>
+                  <div key={task.id} className="flex justify-between items-center p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <span className="font-medium text-gray-900">{task.title}</span>
+                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">{task.dueDate}</Badge>
                   </div>
                 ))}
               </div>
-            </DashboardCard>
-            <DashboardCard title="My Ushers">
-              <ul className="divide-y divide-gray-200">
-                {/* Only show ushers assigned to this organizer by admin (i.e., with correct organizer_id and role) */}
+            </div>
+            
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">My Ushers</h3>
+                  <p className="text-sm text-gray-600">Assigned team members</p>
+                </div>
+                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                  <Users className="w-4 h-4 text-white" />
+                </div>
+              </div>
+              <div className="space-y-3">
                 {ushers?.filter((usher: any) => usher.organizer_id === user?.organizer_id && usher.role === 'usher')?.length === 0 && (
-                  <li className="py-2 text-gray-500">No ushers found.</li>
+                  <div className="text-center py-8 text-gray-400">
+                    <Users className="w-8 h-8 mx-auto mb-2" />
+                    <span>No ushers found</span>
+                  </div>
                 )}
                 {ushers?.filter((usher: any) => usher.organizer_id === user?.organizer_id && usher.role === 'usher')?.map((usher: any) => (
-                  <li key={usher.id} className="py-2 flex justify-between items-center">
-                    <span>{usher.name} <span className="text-xs text-gray-400">({usher.email})</span></span>
-                  </li>
+                  <div key={usher.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
+                    <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm font-medium">{usher.name.charAt(0)}</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">{usher.name}</div>
+                      <div className="text-xs text-gray-500">{usher.email}</div>
+                    </div>
+                  </div>
                 ))}
-              </ul>
-            </DashboardCard>
           </div>
         </div>
-        {/* Right: Calendar, Recent Activity */}
+          </div>
+        </div>
+        {/* Right: Charts and Activity */}
         <div className="flex flex-col gap-8">
           {/* Pie Chart for Guest Type Distribution */}
-          <DashboardCard title="Guest Type Distribution">
-            <div className="w-full h-[200px] sm:h-[250px]">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Guest Type Distribution</h3>
+                <p className="text-sm text-gray-600">Attendee categories</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Users className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            <div className="w-full h-[250px]">
+              {guestTypeDistribution.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={guestTypeDistribution.length > 0 ? guestTypeDistribution : []}
+                      data={guestTypeDistribution}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
                     cy="50%"
+                      innerRadius={40}
                     outerRadius={80}
-                    label
-                  >
-                    {['#3b82f6', '#10b981', '#f59e42', '#a21caf', '#ef4444', '#6366f1'].map((color, idx) => (
+                      label={({ name, value, percent }) => {
+                        // Only show labels for segments with > 5% or if it's a small number of segments
+                        if (percent > 0.05 || guestTypeDistribution.length <= 3) {
+                          return `${name} ${(percent * 100).toFixed(0)}%`;
+                        }
+                        return '';
+                      }}
+                      labelLine={false}
+                    >
+                      {['#3b82f6', '#10b981', '#f59e42', '#a21caf', '#ef4444', '#6366f1', '#8b5cf6', '#06b6d4'].map((color, idx) => (
                       <Cell key={idx} fill={color} />
                     ))}
                   </Pie>
-                  <Legend />
+                    <RechartsTooltip 
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
                 </PieChart>
               </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Users className="w-8 h-8 text-gray-400" />
             </div>
-          </DashboardCard>
+                    <p className="text-sm text-gray-500">No guest type data available</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          
           {/* Bar Chart for Event Popularity */}
-          <DashboardCard title="Event Popularity">
-            <div className="w-full h-[200px] sm:h-[250px]">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Event Popularity</h3>
+                <p className="text-sm text-gray-600">Most attended events</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                <BarChart className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            <div className="w-full h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={eventPopularity.length > 0 ? eventPopularity : []}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <RechartsTooltip />
-                  <Legend />
-                  <Bar dataKey="attendees" fill="#3b82f6" name="Attendees" />
+                  <defs>
+                    <linearGradient id="popularityGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="#64748b"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    stroke="#64748b"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <RechartsTooltip 
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                  />
+                  <Bar 
+                    dataKey="attendees" 
+                    fill="url(#popularityGradient)" 
+                    name="Attendees"
+                    radius={[4, 4, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </DashboardCard>
+          </div>
           {/* Recent Activity / Messages */}
-          <DashboardCard title="Recent Activity">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
+                <p className="text-sm text-gray-600">Latest messages and updates</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg flex items-center justify-center">
+                <MessageSquare className="w-4 h-4 text-white" />
+              </div>
+            </div>
             <div className="space-y-4">
-              {filteredMessages?.length === 0 && <div className="text-gray-400">No recent messages.</div>}
+              {filteredMessages?.length === 0 && (
+                <div className="text-center py-8 text-gray-400">
+                  <MessageSquare className="w-8 h-8 mx-auto mb-2" />
+                  <span>No recent messages</span>
+                </div>
+              )}
               {filteredMessages?.map((message: any) => (
-                <div key={message.id} className="flex items-start gap-4">
+                <div key={message.id} className="flex items-start gap-4 p-3 rounded-lg bg-gray-50 border border-gray-100">
                   {message.unread && <div className="w-2.5 h-2.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>}
                   <div className={!message.unread ? 'ml-5' : ''}>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 mb-1">
                       <p className="font-semibold text-gray-900">{message.from}</p>
                       <p className="text-xs text-gray-500">{message.time}</p>
                     </div>
@@ -581,21 +942,31 @@ export default function OrganizerDashboard() {
               ))}
             </div>
             <Link to="/messages" className="block mt-4" tabIndex={-1} aria-disabled="true" title="Coming Soon!" onClick={e => e.preventDefault()}>
-              <Button variant="outline" size="sm" className="w-full">Messages (Coming Soon)</Button>
+              <Button variant="outline" size="sm" className="w-full bg-white border-gray-200 hover:bg-gray-50">Messages (Coming Soon)</Button>
             </Link>
-          </DashboardCard>
+          </div>
+          
           {/* Quick Actions */}
-          <DashboardCard title="Quick Actions">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
+                <p className="text-sm text-gray-600">Common tasks</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg flex items-center justify-center">
+                <MapPin className="w-4 h-4 text-white" />
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Link
                 to="/dashboard/locate-badges"
-                className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
+                className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 transition-all duration-200"
               >
                 <MapPin className="w-8 h-8 mx-auto mb-2 text-blue-600" />
-                <span className="font-medium">Locate Badges</span>
+                <span className="font-medium text-gray-900">Locate Badges</span>
               </Link>
             </div>
-          </DashboardCard>
+          </div>
         </div>
       </div>
 
@@ -658,6 +1029,214 @@ export default function OrganizerDashboard() {
         </DialogContent>
       </Dialog>
       {/* Edit Event Dialog removed */}
+
+      {/* Detailed Event Performance Chart Modal */}
+      <Dialog open={showDetailedChart} onOpenChange={setShowDetailedChart}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarIcon2 className="w-5 h-5" />
+              Detailed Event Performance Analysis
+            </DialogTitle>
+            <DialogDescription>
+              Comprehensive view of registrations and attendance trends with interactive zoom capabilities
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Zoom Controls */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700">Time Range:</span>
+                <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setChartZoomLevel('3months')}
+                    className={`h-8 px-3 text-xs ${chartZoomLevel === '3months' ? 'bg-white shadow-sm' : 'hover:bg-gray-100'}`}
+                  >
+                    3 Months
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setChartZoomLevel('6months')}
+                    className={`h-8 px-3 text-xs ${chartZoomLevel === '6months' ? 'bg-white shadow-sm' : 'hover:bg-gray-100'}`}
+                  >
+                    6 Months
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setChartZoomLevel('1year')}
+                    className={`h-8 px-3 text-xs ${chartZoomLevel === '1year' ? 'bg-white shadow-sm' : 'hover:bg-gray-100'}`}
+                  >
+                    1 Year
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="text-sm text-gray-600">
+                Showing {currentChartData.length} data points
+              </div>
+            </div>
+
+            {/* Detailed Chart */}
+            <div className="w-full h-[500px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={currentChartData}>
+                  <defs>
+                    <linearGradient id="detailedRegistrationGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="detailedAttendanceGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis 
+                    dataKey="month" 
+                    stroke="#64748b"
+                    fontSize={14}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis 
+                    stroke="#64748b"
+                    fontSize={14}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <RechartsTooltip 
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+                      padding: '12px'
+                    }}
+                    labelStyle={{
+                      fontWeight: 'bold',
+                      color: '#374151'
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="registrations" 
+                    stackId="1" 
+                    stroke="#3b82f6" 
+                    strokeWidth={3}
+                    fill="url(#detailedRegistrationGradient)" 
+                    name="Registrations" 
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="attendance" 
+                    stackId="2" 
+                    stroke="#10b981" 
+                    strokeWidth={3}
+                    fill="url(#detailedAttendanceGradient)" 
+                    name="Attendance" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Detailed Statistics */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                <div className="text-sm font-medium text-blue-700">Total Registrations</div>
+                <div className="text-2xl font-bold text-blue-900">
+                  {currentChartData.reduce((sum, item) => sum + (item.registrations || 0), 0)}
+                </div>
+                <div className="text-xs text-blue-600 mt-1">All time periods</div>
+              </div>
+              
+              <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+                <div className="text-sm font-medium text-green-700">Total Attendance</div>
+                <div className="text-2xl font-bold text-green-900">
+                  {currentChartData.reduce((sum, item) => sum + (item.attendance || 0), 0)}
+                </div>
+                <div className="text-xs text-green-600 mt-1">All time periods</div>
+              </div>
+              
+              <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+                <div className="text-sm font-medium text-purple-700">Avg. Attendance Rate</div>
+                <div className="text-2xl font-bold text-purple-900">
+                  {(() => {
+                    const totalReg = currentChartData.reduce((sum, item) => sum + (item.registrations || 0), 0);
+                    const totalAtt = currentChartData.reduce((sum, item) => sum + (item.attendance || 0), 0);
+                    return totalReg > 0 ? Math.round((totalAtt / totalReg) * 100) : 0;
+                  })()}%
+                </div>
+                <div className="text-xs text-purple-600 mt-1">Attendance/Registration</div>
+              </div>
+              
+              <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
+                <div className="text-sm font-medium text-orange-700">Peak Month</div>
+                <div className="text-lg font-bold text-orange-900">
+                  {(() => {
+                    const peakMonth = currentChartData.reduce((max, item) => 
+                      (item.registrations || 0) > (max.registrations || 0) ? item : max
+                    );
+                    return peakMonth?.month || 'N/A';
+                  })()}
+                </div>
+                <div className="text-xs text-orange-600 mt-1">Highest registrations</div>
+              </div>
+            </div>
+
+            {/* Monthly Breakdown Table */}
+            <div className="bg-gray-50 rounded-xl p-4">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4">Monthly Breakdown</h4>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-white">
+                      <TableHead className="font-semibold text-gray-700">Month</TableHead>
+                      <TableHead className="font-semibold text-gray-700">Registrations</TableHead>
+                      <TableHead className="font-semibold text-gray-700">Attendance</TableHead>
+                      <TableHead className="font-semibold text-gray-700">Attendance Rate</TableHead>
+                      <TableHead className="font-semibold text-gray-700">Trend</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {currentChartData.map((item, index) => {
+                      const attendanceRate = item.registrations > 0 ? Math.round((item.attendance / item.registrations) * 100) : 0;
+                      const prevItem = index > 0 ? currentChartData[index - 1] : null;
+                      const trend = prevItem ? 
+                        (item.registrations > prevItem.registrations ? '↗️' : 
+                         item.registrations < prevItem.registrations ? '↘️' : '→') : '→';
+                      
+                      return (
+                        <TableRow key={item.month} className="hover:bg-white">
+                          <TableCell className="font-medium text-gray-900">{item.month}</TableCell>
+                          <TableCell className="text-blue-600 font-semibold">{item.registrations}</TableCell>
+                          <TableCell className="text-green-600 font-semibold">{item.attendance}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="text-sm font-semibold text-gray-700">{attendanceRate}%</div>
+                              <div className="w-16 bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className="bg-green-500 h-2 rounded-full" 
+                                  style={{ width: `${attendanceRate}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-lg">{trend}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

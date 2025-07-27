@@ -325,8 +325,12 @@ export default function UsherManagement() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading usher management...</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+          <div className="text-lg font-medium text-gray-600">Loading usher management...</div>
+          <div className="text-sm text-gray-500 mt-2">Gathering usher data and assignments</div>
+        </div>
       </div>
     )
   }
@@ -344,65 +348,130 @@ export default function UsherManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Usher Management</h1>
-          <p className="text-gray-600">
-            Manage usher assignments and tasks across events
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+      {/* Header Section */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+            <Users className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+              Usher Management
+            </h1>
+            <p className="text-gray-600">
+              Manage usher assignments and tasks across events
+            </p>
+          </div>
         </div>
+        
+        {/* Action Button */}
         {currentEvent && (
-          <UsherAssignmentDialog
-            eventId={Number(selectedEvent)}
-            eventName={currentEvent.name}
-            trigger={
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Assign Ushers
-              </Button>
-            }
-            onSuccess={() => loadEventUshers(selectedEvent)}
-          />
+          <div className="mt-6">
+            <UsherAssignmentDialog
+              eventId={Number(selectedEvent)}
+              eventName={currentEvent.name}
+              trigger={
+                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg hover:shadow-xl">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Assign Ushers
+                </Button>
+              }
+              onSuccess={() => loadEventUshers(selectedEvent)}
+            />
+          </div>
         )}
       </div>
 
       {/* Statistics Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <DashboardCard title="Total Ushers">
-          <div className="text-3xl font-bold text-blue-600">{stats.totalUshers}</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+              <Users className="w-6 h-6 text-white" />
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-gray-900">{stats.totalUshers}</div>
+              <div className="text-sm text-gray-600">Total Ushers</div>
+            </div>
+          </div>
           <p className="text-sm text-gray-600">All registered ushers</p>
-        </DashboardCard>
-        <DashboardCard title="Assigned Ushers">
-          <div className="text-3xl font-bold text-green-600">{stats.assignedUshers}</div>
+        </div>
+        
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+              <UserCheck className="w-6 h-6 text-white" />
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-gray-900">{stats.assignedUshers}</div>
+              <div className="text-sm text-gray-600">Assigned</div>
+            </div>
+          </div>
           <p className="text-sm text-gray-600">Currently assigned to events</p>
-        </DashboardCard>
-        <DashboardCard title="Available Ushers">
-          <div className="text-3xl font-bold text-purple-600">{stats.availableUshers}</div>
+        </div>
+        
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+              <UserPlus className="w-6 h-6 text-white" />
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-gray-900">{stats.availableUshers}</div>
+              <div className="text-sm text-gray-600">Available</div>
+            </div>
+          </div>
           <p className="text-sm text-gray-600">Ready for assignment</p>
-        </DashboardCard>
-        <DashboardCard title="Task Completion">
-          <div className="text-3xl font-bold text-orange-600">
-            {stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0}%
+        </div>
+        
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
+              <CheckCircle className="w-6 h-6 text-white" />
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-gray-900">
+                {stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0}%
+              </div>
+              <div className="text-sm text-gray-600">Completion</div>
+            </div>
           </div>
           <p className="text-sm text-gray-600">
             {stats.completedTasks}/{stats.totalTasks} tasks completed
           </p>
-        </DashboardCard>
-        <DashboardCard title="Active Events">
-          <div className="text-3xl font-bold text-indigo-600">{events.length}</div>
+        </div>
+        
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center">
+              <Calendar className="w-6 h-6 text-white" />
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-gray-900">{events.length}</div>
+              <div className="text-sm text-gray-600">Active Events</div>
+            </div>
+          </div>
           <p className="text-sm text-gray-600">Events with usher assignments</p>
-        </DashboardCard>
+        </div>
       </div>
 
       {/* Event Selection */}
-      <DashboardCard title="Event Selection">
-        <div className="space-y-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <Label>Select Event</Label>
+            <h3 className="text-lg font-semibold text-gray-900">Event Selection</h3>
+            <p className="text-sm text-gray-600">Choose an event to manage usher assignments</p>
+          </div>
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+            <Calendar className="w-4 h-4 text-white" />
+          </div>
+        </div>
+        
+        <div className="space-y-6">
+          <div>
+            <Label className="text-sm font-medium text-gray-700 mb-2 block">Select Event</Label>
             <Select value={selectedEvent} onValueChange={setSelectedEvent}>
-              <SelectTrigger>
+              <SelectTrigger className="bg-gray-50 border-gray-200 focus:bg-white">
                 <SelectValue placeholder="Choose an event" />
               </SelectTrigger>
               <SelectContent>
@@ -423,33 +492,56 @@ export default function UsherManagement() {
           </div>
 
           {currentEvent && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-gray-500" />
-                <span className="text-sm">
-                  {currentEvent.start_date
-                    ? format(parseISO(currentEvent.start_date), 'MMM dd, yyyy')
-                    : 'No date'}
-                </span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Calendar className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-900">Event Date</div>
+                  <div className="text-sm text-gray-600">
+                    {currentEvent.start_date
+                      ? format(parseISO(currentEvent.start_date), 'MMM dd, yyyy')
+                      : 'No date'}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-gray-500" />
-                <span className="text-sm">{currentEvent.location}</span>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                  <MapPin className="w-4 h-4 text-green-600" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-900">Location</div>
+                  <div className="text-sm text-gray-600">{currentEvent.location}</div>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-gray-500" />
-                <span className="text-sm">
-                  {eventUshers.length} ushers assigned
-                </span>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-4 h-4 text-purple-600" />
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-gray-900">Ushers Assigned</div>
+                  <div className="text-sm text-gray-600">{eventUshers.length} ushers</div>
+                </div>
               </div>
             </div>
           )}
         </div>
-      </DashboardCard>
+      </div>
 
       {/* Filters and Search */}
-      <DashboardCard title="Usher Management">
-        <div className="space-y-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Usher Management</h3>
+            <p className="text-sm text-gray-600">Search and filter ushers for assignment</p>
+          </div>
+          <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+            <UserCheck className="w-4 h-4 text-white" />
+          </div>
+        </div>
+        
+        <div className="space-y-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
@@ -458,12 +550,12 @@ export default function UsherManagement() {
                   placeholder="Search ushers by name or email..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 bg-gray-50 border-gray-200 focus:bg-white"
                 />
               </div>
             </div>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-full sm:w-48">
+              <SelectTrigger className="w-full sm:w-48 bg-gray-50 border-gray-200 focus:bg-white">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -476,14 +568,19 @@ export default function UsherManagement() {
 
           {/* Bulk Actions */}
           {selectedUshersForBulk.size > 0 && (
-            <div className="flex items-center gap-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="text-sm text-blue-700">
-                {selectedUshersForBulk.size} usher(s) selected
+            <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Users className="w-3 h-3 text-blue-600" />
+                </div>
+                <div className="text-sm font-medium text-blue-700">
+                  {selectedUshersForBulk.size} usher(s) selected
+                </div>
               </div>
               <Button
                 size="sm"
                 onClick={() => setBulkAssignDialogOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-blue-600 hover:bg-blue-700 shadow-sm"
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 Assign Selected
@@ -492,6 +589,7 @@ export default function UsherManagement() {
                 size="sm"
                 variant="outline"
                 onClick={() => setSelectedUshersForBulk(new Set())}
+                className="bg-white border-gray-200 hover:bg-gray-50"
               >
                 Clear Selection
               </Button>
@@ -499,11 +597,11 @@ export default function UsherManagement() {
           )}
 
           {/* Ushers Table */}
-          <div className="border rounded-lg overflow-hidden">
+          <div className="border border-gray-200 rounded-xl overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
+                <TableRow className="bg-gray-50">
+                  <TableHead className="w-12 py-4">
                     <input
                       type="checkbox"
                       checked={selectedUshersForBulk.size === filteredUshers.length && filteredUshers.length > 0}
@@ -511,28 +609,37 @@ export default function UsherManagement() {
                       className="rounded border-gray-300"
                     />
                   </TableHead>
-                  <TableHead>Usher</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Assigned Tasks</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="font-semibold text-gray-700 text-sm py-4">Usher</TableHead>
+                  <TableHead className="font-semibold text-gray-700 text-sm py-4">Contact</TableHead>
+                  <TableHead className="font-semibold text-gray-700 text-sm py-4">Status</TableHead>
+                  <TableHead className="font-semibold text-gray-700 text-sm py-4">Assigned Tasks</TableHead>
+                  <TableHead className="font-semibold text-gray-700 text-sm py-4">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredUshers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
+                    <TableCell colSpan={6} className="text-center py-12">
                       {ushers.length === 0 ? (
-                        <div className="space-y-2">
-                          <div className="text-gray-500">No ushers found</div>
-                          <div className="text-sm text-gray-400">
+                        <div className="flex flex-col items-center space-y-3">
+                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                            <Users className="w-8 h-8 text-gray-400" />
+                          </div>
+                          <div className="text-lg font-medium text-gray-900">No ushers found</div>
+                          <div className="text-sm text-gray-600 max-w-md text-center">
                             {user?.role === 'admin' || user?.role === 'superadmin' 
                               ? 'No usher accounts exist in the system.' 
                               : 'No ushers are available for your organization.'}
                           </div>
                         </div>
                       ) : (
-                        <div className="text-gray-500">No ushers match your current filters</div>
+                        <div className="flex flex-col items-center space-y-3">
+                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                            <Search className="w-8 h-8 text-gray-400" />
+                          </div>
+                          <div className="text-lg font-medium text-gray-900">No ushers match your filters</div>
+                          <div className="text-sm text-gray-600">Try adjusting your search criteria</div>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -565,21 +672,21 @@ export default function UsherManagement() {
                         )
                         if (allComplete) {
                           statusBadge = (
-                            <Badge className="bg-green-100 text-green-800">
+                            <Badge className="bg-green-100 text-green-800 border border-green-200">
                               <CheckCircle className="w-3 h-3 mr-1" />
                               All Tasks Complete
                             </Badge>
                           )
                         } else if (anyComplete) {
                           statusBadge = (
-                            <Badge className="bg-yellow-100 text-yellow-800">
+                            <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-200">
                               <Clock className="w-3 h-3 mr-1" />
                               In Progress
                             </Badge>
                           )
                         } else {
                           statusBadge = (
-                            <Badge className="bg-blue-100 text-blue-800">
+                            <Badge className="bg-blue-100 text-blue-800 border border-blue-200">
                               <UserCheck className="w-3 h-3 mr-1" />
                               Assigned
                             </Badge>
@@ -587,7 +694,7 @@ export default function UsherManagement() {
                         }
                       } else {
                         statusBadge = (
-                          <Badge className="bg-gray-100 text-gray-800">
+                          <Badge className="bg-gray-100 text-gray-800 border border-gray-200">
                             <UserCheck className="w-3 h-3 mr-1" />
                             No Tasks Assigned
                           </Badge>
@@ -595,15 +702,15 @@ export default function UsherManagement() {
                       }
                     } else {
                       statusBadge = (
-                        <Badge className="bg-gray-100 text-gray-800">
+                        <Badge className="bg-gray-100 text-gray-800 border border-gray-200">
                           <UserCheck className="w-3 h-3 mr-1" />
                           Available
                         </Badge>
                       )
                     }
                     return (
-                      <TableRow key={usher.id}>
-                        <TableCell>
+                      <TableRow key={usher.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                        <TableCell className="py-4">
                           <input
                             type="checkbox"
                             checked={selectedUshersForBulk.has(usher.id)}
@@ -611,29 +718,31 @@ export default function UsherManagement() {
                             className="rounded border-gray-300"
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm">
                               {usher.name.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <div className="font-medium">{usher.name}</div>
+                              <div className="font-semibold text-gray-900">{usher.name}</div>
                               <div className="text-sm text-gray-500">
                                 ID: {usher.id}
                               </div>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{usher.email}</TableCell>
-                        <TableCell>{statusBadge}</TableCell>
-                        <TableCell>
+                        <TableCell className="py-4">
+                          <div className="text-sm text-gray-900">{usher.email}</div>
+                        </TableCell>
+                        <TableCell className="py-4">{statusBadge}</TableCell>
+                        <TableCell className="py-4">
                           {isAssigned && tasks.length > 0 ? (
                             <div className="space-y-1">
                               {tasks.map((task: string, index: number) => (
                                 <Badge
                                   key={index}
                                   variant="outline"
-                                  className="text-xs"
+                                  className="text-xs bg-gray-50 border-gray-200"
                                 >
                                   {task}
                                 </Badge>
@@ -645,50 +754,57 @@ export default function UsherManagement() {
                             </span>
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-4">
                           <div className="flex items-center gap-2">
                             <Button
                               variant="outline"
                               size="sm"
+                              className="bg-white border-gray-200 hover:bg-gray-50"
                               onClick={() => {
                                 setSelectedUsherDetails(usher)
                                 setShowUsherDetails(true)
                               }}
                             >
-                              <Eye className="w-3 h-3" />
+                              <Eye className="w-3 h-3 mr-1" />
+                              View
                             </Button>
                             {isAssigned ? (
                               <>
                                 <Button
                                   variant="outline"
                                   size="sm"
+                                  className="bg-white border-gray-200 hover:bg-gray-50"
                                   onClick={() => {
                                     setSelectedUsher(usher)
                                     setEditingTasks(tasks.join(', '))
                                     setEditDialogOpen(true)
                                   }}
                                 >
-                                  <Edit className="w-3 h-3" />
+                                  <Edit className="w-3 h-3 mr-1" />
+                                  Edit
                                 </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
+                                  className="bg-white border-gray-200 hover:bg-gray-50"
                                   onClick={() => handleRemoveUsher(usher.id)}
                                 >
-                                  <Trash2 className="w-3 h-3" />
+                                  <Trash2 className="w-3 h-3 mr-1" />
+                                  Remove
                                 </Button>
                               </>
                             ) : (
                               <Button
                                 variant="outline"
                                 size="sm"
+                                className="bg-white border-gray-200 hover:bg-gray-50"
                                 onClick={() => {
                                   setSelectedUsher(usher)
                                   setEditingTasks('')
                                   setEditDialogOpen(true)
                                 }}
                               >
-                                <Plus className="w-3 h-3" />
+                                <Plus className="w-3 h-3 mr-1" />
                                 Assign
                               </Button>
                             )}
@@ -702,7 +818,7 @@ export default function UsherManagement() {
             </Table>
           </div>
         </div>
-      </DashboardCard>
+      </div>
 
       {/* Edit Tasks Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

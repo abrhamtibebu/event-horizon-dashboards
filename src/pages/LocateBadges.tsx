@@ -42,6 +42,7 @@ import Papa from 'papaparse'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import api from '@/lib/api'
+import { getGuestTypeBadgeClasses } from '@/lib/utils'
 
 // --- Data Model ---
 interface BadgeData {
@@ -50,7 +51,7 @@ interface BadgeData {
   registrationId: string
   qrCode: string
   badgeType: string
-  guestType: string
+  guest_type: string
   zone: string
   section: string
   tray: string
@@ -151,7 +152,9 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
             <span className="text-gray-500">Badge Type:</span>
             <span className="font-medium">{badge.badgeType}</span>
             <span className="ml-4 text-gray-500">Guest Type:</span>
-            <span className="font-medium">{badge.guestType}</span>
+            <Badge className={getGuestTypeBadgeClasses(badge.guest_type)}>
+              {badge.guest_type}
+            </Badge>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <span className="text-gray-500">Registration ID:</span>
@@ -302,15 +305,15 @@ export default function LocateBadges() {
   // Simulated badge data for demo
   const [data, setData] = useState<BadgeData[]>([
     {
-      name: 'John Doe', badgeId: '12345', registrationId: 'REG-001', qrCode: 'QR12345', badgeType: 'VIP', guestType: 'VIP', zone: 'A', section: '1', tray: 'A1', organization: 'Tech Corp', email: 'john.doe@example.com', notes: 'Speaker', status: 'pre-printed', collected: false, printHistory: [
+      name: 'John Doe', badgeId: '12345', registrationId: 'REG-001', qrCode: 'QR12345', badgeType: 'VIP', guest_type: 'VIP', zone: 'A', section: '1', tray: 'A1', organization: 'Tech Corp', email: 'john.doe@example.com', notes: 'Speaker', status: 'pre-printed', collected: false, printHistory: [
         { status: 'pre-printed', timestamp: '2024-07-20 09:00', staff: 'Admin', note: 'Initial print' }
       ]
     },
     {
-      name: 'Jane Smith', badgeId: '12346', registrationId: 'REG-002', qrCode: 'QR12346', badgeType: 'Attendee', guestType: 'Attendee', zone: 'B', section: '2', tray: 'B2', organization: 'Biz Group', email: 'jane.smith@biz.com', notes: '', status: 'not printed', collected: false, printHistory: []
+      name: 'Jane Smith', badgeId: '12346', registrationId: 'REG-002', qrCode: 'QR12346', badgeType: 'Attendee', guest_type: 'Attendee', zone: 'B', section: '2', tray: 'B2', organization: 'Biz Group', email: 'jane.smith@biz.com', notes: '', status: 'not printed', collected: false, printHistory: []
     },
     {
-      name: 'Alice Lee', badgeId: '12347', registrationId: 'REG-003', qrCode: 'QR12347', badgeType: 'Speaker', guestType: 'Speaker', zone: 'C', section: '3', tray: 'C3', organization: 'Alpha Inc', email: 'alice.lee@alpha.com', notes: '', status: 'reprint requested', collected: false, printHistory: [
+      name: 'Alice Lee', badgeId: '12347', registrationId: 'REG-003', qrCode: 'QR12347', badgeType: 'Speaker', guest_type: 'Speaker', zone: 'C', section: '3', tray: 'C3', organization: 'Alpha Inc', email: 'alice.lee@alpha.com', notes: '', status: 'reprint requested', collected: false, printHistory: [
         { status: 'not printed', timestamp: '2024-07-20 08:00', staff: 'Admin' },
         { status: 'reprint requested', timestamp: '2024-07-20 10:00', staff: 'Supervisor', note: 'Badge damaged' }
       ]
@@ -336,18 +339,7 @@ export default function LocateBadges() {
   }
 
   const getGuestTypeColor = (type: string) => {
-    switch (type) {
-      case 'VIP':
-        return 'bg-purple-100 text-purple-800'
-      case 'Speaker':
-        return 'bg-blue-100 text-blue-800'
-      case 'Staff':
-        return 'bg-green-100 text-green-800'
-      case 'Visitor':
-        return 'bg-gray-100 text-gray-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
+    return getGuestTypeBadgeClasses(type);
   }
 
   // Fetch events on mount
@@ -392,7 +384,7 @@ export default function LocateBadges() {
             registrationId: row.registrationId || '',
             qrCode: row.qrCode || '',
             badgeType: row.badgeType || '',
-            guestType: row.guestType || '',
+            guest_type: row.guest_type || '',
             zone: row.zone || '',
             section: row.section || '',
             tray: row.tray || '',
@@ -430,7 +422,7 @@ export default function LocateBadges() {
         registrationId: 'REG-001',
         qrCode: 'QR12345',
         badgeType: 'VIP',
-        guestType: 'VIP',
+        guest_type: 'VIP',
         zone: 'A',
         section: '1',
         tray: 'A1',
@@ -446,7 +438,7 @@ export default function LocateBadges() {
         registrationId: 'REG-002',
         qrCode: 'QR12346',
         badgeType: 'Attendee',
-        guestType: 'Attendee',
+        guest_type: 'Attendee',
         zone: 'B',
         section: '2',
         tray: 'B2',

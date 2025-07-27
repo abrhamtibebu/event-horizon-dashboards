@@ -6,9 +6,10 @@ import api from '@/lib/api';
 import Badge from '@/components/Badge';
 import { BadgeTemplate } from '@/types/badge';
 import { Attendee } from '@/types/attendee';
-import { useReactToPrint } from 'react-to-print';
 import { v4 as uuidv4 } from 'uuid';
 import { getBadgeTemplates, getOfficialBadgeTemplate } from '@/lib/badgeTemplates';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // Default template for demonstration - moved to a function
 const createDefaultTemplate = (): BadgeTemplate => ({
@@ -45,12 +46,33 @@ const BatchBadgePage = () => {
 
   const printRef = useRef<HTMLDivElement>(null);
   
-  const handlePrint = useReactToPrint({
-    content: () => printRef.current,
-    removeAfterPrint: false,
-    suppressErrors: true,
-    onAfterPrint: () => {},
-  });
+  const handlePrint = async () => {
+    setTimeout(() => {
+      if (printRef.current) {
+        const badgeElements = Array.from(printRef.current.querySelectorAll('.printable-badge-batch'));
+        if (badgeElements.length === 0) {
+          console.error('No badges found to print.');
+          return;
+        }
+        // Make sure the print area is visible and positioned correctly
+        printRef.current.style.visibility = 'visible';
+        printRef.current.style.position = 'absolute';
+        printRef.current.style.left = '0';
+        printRef.current.style.top = '0';
+        printRef.current.style.width = '100vw';
+        printRef.current.style.height = '100vh';
+        printRef.current.style.zIndex = '9999';
+        printRef.current.style.background = 'white';
+        
+        // Wait a bit more for badges to render, then print
+        setTimeout(() => {
+          window.print();
+          // Reset the print area after printing
+          printRef.current!.style.visibility = 'hidden';
+        }, 500);
+      }
+    }, 300);
+  };
 
   useEffect(() => {
     const ids = searchParams.get('ids');
@@ -133,18 +155,44 @@ const BatchBadgePage = () => {
         `}
       </style>
        <div className="no-print p-4 text-center">
-        <Button onClick={handlePrint}>
-          <Printer className="mr-2 h-4 w-4" />
-          Print All Badges ({attendees.length})
+        <Button onClick={handlePrint} className="flex items-center gap-2">
+          <Printer className="w-4 h-4" />
+          Print Selected Badges
         </Button>
       </div>
       {templateError && <div className="mb-2 text-red-500">{templateError}</div>}
       <div ref={printRef}>
-        {attendees.map(attendee => (
-          <div key={attendee.id} className="printable-badge-batch">
-            <Badge attendee={attendee} />
-          </div>
-        ))}
+        <style>{`
+          @media print {
+            body * { visibility: hidden !important; }
+            #batch-page-print-area, #batch-page-print-area * { visibility: visible !important; }
+            #batch-page-print-area { 
+              position: absolute !important; 
+              left: 0; 
+              top: 0; 
+              width: 100vw; 
+              height: 100vh; 
+              background: white; 
+            }
+            .printable-badge-batch {
+              page-break-after: always;
+              margin: 0;
+              padding: 0;
+              border: none;
+              box-shadow: none;
+            }
+            .printable-badge-batch:last-child {
+              page-break-after: auto;
+            }
+          }
+        `}</style>
+        <div id="batch-page-print-area">
+          {attendees.map(attendee => (
+            <div key={attendee.id} className="printable-badge-batch">
+              <Badge attendee={attendee} />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

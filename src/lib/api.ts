@@ -2,6 +2,8 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'https://api.validity.et/api',
+  // baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+
   headers: {
     'Content-Type': 'application/json',
   },
@@ -72,7 +74,7 @@ api.interceptors.response.use(
       try {
         // Try to refresh the token
         const response = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://api.validity.et//api'}/refresh`,
+          `${import.meta.env.VITE_API_URL || 'http://api.validity.et/api'}/refresh`,
           {},
           {
             headers: {
@@ -155,7 +157,7 @@ export const getEventUshers = (eventId: number) =>
 export const assignUshersToEvent = (
   eventId: number,
   ushers: { id: number; tasks: string[] }[]
-) => api.post(`/events/${eventId}/ushers`, { ushers })
+) => api.post(`/events/${eventId}/ushers`, { ushers });
 
 export const updateUsherTasks = (
   eventId: number,
@@ -194,6 +196,9 @@ export const assignUshersToEventAlt = (
   eventId: number,
   ushers: { id: number; tasks: string[] }[]
 ) => api.post(`/events/${eventId}/assign-ushers`, { ushers })
+
+export const postAttendeesBatch = (eventId: string, attendees: any[]) =>
+  api.post(`/events/${eventId}/attendees/batch`, { attendees });
 
 // --- Vendor Mock API ---
 let mockVendors = [
@@ -312,3 +317,24 @@ export function getVendorAverageRating(vendorId) {
   const avg = reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length;
   return Promise.resolve(avg);
 }
+
+// Share Analytics API functions
+export const getShareAnalytics = (eventId: string, params?: { start_date?: string; end_date?: string }) =>
+  api.get(`/events/${eventId}/share-analytics`, { params })
+
+export const getRealTimeShareAnalytics = (eventId: string) =>
+  api.get(`/events/${eventId}/share-analytics/realtime`)
+
+export const trackShare = (eventId: string, data: {
+  platform: string;
+  source?: string;
+  user_agent?: string;
+  ip_address?: string;
+}) => api.post(`/events/${eventId}/share-analytics/track`, data)
+
+export const trackRegistration = (eventId: string, data: {
+  source?: string;
+  platform?: string;
+  user_agent?: string;
+  ip_address?: string;
+}) => api.post(`/events/${eventId}/share-analytics/registration`, data)

@@ -8,7 +8,7 @@ import {
 import api from '@/lib/api'
 import { useNavigate } from 'react-router-dom'
 
-export type Role = 'admin' | 'organizer' | 'usher' | 'attendee'
+export type Role = 'superadmin' | 'admin' | 'organizer_admin' | 'organizer' | 'usher' | 'attendee'
 
 interface Organizer {
   id: number
@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (remember) {
       localStorage.setItem('jwt', token)
     } else {
-      sessionStorage.setItem('jwt', token)
+      localStorage.setItem('jwt', token)
     }
     setUser(user)
   }

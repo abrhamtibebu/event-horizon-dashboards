@@ -4,6 +4,7 @@ import { BadgeElement, ElementType } from '../types/badge';
 import { Badge } from '@/components/ui/badge';
 import useImage from 'use-image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { getGuestTypeBadgeClasses, GUEST_TYPE_COLORS } from '@/lib/utils';
 
 const PALETTE_ELEMENTS: { type: ElementType; label: string; icon: string }[] = [
   { type: 'text', label: 'Text', icon: '🅣' },
@@ -196,12 +197,16 @@ const BadgeDesignerTab: React.FC = () => {
   return (
     <div className={`min-h-screen flex flex-col ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}
       style={{ transition: 'background 0.3s, color 0.3s' }}>
-      {/* Header */}
-      <header className="flex items-center justify-between px-8 py-4 shadow-sm bg-white dark:bg-gray-950">
+      {/* Modern Header */}
+      <header className="flex items-center gap-4 px-8 py-4 shadow-sm bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+        <span className="text-3xl">🏷️</span>
+        <div>
         <h1 className="text-2xl font-bold tracking-tight">Badge Designer</h1>
-        <div className="flex items-center gap-4">
+          <p className="text-sm opacity-80">Design and customize event badges. Drag elements, edit properties, and preview your badge in real time.</p>
+        </div>
+        <div className="ml-auto flex items-center gap-4">
           <button
-            className="rounded px-3 py-1 text-sm font-medium border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+            className="rounded px-3 py-1 text-sm font-medium border border-white/30 bg-white/10 hover:bg-white/20 transition"
             onClick={() => setDarkMode((d) => !d)}
             aria-label="Toggle dark mode"
           >
@@ -210,26 +215,70 @@ const BadgeDesignerTab: React.FC = () => {
         </div>
       </header>
       {/* Main Layout */}
-      <main className="flex flex-1 overflow-hidden">
+      <main className="flex flex-1 overflow-hidden flex-col md:flex-row">
         {/* Palette Sidebar */}
-        <aside className="w-56 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 p-4 flex flex-col gap-4">
+        <aside className="w-full md:w-56 bg-white dark:bg-gray-950 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 p-4 flex flex-col gap-4">
           <h2 className="text-lg font-semibold mb-2">Elements</h2>
           <div className="flex flex-col gap-2">
             {PALETTE_ELEMENTS.map((el) => (
               <button
                 key={el.type}
-                className={`flex items-center gap-2 px-3 py-2 rounded transition border border-transparent`}
+                className="flex items-center gap-2 px-3 py-2 rounded transition border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 hover:bg-blue-50 dark:hover:bg-blue-900 group relative"
                 onClick={() => handlePaletteClick(el.type)}
                 style={{ cursor: 'pointer' }}
               >
                 <span className="text-xl">{el.icon}</span>
                 <span>{el.label}</span>
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-xs bg-gray-800 text-white px-2 py-1 rounded shadow pointer-events-none transition">Add {el.label}</span>
               </button>
             ))}
           </div>
+          
+          {/* Guest Type Color Preview */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+            <h3 className="text-sm font-semibold mb-3 text-gray-700 dark:text-gray-300">Guest Type Colors</h3>
+            <div className="space-y-2 max-h-32 overflow-y-auto">
+              {Object.entries(GUEST_TYPE_COLORS).map(([type, colors]) => (
+                <div key={type} className="flex items-center gap-2 p-1 rounded border border-gray-200 dark:border-gray-700">
+                  <div className={`w-3 h-3 rounded-full ${colors.bg} ${colors.border || ''} border`}></div>
+                  <span className="text-xs font-medium">{type}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-800 flex flex-col gap-2">
+            <button
+              className="w-full px-3 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+              onClick={() => window.print()}
+            >
+              Preview/Print
+            </button>
+          </div>
         </aside>
         {/* Canvas Area */}
-        <section className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800 transition">
+        <section className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800 transition p-4">
+          <div className="flex gap-4 mb-4 w-full max-w-lg">
+            <button
+              className="flex-1 px-4 py-2 rounded bg-green-600 text-white font-semibold hover:bg-green-700 transition shadow"
+              onClick={() => {
+                const uri = document.querySelector('canvas')?.toDataURL('image/png');
+                if (uri) {
+                  const link = document.createElement('a');
+                  link.href = uri;
+                  link.download = 'badge.png';
+                  link.click();
+                }
+              }}
+            >
+              Download as Image
+            </button>
+            <button
+              className="flex-1 px-4 py-2 rounded bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-semibold hover:bg-gray-300 dark:hover:bg-gray-700 transition shadow"
+              onClick={() => { setElements([]); setSelectedId(null); }}
+            >
+              Reset
+            </button>
+          </div>
           <div
             className={`relative shadow-2xl rounded-xl overflow-hidden border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 flex items-center justify-center ${dragOver ? 'ring-4 ring-blue-400' : ''}`}
             style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, transition: 'box-shadow 0.2s' }}
@@ -364,10 +413,10 @@ const BadgeDesignerTab: React.FC = () => {
           </div>
         </section>
         {/* Property Panel */}
-        <aside className="w-80 bg-white dark:bg-gray-950 border-l border-gray-200 dark:border-gray-800 p-4 flex flex-col gap-4 min-w-[320px]">
+        <aside className="w-full md:w-80 bg-white dark:bg-gray-950 border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-800 p-4 flex flex-col gap-4 min-w-[320px]">
           <h2 className="text-lg font-semibold mb-2">Properties</h2>
           {selected ? (
-            <div className="space-y-2 animate-fade-in">
+            <div className="space-y-2 animate-fade-in bg-gray-50 dark:bg-gray-900 rounded-lg p-4 shadow">
               <div className="text-xs text-gray-500">ID: {selected.id}</div>
               <label className="block text-sm">X</label>
               <input type="number" className="w-full border px-2 py-1 rounded" value={selected.x} onChange={e => handleElementChange(selected.id, { x: Number(e.target.value) })} />

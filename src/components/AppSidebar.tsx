@@ -62,7 +62,7 @@ const allItems = [
     title: 'Guests',
     url: '/dashboard/guests',
     icon: Users,
-    roles: ['superadmin', 'admin'],
+    roles: ['superadmin', 'admin', 'organizer'],
   },
   {
     title: 'Usher Management',
@@ -118,7 +118,7 @@ const allItems = [
     title: 'Settings',
     url: '/dashboard/settings',
     icon: Settings,
-    roles: ['superadmin', 'admin', 'organizer'],
+    roles: ['superadmin', 'admin', 'organizer', 'usher'],
   },
   {
     title: 'My Team',
@@ -248,7 +248,7 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                   {/* Render children if present */}
                   {item.children && !isCollapsed && (
-                    <div className="ml-8 mt-1 space-y-1">
+                    <ul className="ml-8 mt-1 space-y-1">
                       {item.children.map((child) => (
                         <SidebarMenuItem key={child.title} className="rounded-lg">
                           <SidebarMenuButton asChild>
@@ -261,7 +261,7 @@ export function AppSidebar() {
                           </SidebarMenuButton>
                         </SidebarMenuItem>
                       ))}
-                    </div>
+                    </ul>
                   )}
                 </SidebarMenuItem>
               ))}
