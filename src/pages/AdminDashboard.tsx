@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Calendar,
   Users,
@@ -13,28 +13,15 @@ import {
   Shield,
   Trash2,
   MapPin,
+  MessageSquare,
 } from 'lucide-react'
-import { MetricCard } from '@/components/MetricCard'
-import { DashboardCard } from '@/components/DashboardCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-} from 'recharts'
 import { Link, useOutletContext } from 'react-router-dom'
 import api from '@/lib/api'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, PieChart, Pie, Cell, BarChart, Bar } from 'recharts'
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null)
@@ -43,25 +30,34 @@ export default function AdminDashboard() {
   const [trashCount, setTrashCount] = useState(0)
   const { searchQuery } = useOutletContext<{ searchQuery: string }>()
 
+  const [pendingOrganizers, setPendingOrganizers] = useState<any[]>([])
+  const [approvedOrganizers, setApprovedOrganizers] = useState<any[]>([])
+  const [organizerLoading, setOrganizerLoading] = useState(true)
+  const [organizerError, setOrganizerError] = useState<string | null>(null)
+
+  const [auditLogs, setAuditLogs] = useState<any[]>([])
+  const [auditLoading, setAuditLoading] = useState(true)
+  const [auditError, setAuditError] = useState<string | null>(null)
+
+  const [reportSummary, setReportSummary] = useState<any>(null)
+  const [eventsList, setEventsList] = useState<any[]>([])
+  const [reportLoading, setReportLoading] = useState(true)
+  const [reportError, setReportError] = useState<string | null>(null)
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true)
-        // NOTE: This assumes a single /dashboard/admin endpoint exists.
-        // If data comes from multiple endpoints, this needs to be adjusted.
         const response = await api.get('/dashboard/admin')
         setStats(response.data)
         setError(null)
       } catch (err) {
-        setError(
-          'Failed to fetch dashboard data. The backend endpoint might not be implemented yet.'
-        )
+        setError('Failed to fetch dashboard data. The backend endpoint might not be implemented yet.')
         console.error(err)
       } finally {
         setLoading(false)
       }
     }
-
     const fetchTrashCount = async () => {
       try {
         const response = await api.get('/trash')
@@ -70,66 +66,132 @@ export default function AdminDashboard() {
         console.error('Failed to fetch trash count:', error)
       }
     }
-
     fetchDashboardData()
     fetchTrashCount()
   }, [])
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'event':
-        return <Calendar className="w-4 h-4" />
-      case 'user':
-        return <Users className="w-4 h-4" />
-      case 'approval':
-        return <UserCheck className="w-4 h-4" />
-      case 'report':
-        return <FileText className="w-4 h-4" />
-      default:
-        return <AlertCircle className="w-4 h-4" />
-    }
-  }
+  // Fetch organizers
+  useEffect(() => {
+    setOrganizerLoading(true)
+    Promise.all([
+      api.get('/organizers?status=pending'),
+      api.get('/organizers?status=active'),
+    ])
+      .then(([pendingRes, approvedRes]) => {
+        setPendingOrganizers(pendingRes.data)
+        setApprovedOrganizers(approvedRes.data)
+        setOrganizerError(null)
+      })
+      .catch((err) => setOrganizerError('Failed to fetch organizers'))
+      .finally(() => setOrganizerLoading(false))
+  }, [])
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'warning':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'info':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'success':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'error':
-        return 'bg-red-100 text-red-800 border-red-200'
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
+  // Fetch audit logs
+  useEffect(() => {
+    setAuditLoading(true)
+    api.get('/audit-logs')
+      .then((res) => setAuditLogs(res.data.data || res.data))
+      .catch(() => setAuditError('Failed to fetch audit logs'))
+      .finally(() => setAuditLoading(false))
+  }, [])
 
-  // Example: filter recentActivities by searchQuery
+  // Fetch report summary and events
+  useEffect(() => {
+    setReportLoading(true)
+    Promise.all([
+      api.get('/reports/summary'),
+      api.get('/events'),
+    ])
+      .then(([summaryRes, eventsRes]) => {
+        setReportSummary(summaryRes.data)
+        setEventsList(eventsRes.data)
+        setReportError(null)
+      })
+      .catch(() => setReportError('Failed to fetch report summary'))
+      .finally(() => setReportLoading(false))
+  }, [])
+
   const filteredActivities =
     searchQuery && stats?.recentActivities
       ? stats.recentActivities.filter(
           (activity: any) =>
-            activity.description
-              ?.toLowerCase()
-              .includes(searchQuery.toLowerCase()) ||
+            activity.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             activity.type?.toLowerCase().includes(searchQuery.toLowerCase())
         )
       : stats?.recentActivities
 
+  // Organizers donut chart data
+  const organizersDonutData = useMemo(() => [
+    { name: 'Approved', value: approvedOrganizers.length },
+    { name: 'Pending', value: pendingOrganizers.length },
+  ], [approvedOrganizers, pendingOrganizers])
+
+  // Audit logs last 30 days
+  const auditLogsLast30Days = useMemo(() => {
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - 30)
+    return auditLogs.filter((log) => new Date(log.created_at) >= cutoff)
+  }, [auditLogs])
+
+  // Audit logs per day for chart
+  const auditLogsPerDay = useMemo(() => {
+    const counts: Record<string, number> = {}
+    auditLogsLast30Days.forEach((log) => {
+      const day = new Date(log.created_at).toISOString().slice(0, 10)
+      counts[day] = (counts[day] || 0) + 1
+    })
+    // Fill missing days
+    const days: string[] = []
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      days.push(d.toISOString().slice(0, 10))
+    }
+    return days.map((day) => ({ day, count: counts[day] || 0 }))
+  }, [auditLogsLast30Days])
+
+  // Most popular event and top 5 events
+  const topEvents = useMemo(() => {
+    if (!reportSummary || !eventsList.length) return []
+    const idToName: Record<string, string> = {}
+    eventsList.forEach((e) => { idToName[e.id] = e.name })
+    return Object.entries(reportSummary.top_events_by_attendance || {})
+      .map(([id, count]) => ({ name: idToName[id] || `Event #${id}`, attendees: count }))
+      .sort((a, b) => b.attendees - a.attendees)
+      .slice(0, 5)
+  }, [reportSummary, eventsList])
+  const mostPopularEvent = topEvents[0]
+
+  // Peak month calculation
+  const peakMonthData = useMemo(() => {
+    if (!reportSummary || !reportSummary.registration_timeline) return { chart: [], peak: null }
+    const monthCounts: Record<string, number> = {}
+    Object.entries(reportSummary.registration_timeline).forEach(([date, count]) => {
+      const month = new Date(date).toLocaleString('default', { month: 'short', year: 'numeric' })
+      monthCounts[month] = (monthCounts[month] || 0) + count
+    })
+    const chart = Object.entries(monthCounts).map(([month, events]) => ({ month, events }))
+    const peak = chart.reduce((max, cur) => cur.events > (max?.events || 0) ? cur : max, null)
+    return { chart, peak }
+  }, [reportSummary])
+
   if (loading) {
-    return <div>Loading dashboard...</div>
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 animate-pulse">
+        <div className="h-10 w-1/3 bg-gray-200 rounded mb-4" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, i) => <div key={i} className="h-32 w-full bg-white/80 rounded-2xl shadow-xl" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+          <div className="h-96 w-full col-span-2 bg-white/80 rounded-2xl shadow-xl" />
+          <div className="h-96 w-full bg-white/80 rounded-2xl shadow-xl" />
+        </div>
+      </div>
+    )
   }
+  if (error) return <div className="text-red-500">{error}</div>
+  if (!stats) return <div>No dashboard data available.</div>
 
-  if (error) {
-    return <div className="text-red-500">{error}</div>
-  }
-
-  if (!stats) {
-    return <div>No dashboard data available.</div>
-  }
-
-  // Destructure stats from the API response
   const {
     keyMetrics,
     eventGrowth,
@@ -140,71 +202,138 @@ export default function AdminDashboard() {
   } = stats
 
   return (
-    <div className="space-y-6">
-      {/* Removed duplicate <Header onSearch={setSearchQuery} /> */}
-
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard
-          title="Total Events"
-          value={keyMetrics?.totalEvents?.value || 'N/A'}
-          icon={<Calendar className="w-6 h-6 text-blue-600" />}
-          trend={keyMetrics?.totalEvents?.trend}
-          className="min-h-[170px]"
-        />
-        <MetricCard
-          title="Total Users"
-          value={keyMetrics?.totalUsers?.value || 'N/A'}
-          icon={<Users className="w-6 h-6 text-purple-600" />}
-          trend={keyMetrics?.totalUsers?.trend}
-          className="min-h-[170px]"
-        />
-        <MetricCard
-          title="Active Organizers"
-          value={keyMetrics?.activeOrganizers?.value || 'N/A'}
-          icon={<Building2 className="w-6 h-6 text-green-600" />}
-          trend={keyMetrics?.activeOrganizers?.trend}
-          className="min-h-[170px]"
-        />
-        <MetricCard
-          title="Items in Trash"
-          value={trashCount.toString()}
-          icon={<Trash2 className="w-6 h-6 text-red-600" />}
-          trend={null}
-          link="/dashboard/trash"
-          className="min-h-[170px]"
-        />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+            <Shield className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+              Admin Dashboard
+            </h1>
+            <p className="text-gray-600 mt-1">Overview and management for all events, users, and system activity</p>
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <Link to="/dashboard/events/create">
+            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg">
+              <Plus className="w-4 h-4 mr-2" />
+              Create New Event
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DashboardCard title="Event & User Growth">
-          <ResponsiveContainer width="100%" height={300}>
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="group relative overflow-hidden bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-6 hover:shadow-2xl transition-all duration-200">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-sm font-medium text-gray-600">Total Events</div>
+            </div>
+            <div className="text-3xl font-bold text-gray-900 mb-1">{keyMetrics?.totalEvents?.value || 'N/A'}</div>
+            <div className="text-xs text-gray-500">All events in the system</div>
+          </div>
+        </div>
+        <div className="group relative overflow-hidden bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-6 hover:shadow-2xl transition-all duration-200">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <Users className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-sm font-medium text-gray-600">Total Users</div>
+            </div>
+            <div className="text-3xl font-bold text-gray-900 mb-1">{keyMetrics?.totalUsers?.value || 'N/A'}</div>
+            <div className="text-xs text-gray-500">All users in the system</div>
+          </div>
+        </div>
+        <div className="group relative overflow-hidden bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-6 hover:shadow-2xl transition-all duration-200">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-sm font-medium text-gray-600">Active Organizers</div>
+            </div>
+            <div className="text-3xl font-bold text-gray-900 mb-1">{keyMetrics?.activeOrganizers?.value || 'N/A'}</div>
+            <div className="text-xs text-gray-500">Organizers with active events</div>
+          </div>
+        </div>
+        <div className="group relative overflow-hidden bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-6 hover:shadow-2xl transition-all duration-200">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-red-500 to-red-600 opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-white" />
+              </div>
+              <div className="text-sm font-medium text-gray-600">Items in Trash</div>
+            </div>
+            <div className="text-3xl font-bold text-gray-900 mb-1">{trashCount}</div>
+            <div className="text-xs text-gray-500">Soft-deleted items</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left: Charts and Activity */}
+        <div className="lg:col-span-2 flex flex-col gap-8">
+          {/* Event & User Growth Chart */}
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Event & User Growth</h3>
+                <p className="text-sm text-gray-600">Trends in events and user registrations</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            <div className="w-full h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
             <LineChart data={eventGrowth}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip />
-              <Line
-                type="monotone"
-                dataKey="events"
-                stroke="#3b82f6"
-                strokeWidth={3}
-                name="Events"
-              />
-              <Line
-                type="monotone"
-                dataKey="users"
-                stroke="#8b5cf6"
-                strokeWidth={3}
-                name="Users"
-              />
+                  <defs>
+                    <linearGradient id="eventGrowthGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="userGrowthGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="month" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                  <RechartsTooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+                  <Line type="monotone" dataKey="events" stroke="#3b82f6" strokeWidth={3} fill="url(#eventGrowthGradient)" name="Events" />
+                  <Line type="monotone" dataKey="users" stroke="#8b5cf6" strokeWidth={3} fill="url(#userGrowthGradient)" name="Users" />
             </LineChart>
           </ResponsiveContainer>
-        </DashboardCard>
+            </div>
+          </div>
 
-        <DashboardCard title="Event Status Distribution">
-          <ResponsiveContainer width="100%" height={300}>
+          {/* Event Status Distribution Pie Chart */}
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Event Status Distribution</h3>
+                <p className="text-sm text-gray-600">Breakdown of event statuses</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
+                <BarChart3 className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            <div className="w-full h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={eventStatusDistribution}
@@ -213,31 +342,233 @@ export default function AdminDashboard() {
                 innerRadius={60}
                 outerRadius={120}
                 dataKey="value"
+                    label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+                    labelLine={false}
               >
                 {eventStatusDistribution?.map((entry: any, index: number) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip />
+                  <RechartsTooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
             </PieChart>
           </ResponsiveContainer>
+            </div>
           <div className="flex justify-center gap-4 mt-4">
             {eventStatusDistribution?.map((item: any) => (
               <div key={item.name} className="flex items-center gap-2">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: item.color }}
-                />
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
                 <span className="text-sm text-gray-600">{item.name}</span>
               </div>
             ))}
           </div>
-        </DashboardCard>
+          </div>
+
+          {/* Organizers Pending Approval Section */}
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-yellow-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Organizers Pending Approval</h3>
+                <p className="text-sm text-gray-600">Review and approve new organizers</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center">
+                <UserCheck className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Donut Chart */}
+              <div className="w-full md:w-1/3 flex items-center justify-center">
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie
+                      data={organizersDonutData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={70}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) => percent > 0.1 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+                    >
+                      <Cell fill="#facc15" />
+                      <Cell fill="#fde68a" />
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              {/* Pending Organizers List */}
+              <div className="w-full md:w-2/3">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="bg-yellow-50">
+                        <th className="px-4 py-2 text-left font-semibold text-yellow-800">Name</th>
+                        <th className="px-4 py-2 text-left font-semibold text-yellow-800">Email</th>
+                        <th className="px-4 py-2 text-left font-semibold text-yellow-800">Requested</th>
+                        <th className="px-4 py-2 text-left font-semibold text-yellow-800">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {organizerLoading ? (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-2 text-center">Loading organizers...</td>
+                        </tr>
+                      ) : organizerError ? (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-2 text-center text-red-500">{organizerError}</td>
+                        </tr>
+                      ) : pendingOrganizers.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-2 text-center text-gray-500">No pending organizers.</td>
+                        </tr>
+                      ) : (
+                        pendingOrganizers.map((org, idx) => (
+                          <tr key={idx} className="border-b border-yellow-100">
+                            <td className="px-4 py-2 font-medium text-gray-900">{org.name}</td>
+                            <td className="px-4 py-2 text-gray-600">{org.email}</td>
+                            <td className="px-4 py-2 text-gray-600">{org.created_at}</td>
+                            <td className="px-4 py-2">
+                              <Button size="sm" variant="outline" className="border-yellow-300 text-yellow-700 hover:bg-yellow-50">Approve</Button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Audit Log Entries (Last 30 Days) Section */}
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-blue-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Audit Log Entries (Last 30 Days)</h3>
+                <p className="text-sm text-gray-600">System activity trends and recent logs</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
+                <FileText className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row gap-6">
+              {/* Bar Chart */}
+              <div className="w-full md:w-1/2 flex items-center justify-center">
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={auditLogsPerDay}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="day" hide />
+                    <YAxis hide />
+                    <Bar dataKey="count" fill="#60a5fa" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {/* Recent Audit Log List */}
+              <div className="w-full md:w-1/2 max-h-48 overflow-y-auto">
+                <ul className="divide-y divide-blue-100">
+                  {auditLoading ? (
+                    <li className="py-2 text-center text-gray-500">Loading audit logs...</li>
+                  ) : auditError ? (
+                    <li className="py-2 text-center text-red-500">{auditError}</li>
+                  ) : auditLogsLast30Days.length === 0 ? (
+                    <li className="py-2 text-center text-gray-500">No recent audit logs.</li>
+                  ) : (
+                    auditLogsLast30Days.map((log, idx) => (
+                      <li key={idx} className="py-2 flex items-center gap-3">
+                        <FileText className="w-4 h-4 text-blue-400" />
+                        <div>
+                          <div className="font-medium text-gray-900">{log.user?.name || log.user?.email || 'System'}</div>
+                          <div className="text-xs text-gray-600">{log.action} • {log.created_at}</div>
+                        </div>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Most Popular Event Section */}
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-pink-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Most Popular Event</h3>
+                <p className="text-sm text-gray-600">Top events by attendance</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-pink-400 to-pink-600 rounded-lg flex items-center justify-center">
+                <Calendar className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row gap-6 items-center">
+              <div className="w-full md:w-1/2">
+                <div className="text-2xl font-bold text-pink-600 mb-2">Annual Tech Expo</div>
+                <div className="text-sm text-gray-600 mb-4">Attendance: <span className="font-semibold text-gray-900">1,200</span></div>
+                <div className="text-xs text-gray-500">Highest attendance event</div>
+              </div>
+              <div className="w-full md:w-1/2">
+                <ResponsiveContainer width="100%" height={120}>
+                  <BarChart data={[
+                    { name: 'Tech Expo', attendees: 1200 },
+                    { name: 'Health Summit', attendees: 950 },
+                    { name: 'EduCon', attendees: 800 },
+                    { name: 'BizForum', attendees: 700 },
+                    { name: 'ArtFest', attendees: 600 },
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} />
+                    <YAxis fontSize={10} tickLine={false} axisLine={false} />
+                    <Bar dataKey="attendees" fill="#f472b6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          {/* Peak Month Section */}
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-orange-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Peak Month</h3>
+                <p className="text-sm text-gray-600">Events per month (last year)</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-orange-600 rounded-lg flex items-center justify-center">
+                <BarChart3 className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            <div className="w-full h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={peakMonthData.chart}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={12} tickLine={false} axisLine={false} />
+                  <Bar dataKey="events" fill="#fb923c">
+                    {/* Highlight March as peak */}
+                    {peakMonthData.peak && (
+                      <Cell fill="#f59e42" />
+                    )}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 text-sm text-gray-700">
+              <span className="inline-block bg-orange-100 text-orange-800 rounded px-2 py-1 font-semibold mr-2">Peak: {peakMonthData.peak?.month}</span>
+              {peakMonthData.peak?.events} events
+            </div>
+          </div>
       </div>
 
-      {/* User Analytics & System Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DashboardCard title="User Role Distribution">
+        {/* Right: User Roles, Alerts, Activity */}
+        <div className="flex flex-col gap-8">
+          {/* User Role Distribution */}
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">User Role Distribution</h3>
+                <p className="text-sm text-gray-600">Breakdown of user roles</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Users className="w-4 h-4 text-white" />
+              </div>
+            </div>
           <div className="space-y-4">
             {userRoleDistribution?.map((role: any) => (
               <div key={role.role} className="space-y-2">
@@ -246,32 +577,47 @@ export default function AdminDashboard() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600">{role.count}</span>
                     {role.growth > 0 && (
-                      <Badge className="bg-green-100 text-green-800">
-                        +{role.growth}%
-                      </Badge>
+                        <Badge className="bg-green-100 text-green-800">+{role.growth}%</Badge>
                     )}
                   </div>
                 </div>
                 <Progress
                   value={
-                    (role.count / (keyMetrics?.totalUsers?.numericValue || 1)) *
-                    100
+                      (role.count / (keyMetrics?.totalUsers?.numericValue || 1)) * 100
                   }
                   className="h-2"
                 />
               </div>
             ))}
           </div>
-        </DashboardCard>
+          </div>
 
-        <DashboardCard title="System Alerts">
+          {/* System Alerts */}
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">System Alerts</h3>
+                <p className="text-sm text-gray-600">Recent system notifications</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg flex items-center justify-center">
+                <AlertCircle className="w-4 h-4 text-white" />
+              </div>
+            </div>
           <div className="space-y-3">
             {systemAlerts?.map((alert: any) => (
               <div
                 key={alert.id}
-                className={`p-3 rounded-lg border ${getSeverityColor(
-                  alert.severity
-                )}`}
+                  className={`p-3 rounded-lg border ${
+                    alert.severity === 'warning'
+                      ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                      : alert.severity === 'info'
+                      ? 'bg-blue-100 text-blue-800 border-blue-200'
+                      : alert.severity === 'success'
+                      ? 'bg-green-100 text-green-800 border-green-200'
+                      : alert.severity === 'error'
+                      ? 'bg-red-100 text-red-800 border-red-200'
+                      : 'bg-gray-100 text-gray-800 border-gray-200'
+                  }`}
               >
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -286,20 +632,34 @@ export default function AdminDashboard() {
           <Button variant="outline" size="sm" className="w-full mt-4">
             View All Alerts
           </Button>
-        </DashboardCard>
       </div>
 
-      {/* Recent Activity & Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DashboardCard title="Recent Activity">
+          {/* Recent Activity */}
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
+                <p className="text-sm text-gray-600">Latest system activity</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                <MessageSquare className="w-4 h-4 text-white" />
+              </div>
+            </div>
           <div className="space-y-4">
             {filteredActivities?.length === 0 && (
-              <div className="text-gray-400">No recent activity.</div>
+                <div className="text-center py-8 text-gray-400">
+                  <MessageSquare className="w-8 h-8 mx-auto mb-2" />
+                  <span>No recent activity</span>
+                </div>
             )}
             {filteredActivities?.map((activity: any) => (
-              <div key={activity.id} className="flex items-center gap-3">
+                <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
                 <div className="p-2 bg-gray-100 rounded-full">
-                  {getActivityIcon(activity.type)}
+                    {activity.type === 'event' ? <Calendar className="w-4 h-4" /> :
+                     activity.type === 'user' ? <Users className="w-4 h-4" /> :
+                     activity.type === 'approval' ? <UserCheck className="w-4 h-4" /> :
+                     activity.type === 'report' ? <FileText className="w-4 h-4" /> :
+                     <AlertCircle className="w-4 h-4" />}
                 </div>
                 <div>
                   <p className="text-sm font-medium">
@@ -310,47 +670,8 @@ export default function AdminDashboard() {
               </div>
             ))}
           </div>
-        </DashboardCard>
-
-        <DashboardCard title="Quick Actions">
-          <div className="grid grid-cols-2 gap-4">
-            <Link
-              to="/dashboard/users?add=1"
-              className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
-            >
-              <Users className="w-8 h-8 mx-auto mb-2 text-gray-600" />
-              <span className="font-medium">Add User</span>
-            </Link>
-            <Link
-              to="/dashboard/organizers/add"
-              className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
-            >
-              <Building2 className="w-8 h-8 mx-auto mb-2 text-gray-600" />
-              <span className="font-medium">Add Organizer</span>
-            </Link>
-            <Link
-              to="/dashboard/reports"
-              className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
-            >
-              <BarChart3 className="w-8 h-8 mx-auto mb-2 text-gray-600" />
-              <span className="font-medium">View Reports</span>
-            </Link>
-            <Link
-              to="/dashboard/audit-logs"
-              className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
-            >
-              <Shield className="w-8 h-8 mx-auto mb-2 text-gray-600" />
-              <span className="font-medium">Audit Logs</span>
-            </Link>
-            <Link
-              to="/dashboard/locate-badges"
-              className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
-            >
-              <MapPin className="w-8 h-8 mx-auto mb-2 text-blue-600" />
-              <span className="font-medium">Locate Badges</span>
-            </Link>
           </div>
-        </DashboardCard>
+        </div>
       </div>
     </div>
   )

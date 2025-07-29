@@ -83,7 +83,35 @@ export default function PublicEventRegister() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading event...</div>;
   if (error) return <div className="min-h-screen flex items-center justify-center text-red-600">{error}</div>;
-  if (success) return <div className="min-h-screen flex items-center justify-center text-green-600">Thank you for registering for {event?.name}!</div>;
+  if (success) return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="max-w-md mx-auto text-center p-8">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Registration Successful!</h2>
+        <p className="text-gray-600 mb-4">Thank you for registering for <strong>{event?.name}</strong></p>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <span className="font-semibold text-blue-800">Check Your Email</span>
+          </div>
+          <p className="text-blue-700 text-sm">
+            We've sent you a confirmation email with your digital visitor badge attached. 
+            Please check your inbox and save the badge for the event.
+          </p>
+        </div>
+        <div className="text-sm text-gray-500">
+          <p>If you don't see the email, please check your spam folder.</p>
+          <p className="mt-2">We look forward to seeing you at the event!</p>
+        </div>
+      </div>
+    </div>
+  );
 
   // Organizer logo logic
   let organizerLogo = '/placeholder-avatar.png';

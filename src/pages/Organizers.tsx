@@ -16,6 +16,7 @@ import {
   PauseCircle,
   UserPlus,
   Eye,
+  Calendar,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -57,6 +58,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useAuth } from '@/hooks/use-auth'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function Organizers() {
   const [organizers, setOrganizers] = useState<any[]>([])
@@ -85,6 +87,7 @@ export default function Organizers() {
   const [selectedEvents, setSelectedEvents] = useState<any[]>([])
   const [eventsLoading, setEventsLoading] = useState(false)
   const [eventsError, setEventsError] = useState<string | null>(null)
+  const [eventsCountMap, setEventsCountMap] = useState<Record<string, number | undefined>>({});
   const { user: currentUser } = useAuth()
   const isCurrentSuperAdmin = currentUser && currentUser.role === 'superadmin';
   const canDelete = isCurrentSuperAdmin;
@@ -122,6 +125,12 @@ export default function Organizers() {
         api.get(`/organizers/${org.id}/contacts`).then((res) => {
           setContactsMap((prev) => ({ ...prev, [org.id]: res.data }))
         })
+        // Fetch events count for each organizer
+        api.get(`/admin/organizers/${org.id}/events`).then((res) => {
+          setEventsCountMap((prev) => ({ ...prev, [org.id]: Array.isArray(res.data) ? res.data.length : 0 }))
+        }).catch(() => {
+          setEventsCountMap((prev) => ({ ...prev, [org.id]: 0 }))
+        })
       })
     }
   }, [loading, organizers])
@@ -158,6 +167,9 @@ export default function Organizers() {
     suspended: organizers.filter((o) => o.status === 'suspended').length,
     totalEvents: organizers.reduce((sum, o) => sum + (o.eventsManaged || 0), 0),
   }
+
+  // Calculate total events from eventsCountMap
+  const totalEvents = Object.values(eventsCountMap).reduce((sum, count) => sum + (count || 0), 0);
 
   const openAssignDialog = (organizer: any) => {
     setSelectedOrganizer(organizer)
@@ -345,68 +357,79 @@ export default function Organizers() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6 w-full">
+      <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8 px-2 sm:px-6 lg:px-12">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Organizer Management
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Manage event organizers, contacts, and permissions
-            </p>
+            <h1 className="text-4xl font-extrabold text-gray-900 drop-shadow-sm">Organizer Management</h1>
+            <p className="text-lg text-gray-600 mt-2">Manage event organizers, contacts, and permissions</p>
           </div>
           <Link to="/dashboard/organizers/add">
-            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-              <Plus className="w-4 h-4 mr-2" /> Add Organizer
+            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg text-lg px-6 py-3 rounded-xl">
+              <Plus className="w-5 h-5 mr-2" /> Add Organizer
             </Button>
           </Link>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <DashboardCard title="Total Organizers" className="text-center">
-            <div className="text-2xl font-bold text-blue-600">
-              {organizerStats.total}
-            </div>
-          </DashboardCard>
-          <DashboardCard title="Active" className="text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {organizerStats.active}
-            </div>
-          </DashboardCard>
-          <DashboardCard title="Inactive" className="text-center">
-            <div className="text-2xl font-bold text-gray-600">
-              {organizerStats.inactive}
-            </div>
-          </DashboardCard>
-          <DashboardCard title="Suspended" className="text-center">
-            <div className="text-2xl font-bold text-red-600">
-              {organizerStats.suspended}
-            </div>
-          </DashboardCard>
-          <DashboardCard title="Total Events" className="text-center">
-            <div className="text-2xl font-bold text-purple-600">
-              {organizerStats.totalEvents}
-            </div>
-          </DashboardCard>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-blue-200 text-center">
+            <CardHeader>
+              <CardTitle className="text-blue-600 text-lg font-semibold">Total Organizers</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{organizerStats.total}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-green-200 text-center">
+            <CardHeader>
+              <CardTitle className="text-green-600 text-lg font-semibold">Active</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{organizerStats.active}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 text-center">
+            <CardHeader>
+              <CardTitle className="text-gray-600 text-lg font-semibold">Inactive</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{organizerStats.inactive}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-red-200 text-center">
+            <CardHeader>
+              <CardTitle className="text-red-600 text-lg font-semibold">Suspended</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{organizerStats.suspended}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-purple-200 text-center">
+            <CardHeader>
+              <CardTitle className="text-purple-600 text-lg font-semibold">Total Events</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{totalEvents}</div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 w-full">
+        <div className="flex flex-col sm:flex-row gap-4 w-full mb-8">
           <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <Input
               placeholder="Search organizers..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-full"
+              className="pl-12 w-full py-3 rounded-xl text-lg shadow-md"
             />
           </div>
-          <div className="w-full sm:w-40">
+          <div className="w-full sm:w-48">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full">
-                <Filter className="w-4 h-4 mr-2" />
+              <SelectTrigger className="w-full py-3 rounded-xl text-lg shadow-md">
+                <Filter className="w-5 h-5 mr-2" />
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
@@ -421,325 +444,119 @@ export default function Organizers() {
 
         {/* Loading/Error States */}
         {loading && (
-          <div className="text-center py-12">Loading organizers...</div>
+          <div className="flex justify-center items-center py-24">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+            <span className="ml-4 text-xl text-gray-500">Loading organizers...</span>
+          </div>
         )}
-        {error && <div className="text-center py-12 text-red-500">{error}</div>}
+        {error && <div className="text-center py-12 text-red-500 text-xl">{error}</div>}
 
-        {/* Organizers Table / Cards */}
+        {/* Organizer Table View */}
         {!loading && !error && (
-          <DashboardCard title="Organizers">
-            {/* Table for lg+ screens, cards for smaller */}
-            <div className="hidden lg:block overflow-x-auto w-full">
-              <Table className="min-w-[700px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Organization</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="hidden xl:table-cell">
-                      Events Managed
-                    </TableHead>
-                    <TableHead className="hidden xl:table-cell">
-                      Assigned Contacts
-                    </TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-0 overflow-x-auto mt-8">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold text-gray-900 px-6 pt-6 pb-2">Organizers</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gradient-to-r from-blue-50 to-purple-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Organization</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Events Managed</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contacts</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white/60 divide-y divide-gray-100">
                   {filteredOrganizers.map((organizer) => (
-                    <TableRow key={organizer.id} className="align-top">
-                      <TableCell>
-                        <Link
-                          to={`/dashboard/organizers/${organizer.id}`}
-                          className="text-blue-600 hover:underline"
-                        >
-                          {organizer.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(organizer.status)}>
-                          {organizer.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden xl:table-cell">
-                        {organizer.eventsManaged}
-                      </TableCell>
-                      <TableCell className="hidden xl:table-cell">
+                    <tr key={organizer.id} className="hover:bg-blue-50/40 transition">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center text-white text-lg font-bold shadow-md">
+                            {organizer.name?.[0] || <Users className="w-6 h-6" />}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-gray-900">{organizer.name}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge className={getStatusColor(organizer.status) + ' text-xs px-2 py-1 rounded-full'}>{organizer.status}</Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-700">
+                        {eventsCountMap[organizer.id] === undefined ? (
+                          <span className="inline-block w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin align-middle" />
+                        ) : (
+                          eventsCountMap[organizer.id]
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         {contactsMap[organizer.id]?.length > 0 ? (
-                          <div className="flex flex-col gap-1">
+                          <div className="flex flex-wrap gap-2">
                             {contactsMap[organizer.id].map((contact: any) => (
-                              <div
-                                key={contact.id}
-                                className="flex items-center gap-2"
-                              >
-                                <span
-                                  className={
-                                    contact.is_primary_contact
-                                      ? 'font-bold text-purple-700'
-                                      : ''
-                                  }
-                                >
-                                  {contact.name} ({contact.email})
-                                  {contact.is_primary_contact
-                                    ? ' (Primary)'
-                                    : ''}
-                                </span>
-                                {!contact.is_primary_contact && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        size="xs"
-                                        variant="ghost"
-                                        onClick={() =>
-                                          handleSetPrimary(
-                                            organizer.id,
-                                            contact.id
-                                          )
-                                        }
-                                      >
-                                        <Star className="w-4 h-4 text-yellow-500" />{' '}
-                                        Set Primary
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      Set as Primary Contact
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      size="xs"
-                                      variant="ghost"
-                                      onClick={() =>
-                                        handleRemoveContact(
-                                          organizer.id,
-                                          contact.id
-                                        )
-                                      }
-                                    >
-                                      <Trash2 className="w-4 h-4 text-red-500" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    Remove Contact
-                                  </TooltipContent>
-                                </Tooltip>
-                              </div>
+                              <span key={contact.id} className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${contact.is_primary_contact ? 'bg-purple-100 text-purple-700 border border-purple-300' : 'bg-gray-100 text-gray-700'}`}>
+                                {contact.name} <span className="text-gray-400">({contact.email})</span>
+                                {contact.is_primary_contact && <Star className="w-3 h-3 text-purple-500 ml-1" />}
+                              </span>
                             ))}
                           </div>
                         ) : (
                           <span className="text-gray-400">No contacts</span>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-wrap gap-2">
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => openAssignDialog(organizer)}
-                                className="mb-1"
-                              >
-                                <UserPlus className="w-4 h-4" />
+                              <Button variant="outline" size="icon" onClick={() => openAssignDialog(organizer)} className="shadow-sm">
+                                <UserPlus className="w-5 h-5" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>Assign Contacts</TooltipContent>
                           </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="mb-1"
-                                onClick={() => openViewUsersDialog(organizer)}
-                              >
-                                <UserCheck className="w-4 h-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>View Users</TooltipContent>
-                          </Tooltip>
-                          {organizer.status === 'active' ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="destructive"
-                                  onClick={() => handleSuspend(organizer)}
-                                  disabled={statusLoadingId === organizer.id}
-                                >
-                                  <PauseCircle className="w-4 h-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Suspend Organizer</TooltipContent>
-                            </Tooltip>
-                          ) : (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  onClick={() => handleActivate(organizer)}
-                                  disabled={statusLoadingId === organizer.id}
-                                >
-                                  <PlayCircle className="w-4 h-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                Activate Organizer
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => openEditDialog(organizer)}
-                              >
-                                <Edit className="w-4 h-4" />
+                              <Button variant="outline" size="icon" onClick={() => openEditDialog(organizer)} className="shadow-sm">
+                                <Edit className="w-5 h-5" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>Edit Organizer</TooltipContent>
                           </Tooltip>
+                          {canDelete && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="outline" size="icon" onClick={() => openDeleteDialog(organizer)} className="shadow-sm">
+                                  <Trash2 className="w-5 h-5 text-red-500" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Delete Organizer</TooltipContent>
+                            </Tooltip>
+                          )}
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => openDeleteDialog(organizer)}
-                                disabled={!canDelete}
-                              >
-                                <Trash2 className="w-4 h-4" />
+                              <Button variant="outline" size="icon" onClick={() => openViewUsersDialog(organizer)} className="shadow-sm">
+                                <Eye className="w-5 h-5" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Delete Organizer</TooltipContent>
+                            <TooltipContent>View Users</TooltipContent>
                           </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => openViewEventsDialog(organizer)}
-                                className="mb-1"
-                              >
-                                <Eye className="w-4 h-4" />
+                              <Button variant="outline" size="icon" onClick={() => openViewEventsDialog(organizer)} className="shadow-sm">
+                                <Calendar className="w-5 h-5" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>View Events</TooltipContent>
                           </Tooltip>
                         </div>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
-            </div>
-            {/* Card layout for mobile */}
-            <div className="lg:hidden flex flex-col gap-4">
-              {filteredOrganizers.map((organizer) => (
-                <div
-                  key={organizer.id}
-                  className="rounded-lg border bg-white shadow-sm p-4 flex flex-col gap-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <Link
-                      to={`/dashboard/organizers/${organizer.id}`}
-                      className="font-bold text-blue-600 text-lg"
-                    >
-                      {organizer.name}
-                    </Link>
-                    <Badge className={getStatusColor(organizer.status)}>
-                      {organizer.status}
-                    </Badge>
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Events: {organizer.eventsManaged}
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => openAssignDialog(organizer)}
-                          className="mb-1"
-                        >
-                          <UserPlus className="w-4 h-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Assign Contacts</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="mb-1"
-                          onClick={() => openViewUsersDialog(organizer)}
-                        >
-                          <UserCheck className="w-4 h-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>View Users</TooltipContent>
-                    </Tooltip>
-                    {organizer.status === 'active' ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="destructive"
-                            onClick={() => handleSuspend(organizer)}
-                            disabled={statusLoadingId === organizer.id}
-                          >
-                            <PauseCircle className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Suspend Organizer</TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            onClick={() => handleActivate(organizer)}
-                            disabled={statusLoadingId === organizer.id}
-                          >
-                            <PlayCircle className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Activate Organizer</TooltipContent>
-                      </Tooltip>
-                    )}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => openEditDialog(organizer)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Edit Organizer</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => openDeleteDialog(organizer)}
-                          disabled={!canDelete}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Delete Organizer</TooltipContent>
-                    </Tooltip>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </DashboardCard>
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
         )}
 
         {/* Assign Contacts Dialog */}
