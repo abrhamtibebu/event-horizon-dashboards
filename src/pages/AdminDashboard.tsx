@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { format } from 'date-fns'
 import {
   Calendar,
   Users,
@@ -14,6 +15,7 @@ import {
   Trash2,
   MapPin,
   MessageSquare,
+  Globe,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -44,6 +46,9 @@ export default function AdminDashboard() {
   const [reportLoading, setReportLoading] = useState(true)
   const [reportError, setReportError] = useState<string | null>(null)
 
+  const [pendingEvents, setPendingEvents] = useState<any[]>([])
+  const [pendingEventsLoading, setPendingEventsLoading] = useState(true)
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -58,6 +63,7 @@ export default function AdminDashboard() {
         setLoading(false)
       }
     }
+    
     const fetchTrashCount = async () => {
       try {
         const response = await api.get('/trash')
@@ -66,9 +72,42 @@ export default function AdminDashboard() {
         console.error('Failed to fetch trash count:', error)
       }
     }
+    
+    const fetchPendingEvents = async () => {
+      try {
+        setPendingEventsLoading(true)
+        const response = await api.get('/events')
+        const pending = response.data.filter((event: any) => 
+          event.advertisement_status === 'pending'
+        )
+        setPendingEvents(pending.slice(0, 3)) // Show only first 3 pending events
+      } catch (error) {
+        console.error('Failed to fetch pending events:', error)
+      } finally {
+        setPendingEventsLoading(false)
+      }
+    }
+    
     fetchDashboardData()
     fetchTrashCount()
+    fetchPendingEvents()
   }, [])
+
+  const updateAdvertisementStatus = async (eventId: number, status: string) => {
+    try {
+      await api.put(`/events/${eventId}/advertisement-status`, {
+        advertisement_status: status
+      })
+      
+      // Update local state
+      setPendingEvents(prev => prev.filter(event => event.id !== eventId))
+      
+      // Show success message
+      console.log(`Event ${eventId} ${status} successfully`)
+    } catch (error) {
+      console.error('Failed to update advertisement status:', error)
+    }
+  }
 
   // Fetch organizers
   useEffect(() => {
@@ -633,6 +672,67 @@ export default function AdminDashboard() {
             View All Alerts
           </Button>
       </div>
+
+          {/* Pending Event Publications */}
+          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-orange-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Pending Event Publications</h3>
+                <p className="text-sm text-gray-600">Events waiting for Evella platform approval</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                <Globe className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            <div className="space-y-3">
+              {pendingEventsLoading ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500 mx-auto"></div>
+                </div>
+              ) : pendingEvents.length === 0 ? (
+                <div className="text-center py-4 text-gray-500">
+                  <Globe className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                  <p>No pending events for publication</p>
+                </div>
+              ) : (
+                pendingEvents.map((event: any) => (
+                  <div key={event.id} className="flex items-center justify-between p-3 rounded-lg bg-orange-50 border border-orange-200">
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-900">{event.name}</h4>
+                      <p className="text-sm text-gray-600">by {event.organizer?.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {format(new Date(event.start_date), 'MMM dd, yyyy')} • {event.location}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => updateAdvertisementStatus(event.id, 'approved')}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateAdvertisementStatus(event.id, 'rejected')}
+                        className="border-red-300 text-red-700 hover:bg-red-50"
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            {pendingEvents.length > 0 && (
+              <Button variant="outline" size="sm" className="w-full mt-4" asChild>
+                <Link to="/dashboard/event-publication">
+                  View All Events
+                </Link>
+              </Button>
+            )}
+          </div>
 
           {/* Recent Activity */}
           <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-6">

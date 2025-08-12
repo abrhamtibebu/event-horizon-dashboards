@@ -188,6 +188,7 @@ export default function EventDetails() {
   const [attendeesLoading, setAttendeesLoading] = useState(true)
   const [attendeesError, setAttendeesError] = useState<string | null>(null)
   const [guestTypes, setGuestTypes] = useState<any[]>([])
+  const [ticketTypes, setTicketTypes] = useState<any[]>([])
 
   // Badge template state
   const [badgeTemplate, setBadgeTemplate] = useState<BadgeTemplate | null>(null)
@@ -207,6 +208,7 @@ export default function EventDetails() {
     gender: '',
     country: '',
     guest_type_id: '',
+    ticket_type_id: '',
   })
   const [addAttendeeLoading, setAddAttendeeLoading] = useState(false)
   const [selectedAttendees, setSelectedAttendees] = useState<Set<number>>(
@@ -288,7 +290,20 @@ export default function EventDetails() {
     setEventError(null)
     api
       .get(`/events/${Number(eventId)}`)
-      .then((res) => setEventData(res.data))
+      .then((res) => {
+        const eventData = res.data
+        console.log('Event data fetched:', {
+          id: eventData.id,
+          name: eventData.name,
+          event_type: eventData.event_type,
+          guestTypes: eventData.guestTypes,
+          ticketTypes: eventData.ticketTypes,
+          guestTypesLength: eventData.guestTypes?.length,
+          ticketTypesLength: eventData.ticketTypes?.length
+        })
+        console.log('Full event data:', eventData)
+        setEventData(eventData)
+      })
       .catch((err) => setEventError('Failed to fetch event details.'))
       .finally(() => setEventLoading(false))
   }, [eventId])
@@ -301,33 +316,48 @@ export default function EventDetails() {
     api
       .get(`/events/${Number(eventId)}/attendees`)
       .then((res) => {
-        // Patch: Ensure guestType is always an object
-        let mapped = res.data.map((attendee: any) => {
-          if (!attendee.guestType && attendee.guest_type_id && Array.isArray(guestTypes) && guestTypes.length > 0) {
-            const found = guestTypes.find(gt => String(gt.id) === String(attendee.guest_type_id));
-            return { ...attendee, guestType: found || null };
-          }
-          return attendee;
-        });
-        console.log('DEBUG - Fetched attendees:', mapped);
-        if (mapped && mapped.length > 0) {
-          console.log('DEBUG - First attendee:', mapped[0]);
-          console.log('DEBUG - First attendee guestType:', mapped[0]?.guestType);
+        console.log('Attendees response:', res.data)
+        // The backend should already include guestType relationship
+        // Just log and set the data as-is
+        if (res.data && res.data.length > 0) {
+          console.log('First attendee structure:', {
+            id: res.data[0].id,
+            guest_type_id: res.data[0].guest_type_id,
+            guestType: res.data[0].guestType,
+            guest: res.data[0].guest
+          })
         }
-        setAttendees(mapped)
+        setAttendees(res.data || [])
       })
-      .catch((err) => setAttendeesError('Failed to fetch attendees.'))
+      .catch((err) => {
+        console.error('Failed to fetch attendees:', err)
+        setAttendeesError('Failed to fetch attendees.')
+      })
       .finally(() => setAttendeesLoading(false))
-  }, [eventId, guestTypes])
-
-  // Fetch guest types
-  useEffect(() => {
-    if (!eventId) return
-    api
-      .get(`/events/${Number(eventId)}/guest-types`)
-      .then((res) => setGuestTypes(res.data))
-      .catch((err) => toast.error('Failed to fetch guest types.'))
   }, [eventId])
+
+  // Set guest types and ticket types from event data
+  useEffect(() => {
+    if (!eventData) return
+    
+    console.log('Setting types from event data:', {
+      event_type: eventData.event_type,
+      guestTypes: eventData.guestTypes,
+      ticketTypes: eventData.ticketTypes
+    })
+    
+    if (eventData.event_type === 'ticketed') {
+      // Use ticket types from event data
+      const ticketTypesData = Array.isArray(eventData.ticketTypes) ? eventData.ticketTypes : []
+      setTicketTypes(ticketTypesData)
+      setGuestTypes([]) // Clear guest types for ticketed events
+    } else {
+      // Use guest types from event data
+      const guestTypesData = Array.isArray(eventData.guestTypes) ? eventData.guestTypes : []
+      setGuestTypes(guestTypesData)
+      setTicketTypes([]) // Clear ticket types for free events
+    }
+  }, [eventData])
 
   // Fetch badge template
   useEffect(() => {
@@ -382,19 +412,20 @@ export default function EventDetails() {
   // Refresh share analytics every 30 seconds
   useEffect(() => {
     if (!eventId) return
-    const interval = setInterval(() => {
-      getRealTimeShareAnalytics(eventId)
-        .then((res) => {
-          console.log('Share Analytics Auto-refresh:', res.data)
-          setShareAnalytics(res.data)
-        })
-        .catch((err) => {
-          // Silently fail for auto-refresh but log for debugging
-          console.warn('Share Analytics Auto-refresh failed:', err)
-        })
-    }, 30000) // 30 seconds
+    // Temporarily disabled polling to prevent reloading issues
+    // const interval = setInterval(() => {
+    //   getRealTimeShareAnalytics(eventId)
+    //     .then((res) => {
+    //       console.log('Share Analytics Auto-refresh:', res.data)
+    //       setShareAnalytics(res.data)
+    //     })
+    //     .catch((err) => {
+    //       // Silently fail for auto-refresh but log for debugging
+    //       console.warn('Share Analytics Auto-refresh failed:', err)
+    //     })
+    // }, 30000) // 30 seconds
 
-    return () => clearInterval(interval)
+    // return () => clearInterval(interval)
   }, [eventId])
 
   // Load dropdown data for edit form
@@ -951,6 +982,7 @@ export default function EventDetails() {
         gender: '',
         country: '',
         guest_type_id: '',
+        ticket_type_id: '',
       })
     } catch (err: any) {
       // Show a user-friendly error for duplicate phone/email
@@ -1114,6 +1146,7 @@ export default function EventDetails() {
       gender: attendee.guest?.gender || '',
       country: attendee.guest?.country || '',
       guest_type_id: attendee.guest_type_id || attendee.guestType?.id || '',
+      ticket_type_id: attendee.ticket_type_id || attendee.ticketType?.id || '',
     })
     setEditAttendeeDialogOpen(true)
   }
@@ -1137,6 +1170,7 @@ export default function EventDetails() {
         gender: editAttendeeForm.gender,
         country: editAttendeeForm.country,
         guest_type_id: editAttendeeForm.guest_type_id,
+        ticket_type_id: editAttendeeForm.ticket_type_id,
       }
       
       await handleEditAttendee(editAttendeeForm.id, updatedData)
@@ -1452,8 +1486,38 @@ export default function EventDetails() {
         </div>
       </div>
       <div className="space-y-6">
-        {!eventData ? (
-          <div>Loading...</div>
+        {eventLoading ? (
+          <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <p className="text-gray-600">Loading event details...</p>
+          </div>
+        ) : eventError ? (
+          <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+            <XCircle className="w-12 h-12 text-red-500" />
+            <h3 className="text-lg font-semibold text-gray-700">Failed to Load Event</h3>
+            <p className="text-gray-600 text-center">{eventError}</p>
+            <Button
+              onClick={() => window.location.reload()}
+              variant="outline"
+              className="mt-4"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Try Again
+            </Button>
+          </div>
+        ) : !eventData ? (
+          <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+            <XCircle className="w-12 h-12 text-gray-400" />
+            <h3 className="text-lg font-semibold text-gray-700">Event Not Found</h3>
+            <p className="text-gray-600">The event you're looking for doesn't exist.</p>
+            <Button
+              onClick={() => window.history.back()}
+              variant="outline"
+              className="mt-4"
+            >
+              Go Back
+            </Button>
+          </div>
         ) : (
           <>
             {/* Fancy Hero Banner */}
@@ -1482,6 +1546,18 @@ export default function EventDetails() {
             </Link>
           </div>
                 <h1 className="text-4xl md:text-5xl font-extrabold text-white drop-shadow-lg mb-2">{eventData.name}</h1>
+                <div className="mb-3">
+                  <Badge 
+                    variant="secondary" 
+                    className={`text-sm font-semibold px-3 py-1 ${
+                      eventData?.event_type === 'ticketed' 
+                        ? 'bg-purple-600 text-white border-purple-500' 
+                        : 'bg-green-600 text-white border-green-500'
+                    }`}
+                  >
+                    {eventData?.event_type === 'ticketed' ? '🎫 Ticketed Event' : '🎉 Free Event'}
+                  </Badge>
+                </div>
           <div className="flex flex-wrap items-center gap-4 text-white/90 text-lg font-medium">
             <span className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-yellow-300" />
@@ -2028,61 +2104,353 @@ export default function EventDetails() {
               )}
           </TabsList>
             <TabsContent value="details">
-                  {/* Remove duplicated hero/banner here. Only show event info grid, description, and actions. */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                    <div className="bg-white rounded-xl shadow p-6 flex flex-col gap-4">
-                      <div className="flex items-center gap-3">
-                        <Calendar className="w-5 h-5 text-blue-500" />
-                        <span className="font-semibold">Date:</span>
-                        <span>{eventData?.start_date && format(parseISO(eventData.start_date), 'MMM d, yyyy, h:mm a')}</span>
+              <div className="space-y-8">
+                {/* Event Overview Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {/* Event Type Card */}
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-2xl p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        eventData?.event_type === 'ticketed' 
+                          ? 'bg-purple-100 text-purple-600' 
+                          : 'bg-green-100 text-green-600'
+                      }`}>
+                        {eventData?.event_type === 'ticketed' ? '🎫' : '🎉'}
                       </div>
-                      <div className="flex items-center gap-3">
-                        <MapPin className="w-5 h-5 text-pink-500" />
-                        <span className="font-semibold">Location:</span>
-                        <span>{eventData?.location}</span>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Event Type</p>
+                        <p className={`font-bold ${
+                          eventData?.event_type === 'ticketed' ? 'text-purple-700' : 'text-green-700'
+                        }`}>
+                          {eventData?.event_type === 'ticketed' ? 'Ticketed Event' : 'Free Event'}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Users className="w-5 h-5 text-green-500" />
-                        <span className="font-semibold">Registered:</span>
-                        <span>{attendees.length}</span>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <UserPlus className="w-5 h-5 text-blue-400" />
-                        <span className="font-semibold">Organizer:</span>
-                        <span>{user?.organizer?.name || eventData?.organizer?.name}</span>
+                    <div className="text-xs text-gray-500">
+                      {eventData?.event_type === 'ticketed' 
+                        ? `${ticketTypes.length} ticket types available`
+                        : `${guestTypes.length} guest types available`
+                      }
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Tag className="w-5 h-5 text-purple-500" />
-                        <span className="font-semibold">Status:</span>
-                        <span className="capitalize">{eventData?.status}</span>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <Users className="w-5 h-5 text-indigo-500 mt-0.5" />
-                        <span className="font-semibold">Guest Types:</span>
-                        <div className="flex flex-wrap gap-1">
-                          {Array.isArray(eventData?.guest_types) && eventData.guest_types.length > 0 ? (
-                            eventData.guest_types.map((gt: any, index: number) => {
-                              const guestTypeName = typeof gt === 'object' && gt !== null && gt.name ? gt.name : String(gt);
-                              return (
-                                <Badge key={index} variant="secondary" className="text-xs">
-                                  {guestTypeName}
-                                </Badge>
-                              );
-                            })
-                          ) : (
-                            <span className="text-gray-500 text-sm">No guest types defined</span>
+
+                  {/* Status Card */}
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        eventData?.status === 'active' ? 'bg-green-100 text-green-600' :
+                        eventData?.status === 'draft' ? 'bg-yellow-100 text-yellow-600' :
+                        eventData?.status === 'cancelled' ? 'bg-red-100 text-red-600' :
+                        'bg-gray-100 text-gray-600'
+                      }`}>
+                        {eventData?.status === 'active' ? '✓' : 
+                         eventData?.status === 'draft' ? '📝' : 
+                         eventData?.status === 'cancelled' ? '✗' : '?'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Status</p>
+                        <p className="font-bold text-gray-800 capitalize">{eventData?.status || 'Unknown'}</p>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {eventData?.status === 'active' ? 'Event is live and accepting registrations' :
+                       eventData?.status === 'draft' ? 'Event is in preparation mode' :
+                       eventData?.status === 'cancelled' ? 'Event has been cancelled' : 'Status unknown'}
+                    </div>
+                  </div>
+
+                  {/* Registration Card */}
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        eventData?.registration_start_date && new Date(eventData.registration_start_date) <= new Date() && 
+                        eventData?.registration_end_date && new Date(eventData.registration_end_date) >= new Date() 
+                          ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                      }`}>
+                        {eventData?.registration_start_date && new Date(eventData.registration_start_date) <= new Date() && 
+                         eventData?.registration_end_date && new Date(eventData.registration_end_date) >= new Date() 
+                           ? '✓' : '✗'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Registration</p>
+                        <p className="font-bold text-gray-800">
+                          {eventData?.registration_start_date && eventData?.registration_end_date 
+                            ? (new Date(eventData.registration_start_date) <= new Date() && new Date(eventData.registration_end_date) >= new Date())
+                              ? 'Open'
+                              : new Date(eventData.registration_start_date) > new Date()
+                                ? 'Not Started'
+                                : 'Closed'
+                            : 'Not Set'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {attendees.length} attendees registered
+                    </div>
+                  </div>
+
+                  {/* Capacity Card */}
+                  <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-6">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center">
+                        👥
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Capacity</p>
+                        <p className="font-bold text-gray-800">
+                          {eventData?.max_guests ? `${eventData.max_guests} guests` : 'Unlimited'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {eventData?.max_guests 
+                        ? `${attendees.length}/${eventData.max_guests} spots filled`
+                        : 'No capacity limit'
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                {/* Event Details Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Main Event Information */}
+                  <div className="lg:col-span-2 space-y-6">
+                    {/* Event Description */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                          📝
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900">Event Description</h3>
+                      </div>
+                      <div className="prose prose-gray max-w-none">
+                        <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                          {eventData?.description || 'No description provided for this event.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Event Type Details */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
+                          {eventData?.event_type === 'ticketed' ? '🎫' : '🎉'}
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900">
+                          {eventData?.event_type === 'ticketed' ? 'Ticket Information' : 'Guest Type Information'}
+                        </h3>
+                      </div>
+                      
+                          {eventData?.event_type === 'ticketed' ? (
+                        <div className="space-y-4">
+                          {ticketTypes.length > 0 ? (
+                              ticketTypes.map((ticket: any, index: number) => {
+                                const ticketName = ticket?.name || 'Unknown Ticket';
+                                const ticketPrice = ticket?.price ? parseFloat(ticket.price).toLocaleString() : '0';
+                              const ticketQuantity = ticket?.quantity || 'Unlimited';
+                              const ticketDescription = ticket?.description || '';
+                              
+                                return (
+                                <div key={index} className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6">
+                                  <div className="flex items-start justify-between mb-3">
+                                    <div>
+                                      <h4 className="font-bold text-purple-900 text-lg">{ticketName}</h4>
+                                      {ticketDescription && (
+                                        <p className="text-purple-700 text-sm mt-1">{ticketDescription}</p>
+                                      )}
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-2xl font-bold text-purple-900">ETB {ticketPrice}</div>
+                                      <div className="text-sm text-purple-600">
+                                        {ticketQuantity === 'Unlimited' ? 'Unlimited' : `${ticketQuantity} available`}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-purple-600">
+                                    <span>🎫</span>
+                                    <span>Ticket Type</span>
+                                  </div>
+                                </div>
+                                );
+                              })
+                            ) : (
+                            <div className="text-center py-8 text-gray-500">
+                              <div className="text-4xl mb-2">🎫</div>
+                              <p>No ticket types defined for this event</p>
+                            </div>
                           )}
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {guestTypes.length > 0 ? (
+                              guestTypes.map((gt: any, index: number) => {
+                                let guestTypeName = '';
+                              let guestTypePrice = '';
+                              let guestTypeDescription = '';
+                              
+                                if (typeof gt === 'object' && gt !== null) {
+                                  guestTypeName = gt.name || gt.id || String(gt.id) || 'Unknown';
+                                guestTypePrice = gt.price ? parseFloat(gt.price).toLocaleString() : '0';
+                                guestTypeDescription = gt.description || '';
+                                } else {
+                                  guestTypeName = String(gt);
+                                guestTypePrice = '0';
+                                }
+                              
+                                return (
+                                <div key={index} className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+                                  <div className="flex items-start justify-between mb-3">
+                                    <div>
+                                      <h4 className="font-bold text-green-900 text-lg">{guestTypeName}</h4>
+                                      {guestTypeDescription && (
+                                        <p className="text-green-700 text-sm mt-1">{guestTypeDescription}</p>
+                                      )}
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-2xl font-bold text-green-900">
+                                        {guestTypePrice === '0' ? 'Free' : `ETB ${guestTypePrice}`}
+                                      </div>
+                                      <div className="text-sm text-green-600">Guest Type</div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-green-600">
+                                    <span>👥</span>
+                                    <span>Guest Type</span>
+                                  </div>
+                                </div>
+                                );
+                              })
+                            ) : (
+                            <div className="text-center py-8 text-gray-500">
+                              <div className="text-4xl mb-2">👥</div>
+                              <p>No guest types defined for this event</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                        </div>
+
+                  {/* Sidebar Information */}
+                  <div className="space-y-6">
+                    {/* Event Details */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                          📅
+                      </div>
+                        <h3 className="text-lg font-bold text-gray-900">Event Details</h3>
+                    </div>
+                      
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <Calendar className="w-5 h-5 text-blue-500" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Start Date</p>
+                            <p className="text-sm text-gray-900">
+                              {eventData?.start_date && format(parseISO(eventData.start_date), 'MMM d, yyyy')}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {eventData?.start_date && format(parseISO(eventData.start_date), 'h:mm a')}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <Calendar className="w-5 h-5 text-red-500" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">End Date</p>
+                            <p className="text-sm text-gray-900">
+                              {eventData?.end_date && format(parseISO(eventData.end_date), 'MMM d, yyyy')}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {eventData?.end_date && format(parseISO(eventData.end_date), 'h:mm a')}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <MapPin className="w-5 h-5 text-pink-500" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Location</p>
+                            <p className="text-sm text-gray-900">{eventData?.location}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <UserPlus className="w-5 h-5 text-blue-500" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Organizer</p>
+                            <p className="text-sm text-gray-900">
+                              {user?.organizer?.name || eventData?.organizer?.name}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <Tag className="w-5 h-5 text-blue-500" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Category</p>
+                            <p className="text-sm text-gray-900 capitalize">
+                              {eventData?.eventCategory?.name || 'Not specified'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                          <Tag className="w-5 h-5 text-yellow-500" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Type Category</p>
+                            <p className="text-sm text-gray-900 capitalize">
+                              {eventData?.eventType?.name || 'Not specified'}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div className="bg-white rounded-xl shadow p-6">
-                      <h3 className="text-lg font-bold mb-2 text-gray-800">Event Description</h3>
-                      <p className="text-gray-600 whitespace-pre-line">{eventData?.description || 'No description provided.'}</p>
+
+                    {/* Registration Period */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                          ⏰
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900">Registration Period</h3>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                          <Clock className="w-5 h-5 text-green-500" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Opens</p>
+                            <p className="text-sm text-gray-900">
+                              {eventData?.registration_start_date && format(parseISO(eventData.registration_start_date), 'MMM d, yyyy')}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {eventData?.registration_start_date && format(parseISO(eventData.registration_start_date), 'h:mm a')}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg">
+                          <Clock className="w-5 h-5 text-red-500" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-600">Closes</p>
+                            <p className="text-sm text-gray-900">
+                              {eventData?.registration_end_date && format(parseISO(eventData.registration_end_date), 'MMM d, yyyy')}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {eventData?.registration_end_date && format(parseISO(eventData.registration_end_date), 'h:mm a')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                     </div>
                   </div>
                   
                   {/* Event & Registration Dates Section */}
-                  <div className="bg-white rounded-xl shadow p-6 mb-8">
+                  {/* <div className="bg-white rounded-xl shadow p-6 mb-8">
                     <h3 className="text-lg font-bold mb-4 text-gray-800 flex items-center gap-2">
                       <Calendar className="w-5 h-5 text-purple-500" />
                       Event & Registration Dates
@@ -2119,7 +2487,40 @@ export default function EventDetails() {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </div> */}
+                  
+                  {/* Additional Event Details Section */}
+                  {(eventData?.requirements || eventData?.agenda) && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                          📋
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900">Additional Information</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {eventData?.requirements && (
+                          <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                              <Shield className="w-5 h-5 text-orange-600" />
+                              <h4 className="font-bold text-orange-900">Requirements</h4>
+                            </div>
+                            <p className="text-orange-800 leading-relaxed whitespace-pre-line">{eventData.requirements}</p>
+                          </div>
+                        )}
+                        {eventData?.agenda && (
+                          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
+                            <div className="flex items-center gap-3 mb-4">
+                              <Clock className="w-5 h-5 text-blue-600" />
+                              <h4 className="font-bold text-blue-900">Agenda</h4>
+                            </div>
+                            <p className="text-blue-800 leading-relaxed whitespace-pre-line">{eventData.agenda}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Actions Row - move to bottom left */}
                   <div className="flex flex-wrap gap-4 mb-8 justify-start">
                     {(user?.role === 'admin' || user?.role === 'superadmin' || (user?.role === 'organizer' && user?.organizer_id === eventData.organizer_id)) && (
@@ -2478,7 +2879,8 @@ export default function EventDetails() {
                       </>
                     )}
                   </div>
-            </TabsContent>
+                </div>
+              </TabsContent>
             <TabsContent value="badges">
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-wrap gap-2 mb-2">
@@ -4288,32 +4690,65 @@ export default function EventDetails() {
                 </div>
                 <div className="grid grid-cols-1">
                   <div>
-                    <Label htmlFor="guest_type_id">Guest Type</Label>
-                    <Select
-                      onValueChange={(value) =>
-                        handleAddAttendeeInput('guest_type_id', value)
-                      }
-                      value={addAttendeeForm.guest_type_id}
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a guest type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {guestTypes
-                          .filter(
-                            (type) =>
-                              type.id !== undefined &&
-                              type.id !== null &&
-                              type.id !== ''
-                          )
-                          .map((type) => (
-                            <SelectItem key={type.id} value={String(type.id)}>
-                              {type.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    {eventData?.event_type === 'ticketed' ? (
+                      <>
+                        <Label htmlFor="ticket_type_id">Ticket Type</Label>
+                        <Select
+                          onValueChange={(value) =>
+                            handleAddAttendeeInput('ticket_type_id', value)
+                          }
+                          value={addAttendeeForm.ticket_type_id || ''}
+                          required
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a ticket type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ticketTypes
+                              .filter(
+                                (type) =>
+                                  type.id !== undefined &&
+                                  type.id !== null &&
+                                  type.id !== ''
+                              )
+                              .map((type) => (
+                                <SelectItem key={type.id} value={String(type.id)}>
+                                  {type.name} - ETB {parseFloat(type.price).toLocaleString()}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    ) : (
+                      <>
+                        <Label htmlFor="guest_type_id">Guest Type</Label>
+                        <Select
+                          onValueChange={(value) =>
+                            handleAddAttendeeInput('guest_type_id', value)
+                          }
+                          value={addAttendeeForm.guest_type_id}
+                          required
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a guest type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {guestTypes
+                              .filter(
+                                (type) =>
+                                  type.id !== undefined &&
+                                  type.id !== null &&
+                                  type.id !== ''
+                              )
+                              .map((type) => (
+                                <SelectItem key={type.id} value={String(type.id)}>
+                                  {type.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    )}
                   </div>
                 </div>
                 <DialogFooter>
@@ -4455,30 +4890,61 @@ export default function EventDetails() {
                       </Select>
                     </div>
                     <div className="md:col-span-2">
-                      <Label htmlFor="edit_attendee_guest_type">Guest Type</Label>
-                      <Select
-                        value={editAttendeeForm.guest_type_id}
-                        onValueChange={(value) => handleEditAttendeeInput('guest_type_id', value)}
-                        required
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a guest type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {guestTypes
-                            .filter(
-                              (type) =>
-                                type.id !== undefined &&
-                                type.id !== null &&
-                                type.id !== ''
-                            )
-                            .map((type) => (
-                              <SelectItem key={type.id} value={String(type.id)}>
-                                {type.name}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
+                      {eventData?.event_type === 'ticketed' ? (
+                        <>
+                          <Label htmlFor="edit_attendee_ticket_type">Ticket Type</Label>
+                          <Select
+                            value={editAttendeeForm.ticket_type_id || ''}
+                            onValueChange={(value) => handleEditAttendeeInput('ticket_type_id', value)}
+                            required
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a ticket type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ticketTypes
+                                .filter(
+                                  (type) =>
+                                    type.id !== undefined &&
+                                    type.id !== null &&
+                                    type.id !== ''
+                                )
+                                .map((type) => (
+                                  <SelectItem key={type.id} value={String(type.id)}>
+                                    {type.name} - ETB {parseFloat(type.price).toLocaleString()}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </>
+                      ) : (
+                        <>
+                          <Label htmlFor="edit_attendee_guest_type">Guest Type</Label>
+                          <Select
+                            value={editAttendeeForm.guest_type_id}
+                            onValueChange={(value) => handleEditAttendeeInput('guest_type_id', value)}
+                            required
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a guest type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {guestTypes
+                                .filter(
+                                  (type) =>
+                                    type.id !== undefined &&
+                                    type.id !== null &&
+                                    type.id !== ''
+                                )
+                                .map((type) => (
+                                  <SelectItem key={type.id} value={String(type.id)}>
+                                    {type.name}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </>
+                      )}
                     </div>
                   </div>
                   <DialogFooter>

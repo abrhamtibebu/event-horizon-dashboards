@@ -7,6 +7,9 @@ import { Layout } from './components/Layout'
 import Events from './pages/Events'
 import EventDetails from './pages/EventDetails'
 import CreateEvent from './pages/CreateEvent'
+import CreateTicketedEvent from './pages/CreateTicketedEvent'
+import CreateFreeEvent from './pages/CreateFreeEvent'
+import EventTypeSelection from './pages/EventTypeSelection'
 import Users from './pages/Users'
 import Organizers from './pages/Organizers'
 import AddOrganizer from './pages/AddOrganizer'
@@ -44,22 +47,67 @@ import AssignVendor from './pages/vendors/AssignVendor';
 import VendorTaskTracker from './pages/vendors/VendorTaskTracker';
 import UsherJobDetails from './pages/UsherJobDetails';
 import UsherDashboard from './pages/UsherDashboard';
+import EventPublication from './pages/EventPublication';
+import EvellaAnalytics from './pages/EvellaAnalytics';
+import { SuspendedOrganizerBanner } from './components/SuspendedOrganizerBanner';
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+})
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
+  
+  console.log('[ProtectedRoute] isAuthenticated:', isAuthenticated, 'isLoading:', isLoading)
+  
+  // Show loading spinner while checking authentication
+  if (isLoading) {
+    console.log('[ProtectedRoute] Showing loading spinner')
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2">Loading...</span>
+      </div>
+    )
+  }
+  
   if (!isAuthenticated) {
+    console.log('[ProtectedRoute] Not authenticated, redirecting to /')
     return <Navigate to="/" replace />
   }
+  
+  console.log('[ProtectedRoute] Authenticated, showing children')
   return children
 }
 
 const UnauthenticatedRoute = ({ children }: { children: JSX.Element }) => {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
+  
+  console.log('[UnauthenticatedRoute] isAuthenticated:', isAuthenticated, 'isLoading:', isLoading)
+  
+  // Show loading spinner while checking authentication
+  if (isLoading) {
+    console.log('[UnauthenticatedRoute] Showing loading spinner')
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2">Loading...</span>
+      </div>
+    )
+  }
+  
   if (isAuthenticated) {
+    console.log('[UnauthenticatedRoute] Authenticated, redirecting to /dashboard')
     return <Navigate to="/dashboard" replace />
   }
+  
+  console.log('[UnauthenticatedRoute] Not authenticated, showing children')
   return children
 }
 
@@ -74,6 +122,7 @@ const App = () => (
           v7_relativeSplatPath: true,
         }}
       >
+        <SuspendedOrganizerBanner />
         <Routes>
           <Route
             path="/"
@@ -155,7 +204,9 @@ const App = () => (
           >
             <Route index element={<RoleDashboard />} />
             <Route path="events" element={<Events />} />
-            <Route path="events/create" element={<CreateEvent />} />
+            <Route path="events/create" element={<EventTypeSelection />} />
+            <Route path="events/create/ticketed" element={<CreateTicketedEvent />} />
+            <Route path="events/create/free" element={<CreateFreeEvent />} />
             <Route path="events/:eventId" element={<EventDetails />} />
             <Route path="team" element={<Team />} />
             <Route path="users" element={<Users />} />
@@ -171,6 +222,8 @@ const App = () => (
             <Route path="settings" element={<Settings />} />
             <Route path="audit-logs" element={<AuditLogs />} />
             <Route path="trash" element={<Trash />} />
+            <Route path="event-publication" element={<EventPublication />} />
+            <Route path="evella-analytics" element={<EvellaAnalytics />} />
             <Route path="check-in" element={<CheckIn />} />
             <Route path="tickets" element={<Tickets />} />
             <Route path="guests" element={<Guests />} />

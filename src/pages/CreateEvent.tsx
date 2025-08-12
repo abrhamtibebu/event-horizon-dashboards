@@ -10,6 +10,13 @@ import {
   Tag,
   FileText,
   Image,
+  Ticket,
+  Star,
+  Crown,
+  Gift,
+  Users2,
+  Plus,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,6 +36,42 @@ import {
   SelectItem,
   SelectValue,
 } from '@/components/ui/select'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import { Calendar as ShadCalendar } from '@/components/ui/calendar'
+
+// Ethiopian major cities
+const ETHIOPIAN_CITIES = [
+  'Addis Ababa',
+  'Dire Dawa',
+  'Mekelle',
+  'Gondar',
+  'Adama',
+  'Hawassa',
+  'Bahir Dar',
+  'Jimma',
+  'Dessie',
+  'Jijiga',
+  'Shashamane',
+  'Bishoftu',
+  'Arba Minch',
+  'Hosaena',
+  'Harar',
+  'Dilla',
+  'Nekemte',
+  'Debre Birhan',
+  'Asella',
+  'Adigrat',
+  'Moyale',
+  'Goba',
+  'Sodo',
+  'Arsi Negele',
+  'Yirgalem',
+  'Mizan Teferi',
+  'Gambela',
+  'Assosa',
+  'Jinka',
+  'Dembi Dolo'
+]
 
 // Utility to filter valid select options
 function filterValidOptions<T extends { id?: any }>(arr: T[]) {
@@ -46,7 +89,8 @@ export default function CreateEvent() {
     description: '',
     start_date: null as Date | null,
     end_date: null as Date | null,
-    location: '',
+    city: '',
+    venue: '',
     max_guests: '',
     registration_start_date: null as Date | null,
     registration_end_date: null as Date | null,
@@ -58,6 +102,7 @@ export default function CreateEvent() {
     requirements: '',
     agenda: '',
     guest_types: '',
+    event_type: 'free' as 'free' | 'ticketed', // Add event type selection
   })
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -96,6 +141,19 @@ export default function CreateEvent() {
   const PREDEFINED_GUEST_TYPES = [
     'VIP', 'Speaker', 'Staff', 'Exhibitor', 'Media', 'Regular', 'Visitor', 'Sponsor', 'Organizer', 'Volunteer', 'Partner', 'Vendor', 'Press', 'Student', 'Other'
   ];
+
+  // Ticket type options for ticketed events
+  const ticketTypeOptions = [
+    { name: 'Regular', icon: Ticket, description: 'Standard event access', defaultPrice: 1500 },
+    { name: 'VIP', icon: Star, description: 'Premium experience with exclusive benefits', defaultPrice: 4500 },
+    { name: 'VVIP', icon: Crown, description: 'Ultimate experience with all perks included', defaultPrice: 9000 },
+    { name: 'Early Bird', icon: Gift, description: 'Limited time discounted pricing', defaultPrice: 900 },
+    { name: 'Group Package', icon: Users2, description: 'Special pricing for groups of 3-5 people', defaultPrice: 3600 }
+  ]
+
+  // State for ticket types and guest types
+  const [ticketTypes, setTicketTypes] = useState<any[]>([])
+  const [guestTypes, setGuestTypes] = useState<any[]>([])
   const [selectedGuestTypes, setSelectedGuestTypes] = useState<string[]>([]);
 
   useEffect(() => {
@@ -161,11 +219,54 @@ export default function CreateEvent() {
     }
   }
 
+  // Ticket type management functions
+  const addTicketType = (option: typeof ticketTypeOptions[0]) => {
+    const newTicketType = {
+      name: option.name,
+      description: option.description,
+      price: option.defaultPrice,
+      quantity: null,
+      sales_end_date: '',
+      benefits: []
+    }
+    setTicketTypes([...ticketTypes, newTicketType])
+  }
+
+  const updateTicketType = (index: number, field: string, value: any) => {
+    const updated = [...ticketTypes]
+    updated[index] = { ...updated[index], [field]: value }
+    setTicketTypes(updated)
+  }
+
+  const removeTicketType = (index: number) => {
+    setTicketTypes(ticketTypes.filter((_, i) => i !== index))
+  }
+
+  // Guest type management functions
+  const addGuestType = () => {
+    const newGuestType = {
+      name: '',
+      description: '',
+      price: 0
+    }
+    setGuestTypes([...guestTypes, newGuestType])
+  }
+
+  const updateGuestType = (index: number, field: string, value: any) => {
+    const updated = [...guestTypes]
+    updated[index] = { ...updated[index], [field]: value }
+    setGuestTypes(updated)
+  }
+
+  const removeGuestType = (index: number) => {
+    setGuestTypes(guestTypes.filter((_, i) => i !== index))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     // Frontend validation for required fields
     const requiredFields = [
-      'name', 'start_date', 'end_date', 'location', 'max_guests',
+      'name', 'start_date', 'end_date', 'city', 'venue', 'max_guests',
       'registration_start_date', 'registration_end_date', 'event_type_id', 'event_category_id'
     ];
     for (const field of requiredFields) {
@@ -179,9 +280,28 @@ export default function CreateEvent() {
       toast.error('Max Guests must be a positive integer.');
       return;
     }
-    if (selectedGuestTypes.length === 0) {
-      toast.error('Please select at least one guest type.');
-      return;
+    // Validate based on event type
+    if (formData.event_type === 'free') {
+      if (selectedGuestTypes.length === 0) {
+        toast.error('Please select at least one guest type for free events.');
+        return;
+      }
+    } else if (formData.event_type === 'ticketed') {
+      if (ticketTypes.length === 0) {
+        toast.error('Please add at least one ticket type for ticketed events.');
+        return;
+      }
+      // Validate ticket types have names and prices
+      for (let i = 0; i < ticketTypes.length; i++) {
+        if (!ticketTypes[i].name.trim()) {
+          toast.error(`Ticket Type ${i + 1} must have a name.`);
+          return;
+        }
+        if (ticketTypes[i].price < 0) {
+          toast.error(`Ticket Type ${i + 1} must have a valid price.`);
+          return;
+        }
+      }
     }
     setIsSubmitting(true)
     try {
@@ -194,11 +314,16 @@ export default function CreateEvent() {
         end_date: eventRange[0].endDate.toISOString(),
         registration_start_date: regRange[0].startDate.toISOString(),
         registration_end_date: regRange[0].endDate.toISOString(),
+        // Combine city and venue into location for backend
+        location: `${formData.city}, ${formData.venue}`,
         // Ensure max_guests is sent as an integer
         max_guests: parseInt(formData.max_guests, 10),
         // Only include organizer_id if not an organizer (backend sets it for organizers)
         ...(user?.role !== 'organizer' && { organizer_id: formData.organizer_id }),
-        guest_types: selectedGuestTypes,
+        ticket_types: formData.event_type === 'ticketed' ? ticketTypes.map(t => JSON.stringify(t)) : [],
+        guest_types: formData.event_type === 'free'
+          ? selectedGuestTypes
+          : ticketTypes.map((t) => t.name), // <-- send ticket type names as guest_types for ticketed events
       }
       if (formData.event_image) {
         payload = new FormData()
@@ -209,6 +334,18 @@ export default function CreateEvent() {
             (Array.isArray(value) ? value : [value]).forEach((type: string) =>
               payload.append('guest_types[]', type)
             )
+          } else if (key === 'ticket_types') {
+            if (Array.isArray(value)) {
+              value.forEach((ticketType: any) =>
+                payload.append('ticket_types[]', JSON.stringify(ticketType))
+              )
+            }
+          } else if (key === 'guest_types_custom') {
+            if (Array.isArray(value)) {
+              value.forEach((guestType: any) =>
+                payload.append('guest_types_custom[]', JSON.stringify(guestType))
+              )
+            }
           } else {
             payload.append(key, value as any)
           }
@@ -217,6 +354,7 @@ export default function CreateEvent() {
       } else {
         payload = processedFormData
       }
+      console.log('Sending payload:', payload)
       await api.post('/events', payload, { headers })
       toast.success('Event created successfully!')
       navigate('/dashboard/events')
@@ -297,6 +435,92 @@ export default function CreateEvent() {
           className="flex-1 overflow-y-auto p-6"
         >
           <div className="max-w-5xl mx-auto space-y-8">
+          {/* Event Type Selection */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <Ticket className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  Event Type
+                </h3>
+                <p className="text-gray-500 text-sm">
+                  Choose between free or ticketed event
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Free Event Option */}
+              <div 
+                className={`p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${
+                  formData.event_type === 'free' 
+                    ? 'border-purple-500 bg-purple-50' 
+                    : 'border-gray-200 hover:border-purple-300'
+                }`}
+                onClick={() => handleInputChange('event_type', 'free')}
+              >
+                <div className="flex items-center mb-4">
+                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mr-4">
+                    <Gift className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-bold text-gray-900">Free Event</h4>
+                    <p className="text-gray-600">No cost to attendees</p>
+                  </div>
+                </div>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li className="flex items-center">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    Guest type management
+                  </li>
+                  <li className="flex items-center">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    Simple registration
+                  </li>
+                  <li className="flex items-center">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    Basic attendee tracking
+                  </li>
+                </ul>
+              </div>
+
+              {/* Ticketed Event Option */}
+              <div 
+                className={`p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${
+                  formData.event_type === 'ticketed' 
+                    ? 'border-purple-500 bg-purple-50' 
+                    : 'border-gray-200 hover:border-purple-300'
+                }`}
+                onClick={() => handleInputChange('event_type', 'ticketed')}
+              >
+                <div className="flex items-center mb-4">
+                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mr-4">
+                    <Ticket className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-bold text-gray-900">Ticketed Event</h4>
+                    <p className="text-gray-600">Paid tickets with multiple tiers</p>
+                  </div>
+                </div>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li className="flex items-center">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                    Multiple ticket types
+                  </li>
+                  <li className="flex items-center">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                    Revenue tracking
+                  </li>
+                  <li className="flex items-center">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                    Advanced analytics
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           {/* Event Information */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center gap-3 mb-6">
@@ -444,14 +668,34 @@ export default function CreateEvent() {
                 )}
               </div>
               <div>
-                <Label htmlFor="location" className="flex items-center gap-2 text-gray-700 font-medium">
-                  <MapPin className="w-4 h-4 text-green-500" /> Location
+                <Label className="flex items-center gap-2 text-gray-700 font-medium">
+                  <MapPin className="w-4 h-4 text-green-500" /> City
+                </Label>
+                <Select
+                  value={formData.city}
+                  onValueChange={(value) => handleInputChange('city', value)}
+                >
+                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl">
+                    <SelectValue placeholder="Select a city" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {ETHIOPIAN_CITIES.map((city) => (
+                      <SelectItem key={city} value={city}>
+                        {city}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="venue" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <MapPin className="w-4 h-4 text-green-500" /> Venue
                 </Label>
                 <Input
-                  id="location"
-                  value={formData.location}
+                  id="venue"
+                  value={formData.venue}
                   onChange={(e) =>
-                    handleInputChange('location', e.target.value)
+                    handleInputChange('venue', e.target.value)
                   }
                   placeholder="e.g. Grand Convention Center"
                   className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl"
@@ -474,26 +718,34 @@ export default function CreateEvent() {
               </div>
               <div className="lg:col-span-2">
                 <Label htmlFor="guest_types" className="flex items-center gap-2 text-gray-700 font-medium">
-                  <Users className="w-4 h-4 text-pink-500" /> Guest Types
+                  <Users className="w-4 h-4 text-pink-500" /> {formData.event_type === 'ticketed' ? 'Ticket Types' : 'Guest Types'}
                 </Label>
-                <div className="flex flex-wrap gap-2 mb-3 mt-2">
-                  {PREDEFINED_GUEST_TYPES.map(type => (
-                    <Button
-                      key={type}
-                      type="button"
-                      variant={selectedGuestTypes.includes(type) ? 'default' : 'outline'}
-                      className={`${selectedGuestTypes.includes(type) ? 'bg-pink-600 text-white border-pink-600' : 'border-gray-300 hover:border-pink-300'} rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200`}
-                      onClick={() => {
-                        setSelectedGuestTypes(prev => prev.includes(type)
-                          ? prev.filter(t => t !== type)
-                          : [...prev, type]);
-                      }}
-                    >
-                      {type}
-                    </Button>
-                  ))}
-                </div>
-                {selectedGuestTypes.length === 0 && <div className="text-xs text-red-500 mb-2">Select at least one guest type.</div>}
+                {formData.event_type === 'free' ? (
+                  <div className="flex flex-wrap gap-2 mb-3 mt-2">
+                    {PREDEFINED_GUEST_TYPES.map(type => (
+                      <Button
+                        key={type}
+                        type="button"
+                        variant={selectedGuestTypes.includes(type) ? 'default' : 'outline'}
+                        className={`${selectedGuestTypes.includes(type) ? 'bg-pink-600 text-white border-pink-600' : 'border-gray-300 hover:border-pink-300'} rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200`}
+                        onClick={() => {
+                          setSelectedGuestTypes(prev => prev.includes(type)
+                            ? prev.filter(t => t !== type)
+                            : [...prev, type]);
+                        }}
+                      >
+                        {type}
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 mt-2">
+                    Ticket types will be configured in the ticketing section below.
+                  </div>
+                )}
+                {formData.event_type === 'free' && selectedGuestTypes.length === 0 && (
+                  <div className="text-xs text-red-500 mb-2">Select at least one guest type.</div>
+                )}
               </div>
             </div>
           </div>
@@ -567,143 +819,257 @@ export default function CreateEvent() {
               </div>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Event Date Range Picker */}
               <div>
                 <Label className="flex items-center gap-2 text-gray-700">
-                  {' '}
-                  <Calendar className="w-4 h-4" /> Event Date Range{' '}
+                  <Calendar className="w-4 h-4" /> Event Date Range
                 </Label>
-                <Button
-                  type="button"
-                  className="w-full mt-1 mb-2 bg-purple-100 text-purple-700 hover:bg-purple-200"
-                  onClick={() => setShowEventRange(true)}
-                >
-                  {formData.start_date && formData.end_date
-                    ? `${eventRange[0].startDate.toLocaleDateString()} - ${eventRange[0].endDate.toLocaleDateString()}`
-                    : 'Select event date range'}
-                </Button>
-                {showEventRange && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-                    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md mx-auto flex flex-col">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="font-semibold text-purple-700 text-lg">
-                          Event Date Range
-                        </span>
-                        <button
-                          onClick={() => setShowEventRange(false)}
-                          className="text-gray-400 hover:text-gray-700 p-1 rounded-full"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-                      <DateRange
-                        ranges={eventRange}
-                        onChange={(item) => setEventRange([item.selection])}
-                        showDateDisplay={false}
-                        rangeColors={['#a21caf']}
-                        showMonthAndYearPickers={true}
-                        moveRangeOnFirstSelection={false}
-                        months={1}
-                        direction="vertical"
-                        className="rounded-xl"
-                      />
-                      <div className="flex justify-end gap-3 mt-4">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setShowEventRange(false)}
-                          className="rounded-full px-6"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          type="button"
-                          className="bg-purple-700 text-white rounded-full px-6"
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              start_date: eventRange[0].startDate,
-                              end_date: eventRange[0].endDate,
-                            }))
-                            setShowEventRange(false)
-                          }}
-                        >
-                          Apply
-                        </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full mt-1 mb-2 bg-white/80 text-purple-700 border-purple-200 hover:bg-purple-50 rounded-xl shadow"
+                    >
+                      {formData.start_date && formData.end_date
+                        ? `${eventRange[0].startDate.toLocaleDateString()} - ${eventRange[0].endDate.toLocaleDateString()}`
+                        : 'Select event date range'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="p-4 bg-white/90 rounded-2xl shadow-xl border border-purple-200 w-auto">
+                    <div className="flex flex-col gap-4">
+                      <div className="flex gap-4">
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Start Date</div>
+                          <ShadCalendar
+                            mode="single"
+                            selected={eventRange[0].startDate}
+                            onSelect={(date) => {
+                              setEventRange([{ ...eventRange[0], startDate: date || new Date(), endDate: eventRange[0].endDate }])
+                              setFormData((prev) => ({ ...prev, start_date: date }))
+                            }}
+                            className="rounded-xl border"
+                          />
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">End Date</div>
+                          <ShadCalendar
+                            mode="single"
+                            selected={eventRange[0].endDate}
+                            onSelect={(date) => {
+                              setEventRange([{ ...eventRange[0], endDate: date || new Date(), startDate: eventRange[0].startDate }])
+                              setFormData((prev) => ({ ...prev, end_date: date }))
+                            }}
+                            className="rounded-xl border"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  </PopoverContent>
+                </Popover>
               </div>
+              {/* Registration Date Range Picker */}
               <div>
                 <Label className="flex items-center gap-2 text-gray-700">
-                  {' '}
-                  <Calendar className="w-4 h-4" /> Registration Date Range{' '}
+                  <Calendar className="w-4 h-4" /> Registration Date Range
                 </Label>
-                <Button
-                  type="button"
-                  className="w-full mt-1 mb-2 bg-purple-100 text-purple-700 hover:bg-purple-200"
-                  onClick={() => setShowRegRange(true)}
-                >
-                  {formData.registration_start_date &&
-                  formData.registration_end_date
-                    ? `${regRange[0].startDate.toLocaleDateString()} - ${regRange[0].endDate.toLocaleDateString()}`
-                    : 'Select registration date range'}
-                </Button>
-                {showRegRange && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-                    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md mx-auto flex flex-col">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="font-semibold text-purple-700 text-lg">
-                          Registration Date Range
-                        </span>
-                        <button
-                          onClick={() => setShowRegRange(false)}
-                          className="text-gray-400 hover:text-gray-700 p-1 rounded-full"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-                      <DateRange
-                        ranges={regRange}
-                        onChange={(item) => setRegRange([item.selection])}
-                        showDateDisplay={false}
-                        rangeColors={['#a21caf']}
-                        showMonthAndYearPickers={true}
-                        moveRangeOnFirstSelection={false}
-                        months={1}
-                        direction="vertical"
-                        className="rounded-xl"
-                      />
-                      <div className="flex justify-end gap-3 mt-4">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setShowRegRange(false)}
-                          className="rounded-full px-6"
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          type="button"
-                          className="bg-purple-700 text-white rounded-full px-6"
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              registration_start_date: regRange[0].startDate,
-                              registration_end_date: regRange[0].endDate,
-                            }))
-                            setShowRegRange(false)
-                          }}
-                        >
-                          Apply
-                        </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full mt-1 mb-2 bg-white/80 text-purple-700 border-purple-200 hover:bg-purple-50 rounded-xl shadow"
+                    >
+                      {formData.registration_start_date && formData.registration_end_date
+                        ? `${regRange[0].startDate.toLocaleDateString()} - ${regRange[0].endDate.toLocaleDateString()}`
+                        : 'Select registration date range'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="p-4 bg-white/90 rounded-2xl shadow-xl border border-purple-200 w-auto">
+                    <div className="flex flex-col gap-4">
+                      <div className="flex gap-4">
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Start Date</div>
+                          <ShadCalendar
+                            mode="single"
+                            selected={regRange[0].startDate}
+                            onSelect={(date) => {
+                              setRegRange([{ ...regRange[0], startDate: date || new Date(), endDate: regRange[0].endDate }])
+                              setFormData((prev) => ({ ...prev, registration_start_date: date }))
+                            }}
+                            className="rounded-xl border"
+                          />
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">End Date</div>
+                          <ShadCalendar
+                            mode="single"
+                            selected={regRange[0].endDate}
+                            onSelect={(date) => {
+                              setRegRange([{ ...regRange[0], endDate: date || new Date(), startDate: regRange[0].startDate }])
+                              setFormData((prev) => ({ ...prev, registration_end_date: date }))
+                            }}
+                            className="rounded-xl border"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           </div>
+
+          {/* Ticket Types Section - Only show for ticketed events */}
+          {formData.event_type === 'ticketed' && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <Ticket className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      Ticket Types
+                    </h3>
+                    <p className="text-gray-500 text-sm">
+                      Configure ticket types for your event
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Available Ticket Types */}
+              <div className="mb-6">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">Available Ticket Types</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {ticketTypeOptions.map((option) => {
+                    const isSelected = ticketTypes.some(t => t.name === option.name)
+                    return (
+                      <div
+                        key={option.name}
+                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
+                          isSelected 
+                            ? 'border-purple-500 bg-purple-50' 
+                            : 'border-gray-200 hover:border-purple-300'
+                        }`}
+                        onClick={() => !isSelected && addTicketType(option)}
+                      >
+                        <div className="flex items-center mb-2">
+                          <option.icon className="w-5 h-5 text-purple-600 mr-2" />
+                          <span className="font-semibold text-gray-900">{option.name}</span>
+                        </div>
+                        <p className="text-sm text-gray-600">{option.description}</p>
+                                                    <p className="text-sm font-medium text-purple-600 mt-2">
+                              Starting at ETB {option.defaultPrice.toLocaleString()}
+                            </p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Selected Ticket Types */}
+              {ticketTypes.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Configure Ticket Types</h4>
+                  <div className="space-y-4">
+                    {ticketTypes.map((ticketType, index) => (
+                      <div key={index} className="p-6 border border-gray-200 rounded-xl">
+                        <div className="flex items-center justify-between mb-4">
+                          <h5 className="text-lg font-semibold text-gray-900">{ticketType.name}</h5>
+                          <button
+                            type="button"
+                            onClick={() => removeTicketType(index)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                              Price (ETB) *
+                            </Label>
+                            <Input
+                              type="number"
+                              value={ticketType.price}
+                              onChange={(e) => updateTicketType(index, 'price', parseFloat(e.target.value))}
+                              className="w-full h-12 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="0"
+                              min="0"
+                              step="1"
+                            />
+                          </div>
+                          
+                          <div>
+                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                              Quantity (leave empty for unlimited)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={ticketType.quantity || ''}
+                              onChange={(e) => updateTicketType(index, 'quantity', e.target.value ? parseInt(e.target.value) : null)}
+                              className="w-full h-12 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="Unlimited"
+                              min="1"
+                            />
+                          </div>
+                          
+                          <div>
+                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                              Sales End Date
+                            </Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full h-12 bg-white/80 text-purple-700 border-purple-200 hover:bg-purple-50 rounded-xl shadow focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                >
+                                  {ticketType.sales_end_date
+                                    ? new Date(ticketType.sales_end_date).toLocaleDateString()
+                                    : 'Select sales end date'}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="p-4 bg-white/90 rounded-2xl shadow-xl border border-purple-200 w-auto">
+                                <ShadCalendar
+                                  mode="single"
+                                  selected={ticketType.sales_end_date ? new Date(ticketType.sales_end_date) : undefined}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      updateTicketType(index, 'sales_end_date', date.toISOString())
+                                    }
+                                  }}
+                                  className="rounded-xl border"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          
+                          <div>
+                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                              Description
+                            </Label>
+                            <Textarea
+                              value={ticketType.description}
+                              onChange={(e) => updateTicketType(index, 'description', e.target.value)}
+                              rows={2}
+                              className="w-full border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                              placeholder="Describe this ticket type..."
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+
 
           {/* Additional Information Section */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
@@ -752,6 +1118,31 @@ export default function CreateEvent() {
             </div>
           </div>
 
+          {/* Debug Section - Remove after fixing
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+            <h4 className="font-semibold text-yellow-800 mb-2">Debug Info (Remove this section after fixing):</h4>
+            <div className="text-sm text-yellow-700 space-y-1">
+              <div>isSubmitting: {isSubmitting.toString()}</div>
+              <div>loading.eventTypes: {loading.eventTypes.toString()}</div>
+              <div>loading.eventCategories: {loading.eventCategories.toString()}</div>
+              <div>loading.organizers: {loading.organizers.toString()}</div>
+              <div>user?.role: {user?.role}</div>
+              <div>formData.name: "{formData.name}"</div>
+              <div>formData.city: "{formData.city}"</div>
+              <div>formData.venue: "{formData.venue}"</div>
+              <div>formData.max_guests: "{formData.max_guests}"</div>
+              <div>formData.event_type_id: "{formData.event_type_id}"</div>
+              <div>formData.event_category_id: "{formData.event_category_id}"</div>
+              <div>formData.organizer_id: "{formData.organizer_id}"</div>
+              <div>formData.event_type: "{formData.event_type}"</div>
+              <div>selectedGuestTypes.length: {selectedGuestTypes.length}</div>
+              <div>ticketTypes.length: {ticketTypes.length}</div>
+              <div>eventTypes.length: {eventTypes.length}</div>
+              <div>eventCategories.length: {eventCategories.length}</div>
+              <div>organizers.length: {organizers.length}</div>
+            </div>
+          </div> */}
+
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 pt-6 border-t mt-8">
             <Button
@@ -770,14 +1161,17 @@ export default function CreateEvent() {
                 loading.eventCategories ||
                 (user?.role !== 'organizer' && loading.organizers) ||
                 !formData.name.trim() ||
-                !formData.location.trim() ||
+                !formData.city.trim() ||
+                !formData.venue.trim() ||
                 !formData.max_guests.trim() ||
                 !formData.event_type_id ||
                 !formData.event_category_id ||
                 (user?.role !== 'organizer' && !formData.organizer_id) ||
                 !filterValidOptions(eventTypes).some(et => String(et.id) === formData.event_type_id) ||
                 !filterValidOptions(eventCategories).some(ec => String(ec.id) === formData.event_category_id) ||
-                (user?.role !== 'organizer' && !filterValidOptions(organizers).some(org => String(org.id) === formData.organizer_id))
+                (user?.role !== 'organizer' && !filterValidOptions(organizers).some(org => String(org.id) === formData.organizer_id)) ||
+                (formData.event_type === 'free' && selectedGuestTypes.length === 0) ||
+                (formData.event_type === 'ticketed' && ticketTypes.length === 0)
               }
               className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
             >

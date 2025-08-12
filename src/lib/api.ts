@@ -64,10 +64,9 @@ api.interceptors.response.use(
       const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
       
       if (!token) {
-        // No token to refresh, redirect to login
+        // No token to refresh, just reject the request
         localStorage.removeItem('jwt')
         sessionStorage.removeItem('jwt')
-        window.location.href = '/'
         return Promise.reject(error)
       }
 
@@ -96,10 +95,9 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null)
         
-        // Refresh failed, clear tokens and redirect to login
+        // Refresh failed, clear tokens
         localStorage.removeItem('jwt')
         sessionStorage.removeItem('jwt')
-        window.location.href = '/'
         
         return Promise.reject(refreshError)
       } finally {

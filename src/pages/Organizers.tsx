@@ -17,6 +17,7 @@ import {
   UserPlus,
   Eye,
   Calendar,
+  Clock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,6 +50,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import api from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -88,9 +90,15 @@ export default function Organizers() {
   const [eventsLoading, setEventsLoading] = useState(false)
   const [eventsError, setEventsError] = useState<string | null>(null)
   const [eventsCountMap, setEventsCountMap] = useState<Record<string, number | undefined>>({});
+  const [manageContactsDialogOpen, setManageContactsDialogOpen] = useState(false)
+  const [selectedOrganizerForContacts, setSelectedOrganizerForContacts] = useState<any>(null)
+  const [suspendDialogOpen, setSuspendDialogOpen] = useState(false)
+  const [selectedOrganizerForSuspension, setSelectedOrganizerForSuspension] = useState<any>(null)
+  const [suspensionReason, setSuspensionReason] = useState('')
   const { user: currentUser } = useAuth()
   const isCurrentSuperAdmin = currentUser && currentUser.role === 'superadmin';
-  const canDelete = isCurrentSuperAdmin;
+  const isCurrentAdmin = currentUser && currentUser.role === 'admin';
+  const canManageOrganizers = isCurrentSuperAdmin || isCurrentAdmin;
 
   useEffect(() => {
     const fetchOrganizers = async () => {
@@ -143,6 +151,8 @@ export default function Organizers() {
         return 'bg-gray-100 text-gray-800 border-gray-200'
       case 'suspended':
         return 'bg-red-100 text-red-800 border-red-200'
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }
@@ -163,7 +173,6 @@ export default function Organizers() {
   const organizerStats = {
     total: organizers.length,
     active: organizers.filter((o) => o.status === 'active').length,
-    inactive: organizers.filter((o) => o.status === 'inactive').length,
     suspended: organizers.filter((o) => o.status === 'suspended').length,
     totalEvents: organizers.reduce((sum, o) => sum + (o.eventsManaged || 0), 0),
   }
@@ -201,15 +210,25 @@ export default function Organizers() {
     }
   }
 
-  const handleSuspend = async (organizer: any) => {
-    setStatusLoadingId(organizer.id)
+  const openSuspendDialog = (organizer: any) => {
+    setSelectedOrganizerForSuspension(organizer)
+    setSuspensionReason('')
+    setSuspendDialogOpen(true)
+  }
+
+  const handleSuspend = async () => {
+    if (!selectedOrganizerForSuspension) return
+    setStatusLoadingId(selectedOrganizerForSuspension.id)
     try {
-      const res = await api.post(`/organizers/${organizer.id}/suspend`)
+      const res = await api.post(`/organizers/${selectedOrganizerForSuspension.id}/suspend`, {
+        reason: suspensionReason
+      })
       toast({ title: 'Organizer suspended successfully!' })
       // Update local state instead of refetching
       setOrganizers(
-        organizers.map((o) => (o.id === organizer.id ? res.data.organizer : o))
+        organizers.map((o) => (o.id === selectedOrganizerForSuspension.id ? res.data.organizer : o))
       )
+      setSuspendDialogOpen(false)
     } catch (err: any) {
       toast({
         title: 'Failed to suspend organizer',
@@ -240,6 +259,8 @@ export default function Organizers() {
       setStatusLoadingId(null)
     }
   }
+
+
 
   const openEditDialog = (organizer: any) => {
     setEditOrganizer(organizer)
@@ -355,6 +376,11 @@ export default function Organizers() {
     }
   }
 
+  const openManageContactsDialog = (organizer: any) => {
+    setSelectedOrganizerForContacts(organizer)
+    setManageContactsDialogOpen(true)
+  }
+
   return (
     <TooltipProvider>
       <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8 px-2 sm:px-6 lg:px-12">
@@ -372,7 +398,7 @@ export default function Organizers() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-blue-200 text-center">
             <CardHeader>
               <CardTitle className="text-blue-600 text-lg font-semibold">Total Organizers</CardTitle>
@@ -389,14 +415,7 @@ export default function Organizers() {
               <div className="text-3xl font-bold">{organizerStats.active}</div>
             </CardContent>
           </Card>
-          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 text-center">
-            <CardHeader>
-              <CardTitle className="text-gray-600 text-lg font-semibold">Inactive</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{organizerStats.inactive}</div>
-            </CardContent>
-          </Card>
+
           <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-red-200 text-center">
             <CardHeader>
               <CardTitle className="text-red-600 text-lg font-semibold">Suspended</CardTitle>
@@ -405,6 +424,7 @@ export default function Organizers() {
               <div className="text-3xl font-bold">{organizerStats.suspended}</div>
             </CardContent>
           </Card>
+
           <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-purple-200 text-center">
             <CardHeader>
               <CardTitle className="text-purple-600 text-lg font-semibold">Total Events</CardTitle>
@@ -437,6 +457,7 @@ export default function Organizers() {
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
                 <SelectItem value="suspended">Suspended</SelectItem>
+
               </SelectContent>
             </Select>
           </div>
@@ -491,18 +512,79 @@ export default function Organizers() {
                           eventsCountMap[organizer.id]
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap w-48">
                         {contactsMap[organizer.id]?.length > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {contactsMap[organizer.id].map((contact: any) => (
-                              <span key={contact.id} className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold shadow-sm ${contact.is_primary_contact ? 'bg-purple-100 text-purple-700 border border-purple-300' : 'bg-gray-100 text-gray-700'}`}>
-                                {contact.name} <span className="text-gray-400">({contact.email})</span>
-                                {contact.is_primary_contact && <Star className="w-3 h-3 text-purple-500 ml-1" />}
-                              </span>
+                          <div className="space-y-1">
+                            {contactsMap[organizer.id].slice(0, 2).map((contact: any) => (
+                              <div key={contact.id} className={`flex items-center justify-between gap-1 px-2 py-1 rounded text-xs font-medium ${contact.is_primary_contact ? 'bg-purple-100 text-purple-700 border border-purple-300' : 'bg-gray-100 text-gray-700'}`}>
+                                <div className="flex items-center gap-1 min-w-0 flex-1">
+                                  <span className="truncate">{contact.name}</span>
+                                  {contact.is_primary_contact && <Star className="w-3 h-3 text-purple-500 flex-shrink-0" />}
+                                </div>
+                                {isCurrentSuperAdmin && (
+                                  <div className="flex gap-1 flex-shrink-0">
+                                    {!contact.is_primary_contact && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-4 w-4 p-0 hover:bg-purple-200"
+                                            onClick={() => handleSetPrimary(organizer.id, contact.id)}
+                                          >
+                                            <Star className="w-3 h-3" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Set as Primary</TooltipContent>
+                                      </Tooltip>
+                                    )}
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-4 w-4 p-0 hover:bg-red-200 text-red-500"
+                                          onClick={() => handleRemoveContact(organizer.id, contact.id)}
+                                        >
+                                          <UserX className="w-3 h-3" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Remove Contact</TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                )}
+                              </div>
                             ))}
+                            {contactsMap[organizer.id].length > 2 && (
+                              <div className="text-xs text-gray-500 text-center">
+                                +{contactsMap[organizer.id].length - 2} more
+                              </div>
+                            )}
+                            {isCurrentSuperAdmin && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full text-xs py-1"
+                                onClick={() => openManageContactsDialog(organizer)}
+                              >
+                                Manage Contacts
+                              </Button>
+                            )}
                           </div>
                         ) : (
-                          <span className="text-gray-400">No contacts</span>
+                          <div className="text-center">
+                            <span className="text-gray-400 text-xs">No contacts</span>
+                            {isCurrentSuperAdmin && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full text-xs py-1 mt-1"
+                                onClick={() => openAssignDialog(organizer)}
+                              >
+                                Add Contacts
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -515,23 +597,70 @@ export default function Organizers() {
                             </TooltipTrigger>
                             <TooltipContent>Assign Contacts</TooltipContent>
                           </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="outline" size="icon" onClick={() => openEditDialog(organizer)} className="shadow-sm">
-                                <Edit className="w-5 h-5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Edit Organizer</TooltipContent>
-                          </Tooltip>
-                          {canDelete && (
+                          {canManageOrganizers && (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button variant="outline" size="icon" onClick={() => openDeleteDialog(organizer)} className="shadow-sm">
-                                  <Trash2 className="w-5 h-5 text-red-500" />
+                                <Button variant="outline" size="icon" onClick={() => openEditDialog(organizer)} className="shadow-sm">
+                                  <Edit className="w-5 h-5" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Delete Organizer</TooltipContent>
+                              <TooltipContent>Edit Organizer</TooltipContent>
                             </Tooltip>
+                          )}
+                          {canManageOrganizers && (
+                            <>
+                              {/* Status Management Buttons */}
+                              {organizer.status === 'active' ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="outline" 
+                                      size="icon" 
+                                      onClick={() => openSuspendDialog(organizer)} 
+                                      className="shadow-sm"
+                                      disabled={statusLoadingId === organizer.id}
+                                    >
+                                      {statusLoadingId === organizer.id ? (
+                                        <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                                      ) : (
+                                        <PauseCircle className="w-5 h-5 text-red-500" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Suspend Organizer</TooltipContent>
+                                </Tooltip>
+                              ) : (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="outline" 
+                                      size="icon" 
+                                      onClick={() => handleActivate(organizer)} 
+                                      className="shadow-sm"
+                                      disabled={statusLoadingId === organizer.id}
+                                    >
+                                      {statusLoadingId === organizer.id ? (
+                                        <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                                      ) : (
+                                        <PlayCircle className="w-5 h-5 text-green-500" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Activate Organizer</TooltipContent>
+                                </Tooltip>
+                              )}
+                              
+
+                              
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="outline" size="icon" onClick={() => openDeleteDialog(organizer)} className="shadow-sm">
+                                    <Trash2 className="w-5 h-5 text-red-500" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Delete Organizer</TooltipContent>
+                              </Tooltip>
+                            </>
                           )}
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -796,6 +925,140 @@ export default function Organizers() {
                 Close
               </Button>
             </DialogClose>
+          </DialogContent>
+        </Dialog>
+
+        {/* Manage Contacts Dialog */}
+        <Dialog open={manageContactsDialogOpen} onOpenChange={setManageContactsDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Manage Contacts for {selectedOrganizerForContacts?.name}</DialogTitle>
+              <DialogDescription>
+                View and manage all contacts for this organizer. Set primary contacts and remove contacts as needed.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {selectedOrganizerForContacts && contactsMap[selectedOrganizerForContacts.id]?.length > 0 ? (
+                <div className="space-y-3 max-h-80 overflow-y-auto">
+                  {contactsMap[selectedOrganizerForContacts.id].map((contact: any) => (
+                    <div
+                      key={contact.id}
+                      className={`flex items-center justify-between p-3 border rounded-lg ${contact.is_primary_contact ? 'bg-purple-50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold">
+                          {contact.name?.[0] || 'U'}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-gray-900">{contact.name}</div>
+                          <div className="text-sm text-gray-500">{contact.email}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {contact.is_primary_contact ? (
+                          <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+                            <Star className="w-3 h-3 mr-1" />
+                            Primary
+                          </Badge>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSetPrimary(selectedOrganizerForContacts.id, contact.id)}
+                                className="text-purple-600 border-purple-300 hover:bg-purple-50"
+                              >
+                                <Star className="w-3 h-3 mr-1" />
+                                Set Primary
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Set as Primary Contact</TooltipContent>
+                          </Tooltip>
+                        )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRemoveContact(selectedOrganizerForContacts.id, contact.id)}
+                              className="text-red-600 border-red-300 hover:bg-red-50"
+                            >
+                              <UserX className="w-3 h-3 mr-1" />
+                              Remove
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Remove Contact</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No contacts assigned</h3>
+                  <p className="text-gray-600 mb-4">This organizer doesn't have any contacts assigned yet.</p>
+                  <Button onClick={() => openAssignDialog(selectedOrganizerForContacts)}>
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Assign Contacts
+                  </Button>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setManageContactsDialogOpen(false)}>
+                Close
+              </Button>
+              {selectedOrganizerForContacts && contactsMap[selectedOrganizerForContacts.id]?.length > 0 && (
+                <Button onClick={() => openAssignDialog(selectedOrganizerForContacts)}>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Add More Contacts
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Suspend Organizer Dialog */}
+        <Dialog open={suspendDialogOpen} onOpenChange={setSuspendDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Suspend Organizer</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to suspend {selectedOrganizerForSuspension?.name}? This will block all their activities.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="suspension-reason">Reason for Suspension (Optional)</Label>
+                <Textarea
+                  id="suspension-reason"
+                  placeholder="Enter the reason for suspending this organizer..."
+                  value={suspensionReason}
+                  onChange={(e) => setSuspensionReason(e.target.value)}
+                  className="mt-2"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSuspendDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleSuspend}
+                disabled={statusLoadingId === selectedOrganizerForSuspension?.id}
+              >
+                {statusLoadingId === selectedOrganizerForSuspension?.id ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                ) : (
+                  <PauseCircle className="w-4 h-4 mr-2" />
+                )}
+                Suspend Organizer
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

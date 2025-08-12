@@ -228,7 +228,8 @@ export default function OrganizerDashboard() {
       }
     };
     fetchEvents();
-    eventsIntervalRef.current = setInterval(fetchEvents, 150000);
+    // Temporarily disabled polling to prevent reloading issues
+    // eventsIntervalRef.current = setInterval(fetchEvents, 150000);
     return () => {
       if (eventsIntervalRef.current) clearInterval(eventsIntervalRef.current);
     };

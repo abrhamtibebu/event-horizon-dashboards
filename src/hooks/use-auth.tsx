@@ -13,6 +13,9 @@ export type Role = 'superadmin' | 'admin' | 'organizer_admin' | 'organizer' | 'u
 interface Organizer {
   id: number
   name: string
+  status: string
+  suspended_at?: string
+  suspended_reason?: string
 }
 
 interface User {
@@ -42,18 +45,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const checkLoggedIn = async () => {
+      console.log('[Auth] Checking authentication status...')
       const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
+      console.log('[Auth] Token found:', !!token)
+      
       if (token) {
         try {
+          console.log('[Auth] Making API call to /me...')
           const { data } = await api.get('/me')
+          console.log('[Auth] User data received:', data)
           setUser(data)
         } catch (error) {
-          console.error('Session expired or invalid', error)
+          console.error('[Auth] Session expired or invalid:', error)
+          // Clear invalid tokens
           localStorage.removeItem('jwt')
           sessionStorage.removeItem('jwt')
           setUser(null)
         }
+      } else {
+        // No token found, user is not authenticated
+        console.log('[Auth] No token found, user not authenticated')
+        setUser(null)
       }
+      console.log('[Auth] Setting isLoading to false')
       setIsLoading(false)
     }
     checkLoggedIn()

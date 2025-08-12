@@ -16,6 +16,8 @@ import {
   Trash2,
   UserPlus,
   Briefcase,
+  Globe,
+  TrendingUp,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -96,6 +98,12 @@ const allItems = [
     roles: ['superadmin', 'organizer'],
   },
   {
+    title: 'Evella Analytics',
+    url: '/dashboard/evella-analytics',
+    icon: TrendingUp,
+    roles: ['superadmin', 'admin'],
+  },
+  {
     title: 'Attendee Check-in',
     url: '/dashboard/check-in',
     icon: UserCheck,
@@ -111,6 +119,12 @@ const allItems = [
     title: 'System Logs',
     url: '/dashboard/audit-logs',
     icon: Shield,
+    roles: ['superadmin', 'admin'],
+  },
+  {
+    title: 'Event Publication',
+    url: '/dashboard/event-publication',
+    icon: Globe,
     roles: ['superadmin', 'admin'],
   },
   { title: 'Trash', url: '/dashboard/trash', icon: Trash2, roles: ['superadmin', 'admin'] },

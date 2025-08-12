@@ -46,14 +46,19 @@ export default function Events() {
 
   const { user } = useAuth()
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Debug logging
+  console.log('Events component rendered, user:', user?.id)
 
   useEffect(() => {
+    console.log('Events useEffect triggered, user?.id:', user?.id)
     const fetchEvents = async () => {
       setLoading(true)
       setError(null)
       try {
         // All users now use the same endpoint, but the backend handles role-based filtering
         const res = await api.get('/events')
+        console.log('[Events] API Response:', res.data)
         setEvents(res.data)
       } catch (err: any) {
         setError(err.response?.data?.message || 'Failed to fetch events')
@@ -61,13 +66,18 @@ export default function Events() {
         setLoading(false)
       }
     }
-    fetchEvents()
-    // Polling for real-time updates
-    intervalRef.current = setInterval(fetchEvents, 150000)
+    
+    // Only fetch if we have a user
+    if (user) {
+      fetchEvents()
+      // Temporarily disabled polling to prevent reloading issues
+      // intervalRef.current = setInterval(fetchEvents, 150000)
+    }
+    
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [user?.role])
+  }, [user?.id]) // Only depend on user ID, not the entire user object
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -349,6 +359,7 @@ export default function Events() {
                             <TableHead className="font-semibold text-gray-700 text-sm py-4">Name</TableHead>
                             <TableHead className="font-semibold text-gray-700 text-sm py-4">Type</TableHead>
                             <TableHead className="font-semibold text-gray-700 text-sm py-4">Category</TableHead>
+                            <TableHead className="font-semibold text-gray-700 text-sm py-4">Pricing</TableHead>
                             <TableHead className="font-semibold text-gray-700 text-sm py-4">Organizer</TableHead>
                             <TableHead className="font-semibold text-gray-700 text-sm py-4">Status</TableHead>
                             <TableHead className="font-semibold text-gray-700 text-sm py-4">Date</TableHead>
@@ -367,6 +378,34 @@ export default function Events() {
                               <TableCell className="text-gray-600 py-4">{event.event_type?.name || '-'}</TableCell>
                               <TableCell className="text-gray-600 py-4">
                                 {event.event_category?.name || '-'}
+                              </TableCell>
+                              <TableCell className="py-4">
+                                <div className="flex flex-col gap-1">
+                                  {event.event_type === 'ticketed' ? (
+                                    <>
+                                      <Badge className="bg-purple-100 text-purple-800 text-xs font-medium">
+                                        🎫 Ticketed
+                                      </Badge>
+                                      {event.pricing_info?.formatted_price && (
+                                        <span className="text-xs text-purple-700 font-medium">
+                                          {event.pricing_info.formatted_price}
+                                        </span>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Badge className="bg-green-100 text-green-800 text-xs font-medium">
+                                        🎉 Free Event
+                                      </Badge>
+                                      {event.pricing_info?.guest_types && event.pricing_info.guest_types.length > 0 && (
+                                        <span className="text-xs text-green-700">
+                                          {event.pricing_info.guest_types.slice(0, 2).join(', ')}
+                                          {event.pricing_info.guest_types.length > 2 && '...'}
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell className="text-gray-600 py-4">{event.organizer?.name || '-'}</TableCell>
                               <TableCell className="py-4">
@@ -431,6 +470,35 @@ export default function Events() {
                             <div className="flex items-center gap-3 text-sm text-gray-600">
                               <span className="font-medium">Category:</span>
                               <span>{event.event_category?.name || '-'}</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm text-gray-600">
+                              <span className="font-medium">Pricing:</span>
+                              <div className="flex flex-col gap-1">
+                                {event.event_type === 'ticketed' ? (
+                                  <>
+                                    <Badge className="bg-purple-100 text-purple-800 text-xs font-medium">
+                                      🎫 Ticketed
+                                    </Badge>
+                                    {event.pricing_info?.formatted_price && (
+                                      <span className="text-xs text-purple-700 font-medium">
+                                        {event.pricing_info.formatted_price}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Badge className="bg-green-100 text-green-800 text-xs font-medium">
+                                      🎉 Free Event
+                                    </Badge>
+                                    {event.pricing_info?.guest_types && event.pricing_info.guest_types.length > 0 && (
+                                      <span className="text-xs text-green-700">
+                                        {event.pricing_info.guest_types.slice(0, 2).join(', ')}
+                                        {event.pricing_info.guest_types.length > 2 && '...'}
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center gap-3 text-sm text-gray-600">
                               <span className="font-medium">Organizer:</span>

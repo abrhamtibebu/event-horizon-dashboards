@@ -9,6 +9,22 @@ import {
   Trash,
   Eye,
   EyeOff,
+  Plus,
+  Shield,
+  UserCheck,
+  UserX,
+  Clock,
+  Calendar,
+  Phone,
+  Edit,
+  Trash2,
+  Eye as ViewIcon,
+  Power,
+  PlayCircle,
+  PauseCircle,
+  UserPlus,
+  Settings,
+  Key,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,6 +68,13 @@ import {
 import { useAuth } from '@/hooks/use-auth'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 export default function Users() {
   const [users, setUsers] = useState<any[]>([])
@@ -115,27 +138,29 @@ export default function Users() {
 
   const getRoleColor = (role: string) => {
     switch (role) {
+      case 'superadmin':
+        return 'bg-red-100 text-red-800 border-red-200'
       case 'admin':
-        return 'bg-purple-100 text-purple-800'
+        return 'bg-purple-100 text-purple-800 border-purple-200'
       case 'organizer':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-blue-100 text-blue-800 border-blue-200'
       case 'usher':
-        return 'bg-green-100 text-green-800'
+        return 'bg-green-100 text-green-800 border-green-200'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
-        return 'bg-green-100 text-green-800'
+        return 'bg-green-100 text-green-800 border-green-200'
       case 'inactive':
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-100 text-gray-800 border-gray-200'
       case 'suspended':
-        return 'bg-red-100 text-red-800'
+        return 'bg-red-100 text-red-800 border-red-200'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
 
@@ -150,10 +175,14 @@ export default function Users() {
 
   const userStats = {
     total: users.length,
+    superadmins: users.filter((u) => u.role === 'superadmin').length,
     admins: users.filter((u) => u.role === 'admin').length,
     organizers: users.filter((u) => u.role === 'organizer').length,
     ushers: users.filter((u) => u.role === 'usher').length,
     active: users.filter((u) => u.status === 'active').length,
+    inactive: users.filter((u) => u.status === 'inactive').length,
+    suspended: users.filter((u) => u.status === 'suspended').length,
+
   }
 
   const handleAddChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -185,8 +214,10 @@ export default function Users() {
       const res = await api.get('/users')
       setUsers(res.data)
       setLoading(false)
+      toast.success('User added successfully!')
     } catch (err: any) {
       setAddError(err.response?.data?.error || 'Failed to add user')
+      toast.error('Failed to add user')
     } finally {
       setAddLoading(false)
     }
@@ -224,8 +255,10 @@ export default function Users() {
       const res = await api.get('/users')
       setUsers(res.data)
       setLoading(false)
+      toast.success('User updated successfully!')
     } catch (err: any) {
       setEditError(err.response?.data?.error || 'Failed to update user')
+      toast.error('Failed to update user')
     } finally {
       setEditLoading(false)
     }
@@ -257,8 +290,10 @@ export default function Users() {
       const res = await api.get('/users')
       setUsers(res.data)
       setLoading(false)
-    } catch (err) {
-      // Optionally show error
+      toast.success(`User status updated to ${status}`)
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error || err.response?.data?.status?.[0] || 'Failed to update user status'
+      toast.error(errorMessage)
     } finally {
       setStatusLoading(null)
     }
@@ -272,6 +307,7 @@ export default function Users() {
   const isCurrentSuperAdmin = currentUser && currentUser.role === 'superadmin';
   // Helper to check if current user is admin
   const isCurrentAdmin = currentUser?.role === 'admin'
+  const canManageUsers = isCurrentSuperAdmin || isCurrentAdmin;
 
   const handleResetPassword = async () => {
     if (!resetUserId) return
@@ -293,53 +329,60 @@ export default function Users() {
       setResetPasswordConfirm('')
     } catch (err: any) {
       setResetError(err.response?.data?.error || 'Failed to reset password')
+      toast.error('Failed to reset password')
     } finally {
       setResetLoading(false)
     }
   }
 
   return (
-    <div className="space-y-6">
+    <TooltipProvider>
+      <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8 px-2 sm:px-6 lg:px-12">
       {/* Header */}
-      <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-600 mt-1">
-            Manage users, roles, and permissions
-          </p>
+            <h1 className="text-4xl font-extrabold text-gray-900 drop-shadow-sm">User Management</h1>
+            <p className="text-lg text-gray-600 mt-2">Manage users, roles, permissions, and access control</p>
         </div>
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-              <User className="w-4 h-4 mr-2" />
-              Add User
+              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg text-lg px-6 py-3 rounded-xl">
+                <UserPlus className="w-5 h-5 mr-2" /> Add User
             </Button>
           </DialogTrigger>
-          <DialogContent>
+            <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Add User</DialogTitle>
+                <DialogTitle className="text-xl font-bold">Add New User</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleAdd} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Name</label>
               <Input
                 name="name"
-                placeholder="Name"
+                    placeholder="Enter full name"
                 value={addForm.name ?? ''}
                 onChange={handleAddChange}
                 required
               />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Email</label>
               <Input
                 name="email"
                 type="email"
-                placeholder="Email"
+                    placeholder="Enter email address"
                 value={addForm.email ?? ''}
                 onChange={handleAddChange}
                 required
               />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Password</label>
               <div className="relative">
                 <Input
                   name="password"
                   type={showAddPassword ? 'text' : 'password'}
-                  placeholder="Password"
+                      placeholder="Enter password"
                   value={addForm.password ?? ''}
                   onChange={handleAddChange}
                   required
@@ -348,7 +391,6 @@ export default function Users() {
                 <button
                   type="button"
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                  tabIndex={-1}
                   onClick={() => setShowAddPassword((v) => !v)}
                 >
                   {showAddPassword ? (
@@ -358,11 +400,14 @@ export default function Users() {
                   )}
                 </button>
               </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Confirm Password</label>
               <div className="relative">
                 <Input
                   name="password_confirmation"
                   type={showAddPasswordConfirm ? 'text' : 'password'}
-                  placeholder="Confirm Password"
+                      placeholder="Confirm password"
                   value={addForm.password_confirmation ?? ''}
                   onChange={handleAddChange}
                   required
@@ -371,7 +416,6 @@ export default function Users() {
                 <button
                   type="button"
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                  tabIndex={-1}
                   onClick={() => setShowAddPasswordConfirm((v) => !v)}
                 >
                   {showAddPasswordConfirm ? (
@@ -381,9 +425,12 @@ export default function Users() {
                   )}
                 </button>
               </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Role</label>
               <Select value={addForm.role} onValueChange={handleAddRole}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Role" />
+                      <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
@@ -391,30 +438,32 @@ export default function Users() {
                   <SelectItem value="usher">Usher</SelectItem>
                 </SelectContent>
               </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Phone (Optional)</label>
               <Input
                 name="phone"
-                placeholder="Phone (optional)"
+                    placeholder="Enter phone number"
                 value={addForm.phone ?? ''}
                 onChange={handleAddChange}
               />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Bio (Optional)</label>
               <Input
                 name="bio"
-                placeholder="Bio (optional)"
+                    placeholder="Enter bio"
                 value={addForm.bio ?? ''}
                 onChange={handleAddChange}
               />
+                </div>
               {addError && (
-                <div className="text-red-500 text-sm">{addError}</div>
+                  <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{addError}</div>
               )}
               <DialogFooter>
-                <Button type="submit" disabled={addLoading}>
-                  {addLoading ? 'Adding...' : 'Add User'}
-                </Button>
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">
-                    Cancel
+                  <Button type="submit" disabled={addLoading} className="w-full">
+                    {addLoading ? 'Adding User...' : 'Add User'}
                   </Button>
-                </DialogClose>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -422,59 +471,70 @@ export default function Users() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <DashboardCard title="Total Users" className="text-center">
-          <div className="text-2xl font-bold text-blue-600">
-            {userStats.total}
-          </div>
-        </DashboardCard>
-        <DashboardCard title="Admins" className="text-center">
-          <div className="text-2xl font-bold text-purple-600">
-            {userStats.admins}
-          </div>
-        </DashboardCard>
-        <DashboardCard title="Organizers" className="text-center">
-          <div className="text-2xl font-bold text-blue-600">
-            {userStats.organizers}
-          </div>
-        </DashboardCard>
-        <DashboardCard title="Ushers" className="text-center">
-          <div className="text-2xl font-bold text-green-600">
-            {userStats.ushers}
-          </div>
-        </DashboardCard>
-        <DashboardCard title="Active" className="text-center">
-          <div className="text-2xl font-bold text-green-600">
-            {userStats.active}
-          </div>
-        </DashboardCard>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-blue-200 text-center">
+            <CardHeader>
+              <CardTitle className="text-blue-600 text-lg font-semibold">Total Users</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{userStats.total}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-purple-200 text-center">
+            <CardHeader>
+              <CardTitle className="text-purple-600 text-lg font-semibold">Administrators</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{userStats.admins + userStats.superadmins}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-green-200 text-center">
+            <CardHeader>
+              <CardTitle className="text-green-600 text-lg font-semibold">Active Users</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{userStats.active}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-orange-200 text-center">
+            <CardHeader>
+              <CardTitle className="text-orange-600 text-lg font-semibold">Organizers</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{userStats.organizers}</div>
+            </CardContent>
+          </Card>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <div className="flex flex-col sm:flex-row gap-4 w-full mb-8">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <Input
             placeholder="Search users..."
             value={searchTerm ?? ''}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+              className="pl-12 w-full py-3 rounded-xl text-lg shadow-md"
           />
         </div>
+          <div className="w-full sm:w-48">
         <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className="w-40">
-            <Filter className="w-4 h-4 mr-2" />
+              <SelectTrigger className="w-full py-3 rounded-xl text-lg shadow-md">
+                <Filter className="w-5 h-5 mr-2" />
             <SelectValue placeholder="All Roles" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="superadmin">Super Admin</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
             <SelectItem value="organizer">Organizer</SelectItem>
             <SelectItem value="usher">Usher</SelectItem>
           </SelectContent>
         </Select>
+          </div>
+          <div className="w-full sm:w-48">
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
+              <SelectTrigger className="w-full py-3 rounded-xl text-lg shadow-md">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
@@ -484,67 +544,79 @@ export default function Users() {
             <SelectItem value="suspended">Suspended</SelectItem>
           </SelectContent>
         </Select>
+          </div>
       </div>
 
       {/* Loading/Error States */}
-      {loading && <div className="text-center py-12">Loading users...</div>}
-      {error && <div className="text-center py-12 text-red-500">{error}</div>}
+        {loading && (
+          <div className="flex justify-center items-center py-24">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+            <span className="ml-4 text-xl text-gray-500">Loading users...</span>
+          </div>
+        )}
+        {error && <div className="text-center py-12 text-red-500 text-xl">{error}</div>}
 
-      {/* Users Table */}
+        {/* Users Table View */}
       {!loading && !error && (
-        <DashboardCard title="Users">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Join Date</TableHead>
-                <TableHead>Events Managed</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-0 overflow-x-auto">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold text-gray-900 px-6 pt-6 pb-2">Users</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gradient-to-r from-blue-50 to-purple-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">User</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Role</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Join Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white/60 divide-y divide-gray-100">
               {filteredUsers.map((user) => {
-                const showActions = isCurrentAdmin && !isSuperAdmin(user)
-                const canEdit =
-                  showActions && (isCurrentSuperAdmin || !isAdmin(user))
+                    const showActions = canManageUsers && !isSuperAdmin(user)
+                    const canEdit = showActions && (isCurrentSuperAdmin || !isAdmin(user))
                 const canDelete = isCurrentSuperAdmin && user.id !== currentUser.id;
-                const canChangeStatus =
-                  showActions && (isCurrentSuperAdmin || !isAdmin(user))
+                    const canChangeStatus = showActions && (isCurrentSuperAdmin || !isAdmin(user))
+                    
                 return (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="bg-gray-200 rounded-full w-8 h-8 flex items-center justify-center font-bold text-gray-700">
+                      <tr key={user.id} className="hover:bg-blue-50/40 transition">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center text-white text-lg font-bold shadow-md">
                           {user.avatar ||
                             user.name
                               ?.split(' ')
                               .map((n: string) => n[0])
                               .join('')
-                              .toUpperCase()}
+                                  .toUpperCase() || 'U'}
                         </div>
                         <div>
-                          <div className="font-semibold">{user.name}</div>
-                          <div className="text-xs text-gray-500">
-                            {user.email}
+                              <div className="font-semibold text-gray-900">{user.name}</div>
+                              <div className="text-sm text-gray-500">{user.email}</div>
+                              {user.phone && (
+                                <div className="text-xs text-gray-400 flex items-center gap-1">
+                                  <Phone className="w-3 h-3" />
+                                  {user.phone}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getRoleColor(user.role)}>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <Badge className={getRoleColor(user.role) + ' text-xs px-2 py-1 rounded-full'}>
                         {user.role}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                       {canChangeStatus ? (
                         <Select
-                          value={user.status}
+                              value={user.status || 'active'}
                           onValueChange={(v) => handleStatusChange(user, v)}
                           disabled={statusLoading === user.id}
                         >
-                          <SelectTrigger>
+                              <SelectTrigger className="w-32">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -554,26 +626,149 @@ export default function Users() {
                           </SelectContent>
                         </Select>
                       ) : (
-                        <Badge className={getStatusColor(user.status)}>
-                          {user.status}
+                            <Badge className={getStatusColor(user.status || 'active') + ' text-xs px-2 py-1 rounded-full'}>
+                              {user.status || 'active'}
                         </Badge>
                       )}
-                    </TableCell>
-                    <TableCell>{user.created_at || user.createdAt}</TableCell>
-                    <TableCell>{user.eventsManaged || '-'}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        {(canEdit || isCurrentSuperAdmin) && (
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-gray-700">
+                          {user.created_at || user.createdAt || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex flex-wrap gap-2">
+                            {canEdit && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="outline" size="icon" onClick={() => openEdit(user)} className="shadow-sm">
+                                    <Edit className="w-5 h-5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Edit User</TooltipContent>
+                              </Tooltip>
+                            )}
+                            {isCurrentSuperAdmin && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
                           <Button
-                            size="sm"
                             variant="outline"
-                            onClick={() => openEdit(user)}
-                          >
-                            <Pencil className="w-4 h-4" />
+                                    size="icon" 
+                                    onClick={() => setResetUserId(String(user.id))} 
+                                    className="shadow-sm"
+                                  >
+                                    <Key className="w-5 h-5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Reset Password</TooltipContent>
+                              </Tooltip>
+                            )}
+                            {canDelete && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="outline" size="icon" onClick={() => setDeleteUserId(user.id)} className="shadow-sm">
+                                    <Trash2 className="w-5 h-5 text-red-500" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Delete User</TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        )}
+
+        {filteredUsers.length === 0 && !loading && (
+          <div className="text-center py-12">
+            <UsersIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No users found
+            </h3>
+            <p className="text-gray-600">
+              Try adjusting your search or filter criteria
+            </p>
+          </div>
+        )}
+
+        {/* Edit User Modal */}
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">Edit User</DialogTitle>
+            </DialogHeader>
+            {editForm && (
+              <form onSubmit={handleEdit} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Name</label>
+                  <Input
+                    name="name"
+                    placeholder="Enter full name"
+                    value={editForm.name ?? ''}
+                    onChange={handleEditChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Email</label>
+                  <Input
+                    name="email"
+                    type="email"
+                    placeholder="Enter email address"
+                    value={editForm.email ?? ''}
+                    onChange={handleEditChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Role</label>
+                  <Select value={editForm.role} onValueChange={handleEditRole}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="organizer">Organizer</SelectItem>
+                      <SelectItem value="usher">Usher</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Phone (Optional)</label>
+                  <Input
+                    name="phone"
+                    placeholder="Enter phone number"
+                    value={editForm.phone ?? ''}
+                    onChange={handleEditChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Bio (Optional)</label>
+                  <Input
+                    name="bio"
+                    placeholder="Enter bio"
+                    value={editForm.bio ?? ''}
+                    onChange={handleEditChange}
+                  />
+                </div>
+                {editError && (
+                  <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{editError}</div>
+                )}
+                <DialogFooter>
+                  <Button type="submit" disabled={editLoading} className="w-full">
+                    {editLoading ? 'Saving Changes...' : 'Save Changes'}
                           </Button>
-                        )}
-                        {isCurrentSuperAdmin && (
-                          <Dialog open={resetUserId === String(user.id)} onOpenChange={(open) => {
+                </DialogFooter>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Reset Password Modal */}
+        <Dialog open={resetUserId !== null} onOpenChange={(open) => {
                             if (!open) {
                               setResetUserId(null)
                               setResetPassword('')
@@ -581,62 +776,53 @@ export default function Users() {
                               setResetError(null)
                             }
                           }}>
-                            <DialogTrigger asChild>
-                              <Button size="sm" variant="outline" onClick={() => setResetUserId(String(user.id))}>
-                                Reset Password
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
+          <DialogContent className="max-w-md">
                               <DialogHeader>
-                                <DialogTitle>Reset Password for {user.name}</DialogTitle>
+              <DialogTitle className="text-xl font-bold">Reset Password</DialogTitle>
                               </DialogHeader>
                               <form onSubmit={e => { e.preventDefault(); handleResetPassword(); }} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">New Password</label>
                                 <Input
                                   type="password"
-                                  placeholder="New Password"
+                  placeholder="Enter new password"
                                   value={resetPassword ?? ''}
                                   onChange={e => setResetPassword(e.target.value)}
                                   required
                                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Confirm New Password</label>
                                 <Input
                                   type="password"
-                                  placeholder="Confirm New Password"
+                  placeholder="Confirm new password"
                                   value={resetPasswordConfirm ?? ''}
                                   onChange={e => setResetPasswordConfirm(e.target.value)}
                                   required
                                 />
-                                {resetError && <div className="text-red-500 text-sm">{resetError}</div>}
+              </div>
+              {resetError && (
+                <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{resetError}</div>
+              )}
                                 <DialogFooter>
-                                  <Button type="submit" disabled={resetLoading}>
-                                    {resetLoading ? 'Resetting...' : 'Reset Password'}
-                                  </Button>
-                                  <DialogClose asChild>
-                                    <Button type="button" variant="outline" onClick={() => setResetUserId(null)}>
-                                      Cancel
+                <Button type="submit" disabled={resetLoading} className="w-full">
+                  {resetLoading ? 'Resetting Password...' : 'Reset Password'}
                                     </Button>
-                                  </DialogClose>
                                 </DialogFooter>
                               </form>
                             </DialogContent>
                           </Dialog>
-                        )}
-                        {canDelete && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => setDeleteUserId(user.id)}
-                              >
-                                <Trash className="w-4 h-4" />
-                              </Button>
-                            </AlertDialogTrigger>
+
+        {/* Delete User Confirmation */}
+        <AlertDialog open={deleteUserId !== null} onOpenChange={(open) => {
+          if (!open) setDeleteUserId(null)
+        }}>
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete User</AlertDialogTitle>
                               </AlertDialogHeader>
                               <div>
-                                Are you sure you want to delete this user?
+              Are you sure you want to delete this user? This action cannot be undone.
                               </div>
                               <AlertDialogFooter>
                                 <AlertDialogCancel asChild>
@@ -654,91 +840,7 @@ export default function Users() {
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
-                        )}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </DashboardCard>
-      )}
-
-      {filteredUsers.length === 0 && (
-        <div className="text-center py-12">
-          <UsersIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            No users found
-          </h3>
-          <p className="text-gray-600">
-            Try adjusting your search or filter criteria
-          </p>
-        </div>
-      )}
-
-      {/* Edit User Modal */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
-          </DialogHeader>
-          {editForm && (
-            <form onSubmit={handleEdit} className="space-y-4">
-              <Input
-                name="name"
-                placeholder="Name"
-                value={editForm.name ?? ''}
-                onChange={handleEditChange}
-                required
-              />
-              <Input
-                name="email"
-                type="email"
-                placeholder="Email"
-                value={editForm.email ?? ''}
-                onChange={handleEditChange}
-                required
-              />
-              <Select value={editForm.role} onValueChange={handleEditRole}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="organizer">Organizer</SelectItem>
-                  <SelectItem value="usher">Usher</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                name="phone"
-                placeholder="Phone (optional)"
-                value={editForm.phone ?? ''}
-                onChange={handleEditChange}
-              />
-              <Input
-                name="bio"
-                placeholder="Bio (optional)"
-                value={editForm.bio ?? ''}
-                onChange={handleEditChange}
-              />
-              {editError && (
-                <div className="text-red-500 text-sm">{editError}</div>
-              )}
-              <DialogFooter>
-                <Button type="submit" disabled={editLoading}>
-                  {editLoading ? 'Saving...' : 'Save Changes'}
-                </Button>
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">
-                    Cancel
-                  </Button>
-                </DialogClose>
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+    </TooltipProvider>
   )
 }
