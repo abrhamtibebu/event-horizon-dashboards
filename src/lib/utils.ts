@@ -13,6 +13,7 @@ export const GUEST_TYPE_COLORS: Record<string, { bg: string; text: string; borde
   'Exhibitor': { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' },
   'Media': { bg: 'bg-pink-100', text: 'text-pink-800', border: 'border-pink-200' },
   'Regular': { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-200' },
+  'General': { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-200' },
   'Visitor': { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-200' },
   'Sponsor': { bg: 'bg-yellow-100', text: 'text-yellow-800', border: 'border-yellow-200' },
   'Organizer': { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200' },
@@ -43,4 +44,39 @@ export function getGuestTypeColor(guestType: string | null | undefined): { bg: s
 export function getGuestTypeBadgeClasses(guestType: string | null | undefined): string {
   const colors = getGuestTypeColor(guestType);
   return `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors.bg} ${colors.text} ${colors.border || ''} border`;
+}
+
+// Check-in Status Color Coding
+export function getCheckInBadgeClasses(checkedIn: boolean | null | undefined): string {
+  if (checkedIn) {
+    return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200';
+  }
+  return 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200';
+}
+
+/**
+ * Constructs a proper image URL from a storage path
+ * @param imagePath - The image path from the backend (e.g., "/storage/image.png")
+ * @returns The full URL to the image
+ */
+export const getImageUrl = (imagePath: string | null | undefined): string => {
+  if (!imagePath) {
+    return '/placeholder.svg' // Default placeholder
+  }
+  
+  // If it's already a full URL, return as is
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath
+  }
+  
+  // If it starts with /storage/, construct the proper URL
+  if (imagePath.startsWith('/storage/')) {
+    const baseUrl = import.meta.env.VITE_API_URL || 'https://api.validity.et/api'
+    // Remove /api from the base URL for storage access
+    const storageBaseUrl = baseUrl.replace('/api', '')
+    return `${storageBaseUrl}${imagePath}`
+  }
+  
+  // If it's a relative path, assume it's from the public folder
+  return imagePath
 }

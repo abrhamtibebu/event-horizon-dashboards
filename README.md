@@ -65,8 +65,64 @@ A dashboard application for event management, built with React, TypeScript, Vite
 ## Scripts
 - `npm run dev` – Start development server
 - `npm run build` – Build for production
+- `npm run build:prod` – Build for production with production environment
+- `npm run build:dev` – Build for development environment
 - `npm run preview` – Preview production build
 - `npm run lint` – Lint codebase
+
+## Production Deployment
+
+### Environment Configuration
+
+1. Create a production environment file:
+   ```bash
+   cp env.example .env.production
+   ```
+
+2. Update the production environment variables:
+   ```env
+   VITE_API_URL=http://localhost:8000/api
+   VITE_API_KEY=your-production-api-key
+   ```
+
+### Building for Production
+
+1. Build the application for production:
+   ```bash
+   npm run build:prod
+   # or
+   bun run build:prod
+   ```
+
+2. The built files will be in the `dist/` directory, ready for deployment.
+
+### Deployment Options
+
+#### Static Hosting (Netlify, Vercel, etc.)
+- Upload the contents of the `dist/` directory to your static hosting provider
+- Configure environment variables in your hosting platform's dashboard
+
+#### Nginx/Apache Server
+- Copy the contents of `dist/` to your web server's document root
+- Configure your server to serve the `index.html` file for all routes (SPA routing)
+
+#### Docker Deployment
+```dockerfile
+FROM nginx:alpine
+COPY dist/ /usr/share/nginx/html/
+COPY nginx.conf /etc/nginx/nginx.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `VITE_API_URL` | Backend API URL | `http://localhost:8000/api` |
+| `VITE_API_KEY` | API key for authentication | Required |
+| `VITE_EVELLA_URL` | Evella platform URL (for testing) | `http://localhost:3000` |
+| `VITE_PLATFORM_URL` | Platform URL (for testing) | `http://localhost:5174` |
 
 ## Contributing
 

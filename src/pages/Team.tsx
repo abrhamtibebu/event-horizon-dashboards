@@ -138,12 +138,34 @@ export default function Team() {
   }
 
   const handleRemoveConfirm = async () => {
+    if (!removeMember) return
+    
+    // Check if this is a primary contact
+    if (removeMember.is_primary_contact) {
+      // Count primary contacts for this organizer
+      const primaryContactCount = teamMembers.filter((m: any) => m.is_primary_contact).length
+      
+      if (primaryContactCount <= 1) {
+        toast.error('Cannot remove the only primary contact. Please assign another primary contact first.')
+        setRemoveDialogOpen(false)
+        setRemoveMember(null)
+        return
+      }
+      
+      // Show confirmation for removing primary contact
+      if (!confirm(`Are you sure you want to remove ${removeMember.name} as a primary contact? This organizer has ${primaryContactCount} primary contact(s).`)) {
+        setRemoveDialogOpen(false)
+        setRemoveMember(null)
+        return
+      }
+    }
+    
     setRemoveLoading(true)
     try {
       await api.delete(
-        `/organizers/${user?.organizer_id}/contacts/${removeMember?.id}`
+        `/organizers/${user?.organizer_id}/contacts/${removeMember.id}`
       )
-      toast.success('Team member removed successfully!')
+      toast.success(removeMember.is_primary_contact ? 'Primary contact removed successfully!' : 'Team member removed successfully!')
       setRemoveDialogOpen(false)
       setRemoveMember(null)
       // Refresh team list
@@ -481,10 +503,10 @@ export default function Team() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
                         onClick={() => handleRemoveMember(member)}
-                          className="text-red-600"
+                          className={member.is_primary_contact ? "text-orange-600" : "text-red-600"}
                       >
                           <Trash2 className="w-4 h-4 mr-2" />
-                          Remove Member
+                          {member.is_primary_contact ? 'Remove Primary Contact' : 'Remove Member'}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

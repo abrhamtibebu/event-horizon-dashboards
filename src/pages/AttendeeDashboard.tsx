@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select'
 import { Link, useOutletContext } from 'react-router-dom'
 import api from '@/lib/api'
+import { getImageUrl } from '@/lib/utils'
 
 export default function AttendeeDashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null)
@@ -187,9 +188,7 @@ export default function AttendeeDashboard() {
               <div className="h-48 bg-gradient-to-r from-blue-100 to-purple-100 overflow-hidden">
                 {event.event_image ? (
                   <img
-                    src={event.event_image.startsWith('http')
-                      ? event.event_image
-                      : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${event.event_image}`}
+                                    src={getImageUrl(event.event_image)}
                     alt={event.name}
                     className="w-full h-full object-cover"
                   />

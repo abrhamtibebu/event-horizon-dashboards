@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
-import { useAuth } from '@/hooks/use-auth.tsx'
+import { useAuth } from '@/hooks/use-auth'
 import { useState } from 'react'
 
 export function Header({ onSearch }: { onSearch?: (query: string) => void }) {

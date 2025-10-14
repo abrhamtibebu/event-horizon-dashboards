@@ -8,23 +8,25 @@ import { BadgeTemplate } from '@/types/badge';
 import { Attendee } from '@/types/attendee';
 import { v4 as uuidv4 } from 'uuid';
 import { getBadgeTemplates, getOfficialBadgeTemplate } from '@/lib/badgeTemplates';
+import { calculateNameFontSize, calculateCompanyFontSize, calculateJobTitleFontSize } from '@/lib/nameSizing';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-// Default template for demonstration - moved to a function
+// Default template for demonstration - Updated for 4"x4" (100mm x 100mm) without header/footer
 const createDefaultTemplate = (): BadgeTemplate => ({
   id: 0,
   event_id: 0,
-  name: 'Default Conference Badge',
+  name: 'Default Conference Badge 4x4 Clean',
   template_json: {
     front: {
       elements: [
-        { id: uuidv4(), type: 'shape', shapeType: 'rectangle', x: 0, y: 0, width: 396, height: 100, rotation: 0, zIndex: 1, backgroundColor: '#10B981', borderColor: '#10B981', borderWidth: 0 },
-        { id: uuidv4(), type: 'text', content: 'VEMSCON 2024', x: 20, y: 20, width: 356, height: 40, rotation: 0, zIndex: 2, fontFamily: 'Arial', fontSize: 32, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center' },
-        { id: uuidv4(), type: 'image', src: '{profilePicture}', x: 148, y: 120, width: 100, height: 100, rotation: 0, zIndex: 2 },
-        { id: uuidv4(), type: 'text', content: '{fullName}', x: 20, y: 240, width: 356, height: 30, rotation: 0, zIndex: 2, fontFamily: 'Arial', fontSize: 28, fontWeight: 'bold', color: '#000000', textAlign: 'center' },
-        { id: uuidv4(), type: 'text', content: '{jobTitle}', x: 20, y: 280, width: 356, height: 20, rotation: 0, zIndex: 2, fontFamily: 'Arial', fontSize: 18, fontWeight: 'normal', color: '#6B7280', textAlign: 'center' },
-        { id: uuidv4(), type: 'text', content: '{company}', x: 20, y: 310, width: 356, height: 20, rotation: 0, zIndex: 2, fontFamily: 'Arial', fontSize: 18, fontWeight: 'normal', color: '#6B7280', textAlign: 'center' },
+        { id: uuidv4(), type: 'text', content: '{fullName}', x: 20, y: 50, width: 360, height: 60, rotation: 0, zIndex: 2, fontFamily: 'Helvetica', fontSize: 36, fontWeight: 'bold', color: '#1e293b', textAlign: 'center' },
+        { id: uuidv4(), type: 'text', content: '{company}', x: 20, y: 120, width: 360, height: 30, rotation: 0, zIndex: 2, fontFamily: 'Helvetica', fontSize: 20, fontWeight: 'bold', color: '#475569', textAlign: 'center' },
+        { id: uuidv4(), type: 'text', content: '{jobTitle}', x: 20, y: 155, width: 360, height: 25, rotation: 0, zIndex: 2, fontFamily: 'Helvetica', fontSize: 18, fontWeight: 'bold', color: '#64748b', textAlign: 'center' },
+        { id: uuidv4(), type: 'shape', shapeType: 'rectangle', x: 130, y: 200, width: 140, height: 140, rotation: 0, zIndex: 2, backgroundColor: '#f1f5f9', borderColor: '#cbd5e1', borderWidth: 2 },
+        { id: uuidv4(), type: 'text', content: 'QR CODE', x: 130, y: 250, width: 140, height: 20, rotation: 0, zIndex: 3, fontFamily: 'Helvetica', fontSize: 14, fontWeight: 'bold', color: '#64748b', textAlign: 'center' },
+        { id: uuidv4(), type: 'text', content: 'ID: {uuid}', x: 20, y: 350, width: 360, height: 25, rotation: 0, zIndex: 2, fontFamily: 'Helvetica', fontSize: 14, fontWeight: 'bold', color: '#64748b', textAlign: 'center' },
+        { id: uuidv4(), type: 'text', content: '{guestType}', x: 20, y: 375, width: 360, height: 25, rotation: 0, zIndex: 2, fontFamily: 'Helvetica', fontSize: 22, fontWeight: 'bold', color: '#1e40af', textAlign: 'center' },
       ],
       background: null
     },

@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useAuth } from '@/hooks/use-auth.tsx'
+import { useAuth } from '@/hooks/use-auth'
 import { 
   Mail, 
   Lock, 
@@ -229,6 +229,28 @@ export default function SignIn() {
                   </div>
                 )}
               </Button>
+              
+              {/* Development Mode Button */}
+              {import.meta.env.DEV && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-dashed border-gray-300 text-gray-600 hover:border-gray-400 hover:text-gray-700"
+                  onClick={() => {
+                    // Clear any logout flags and enable mock mode
+                    sessionStorage.removeItem('just_logged_out')
+                    localStorage.setItem('mock_auth', 'true')
+                    localStorage.setItem('jwt', 'dev-token')
+                    localStorage.setItem('user_role', 'organizer')
+                    localStorage.setItem('user_id', '6')
+                    localStorage.setItem('organizer_id', '1')
+                    window.location.href = '/dashboard'
+                  }}
+                >
+                  <Shield className="w-4 h-4 mr-2" />
+                  Enter Development Mode
+                </Button>
+              )}
             </CardFooter>
           </form>
           </div>

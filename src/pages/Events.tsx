@@ -7,6 +7,7 @@ import {
   Search,
   Filter,
   Eye,
+  DollarSign,
   Settings as SettingsIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import api from '@/lib/api'
+import { getImageUrl } from '@/lib/utils'
 import EventCategoryManager from './EventCategoryManager'
 import EventTypeManager from './EventTypeManager'
 import { useAuth } from '@/hooks/use-auth'
@@ -42,6 +44,7 @@ export default function Events() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [pricingFilter, setPricingFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   const { user } = useAuth()
@@ -100,7 +103,9 @@ export default function Events() {
       event.description?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus =
       statusFilter === 'all' || event.status === statusFilter
-    return matchesSearch && matchesStatus
+    const matchesPricing =
+      pricingFilter === 'all' || event.event_type === pricingFilter
+    return matchesSearch && matchesStatus && matchesPricing
   })
 
   return (
@@ -193,6 +198,60 @@ export default function Events() {
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={pricingFilter} onValueChange={setPricingFilter}>
+                <SelectTrigger className="w-48 bg-gray-50 border-gray-200 focus:bg-white">
+                  <DollarSign className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Filter by pricing" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Pricing</SelectItem>
+                  <SelectItem value="free">Free Events</SelectItem>
+                  <SelectItem value="ticketed">Ticketed Events</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Pricing Statistics */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <DollarSign className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-purple-600 font-medium">Ticketed Events</p>
+                    <p className="text-xl font-bold text-purple-900">
+                      {events.filter(e => e.event_type === 'ticketed').length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                    <Calendar className="w-4 h-4 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-green-600 font-medium">Free Events</p>
+                    <p className="text-xl font-bold text-green-900">
+                      {events.filter(e => e.event_type === 'free').length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Users className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-600 font-medium">Total Events</p>
+                    <p className="text-xl font-bold text-blue-900">
+                      {events.length}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -241,9 +300,7 @@ export default function Events() {
                           <div className="relative h-48 w-full overflow-hidden">
                             {event.event_image ? (
                               <img
-                                src={event.event_image.startsWith('http')
-                                  ? event.event_image
-                                  : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${event.event_image}`}
+                                                src={getImageUrl(event.event_image)}
                                 alt={event.name}
                                 className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
                               />
@@ -375,7 +432,19 @@ export default function Events() {
                               <TableCell className="font-medium text-gray-900 py-4 group-hover:text-blue-700 transition-colors">
                                 {event.name}
                               </TableCell>
-                              <TableCell className="text-gray-600 py-4">{event.event_type?.name || '-'}</TableCell>
+                              <TableCell className="text-gray-600 py-4">
+                                {event.event_type === 'ticketed' ? (
+                                  <Badge className="bg-purple-100 text-purple-800 text-xs font-medium">
+                                    🎫 Ticketed
+                                  </Badge>
+                                ) : event.event_type === 'free' ? (
+                                  <Badge className="bg-green-100 text-green-800 text-xs font-medium">
+                                    🎉 Free
+                                  </Badge>
+                                ) : (
+                                  '-'
+                                )}
+                              </TableCell>
                               <TableCell className="text-gray-600 py-4">
                                 {event.event_category?.name || '-'}
                               </TableCell>
@@ -384,11 +453,24 @@ export default function Events() {
                                   {event.event_type === 'ticketed' ? (
                                     <>
                                       <Badge className="bg-purple-100 text-purple-800 text-xs font-medium">
-                                        🎫 Ticketed
+                                        🎫 Ticketed Event
                                       </Badge>
-                                      {event.pricing_info?.formatted_price && (
+                                      {event.pricing_info?.formatted_price ? (
                                         <span className="text-xs text-purple-700 font-medium">
                                           {event.pricing_info.formatted_price}
+                                        </span>
+                                      ) : event.ticket_types && event.ticket_types.length > 0 ? (
+                                        <span className="text-xs text-purple-700 font-medium">
+                                          From ETB {Math.min(...event.ticket_types.map((t: any) => t.price)).toLocaleString()}
+                                        </span>
+                                      ) : (
+                                        <span className="text-xs text-purple-700 font-medium">
+                                          Pricing TBD
+                                        </span>
+                                      )}
+                                      {event.ticket_types && event.ticket_types.length > 0 && (
+                                        <span className="text-xs text-purple-600">
+                                          {event.ticket_types.length} ticket type{event.ticket_types.length > 1 ? 's' : ''}
                                         </span>
                                       )}
                                     </>
@@ -397,10 +479,24 @@ export default function Events() {
                                       <Badge className="bg-green-100 text-green-800 text-xs font-medium">
                                         🎉 Free Event
                                       </Badge>
-                                      {event.pricing_info?.guest_types && event.pricing_info.guest_types.length > 0 && (
+                                      {event.pricing_info?.guest_types && event.pricing_info.guest_types.length > 0 ? (
                                         <span className="text-xs text-green-700">
                                           {event.pricing_info.guest_types.slice(0, 2).join(', ')}
                                           {event.pricing_info.guest_types.length > 2 && '...'}
+                                        </span>
+                                      ) : event.guest_types && event.guest_types.length > 0 ? (
+                                        <span className="text-xs text-green-700">
+                                          {event.guest_types.slice(0, 2).join(', ')}
+                                          {event.guest_types.length > 2 && '...'}
+                                        </span>
+                                      ) : (
+                                        <span className="text-xs text-green-700">
+                                          Open to all
+                                        </span>
+                                      )}
+                                      {event.guest_types && event.guest_types.length > 0 && (
+                                        <span className="text-xs text-green-600">
+                                          {event.guest_types.length} guest type{event.guest_types.length > 1 ? 's' : ''}
                                         </span>
                                       )}
                                     </>
@@ -439,9 +535,20 @@ export default function Events() {
                               <h3 className="font-bold text-gray-900 text-lg mb-1">{event.name}</h3>
                               <p className="text-sm text-gray-600 line-clamp-2">{event.description}</p>
                             </div>
-                            <Badge className={`${getStatusColor(event.status)} text-xs font-medium ml-3`}>
-                              {event.status}
-                            </Badge>
+                            <div className="flex flex-col gap-2 ml-3">
+                              {event.event_type === 'ticketed' ? (
+                                <Badge className="bg-purple-100 text-purple-800 text-xs font-medium">
+                                  🎫 Ticketed
+                                </Badge>
+                              ) : event.event_type === 'free' ? (
+                                <Badge className="bg-green-100 text-green-800 text-xs font-medium">
+                                  🎉 Free
+                                </Badge>
+                              ) : null}
+                              <Badge className={`${getStatusColor(event.status)} text-xs font-medium`}>
+                                {event.status}
+                              </Badge>
+                            </div>
                           </div>
                           
                           <div className="space-y-3 mb-4">
@@ -465,7 +572,17 @@ export default function Events() {
                             </div>
                             <div className="flex items-center gap-3 text-sm text-gray-600">
                               <span className="font-medium">Type:</span>
-                              <span>{event.event_type?.name || '-'}</span>
+                              {event.event_type === 'ticketed' ? (
+                                <Badge className="bg-purple-100 text-purple-800 text-xs font-medium">
+                                  🎫 Ticketed
+                                </Badge>
+                              ) : event.event_type === 'free' ? (
+                                <Badge className="bg-green-100 text-green-800 text-xs font-medium">
+                                  🎉 Free
+                                </Badge>
+                              ) : (
+                                <span>-</span>
+                              )}
                             </div>
                             <div className="flex items-center gap-3 text-sm text-gray-600">
                               <span className="font-medium">Category:</span>
@@ -477,11 +594,24 @@ export default function Events() {
                                 {event.event_type === 'ticketed' ? (
                                   <>
                                     <Badge className="bg-purple-100 text-purple-800 text-xs font-medium">
-                                      🎫 Ticketed
+                                      🎫 Ticketed Event
                                     </Badge>
-                                    {event.pricing_info?.formatted_price && (
+                                    {event.pricing_info?.formatted_price ? (
                                       <span className="text-xs text-purple-700 font-medium">
                                         {event.pricing_info.formatted_price}
+                                      </span>
+                                    ) : event.ticket_types && event.ticket_types.length > 0 ? (
+                                      <span className="text-xs text-purple-700 font-medium">
+                                        From ETB {Math.min(...event.ticket_types.map((t: any) => t.price)).toLocaleString()}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-purple-700 font-medium">
+                                        Pricing TBD
+                                      </span>
+                                    )}
+                                    {event.ticket_types && event.ticket_types.length > 0 && (
+                                      <span className="text-xs text-purple-600">
+                                        {event.ticket_types.length} ticket type{event.ticket_types.length > 1 ? 's' : ''}
                                       </span>
                                     )}
                                   </>
@@ -490,10 +620,24 @@ export default function Events() {
                                     <Badge className="bg-green-100 text-green-800 text-xs font-medium">
                                       🎉 Free Event
                                     </Badge>
-                                    {event.pricing_info?.guest_types && event.pricing_info.guest_types.length > 0 && (
+                                    {event.pricing_info?.guest_types && event.pricing_info.guest_types.length > 0 ? (
                                       <span className="text-xs text-green-700">
                                         {event.pricing_info.guest_types.slice(0, 2).join(', ')}
                                         {event.pricing_info.guest_types.length > 2 && '...'}
+                                      </span>
+                                    ) : event.guest_types && event.guest_types.length > 0 ? (
+                                      <span className="text-xs text-green-700">
+                                        {event.guest_types.slice(0, 2).join(', ')}
+                                        {event.guest_types.length > 2 && '...'}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-green-700">
+                                        Open to all
+                                      </span>
+                                    )}
+                                    {event.guest_types && event.guest_types.length > 0 && (
+                                      <span className="text-xs text-green-600">
+                                        {event.guest_types.length} guest type{event.guest_types.length > 1 ? 's' : ''}
                                       </span>
                                     )}
                                   </>

@@ -238,12 +238,12 @@ export default function UsherDashboard() {
         {/* Additional Stats */}
         <MetricCard
           title="Total Earnings"
-          value={keyMetrics?.totalEarnings ? `${keyMetrics.totalEarnings} ETB` : '0.00 ETB'}
+          value={keyMetrics?.totalEarnings ? `${keyMetrics.totalEarnings} ETB` : '0.00'}
           icon={<CheckCircle className="w-6 h-6 text-yellow-500" />}
         />
         <MetricCard
           title="Earnings per Event"
-          value={keyMetrics?.earningsPerEvent ? `${keyMetrics.earningsPerEvent} ETB` : '0.00 ETB'}
+          value={keyMetrics?.earningsPerEvent ? `${keyMetrics.earningsPerEvent} ETB` : '0.00'}
           icon={<CheckCircle className="w-6 h-6 text-yellow-500" />}
         />
         {/* More stats coming soon */}
@@ -510,11 +510,7 @@ export default function UsherDashboard() {
                       </Dialog>
                     </div>
                   </div>
-                  <Link to={`/dashboard/usher/jobs/${event.id}`} className="w-full sm:w-auto">
-                    <Button size="sm" variant="outline" className="w-full sm:w-auto">
-                      View Details
-                    </Button>
-                  </Link>
+
                 </div>
               )
             })}

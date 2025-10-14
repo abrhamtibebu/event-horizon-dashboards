@@ -3,10 +3,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
 import api from '@/lib/api'
-import { getGuestTypeBadgeClasses } from '@/lib/utils'
+import { getGuestTypeBadgeClasses, getCheckInBadgeClasses } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Printer } from 'lucide-react'
 import BadgePrint from '@/components/Badge'
@@ -45,6 +46,7 @@ export default function UsherEvents() {
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [searching, setSearching] = useState(false)
   const searchTimeout = useRef<NodeJS.Timeout | null>(null)
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [qrScanStatus, setQrScanStatus] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
@@ -112,7 +114,14 @@ export default function UsherEvents() {
     setLoading(true)
     api.get(`/events/${selectedEventId}/attendees`)
       .then(res => {
-        setAttendees(res.data)
+        const indexed = (res.data || []).map((a: any) => {
+          const name = a?.guest?.name ? String(a.guest.name) : ''
+          const email = a?.guest?.email ? String(a.guest.email) : ''
+          const company = a?.guest?.company ? String(a.guest.company) : ''
+          const blob = `${name} ${email} ${company}`.toLowerCase()
+          return { ...a, _search: blob }
+        })
+        setAttendees(indexed)
         setError(null)
       })
       .catch(err => {
@@ -121,6 +130,12 @@ export default function UsherEvents() {
       })
       .finally(() => setLoading(false))
   }, [selectedEventId])
+
+  // Debounce search for smoother UX
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearchTerm(searchTerm.trim().toLowerCase()), 250)
+    return () => clearTimeout(handle)
+  }, [searchTerm])
 
   // Fetch guest types for selected event
   useEffect(() => {
@@ -227,15 +242,16 @@ export default function UsherEvents() {
       jobtitle: attendee.guest?.jobtitle || '',
       gender: attendee.guest?.gender || '',
       country: attendee.guest?.country || '',
-      guest_type_id: attendee.guest_type_id || '',
+      guest_type_id: attendee.guest_type_id != null ? String(attendee.guest_type_id) : '',
     })
     setEditDialogOpen(true)
   }
 
-  // Print badge handler (matches system)
+  // Print badge handler (matches attendees tab)
   const handlePrintBadge = async (attendee: any) => {
     setSinglePrintAttendee(attendee);
-    setTimeout(() => {
+    // Wait for the badge to render in the hidden printRef
+    setTimeout(async () => {
       if (printRef.current) {
         const badgeElement = printRef.current.querySelector('.printable-badge-batch');
         if (!badgeElement) {
@@ -247,25 +263,56 @@ export default function UsherEvents() {
           setSinglePrintAttendee(null);
           return;
         }
-        // Make sure the print area is visible and positioned correctly
-        printRef.current.style.visibility = 'visible';
-        printRef.current.style.position = 'absolute';
-        printRef.current.style.left = '0';
-        printRef.current.style.top = '0';
-        printRef.current.style.width = '100vw';
-        printRef.current.style.height = '100vh';
-        printRef.current.style.zIndex = '9999';
-        printRef.current.style.background = 'white';
-        
-        // Wait a bit more for badge to render, then print
-        setTimeout(() => {
-          window.print();
-          // Reset the print area after printing
-          printRef.current!.style.visibility = 'hidden';
-          setSinglePrintAttendee(null);
-        }, 500);
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [400, 400] });
+        const canvas = await html2canvas(badgeElement as HTMLElement, { 
+          scale: 1.5,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff'
+        });
+        const imgData = canvas.toDataURL('image/jpeg', 0.9); // JPEG for smaller file size
+        pdf.addImage(imgData, 'JPEG', 0, 0, 400, 400);
+        // We will trigger print manually via iframe to avoid auto-closing behavior
+        const blob = pdf.output('blob');
+        const blobUrl = URL.createObjectURL(blob);
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.src = blobUrl;
+        document.body.appendChild(iframe);
+        iframe.onload = () => {
+          const cleanup = () => {
+            if (iframe.parentNode) document.body.removeChild(iframe);
+            URL.revokeObjectURL(blobUrl);
+            setSinglePrintAttendee(null);
+            document.removeEventListener('visibilitychange', handleVisibility);
+          };
+          const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+              setTimeout(cleanup, 300);
+            }
+          };
+          document.addEventListener('visibilitychange', handleVisibility);
+          try {
+            const cw = iframe.contentWindow;
+            cw?.focus();
+            setTimeout(() => cw?.print(), 400);
+          } catch (e) {
+            setTimeout(cleanup, 120000);
+          }
+          setTimeout(() => {
+            document.removeEventListener('visibilitychange', handleVisibility);
+            if (iframe.parentNode) document.body.removeChild(iframe);
+            URL.revokeObjectURL(blobUrl);
+        setSinglePrintAttendee(null);
+          }, 120000);
+        };
       }
-    }, 300);
+    }, 150); // Reduced timeout from 300ms to 150ms for faster response
   }
 
   // Handler for QR scan
@@ -307,8 +354,8 @@ export default function UsherEvents() {
   const filteredAttendees = searchPerformed ? attendees : [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex flex-col items-center py-12 px-2">
-      <div className="w-full max-w-5xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex flex-col items-center py-12 px-3 md:px-6">
+      <div className="w-full max-w-7xl mx-auto">
         <div className="bg-white/90 rounded-2xl shadow-xl p-8 flex flex-col items-center gap-6 border border-blue-100">
           <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight mb-2">Guest Management</h1>
           <p className="text-gray-500 text-center mb-4">Search for guests by name, email, phone, or company. Add and edit attendees for your assigned event.</p>
@@ -488,7 +535,11 @@ export default function UsherEvents() {
                                 {attendee.guest_type?.name || '-'}
                               </Badge>
                             </TableCell>
-                      <TableCell>{attendee.checked_in ? 'Checked In' : 'Not Checked In'}</TableCell>
+                      <TableCell>
+                        <Badge className={getCheckInBadgeClasses(attendee.checked_in)}>
+                          {attendee.checked_in ? 'Checked In' : 'Not Checked In'}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         <Button size="sm" variant="outline" onClick={() => openEditDialog(attendee)}>
                           Edit
@@ -501,6 +552,11 @@ export default function UsherEvents() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          )}
+          {searchPerformed && !loading && !error && filteredAttendees.length === 0 && (
+            <div className="bg-white rounded-2xl shadow p-4 mt-4 text-gray-600 text-sm border">
+              No matching guests found for "{searchTerm}".
             </div>
           )}
         </div>
@@ -698,21 +754,50 @@ export default function UsherEvents() {
       </Dialog>
       {/* Edit Attendee Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[560px] p-0 overflow-hidden">
+          <div className="px-6 pt-6 pb-2 border-b">
           <DialogHeader>
-            <DialogTitle>Edit Guest</DialogTitle>
+              <DialogTitle className="text-xl font-semibold">Edit Guest</DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground">
+                Update guest information and type. All fields are optional unless marked.
+              </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleEditAttendee} className="space-y-4">
-            <Input required placeholder="Name" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
-            <Input required placeholder="Email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
-            <Input placeholder="Phone" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
-            <Input placeholder="Company" value={editForm.company} onChange={e => setEditForm(f => ({ ...f, company: e.target.value }))} />
-            <Input placeholder="Job Title" value={editForm.jobtitle} onChange={e => setEditForm(f => ({ ...f, jobtitle: e.target.value }))} />
-            <Input placeholder="Gender" value={editForm.gender} onChange={e => setEditForm(f => ({ ...f, gender: e.target.value }))} />
-            <Input placeholder="Country" value={editForm.country} onChange={e => setEditForm(f => ({ ...f, country: e.target.value }))} />
+          </div>
+          <form onSubmit={handleEditAttendee} className="p-6 space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>Name</Label>
+                <Input required value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input required type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Company</Label>
+                <Input value={editForm.company} onChange={e => setEditForm(f => ({ ...f, company: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Job Title</Label>
+                <Input value={editForm.jobtitle} onChange={e => setEditForm(f => ({ ...f, jobtitle: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Gender</Label>
+                <Input value={editForm.gender} onChange={e => setEditForm(f => ({ ...f, gender: e.target.value }))} />
+              </div>
+              <div className="sm:col-span-2">
+                <Label>Country</Label>
+                <Input value={editForm.country} onChange={e => setEditForm(f => ({ ...f, country: e.target.value }))} />
+              </div>
+              <div className="sm:col-span-2">
+                <Label>Guest Type</Label>
             <Select required value={editForm.guest_type_id} onValueChange={val => setEditForm(f => ({ ...f, guest_type_id: val }))}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select Guest Type" />
+                    <SelectValue placeholder={editForm.guest_type_id ? undefined : 'Select Guest Type'} />
               </SelectTrigger>
               <SelectContent>
                 {guestTypes.map(gt => (
@@ -720,9 +805,11 @@ export default function UsherEvents() {
                 ))}
               </SelectContent>
             </Select>
-            <div className="flex justify-end gap-2">
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
               <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-              <Button type="submit">Save</Button>
+              <Button type="submit">Save Changes</Button>
             </div>
           </form>
         </DialogContent>

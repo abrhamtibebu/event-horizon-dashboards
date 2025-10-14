@@ -14,6 +14,7 @@ import {
   Trash2,
   UserCheck,
 } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,6 +37,25 @@ import {
 const ETHIOPIAN_CITIES = [
   'Addis Ababa', 'Dire Dawa', 'Mekelle', 'Gondar', 'Adama',
   'Hawassa', 'Bahir Dar', 'Jimma', 'Dessie', 'Jijiga'
+]
+
+// Predefined guest types with descriptions and default prices
+const PREDEFINED_GUEST_TYPES = [
+  { name: 'VIP', description: 'Very Important Person with premium access', price: 0 },
+  { name: 'Speaker', description: 'Event speakers and presenters', price: 0 },
+  { name: 'Staff', description: 'Event staff and organizers', price: 0 },
+  { name: 'Exhibitor', description: 'Trade show exhibitors and vendors', price: 0 },
+  { name: 'Media', description: 'Press and media representatives', price: 0 },
+  { name: 'Regular', description: 'Standard event attendees', price: 0 },
+  { name: 'Visitor', description: 'General visitors and guests', price: 0 },
+  { name: 'Sponsor', description: 'Event sponsors and partners', price: 0 },
+  { name: 'Organizer', description: 'Event organizers and coordinators', price: 0 },
+  { name: 'Volunteer', description: 'Event volunteers and helpers', price: 0 },
+  { name: 'Partner', description: 'Business partners and collaborators', price: 0 },
+  { name: 'Vendor', description: 'Service providers and vendors', price: 0 },
+  { name: 'Press', description: 'Journalists and press members', price: 0 },
+  { name: 'Student', description: 'Student attendees with special access', price: 0 },
+  { name: 'Other', description: 'Other guest categories', price: 0 }
 ]
 
 interface GuestType {
@@ -61,6 +81,7 @@ export default function CreateFreeEvent() {
     requirements: '',
     agenda: '',
     event_image: null as File | null,
+    event_type: 'free', // Add event_type field
   })
 
   const [eventRange, setEventRange] = useState([{
@@ -75,7 +96,8 @@ export default function CreateFreeEvent() {
     key: 'selection',
   }])
 
-  const [guestTypes, setGuestTypes] = useState<GuestType[]>([])
+  const [selectedGuestTypes, setSelectedGuestTypes] = useState<string[]>([])
+  const [customGuestTypes, setCustomGuestTypes] = useState<GuestType[]>([])
   const [loading, setLoading] = useState({
     eventTypes: true,
     eventCategories: true,
@@ -111,6 +133,8 @@ export default function CreateFreeEvent() {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
+
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -122,30 +146,104 @@ export default function CreateFreeEvent() {
     }
   }
 
-  const addGuestType = () => {
+  const toggleGuestType = (guestTypeName: string) => {
+    setSelectedGuestTypes(prev => 
+      prev.includes(guestTypeName)
+        ? prev.filter(name => name !== guestTypeName)
+        : [...prev, guestTypeName]
+    )
+  }
+
+  const addCustomGuestType = () => {
     const newGuestType: GuestType = {
       name: '',
       description: '',
       price: 0,
     }
-    setGuestTypes(prev => [...prev, newGuestType])
+    setCustomGuestTypes(prev => [...prev, newGuestType])
   }
 
-  const updateGuestType = (index: number, field: string, value: any) => {
-    setGuestTypes(prev => prev.map((type, i) => 
+  const updateCustomGuestType = (index: number, field: string, value: any) => {
+    setCustomGuestTypes(prev => prev.map((type, i) => 
       i === index ? { ...type, [field]: value } : type
     ))
   }
 
-  const removeGuestType = (index: number) => {
-    setGuestTypes(prev => prev.filter((_, i) => i !== index))
+  const removeCustomGuestType = (index: number) => {
+    setCustomGuestTypes(prev => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (guestTypes.length === 0) {
-      toast.error('Please add at least one guest type.')
+    // Validate guest types
+    const validCustomGuestTypes = customGuestTypes.filter(gt => gt.name.trim())
+    const allGuestTypes = [
+      ...selectedGuestTypes.map(name => {
+        const predefined = PREDEFINED_GUEST_TYPES.find(gt => gt.name === name)
+        return {
+          name: predefined?.name || name,
+          description: predefined?.description || '',
+          price: predefined?.price || 0
+        }
+      }),
+      ...validCustomGuestTypes
+    ]
+    
+    if (allGuestTypes.length === 0) {
+      toast.error('Please select at least one guest type.')
+      return
+    }
+
+    // Validate required fields
+    if (!formData.name || !formData.event_type_id || !formData.event_category_id || !formData.max_guests) {
+      toast.error('Please fill in all required fields.')
+      return
+    }
+
+    // Validate location data
+    if (!formData.city || !formData.venue) {
+      toast.error('Please fill in both city and venue.')
+      return
+    }
+
+    // Validate that event type and category are selected
+    if (!eventTypes.some(et => String(et.id) === formData.event_type_id)) {
+      toast.error('Please select a valid event type.')
+      return
+    }
+
+    if (!eventCategories.some(ec => String(ec.id) === formData.event_category_id)) {
+      toast.error('Please select a valid event category.')
+      return
+    }
+
+    // Validate max_guests is a valid number
+    const maxGuests = parseInt(formData.max_guests, 10)
+    if (isNaN(maxGuests) || maxGuests <= 0) {
+      toast.error('Please enter a valid number of maximum guests.')
+      return
+    }
+
+    // Validate organizer_id for admin users
+    if (user?.role !== 'organizer' && !formData.organizer_id) {
+      toast.error('Please select an organizer.')
+      return
+    }
+
+    // Validate dates
+    if (eventRange[0].startDate >= eventRange[0].endDate) {
+      toast.error('Event end date must be after start date.')
+      return
+    }
+
+    if (regRange[0].startDate >= regRange[0].endDate) {
+      toast.error('Registration end date must be after start date.')
+      return
+    }
+
+    if (regRange[0].endDate > eventRange[0].endDate) {
+      toast.error('Registration must end before or on the event end date.')
       return
     }
 
@@ -158,11 +256,11 @@ export default function CreateFreeEvent() {
         end_date: eventRange[0].endDate.toISOString(),
         registration_start_date: regRange[0].startDate.toISOString(),
         registration_end_date: regRange[0].endDate.toISOString(),
-        location: `${formData.city}, ${formData.venue}`,
-        max_guests: parseInt(formData.max_guests, 10),
+        location: formData.city && formData.venue ? `${formData.city}, ${formData.venue}` : formData.venue || formData.city || '',
+        max_guests: maxGuests,
         ...(user?.role !== 'organizer' && { organizer_id: formData.organizer_id }),
-        event_type: 'free',
-        guest_types: guestTypes,
+        // Convert guest types to array of objects
+        guest_types: allGuestTypes,
       }
 
       let payload = processedFormData
@@ -173,24 +271,55 @@ export default function CreateFreeEvent() {
         Object.entries(processedFormData).forEach(([key, value]) => {
           if (key === 'event_image' && value) {
             payload.append('event_image', value)
+          } else if (key === 'event_image' && !value) {
+            // Skip event_image if no file is uploaded
           } else if (key === 'guest_types') {
             if (Array.isArray(value)) {
-              value.forEach((guestType: GuestType) =>
-                payload.append('guest_types[]', JSON.stringify(guestType))
-              )
+              // Send guest types as JSON string for FormData
+              payload.append('guest_types', JSON.stringify(value))
             }
-          } else {
-            payload.append(key, value as any)
+          } else if (value !== null && value !== undefined && value !== '') {
+            if (key === 'organizer_id' && user?.role === 'organizer') {
+              // Skip organizer_id for organizer users as it's determined from JWT
+            } else if (key === 'event_image' && !value) {
+              // Skip event_image if no file is uploaded
+            } else {
+              payload.append(key, value as any)
+            }
           }
         })
         headers = { 'Content-Type': 'multipart/form-data' }
+      } else {
+        // Remove empty values from payload
+        payload = Object.fromEntries(
+          Object.entries(processedFormData).filter(([key, value]) => {
+            if (key === 'organizer_id' && user?.role === 'organizer') {
+              return false // Skip organizer_id for organizer users
+            }
+            if (key === 'event_image' && !value) {
+              return false // Skip event_image if no file is uploaded
+            }
+            return value !== null && value !== undefined && value !== ''
+          })
+        )
       }
 
-      await api.post('/events/free', payload, { headers })
+      console.log('Sending payload:', payload)
+      console.log('Headers:', headers)
+      console.log('Guest types being sent:', allGuestTypes)
+      if (formData.event_image) {
+        console.log('FormData entries:')
+        for (let [key, value] of payload.entries()) {
+          console.log(`${key}:`, value)
+        }
+      }
+      await api.post('/events/free/add', payload, { headers })
       toast.success('Free event created successfully!')
       navigate('/dashboard/events')
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to create free event.')
+      console.error('Error creating event:', error)
+      console.error('Error response:', error.response?.data)
+      toast.error(error.response?.data?.message || error.response?.data?.error || 'Failed to create free event.')
     } finally {
       setIsSubmitting(false)
     }
@@ -338,17 +467,18 @@ export default function CreateFreeEvent() {
               </div>
               
               <div>
-                <Label className="flex items-center gap-2 text-gray-700 font-medium">
-                  <MapPin className="w-4 h-4 text-green-500" /> City
+                <Label htmlFor="city" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <MapPin className="w-4 h-4 text-blue-500" /> City
                 </Label>
                 <Select
                   value={formData.city}
                   onValueChange={(value) => handleInputChange('city', value)}
+                  required
                 >
-                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl">
+                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl">
                     <SelectValue placeholder="Select a city" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-60">
+                  <SelectContent>
                     {ETHIOPIAN_CITIES.map((city) => (
                       <SelectItem key={city} value={city}>
                         {city}
@@ -366,7 +496,8 @@ export default function CreateFreeEvent() {
                   id="venue"
                   value={formData.venue}
                   onChange={(e) => handleInputChange('venue', e.target.value)}
-                  placeholder="e.g. Grand Convention Center"
+                  placeholder="Enter venue name"
+                  required
                   className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl"
                 />
               </div>
@@ -384,6 +515,101 @@ export default function CreateFreeEvent() {
                   className="mt-2 h-12 border-gray-300 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Event Image Upload */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                <Image className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Event Image</h3>
+                <p className="text-gray-500 text-sm">Upload an image for your event (optional)</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <Label htmlFor="event_image" className="flex items-center gap-2 text-gray-700 font-medium">
+                    <Upload className="w-4 h-4 text-purple-500" /> Event Image
+                  </Label>
+                  <div className="mt-2">
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      id="event_image"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => imageInputRef.current?.click()}
+                        className="flex items-center gap-2 border-2 border-dashed border-gray-300 hover:border-purple-500 hover:bg-purple-50 transition-all duration-200"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Choose Image
+                      </Button>
+                      {formData.event_image && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, event_image: null }))
+                            if (imageInputRef.current) {
+                              imageInputRef.current.value = ''
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Maximum file size: 2MB. Supported formats: JPG, PNG, GIF
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Image Preview */}
+                <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center">
+                  {formData.event_image ? (
+                    <img
+                      src={URL.createObjectURL(formData.event_image)}
+                      alt="Event preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-center text-gray-400">
+                      <Image className="w-8 h-8 mx-auto mb-2" />
+                      <p className="text-xs">No image</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {!formData.event_image && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Image className="w-3 h-3 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">Default Image</p>
+                      <p className="text-sm text-blue-700 mt-1">
+                        If no image is uploaded, the default banner image will be used for your event.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -428,88 +654,149 @@ export default function CreateFreeEvent() {
 
           {/* Guest Types */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
-                  <UserCheck className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Guest Types</h3>
-                  <p className="text-gray-500 text-sm">Configure different guest categories</p>
-                </div>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
+                <UserCheck className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-gray-900">Guest Types</h3>
+                <p className="text-gray-500 text-sm">Choose the types of guests that can attend your event</p>
               </div>
               <Button
                 type="button"
-                onClick={addGuestType}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={addCustomGuestType}
+                variant="outline"
+                size="sm"
+                className="border-green-300 text-green-700 hover:bg-green-50"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Add Guest Type
+                Custom Type
               </Button>
             </div>
             
-            {guestTypes.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <UserCheck className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p>No guest types added yet</p>
-                <p className="text-sm">Click "Add Guest Type" to get started</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {guestTypes.map((guestType, index) => (
-                  <div key={index} className="border border-gray-200 rounded-xl p-6 bg-gray-50">
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-lg font-semibold text-gray-900">
-                        Guest Type {index + 1}
-                      </h4>
+            {/* Guest Type Selection */}
+            <div className="space-y-6">
+              {/* Predefined Guest Types */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Common Guest Types</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {PREDEFINED_GUEST_TYPES.map((guestType) => {
+                    const isSelected = selectedGuestTypes.includes(guestType.name)
+                    return (
                       <Button
+                        key={guestType.name}
                         type="button"
-                        variant="outline"
+                        variant={isSelected ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => removeGuestType(index)}
-                        className="text-red-600 hover:text-red-700"
+                        className={`${
+                          isSelected 
+                            ? 'bg-green-600 text-white border-green-600 shadow-sm' 
+                            : 'border-gray-200 hover:border-green-300 hover:bg-green-50 text-gray-700'
+                        } rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 h-auto`}
+                        onClick={() => toggleGuestType(guestType.name)}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {guestType.name}
                       </Button>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Name</Label>
-                        <Input
-                          value={guestType.name}
-                          onChange={(e) => updateGuestType(index, 'name', e.target.value)}
-                          placeholder="e.g. VIP, Standard, Corporate"
-                          className="mt-1"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Price (ETB)</Label>
-                        <Input
-                          type="number"
-                          value={guestType.price}
-                          onChange={(e) => updateGuestType(index, 'price', parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          className="mt-1"
-                        />
-                      </div>
-                      
-                      <div className="md:col-span-2">
-                        <Label className="text-sm font-medium text-gray-700">Description</Label>
-                        <Textarea
-                          value={guestType.description}
-                          onChange={(e) => updateGuestType(index, 'description', e.target.value)}
-                          placeholder="Describe this guest type..."
-                          rows={3}
-                          className="mt-1"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    )
+                  })}
+                </div>
               </div>
-            )}
+
+              {/* Custom Guest Types */}
+              {customGuestTypes.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Custom Guest Types</h4>
+                  <div className="space-y-3">
+                    {customGuestTypes.map((guestType, index) => (
+                      <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <h5 className="text-sm font-medium text-gray-900">Custom Type {index + 1}</h5>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeCustomGuestType(index)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div>
+                            <Label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Name</Label>
+                            <Input
+                              value={guestType.name}
+                              onChange={(e) => updateCustomGuestType(index, 'name', e.target.value)}
+                              placeholder="e.g. VIP, Corporate"
+                              className="mt-1 h-9 text-sm"
+                            />
+                          </div>
+                          
+                          <div>
+                            <Label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Price (ETB)</Label>
+                            <Input
+                              type="number"
+                              value={guestType.price}
+                              onChange={(e) => updateCustomGuestType(index, 'price', parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                              className="mt-1 h-9 text-sm"
+                            />
+                          </div>
+                          
+                          <div>
+                            <Label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Description</Label>
+                            <Input
+                              value={guestType.description}
+                              onChange={(e) => updateCustomGuestType(index, 'description', e.target.value)}
+                              placeholder="Brief description..."
+                              className="mt-1 h-9 text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Selection Summary */}
+              {(selectedGuestTypes.length > 0 || customGuestTypes.filter(gt => gt.name.trim()).length > 0) && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-semibold text-blue-900">
+                      Selected Guest Types ({selectedGuestTypes.length + customGuestTypes.filter(gt => gt.name.trim()).length})
+                    </h4>
+                    <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                      {selectedGuestTypes.length + customGuestTypes.filter(gt => gt.name.trim()).length} selected
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedGuestTypes.map((name) => (
+                      <span key={name} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-xs font-medium">
+                        {name}
+                      </span>
+                    ))}
+                    {customGuestTypes.filter(gt => gt.name.trim()).map((gt, index) => (
+                      <span key={`custom-${index}`} className="bg-green-100 text-green-800 px-2 py-1 rounded-md text-xs font-medium">
+                        {gt.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty State */}
+              {selectedGuestTypes.length === 0 && customGuestTypes.length === 0 && (
+                <div className="text-center py-6 text-gray-500">
+                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <UserCheck className="w-6 h-6 text-gray-400" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-600">No guest types selected</p>
+                  <p className="text-xs text-gray-500 mt-1">Select from common types above or add custom ones</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Action Buttons */}
@@ -524,7 +811,7 @@ export default function CreateFreeEvent() {
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || guestTypes.length === 0}
+              disabled={isSubmitting || (selectedGuestTypes.length === 0 && customGuestTypes.length === 0)}
               className="bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
             >
               {isSubmitting ? (

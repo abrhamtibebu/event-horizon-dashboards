@@ -11,11 +11,12 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Users as UsersIcon, Mail, MessageSquare, Filter } from 'lucide-react';
+import { Search, Users as UsersIcon, Mail, MessageSquare, Filter, Download } from 'lucide-react';
 import { getAllGuests, getMyEvents } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import api from '@/lib/api';
+import Papa from 'papaparse';
 import {
   Select,
   SelectContent,
@@ -276,6 +277,42 @@ export default function Guests() {
     setGuestTypeFilter('all');
   };
 
+  const exportGuestsToCSV = () => {
+    if (filteredGuests.length === 0) {
+      alert('No guests to export.');
+      return;
+    }
+
+    const dataToExport = filteredGuests.map((guest) => {
+      return {
+        'Guest ID': guest.id,
+        'Name': guest.name || 'N/A',
+        'Email': guest.email || 'N/A',
+        'Phone': guest.phone || 'N/A',
+        'Company': guest.company || 'N/A',
+        'Job Title': guest.jobtitle || 'N/A',
+        'Gender': guest.gender || 'N/A',
+        'Country': guest.country || 'N/A',
+        'Guest Type': guest.guest_type?.name || 'N/A',
+        'Events Attended': (guestEvents[guest.id] || []).join(', ') || 'N/A',
+        'Total Events': (guestEvents[guest.id] || []).length || 0,
+      };
+    });
+
+    const csv = Papa.unparse(dataToExport);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `guests_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    alert('Guest data exported successfully.');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
       {/* Header Section */}
@@ -296,6 +333,13 @@ export default function Guests() {
         
         {/* Action Buttons */}
         <div className="flex gap-3 mt-6">
+          <Button
+            variant="outline"
+            className="bg-white border-gray-200 shadow-sm hover:bg-gray-50 flex items-center gap-2"
+            onClick={exportGuestsToCSV}
+          >
+            <Download className="w-4 h-4" /> Export CSV
+          </Button>
           <Button
             variant="outline"
             className="bg-white border-gray-200 shadow-sm hover:bg-gray-50 flex items-center gap-2"

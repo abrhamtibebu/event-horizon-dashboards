@@ -1,8 +1,8 @@
 import axios from 'axios'
 
-const api = axios.create({
-  // baseURL: import.meta.env.VITE_API_URL || 'https://api.validity.et/api',
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+  const api = axios.create({
+    // baseURL: import.meta.env.VITE_API_URL || 'https://api.validity.et/api',
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
 
   headers: {
     'Content-Type': 'application/json',
@@ -28,9 +28,27 @@ const processQueue = (error: any, token: string | null = null) => {
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
-    if (token) {
+    const isMockAuth = localStorage.getItem('mock_auth') === 'true'
+    
+    // Allow public endpoints even in mock mode
+    const isPublicEndpoint = config.url?.startsWith('/public/') || 
+                            config.url?.startsWith('/events/uuid/') ||
+                            config.url?.includes('/register') ||
+                            config.url?.includes('/guest-types') ||
+                            config.url === '/login' ||
+                            config.url === '/register' ||
+                            config.url === '/forgot-password' ||
+                            config.url === '/reset-password' ||
+                            config.url === '/refresh' ||
+                            config.url?.startsWith('/analytics/')
+    
+    if (isMockAuth && !isPublicEndpoint) {
+      // In mock mode, reject non-public API calls to prevent 401 errors
+      console.log('[API] Mock authentication mode - rejecting API call to prevent 401 errors')
+      return Promise.reject(new Error('Mock authentication mode - API calls disabled'))
+    } else if (token) {
       config.headers.Authorization = `Bearer ${token}`
-    } else {
+    } else if (!isPublicEndpoint && !isMockAuth) {
       console.warn('[API] No JWT token found in localStorage or sessionStorage. Requests may fail with 401 Unauthorized.')
     }
     return config
@@ -46,63 +64,9 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject })
-        }).then((token) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`
-          return api(originalRequest)
-        }).catch((err) => {
-          return Promise.reject(err)
-        })
-      }
-
-      originalRequest._retry = true
-      isRefreshing = true
-
-      const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
-      
-      if (!token) {
-        // No token to refresh, just reject the request
-        localStorage.removeItem('jwt')
-        sessionStorage.removeItem('jwt')
-        return Promise.reject(error)
-      }
-
-      try {
-        // Try to refresh the token
-        const response = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://api.validity.et/api'}/refresh`,
-          {},
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        )
-
-        const newToken = response.data.token
-        localStorage.setItem('jwt', newToken)
-        sessionStorage.setItem('jwt', newToken)
-        
-        api.defaults.headers.common.Authorization = `Bearer ${newToken}`
-        originalRequest.headers.Authorization = `Bearer ${newToken}`
-        
-        processQueue(null, newToken)
-        
-        return api(originalRequest)
-      } catch (refreshError) {
-        processQueue(refreshError, null)
-        
-        // Refresh failed, clear tokens
-        localStorage.removeItem('jwt')
-        sessionStorage.removeItem('jwt')
-        
-        return Promise.reject(refreshError)
-      } finally {
-        isRefreshing = false
-      }
+    // Do not attempt automatic token refresh; surface 401 to the UI
+    if (error.response?.status === 401) {
+      return Promise.reject(error)
     }
 
     return Promise.reject(error)
@@ -198,123 +162,151 @@ export const assignUshersToEventAlt = (
 export const postAttendeesBatch = (eventId: string, attendees: any[]) =>
   api.post(`/events/${eventId}/attendees/batch`, { attendees });
 
-// --- Vendor Mock API ---
-let mockVendors = [
-  {
-    id: 1,
-    name: 'Acme Catering',
-    company: 'Acme Inc.',
-    category: 'Catering',
-    status: 'active',
-    rating: 4.5,
-    assignedEvents: ['Annual Gala', 'Tech Expo'],
-    email: 'contact@acme.com',
-    phone: '+1234567890',
-    services: ['Buffet', 'Cocktail', 'Custom Menus'],
-    documents: [],
-    contracts: [],
-    notes: '',
-  },
-  {
-    id: 2,
-    name: 'Bright Lights AV',
-    company: 'Bright AV',
-    category: 'AV',
-    status: 'inactive',
-    rating: 3.8,
-    assignedEvents: ['Tech Expo'],
-    email: 'info@brightav.com',
-    phone: '+1987654321',
-    services: ['Audio', 'Video', 'Lighting'],
-    documents: [],
-    contracts: [],
-    notes: '',
-  },
-];
-let mockVendorTasks = [
-  {
-    id: 1,
-    vendorId: 1,
-    event: 'Annual Gala',
-    description: 'Provide catering for 200 guests',
-    deadline: '2025-08-01',
-    deliverables: 'Menu, Staff, Setup',
-    status: 'In Progress',
-    files: [],
-  },
-];
-let mockVendorReviews = [
-  // { vendorId: 1, event: 'Annual Gala', rating: 5, review: 'Great service!', reviewer: 'Alice', date: '2024-08-02' }
-];
+// --- Usher Registration ---
+export const createUsherRegistration = (eventId: number, data: any) =>
+  api.post(`/events/${eventId}/usher-registrations`, data)
+export const getUsherRegistrations = (eventId: number) =>
+  api.get(`/events/${eventId}/usher-registrations`)
+export const exportUsherRegistrations = (eventId: number) =>
+  api.get(`/events/${eventId}/usher-registrations/export`, { responseType: 'blob' })
+export const updateUsherRegistrationStatus = (eventId: number, registrationId: number, status: string) =>
+  api.patch(`/events/${eventId}/usher-registrations/${registrationId}`, { status })
 
-export function getVendors() {
-  return Promise.resolve([...mockVendors]);
-}
+// --- Short Links ---
+export const createShortLink = (eventId: number, registrationData: any, expiresAt?: string) =>
+  api.post('/short-links', { event_id: eventId, registration_data: registrationData, expires_at: expiresAt })
+export const resolveShortLink = (shortCode: string) =>
+  api.get(`/r/${shortCode}`)
+export const getShortLinks = (params = {}) =>
+  api.get('/short-links', { params })
+export const getShortLink = (id: number) =>
+  api.get(`/short-links/${id}`)
+export const updateShortLink = (id: number, data: any) =>
+  api.put(`/short-links/${id}`, data)
+export const deleteShortLink = (id: number) =>
+  api.delete(`/short-links/${id}`)
+export const getShortLinkStats = (id: number) =>
+  api.get(`/short-links/${id}/stats`)
 
-export function getVendorById(id) {
-  return Promise.resolve(mockVendors.find(v => v.id === Number(id)));
-}
+// --- Vendor Management API Functions ---
 
-export function createVendor(data) {
-  const newVendor = { ...data, id: Date.now(), documents: data.documents || [] };
-  mockVendors.push(newVendor);
-  return Promise.resolve(newVendor);
-}
-
-export function updateVendor(id, data) {
-  mockVendors = mockVendors.map(v => (v.id === Number(id) ? { ...v, ...data, documents: data.documents || v.documents || [] } : v));
-  return Promise.resolve(mockVendors.find(v => v.id === Number(id)));
-}
-
-export function deleteVendor(id) {
-  mockVendors = mockVendors.filter(v => v.id !== Number(id));
-  return Promise.resolve();
-}
-
-export function assignVendorsToEvents(vendorIds, eventIds, task) {
-  // For mock: just return success
-  return Promise.resolve({ vendorIds, eventIds, task });
-}
-
-export function uploadVendorFile(vendorId, file) {
-  // For mock: add file to vendor's documents array
-  const vendor = mockVendors.find(v => v.id === Number(vendorId));
-  if (vendor) {
-    vendor.documents = vendor.documents || [];
-    vendor.documents.push({ name: file.name, url: '#' });
+// Vendor CRUD operations
+export const getVendors = (params = {}) => api.get('/vendors', { params })
+export const getVendorById = (id: number) => api.get(`/vendors/${id}`)
+export const createVendor = (data: any) => {
+  // Check if data is FormData (for file uploads)
+  if (data instanceof FormData) {
+    return api.post('/vendors', data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
   }
-  return Promise.resolve({ vendorId, fileName: file.name });
+  return api.post('/vendors', data);
+}
+export const updateVendor = (id: number, data: any) => api.put(`/vendors/${id}`, data)
+export const deleteVendor = (id: number) => api.delete(`/vendors/${id}`)
+export const deactivateVendor = (id: number) => api.patch(`/vendors/${id}/deactivate`)
+export const activateVendor = (id: number) => api.patch(`/vendors/${id}/activate`)
+
+// Vendor Quotations
+export const getVendorQuotations = (params = {}) => api.get('/vendors/quotations', { params })
+export const getVendorQuotationById = (id: number) => api.get(`/vendors/quotations/${id}`)
+export const createVendorQuotation = (data: any) => api.post('/vendors/quotations', data)
+export const updateVendorQuotation = (id: number, data: any) => api.put(`/vendors/quotations/${id}`, data)
+export const deleteVendorQuotation = (id: number) => api.delete(`/vendors/quotations/${id}`)
+export const approveVendorQuotation = (id: number) => api.post(`/vendors/quotations/${id}/approve`)
+export const rejectVendorQuotation = (id: number, reason: string) => api.post(`/vendors/quotations/${id}/reject`, { rejection_reason: reason })
+
+// Vendor Payments
+export const getVendorPayments = (params = {}) => api.get('/vendors/payments', { params })
+export const getVendorPaymentById = (id: number) => api.get(`/vendors/payments/${id}`)
+export const createVendorPayment = (data: any) => api.post('/vendors/payments', data)
+export const updateVendorPayment = (id: number, data: any) => api.put(`/vendors/payments/${id}`, data)
+export const deleteVendorPayment = (id: number) => api.delete(`/vendors/payments/${id}`)
+export const markPaymentAsPaid = (id: number, data: any) => api.post(`/vendors/payments/${id}/mark-paid`, data)
+export const markPaymentAsFailed = (id: number, data: any) => api.post(`/vendors/payments/${id}/mark-failed`, data)
+
+// Vendor Deliveries
+export const getVendorDeliveries = (params = {}) => api.get('/vendors/deliveries', { params })
+export const getVendorDeliveryById = (id: number) => api.get(`/vendors/deliveries/${id}`)
+export const createVendorDelivery = (data: any) => api.post('/vendors/deliveries', data)
+export const updateVendorDelivery = (id: number, data: any) => api.put(`/vendors/deliveries/${id}`, data)
+export const deleteVendorDelivery = (id: number) => api.delete(`/vendors/deliveries/${id}`)
+export const markDeliveryAsDelivered = (id: number, data: any) => api.post(`/vendors/deliveries/${id}/mark-delivered`, data)
+export const markDeliveryAsFailed = (id: number, data: any) => api.post(`/vendors/deliveries/${id}/mark-failed`, data)
+
+// Vendor Ratings
+export const getVendorRatings = (params = {}) => api.get('/vendors/ratings', { params })
+export const getVendorRatingById = (id: number) => api.get(`/vendors/ratings/${id}`)
+export const createVendorRating = (data: any) => api.post('/vendors/ratings', data)
+export const updateVendorRating = (id: number, data: any) => api.put(`/vendors/ratings/${id}`, data)
+export const deleteVendorRating = (id: number) => api.delete(`/vendors/ratings/${id}`)
+export const getVendorRatingSummary = (vendorId: number) => api.get(`/vendors/ratings/vendor/${vendorId}/summary`)
+
+// Vendor Statistics and Reports
+export const getVendorStatistics = () => api.get('/vendors/statistics')
+export const getVendorQuotationStatistics = () => api.get('/vendors/quotations/statistics')
+export const getVendorPaymentStatistics = () => api.get('/vendors/payments/statistics')
+export const getVendorDeliveryStatistics = () => api.get('/vendors/deliveries/statistics')
+export const getVendorRatingStatistics = () => api.get('/vendors/ratings/statistics')
+
+// Vendor Event Assignment
+export const assignVendorToEvent = (eventId: number, vendorId: number, data: any) =>
+  api.post(`/events/${eventId}/vendors`, { vendor_id: vendorId, ...data })
+export const removeVendorFromEvent = (eventId: number, vendorId: number) =>
+  api.delete(`/events/${eventId}/vendors/${vendorId}`)
+export const getEventVendors = (eventId: number) => api.get(`/events/${eventId}/vendors`)
+
+// File Upload for Vendor Documents
+export const uploadVendorDocument = (vendorId: number, file: File, type: string) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('type', type)
+  return api.post(`/vendors/${vendorId}/documents`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
 }
 
-export function getVendorDocuments(vendorId) {
-  const vendor = mockVendors.find(v => v.id === Number(vendorId));
-  return Promise.resolve(vendor ? vendor.documents || [] : []);
+export const uploadQuotationAttachment = (quotationId: number, file: File) => {
+  const formData = new FormData()
+  formData.append('attachment', file)
+  return api.post(`/vendors/quotations/${quotationId}/attachment`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
 }
 
-export function getVendorTasks() {
-  return Promise.resolve([...mockVendorTasks]);
+export const uploadPaymentReceipt = (paymentId: number, file: File) => {
+  const formData = new FormData()
+  formData.append('receipt', file)
+  return api.post(`/vendors/payments/${paymentId}/receipt`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
 }
 
-export function updateVendorTaskStatus(taskId, status) {
-  mockVendorTasks = mockVendorTasks.map(t => (t.id === Number(taskId) ? { ...t, status } : t));
-  return Promise.resolve(mockVendorTasks.find(t => t.id === Number(taskId)));
-}
+// Export Reports
+export const exportVendorReport = (params = {}) => api.get('/vendors/export', { params, responseType: 'blob' })
+export const exportQuotationReport = (params = {}) => api.get('/vendors/quotations/export', { params, responseType: 'blob' })
+export const exportPaymentReport = (params = {}) => api.get('/vendors/payments/export', { params, responseType: 'blob' })
+export const exportDeliveryReport = (params = {}) => api.get('/vendors/deliveries/export', { params, responseType: 'blob' })
 
-export function getVendorReviews(vendorId) {
-  return Promise.resolve(mockVendorReviews.filter(r => r.vendorId === Number(vendorId)));
-}
+// Bulk Operations
+export const bulkVendorOperations = (data: { action: string; vendor_ids: number[]; data?: any }) => 
+  api.post('/vendors/bulk-operations', data)
+export const bulkActivateVendors = (vendorIds: number[]) => 
+  bulkVendorOperations({ action: 'activate', vendor_ids: vendorIds })
+export const bulkDeactivateVendors = (vendorIds: number[]) => 
+  bulkVendorOperations({ action: 'deactivate', vendor_ids: vendorIds })
+export const bulkDeleteVendors = (vendorIds: number[]) => 
+  bulkVendorOperations({ action: 'delete', vendor_ids: vendorIds })
 
-export function addVendorReview(vendorId, review) {
-  mockVendorReviews.push({ ...review, vendorId: Number(vendorId) });
-  return Promise.resolve();
-}
 
-export function getVendorAverageRating(vendorId) {
-  const reviews = mockVendorReviews.filter(r => r.vendorId === Number(vendorId));
-  if (!reviews.length) return Promise.resolve(null);
-  const avg = reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length;
-  return Promise.resolve(avg);
-}
 
 // Share Analytics API functions
 export const getShareAnalytics = (eventId: string, params?: { start_date?: string; end_date?: string }) =>
@@ -336,3 +328,32 @@ export const trackRegistration = (eventId: string, data: {
   user_agent?: string;
   ip_address?: string;
 }) => api.post(`/events/${eventId}/share-analytics/registration`, data)
+
+// --- Sessions API ---
+export const getEventSessions = (eventId: number) => api.get(`/events/${eventId}/sessions`)
+export const createEventSession = (eventId: number, data: any) => api.post(`/events/${eventId}/sessions`, data)
+export const getSessionById = (sessionId: number) => api.get(`/sessions/${sessionId}`)
+export const updateSession = (sessionId: number, data: any) => api.put(`/sessions/${sessionId}`, data)
+export const deleteSession = (sessionId: number) => api.delete(`/sessions/${sessionId}`)
+export const cancelSession = (sessionId: number) => api.post(`/sessions/${sessionId}/cancel`)
+
+// Session Attendance
+export const createSessionAttendance = (sessionId: number, data: any) => api.post(`/sessions/${sessionId}/attendances`, data)
+export const updateSessionAttendance = (sessionId: number, attendanceId: number, data: any) => api.put(`/sessions/${sessionId}/attendances/${attendanceId}`, data)
+
+// Session Usher assignment
+export const getSessionUshers = (sessionId: number) => api.get(`/sessions/${sessionId}/ushers`)
+export const assignSessionUshers = (sessionId: number, ushers: { id: number; tasks?: string[] }[]) => api.post(`/sessions/${sessionId}/ushers`, { ushers })
+export const updateSessionUsher = (sessionId: number, usherId: number, tasks: string[]) => api.put(`/sessions/${sessionId}/ushers/${usherId}`, { tasks })
+export const removeSessionUsher = (sessionId: number, usherId: number) => api.delete(`/sessions/${sessionId}/ushers/${usherId}`)
+
+// Deliverables
+export const getDeliverables = (params?: any) => api.get('/deliverables', { params })
+export const getDeliverable = (id: number) => api.get(`/deliverables/${id}`)
+export const createDeliverable = (data: any) => api.post('/deliverables', data)
+export const updateDeliverable = (id: number, data: any) => api.put(`/deliverables/${id}`, data)
+export const deleteDeliverable = (id: number) => api.delete(`/deliverables/${id}`)
+export const bulkUpdateDeliverableStatus = (ids: number[], status: string) => api.post('/deliverables/bulk-update-status', { deliverable_ids: ids, status })
+export const getVendorEventDeliverables = (vendorId: number, eventId: number) => api.get(`/vendors/${vendorId}/events/${eventId}/deliverables`)
+
+export { api }

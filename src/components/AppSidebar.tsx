@@ -15,9 +15,10 @@ import {
   UserCheck,
   Trash2,
   UserPlus,
-  Briefcase,
   Globe,
   TrendingUp,
+  Briefcase,
+  Mail,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -31,7 +32,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { Badge } from '@/components/ui/badge'
-import { useAuth } from '@/hooks/use-auth.tsx'
+import { useAuth } from '@/hooks/use-auth'
 import api from '@/lib/api'
 
 const allItems = [
@@ -66,11 +67,23 @@ const allItems = [
     icon: Users,
     roles: ['superadmin', 'admin', 'organizer'],
   },
-  {
+    {
     title: 'Usher Management',
     url: '/dashboard/usher-management',
     icon: UserPlus,
     roles: ['superadmin', 'admin', 'organizer', 'user'],
+  },
+  {
+    title: 'Vendor Management',
+    url: '/dashboard/vendor-management',
+    icon: Briefcase,
+    roles: ['superadmin', 'admin', 'organizer'],
+  },
+  {
+    title: 'Tasks & Deliverables',
+    url: '/dashboard/tasks',
+    icon: ClipboardList,
+    roles: ['superadmin', 'admin', 'organizer'],
   },
   {
     title: 'Locate Badges',
@@ -83,6 +96,12 @@ const allItems = [
     url: '/apps/badge-designer',
     icon: ClipboardList,
     roles: ['superadmin', 'admin', ''],
+  },
+  {
+    title: 'Marketing',
+    url: '/dashboard/marketing',
+    icon: Mail,
+    roles: ['superadmin', 'admin', 'organizer'],
   },
   {
     title: 'Messages',
@@ -140,24 +159,7 @@ const allItems = [
     icon: Users,
     roles: ['superadmin', 'organizer'],
   },
-  {
-    title: 'Vendors',
-    url: '/dashboard/vendors',
-    icon: Briefcase,
-    roles: ['superadmin', 'admin', ''],
-    children: [
-      {
-        title: 'Assign Vendor',
-        url: '/dashboard/vendors/assign',
-        roles: ['superadmin', 'admin', 'organizer'],
-      },
-      {
-        title: 'Task Tracker',
-        url: '/dashboard/vendors/tasks',
-        roles: ['superadmin', 'admin', 'organizer'],
-      },
-    ],
-  },
+
 ]
 
 export function AppSidebar() {

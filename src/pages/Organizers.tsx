@@ -74,6 +74,7 @@ export default function Organizers() {
   const [organizerUsers, setOrganizerUsers] = useState<any[]>([])
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
   const [primaryContact, setPrimaryContact] = useState<string>('')
+  const [existingPrimaryContact, setExistingPrimaryContact] = useState<any>(null)
   const [assignLoading, setAssignLoading] = useState(false)
   const [statusLoadingId, setStatusLoadingId] = useState<string | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -180,25 +181,63 @@ export default function Organizers() {
   // Calculate total events from eventsCountMap
   const totalEvents = Object.values(eventsCountMap).reduce((sum, count) => sum + (count || 0), 0);
 
-  const openAssignDialog = (organizer: any) => {
+  const openAssignDialog = async (organizer: any) => {
     setSelectedOrganizer(organizer)
-    setAssignDialogOpen(true)
     setSelectedContacts([])
     setPrimaryContact('')
+    setExistingPrimaryContact(null)
+    
+    // Check if organizer already has contacts and find primary contact
+    try {
+      const contactsResponse = await api.get(`/organizers/${organizer.id}/contacts`)
+      const contacts = contactsResponse.data || []
+      const primaryContact = contacts.find((contact: any) => contact.is_primary_contact)
+      setExistingPrimaryContact(primaryContact)
+    } catch (error) {
+      console.error('Failed to fetch organizer contacts:', error)
+    }
+    
+    setAssignDialogOpen(true)
   }
 
   const handleAssignContacts = async () => {
-    if (!selectedOrganizer || selectedContacts.length === 0 || !primaryContact)
+    if (!selectedOrganizer || selectedContacts.length === 0)
       return
+    
+    // If no existing primary contact, require primary contact selection
+    if (!existingPrimaryContact && !primaryContact) {
+      toast({
+        title: 'Primary contact required',
+        description: 'Please select a primary contact for this organizer.',
+        variant: 'destructive',
+      })
+      return
+    }
+    
     setAssignLoading(true)
     try {
-      await api.post(`/organizers/${selectedOrganizer.id}/contacts`, {
+      const payload: any = {
         user_ids: selectedContacts,
-        primary_contact_id: primaryContact,
-      })
-      toast({ title: 'Contacts assigned successfully!' })
+      }
+      
+      // Only include primary_contact_id if one is selected
+      if (primaryContact) {
+        payload.primary_contact_id = primaryContact
+      }
+      
+      await api.post(`/organizers/${selectedOrganizer.id}/contacts`, payload)
+      
+      const message = primaryContact 
+        ? 'Contacts assigned and primary contact updated!'
+        : 'Contacts assigned successfully!'
+      
+      toast({ title: message })
       setAssignDialogOpen(false)
-      // Optionally refresh organizers or contacts here
+      
+      // Refresh contacts for this organizer
+      const contactsRes = await api.get(`/organizers/${selectedOrganizer.id}/contacts`)
+      setContactsMap(prev => ({ ...prev, [selectedOrganizer.id]: contactsRes.data }))
+      
     } catch (err: any) {
       toast({
         title: 'Failed to assign contacts',
@@ -325,9 +364,33 @@ export default function Organizers() {
   }
 
   const handleRemoveContact = async (organizerId: string, userId: string) => {
+    // Find the contact to check if it's a primary contact
+    const contact = contactsMap[organizerId]?.find((c: any) => c.id === userId)
+    
+    if (contact?.is_primary_contact) {
+      // Count primary contacts for this organizer
+      const primaryContactCount = contactsMap[organizerId]?.filter((c: any) => c.is_primary_contact).length || 0
+      
+      if (primaryContactCount <= 1) {
+        toast({
+          title: 'Cannot remove primary contact',
+          description: 'This is the only primary contact. Please assign another primary contact first.',
+          variant: 'destructive',
+        })
+        return
+      }
+      
+      // Show confirmation for removing primary contact
+      if (!confirm(`Are you sure you want to remove ${contact.name} as a primary contact? This organizer has ${primaryContactCount} primary contact(s).`)) {
+        return
+      }
+    }
+    
     try {
       await api.delete(`/organizers/${organizerId}/contacts/${userId}`)
-      toast({ title: 'Contact removed successfully!' })
+      toast({ 
+        title: contact?.is_primary_contact ? 'Primary contact removed successfully!' : 'Contact removed successfully!' 
+      })
       // Refresh contacts for this organizer
       const res = await api.get(`/organizers/${organizerId}/contacts`)
       setContactsMap((prev) => ({ ...prev, [organizerId]: res.data }))
@@ -543,13 +606,22 @@ export default function Organizers() {
                                         <Button
                                           size="sm"
                                           variant="ghost"
-                                          className="h-4 w-4 p-0 hover:bg-red-200 text-red-500"
+                                          className={`h-4 w-4 p-0 ${
+                                            contact.is_primary_contact 
+                                              ? 'hover:bg-orange-200 text-orange-500' 
+                                              : 'hover:bg-red-200 text-red-500'
+                                          }`}
                                           onClick={() => handleRemoveContact(organizer.id, contact.id)}
                                         >
                                           <UserX className="w-3 h-3" />
                                         </Button>
                                       </TooltipTrigger>
-                                      <TooltipContent>Remove Contact</TooltipContent>
+                                      <TooltipContent>
+                                        {contact.is_primary_contact 
+                                          ? 'Remove Primary Contact (if multiple exist)' 
+                                          : 'Remove Contact'
+                                        }
+                                      </TooltipContent>
                                     </Tooltip>
                                   </div>
                                 )}
@@ -696,8 +768,10 @@ export default function Organizers() {
                 Assign Contacts to {selectedOrganizer?.name}
               </DialogTitle>
               <DialogDescription>
-                Select users with the organizer role and choose a primary
-                contact.
+                {existingPrimaryContact 
+                  ? `Select users to add as contacts. Current primary contact: ${existingPrimaryContact.name}. You can optionally change the primary contact.`
+                  : 'Select users with the organizer role and choose a primary contact.'
+                }
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -723,8 +797,42 @@ export default function Organizers() {
                   </label>
                 ))}
               </div>
-              <Label>Primary Contact</Label>
+              {existingPrimaryContact && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-blue-800">
+                    <Star className="w-4 h-4" />
+                    <span className="font-medium">Current Primary Contact:</span>
+                    <span>{existingPrimaryContact.name} ({existingPrimaryContact.email})</span>
+                  </div>
+                </div>
+              )}
+              
+              <Label>
+                {existingPrimaryContact ? 'Change Primary Contact (Optional)' : 'Primary Contact'}
+                {!existingPrimaryContact && <span className="text-red-500 ml-1">*</span>}
+              </Label>
+              
+              {existingPrimaryContact && (
+                <div className="text-sm text-gray-600 mb-2">
+                  Leave blank to keep the current primary contact unchanged.
+                </div>
+              )}
+              
               <div className="flex flex-col gap-2">
+                {existingPrimaryContact && (
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="primaryContact"
+                      checked={primaryContact === ''}
+                      onChange={() => setPrimaryContact('')}
+                    />
+                    <span className="text-gray-600">
+                      Keep current primary contact ({existingPrimaryContact.name})
+                    </span>
+                  </label>
+                )}
+                
                 {selectedContacts.map((id) => {
                   const user = organizerUsers.find((u) => u.id === id)
                   if (!user) return null
@@ -737,7 +845,7 @@ export default function Organizers() {
                         onChange={() => setPrimaryContact(id)}
                       />
                       <span>
-                        {user.name} ({user.email})
+                        Make {user.name} ({user.email}) primary contact
                       </span>
                     </label>
                   )
@@ -749,8 +857,8 @@ export default function Organizers() {
                 onClick={handleAssignContacts}
                 disabled={
                   assignLoading ||
-                  !primaryContact ||
-                  selectedContacts.length === 0
+                  selectedContacts.length === 0 ||
+                  (!existingPrimaryContact && !primaryContact)
                 }
               >
                 {assignLoading ? 'Assigning...' : 'Assign Contacts'}
@@ -982,13 +1090,22 @@ export default function Organizers() {
                               size="sm"
                               variant="outline"
                               onClick={() => handleRemoveContact(selectedOrganizerForContacts.id, contact.id)}
-                              className="text-red-600 border-red-300 hover:bg-red-50"
+                              className={`${
+                                contact.is_primary_contact 
+                                  ? 'text-orange-600 border-orange-300 hover:bg-orange-50' 
+                                  : 'text-red-600 border-red-300 hover:bg-red-50'
+                              }`}
                             >
                               <UserX className="w-3 h-3 mr-1" />
-                              Remove
+                              {contact.is_primary_contact ? 'Remove Primary' : 'Remove'}
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Remove Contact</TooltipContent>
+                          <TooltipContent>
+                            {contact.is_primary_contact 
+                              ? 'Remove Primary Contact (if multiple exist)' 
+                              : 'Remove Contact'
+                            }
+                          </TooltipContent>
                         </Tooltip>
                       </div>
                     </div>

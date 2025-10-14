@@ -30,26 +30,39 @@ import LocateBadges from './pages/LocateBadges'
 import CheckIn from './pages/CheckIn'
 import Tickets from './pages/Tickets'
 import OrganizerProfile from './pages/OrganizerProfile'
-import { useAuth } from './hooks/use-auth.tsx'
+import { useAuth } from './hooks/use-auth'
 import BadgePage from './pages/BadgePage'
 import BatchBadgePage from './pages/BatchBadgePage'
 import Guests from './pages/Guests'
 import BadgeDesignerTab from './pages/BadgeDesignerTab'
+import BadgeDesignPage from './pages/BadgeDesignPage'
 import Team from '@/pages/Team'
 import UsherManagement from '@/pages/UsherManagement'
 import UsherEventManagement from '@/pages/UsherEventManagement'
 import UsherEvents from '@/pages/UsherEvents'
+import UsherBadgeLocator from '@/pages/UsherBadgeLocator'
 import PublicEventRegister from './pages/PublicEventRegister'
-import VendorDashboard from './pages/vendors/VendorDashboard';
-import VendorProfile from './pages/vendors/VendorProfile';
-import VendorForm from './pages/vendors/VendorForm';
-import AssignVendor from './pages/vendors/AssignVendor';
-import VendorTaskTracker from './pages/vendors/VendorTaskTracker';
+
 import UsherJobDetails from './pages/UsherJobDetails';
 import UsherDashboard from './pages/UsherDashboard';
 import EventPublication from './pages/EventPublication';
 import EvellaAnalytics from './pages/EvellaAnalytics';
+import VendorManagement from './pages/VendorManagement';
+import VendorManagementRevamped from './pages/VendorManagementRevamped';
+import Tasks from './pages/Tasks';
+import Marketing from './pages/Marketing';
 import { SuspendedOrganizerBanner } from './components/SuspendedOrganizerBanner';
+import GenerateUsherRegistrationLink from './pages/GenerateUsherRegistrationLink';
+import UsherRegister from './pages/UsherRegister';
+import UsherRegistrationSuccess from './pages/UsherRegistrationSuccess';
+import ShortLinkResolver from './pages/ShortLinkResolver';
+import ShortLinkManagement from './pages/ShortLinkManagement';
+import RegistrationSuccess from './pages/RegistrationSuccess';
+
+// Import API test utility for development
+if (import.meta.env.DEV) {
+  import('./utils/apiTest');
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -195,6 +208,15 @@ const App = () => (
           />
 
           <Route
+            path="/events/:eventId/badge-design"
+            element={
+              <ProtectedRoute>
+                <BadgeDesignPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/dashboard"
             element={
               <ProtectedRoute>
@@ -228,21 +250,24 @@ const App = () => (
             <Route path="tickets" element={<Tickets />} />
             <Route path="guests" element={<Guests />} />
             <Route path="usher-management" element={<UsherManagement />} />
+            <Route path="usher-management/register" element={<GenerateUsherRegistrationLink />} />
+            <Route path="usher-management/links" element={<ShortLinkManagement />} />
             <Route path="usher/events" element={<UsherEvents />} />
             <Route path="usher/events/:eventId" element={<UsherEventManagement />} />
+            <Route path="usher/badge-locator" element={<UsherBadgeLocator />} />
             <Route path="usher/jobs" element={<UsherDashboard />} />
             <Route path="usher/jobs/:eventId" element={<UsherJobDetails />} />
-            <Route path="vendors" >
-              <Route index element={<VendorDashboard />} />
-              <Route path="profile/:vendorId" element={<VendorProfile />} />
-              <Route path="add" element={<VendorForm />} />
-              <Route path="edit/:vendorId" element={<VendorForm />} />
-              <Route path="assign" element={<AssignVendor />} />
-              <Route path="tasks" element={<VendorTaskTracker />} />
-            </Route>
+            <Route path="vendor-management" element={<VendorManagementRevamped />} />
+            <Route path="tasks" element={<Tasks />} />
+            <Route path="marketing" element={<Marketing />} />
+
           </Route>
 
           <Route path="/register/:eventUuid" element={<PublicEventRegister />} />
+          <Route path="/registration/success" element={<RegistrationSuccess />} />
+          <Route path="/usher/register" element={<UsherRegister />} />
+          <Route path="/usher/register/success" element={<UsherRegistrationSuccess />} />
+          <Route path="/r/:shortCode" element={<ShortLinkResolver />} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

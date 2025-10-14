@@ -103,9 +103,27 @@ export default function OrganizerProfile() {
   }, [organizerId, user])
 
   const handleRemoveContact = async (userId: string) => {
+    // Find the contact to check if it's a primary contact
+    const contact = contacts.find((c: any) => c.id === userId)
+    
+    if (contact?.is_primary_contact) {
+      // Count primary contacts for this organizer
+      const primaryContactCount = contacts.filter((c: any) => c.is_primary_contact).length
+      
+      if (primaryContactCount <= 1) {
+        toast.error('Cannot remove the only primary contact. Please assign another primary contact first.')
+        return
+      }
+      
+      // Show confirmation for removing primary contact
+      if (!confirm(`Are you sure you want to remove ${contact.name} as a primary contact? This organizer has ${primaryContactCount} primary contact(s).`)) {
+        return
+      }
+    }
+    
     try {
       await api.delete(`/organizers/${organizerId}/contacts/${userId}`)
-      toast.success('Contact removed successfully!')
+      toast.success(contact?.is_primary_contact ? 'Primary contact removed successfully!' : 'Contact removed successfully!')
       const contactsRes = await api.get(`/organizers/${organizerId}/contacts`)
       setContacts(contactsRes.data)
     } catch (err: any) {
@@ -251,12 +269,58 @@ export default function OrganizerProfile() {
     e.preventDefault()
     setEditLoading(true)
     try {
-      const guestTypesArr = editForm.guest_types
-        .split(',')
-        .map((s: string) => s.trim())
-        .filter(Boolean)
-      const payload = { ...editForm, guest_types: guestTypesArr }
-      await api.put(`/events/${editForm.id}`, payload)
+      // Normalize guest types to array
+      const guestTypesArr = (typeof editForm.guest_types === 'string'
+        ? (editForm.guest_types as string).split(',').map((s: string) => s.trim())
+        : Array.isArray(editForm.guest_types)
+          ? editForm.guest_types
+          : []
+      ).filter(Boolean)
+
+      // Normalize dates to ISO strings if they look like Date objects
+      const toIsoIfDateLike = (val: any) => {
+        if (!val) return val
+        try {
+          // If already ISO string, leave it
+          if (typeof val === 'string' && /\d{4}-\d{2}-\d{2}T/.test(val)) return val
+          const d = new Date(val)
+          if (!isNaN(d.getTime())) return d.toISOString()
+          return val
+        } catch {
+          return val
+        }
+      }
+
+      const processed = {
+        ...editForm,
+        start_date: toIsoIfDateLike(editForm.start_date),
+        end_date: toIsoIfDateLike(editForm.end_date),
+        registration_start_date: toIsoIfDateLike(editForm.registration_start_date),
+        registration_end_date: toIsoIfDateLike(editForm.registration_end_date),
+        max_guests: editForm.max_guests !== undefined ? Number(editForm.max_guests) : editForm.max_guests,
+        guest_types: guestTypesArr,
+      }
+
+      let payload: any = processed
+      let headers: Record<string, string> = {}
+
+      // If an image file is present, use multipart/form-data
+      if (processed.event_image && processed.event_image instanceof File) {
+        const formData = new FormData()
+        Object.entries(processed).forEach(([key, value]) => {
+          if (key === 'event_image') {
+            if (value) formData.append('event_image', value as File)
+          } else if (key === 'guest_types') {
+            (value as string[]).forEach((gt) => formData.append('guest_types[]', gt))
+          } else if (value !== undefined && value !== null) {
+            formData.append(key, String(value))
+          }
+        })
+        payload = formData
+        headers = { 'Content-Type': 'multipart/form-data' }
+      }
+
+      await api.put(`/events/${editForm.id}`, payload, { headers })
       toast.success('Event updated successfully!')
       setEditDialogOpen(false)
       // Refresh events

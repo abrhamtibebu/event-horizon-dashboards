@@ -1,8 +1,10 @@
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Shield, Lock, Eye, Users, FileText } from 'lucide-react'
 
 export default function PrivacyPolicy() {
+  const [searchParams] = useSearchParams()
+  const returnUrl = searchParams.get('returnUrl') || '/'
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50">
       {/* Header */}
@@ -19,9 +21,9 @@ export default function PrivacyPolicy() {
               </div>
         </div>
             <Button asChild variant="outline">
-            <Link to="/" className="flex items-center">
+            <Link to={returnUrl} className="flex items-center">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Home
+              Back to Registration
             </Link>
           </Button>
           </div>

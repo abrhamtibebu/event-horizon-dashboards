@@ -34,7 +34,7 @@ import {
   Trash2,
   User,
   UserCog,
-  Eye,
+
   UserCheck,
   Image,
   Loader2,
@@ -50,6 +50,8 @@ import {
   TrendingUp,
   Building,
   Globe,
+  Palette,
+  RotateCcw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -94,8 +96,9 @@ import api, {
   trackShare,
 } from '@/lib/api'
 import { format, parseISO } from 'date-fns'
-import { getGuestTypeBadgeClasses } from '@/lib/utils'
+import { getGuestTypeBadgeClasses, getImageUrl } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import EventSessions from '@/components/EventSessions'
 import { useAuth } from '@/hooks/use-auth'
 import { Checkbox } from '@/components/ui/checkbox'
 import Papa from 'papaparse'
@@ -131,11 +134,54 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 // Add predefined guest types at the top, after imports
 const PREDEFINED_GUEST_TYPES = [
-  'VIP', 'Speaker', 'Staff', 'Exhibitor', 'Media', 'Regular', 'Visitor', 'Sponsor', 'Organizer', 'Volunteer', 'Partner', 'Vendor', 'Press', 'Student', 'Other'
+  'General', 'VIP', 'Speaker', 'Staff', 'Exhibitor', 'Media', 'Regular', 'Visitor', 'Sponsor', 'Organizer', 'Volunteer', 'Partner', 'Vendor', 'Press', 'Student', 'Other'
 ];
 
 export default function EventDetails() {
   const { eventId } = useParams()
+
+  // Function to get color coding for tasks based on task type
+  const getTaskColor = (task: string) => {
+    const taskLower = task.toLowerCase().trim()
+    
+    // Check-in related tasks
+    if (taskLower.includes('check-in') || taskLower.includes('checkin') || taskLower.includes('registration')) {
+      return 'bg-blue-100 text-blue-800 border-blue-200'
+    }
+    
+    // Security related tasks
+    if (taskLower.includes('security') || taskLower.includes('guard') || taskLower.includes('safety')) {
+      return 'bg-red-100 text-red-800 border-red-200'
+    }
+    
+    // Guest assistance tasks
+    if (taskLower.includes('guest') || taskLower.includes('assistance') || taskLower.includes('help') || taskLower.includes('support')) {
+      return 'bg-green-100 text-green-800 border-green-200'
+    }
+    
+    // Crowd control tasks
+    if (taskLower.includes('crowd') || taskLower.includes('control') || taskLower.includes('manage')) {
+      return 'bg-purple-100 text-purple-800 border-purple-200'
+    }
+    
+    // Communication tasks
+    if (taskLower.includes('communication') || taskLower.includes('announcement') || taskLower.includes('coordination')) {
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+    }
+    
+    // Technical tasks
+    if (taskLower.includes('technical') || taskLower.includes('equipment') || taskLower.includes('setup') || taskLower.includes('audio') || taskLower.includes('video')) {
+      return 'bg-indigo-100 text-indigo-800 border-indigo-200'
+    }
+    
+    // Emergency tasks
+    if (taskLower.includes('emergency') || taskLower.includes('first aid') || taskLower.includes('medical')) {
+      return 'bg-orange-100 text-orange-800 border-orange-200'
+    }
+    
+    // Default color for other tasks
+    return 'bg-gray-100 text-gray-800 border-gray-200'
+  }
   const [searchTerm, setSearchTerm] = useState('')
   const [guestTypeFilter, setGuestTypeFilter] = useState('all')
   const [checkedInFilter, setCheckedInFilter] = useState('all')
@@ -193,6 +239,7 @@ export default function EventDetails() {
   // Badge template state
   const [badgeTemplate, setBadgeTemplate] = useState<BadgeTemplate | null>(null)
   const [badgeTemplateLoading, setBadgeTemplateLoading] = useState(false)
+  const [badgeDesignerOpen, setBadgeDesignerOpen] = useState(false)
 
   const { user } = useAuth()
   const [isUsherAssigned, setIsUsherAssigned] = useState(false)
@@ -225,6 +272,12 @@ export default function EventDetails() {
   const [shareAnalytics, setShareAnalytics] = useState<any>(null)
   const [shareAnalyticsLoading, setShareAnalyticsLoading] = useState(false)
   const [shareAnalyticsError, setShareAnalyticsError] = useState<string | null>(null)
+  
+  // Session guests state
+  const [selectedSession, setSelectedSession] = useState<any>(null)
+  const [sessionGuests, setSessionGuests] = useState<any[]>([])
+  const [sessionGuestsLoading, setSessionGuestsLoading] = useState(false)
+  const [sessionGuestsDialogOpen, setSessionGuestsDialogOpen] = useState(false)
 
   const [printing, setPrinting] = useState(false)
   const printRef = useRef<HTMLDivElement>(null)
@@ -324,6 +377,7 @@ export default function EventDetails() {
             id: res.data[0].id,
             guest_type_id: res.data[0].guest_type_id,
             guestType: res.data[0].guestType,
+            guest_type: res.data[0].guest_type,
             guest: res.data[0].guest
           })
         }
@@ -387,7 +441,11 @@ export default function EventDetails() {
     setAnalyticsError(null)
     api
       .get(`/events/${Number(eventId)}/check-in/stats`)
-      .then((res) => setAnalytics(res.data))
+      .then((res) => {
+        console.log('Analytics data received:', res.data)
+        console.log('Registration timeline:', res.data.registration_timeline)
+        setAnalytics(res.data)
+      })
       .catch((err) => setAnalyticsError('Failed to fetch analytics.'))
       .finally(() => setAnalyticsLoading(false))
   }, [eventId, activeTab])
@@ -533,20 +591,27 @@ export default function EventDetails() {
  
 
   const filteredAttendees = attendees.filter((attendee) => {
-    const matchesSearch =
-      attendee.guest?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      attendee.guest?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      attendee.guest?.company?.toLowerCase().includes(searchTerm.toLowerCase())
+    const searchTermLower = searchTerm.toLowerCase().trim()
+    
+    const matchesSearch = searchTermLower === '' || 
+      attendee.guest?.name?.toLowerCase().includes(searchTermLower) ||
+      attendee.guest?.email?.toLowerCase().includes(searchTermLower) ||
+      attendee.guest?.phone?.toLowerCase().includes(searchTermLower) ||
+      attendee.guest?.company?.toLowerCase().includes(searchTermLower) ||
+      attendee.guest?.jobtitle?.toLowerCase().includes(searchTermLower) ||
+      attendee.guest?.country?.toLowerCase().includes(searchTermLower)
     
     // Handle guest type filtering properly
     let guestTypeName = '';
-    if (attendee.guestType) {
-      if (typeof attendee.guestType === 'object' && attendee.guestType !== null) {
-        guestTypeName = (attendee.guestType.name || attendee.guestType.id || '').toLowerCase();
-      } else if (typeof attendee.guestType === 'string') {
-        guestTypeName = attendee.guestType.toLowerCase();
+    // Try both guestType and guest_type for compatibility
+    const guestType = attendee.guestType || attendee.guest_type;
+    if (guestType) {
+      if (typeof guestType === 'object' && guestType !== null) {
+        guestTypeName = (guestType.name || guestType.id || '').toLowerCase();
+      } else if (typeof guestType === 'string') {
+        guestTypeName = guestType.toLowerCase();
       } else {
-        guestTypeName = String(attendee.guestType).toLowerCase();
+        guestTypeName = String(guestType).toLowerCase();
       }
     }
     
@@ -561,10 +626,7 @@ export default function EventDetails() {
     return matchesSearch && matchesGuestType && matchesCheckedIn
   })
 
-  const testBadge = (attendee: (typeof attendees)[0]) => {
-    setSinglePrintAttendee(attendee)
-    // setSinglePrintDialogOpen(true) // This function does not exist
-  }
+
 
   const exportCSV = () => {
     if (filteredAttendees.length === 0) {
@@ -575,13 +637,15 @@ export default function EventDetails() {
     const dataToExport = filteredAttendees.map((attendee) => {
       // Handle guest type display properly for CSV export
       let guestTypeName = 'N/A';
-      if (attendee.guestType) {
-        if (typeof attendee.guestType === 'object' && attendee.guestType !== null) {
-          guestTypeName = attendee.guestType.name || attendee.guestType.id || 'N/A';
-        } else if (typeof attendee.guestType === 'string') {
-          guestTypeName = attendee.guestType;
+      // Try both guestType and guest_type for compatibility
+      const guestType = attendee.guestType || attendee.guest_type;
+      if (guestType) {
+        if (typeof guestType === 'object' && guestType !== null) {
+          guestTypeName = guestType.name || guestType.id || 'N/A';
+        } else if (typeof guestType === 'string') {
+          guestTypeName = guestType;
         } else {
-          guestTypeName = String(attendee.guestType);
+          guestTypeName = String(guestType);
         }
       }
       
@@ -664,19 +728,61 @@ export default function EventDetails() {
           setPrinting(false);
           return;
         }
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [320, 480] });
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [400, 400] });
         for (let i = 0; i < badgeElements.length; i++) {
           const el = badgeElements[i] as HTMLElement;
-          const canvas = await html2canvas(el, { scale: 2 });
-          const imgData = canvas.toDataURL('image/png');
-          if (i > 0) pdf.addPage([320, 480], 'portrait');
-          pdf.addImage(imgData, 'PNG', 0, 0, 320, 480);
+          const canvas = await html2canvas(el, { 
+          scale: 1.5,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff'
+        });
+          const imgData = canvas.toDataURL('image/jpeg', 0.9); // JPEG for smaller file size
+          if (i > 0) pdf.addPage([400, 400], 'portrait');
+          pdf.addImage(imgData, 'JPEG', 0, 0, 400, 400);
         }
-        pdf.autoPrint();
-        window.open(pdf.output('bloburl'));
+        // We will trigger print manually via iframe to avoid auto-closing behavior
+        const blob = pdf.output('blob');
+        const blobUrl = URL.createObjectURL(blob);
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.src = blobUrl;
+        document.body.appendChild(iframe);
+        iframe.onload = () => {
+          const cleanup = () => {
+            if (iframe.parentNode) document.body.removeChild(iframe);
+            URL.revokeObjectURL(blobUrl);
+            setPrinting(false);
+            document.removeEventListener('visibilitychange', handleVisibility);
+          };
+          const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+              setTimeout(cleanup, 300);
+            }
+          };
+          document.addEventListener('visibilitychange', handleVisibility);
+          try {
+            const cw = iframe.contentWindow;
+            cw?.focus();
+            setTimeout(() => cw?.print(), 400);
+          } catch (e) {
+            setTimeout(cleanup, 120000);
+          }
+          setTimeout(() => {
+            document.removeEventListener('visibilitychange', handleVisibility);
+            if (iframe.parentNode) document.body.removeChild(iframe);
+            URL.revokeObjectURL(blobUrl);
+            setPrinting(false);
+          }, 120000);
+        };
         setPrinting(false);
       }
-    }, 300);
+    }, 150); // Reduced timeout from 300ms to 150ms for faster response
   };
 
   const handleImportClick = () => {
@@ -689,6 +795,18 @@ export default function EventDetails() {
   }
 
   const downloadSampleCSV = () => {
+    // Prefer real event guest types for a valid sample
+    const typeNames: string[] = Array.isArray(guestTypes)
+      ? guestTypes.map((gt: any) =>
+          typeof gt === 'object' && gt !== null
+            ? String(gt.name ?? gt.title ?? '').trim()
+            : String(gt ?? '').trim()
+        ).filter((n: string) => !!n)
+      : []
+    const t1 = typeNames[0] || 'Regular'
+    const t2 = typeNames[1] || t1 || 'VIP'
+
+    // Columns exactly as the system expects; extra columns are optional
     const sampleData = [
       {
         name: 'John Doe',
@@ -698,7 +816,7 @@ export default function EventDetails() {
         jobtitle: 'Software Engineer',
         gender: 'Male',
         country: 'United States',
-        guest_type_name: 'Regular'
+        guest_type_name: t1,
       },
       {
         name: 'Jane Smith',
@@ -708,8 +826,8 @@ export default function EventDetails() {
         jobtitle: 'UX Designer',
         gender: 'Female',
         country: 'Canada',
-        guest_type_name: 'VIP'
-      }
+        guest_type_name: t2,
+      },
     ]
 
     const csv = Papa.unparse(sampleData)
@@ -785,7 +903,10 @@ export default function EventDetails() {
         })
 
         const invalidRows = attendeesToImport.filter((a, index) => {
-          const isValid = a.guest_type_id && a.name && a.email
+          const emailOk = !!a.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(a.email))
+          const phoneStr = (a.phone || '').toString().replace(/\s|-/g, '')
+          const phoneOk = !!phoneStr && /^\+?[0-9]{7,15}$/.test(phoneStr)
+          const isValid = a.guest_type_id && a.name && emailOk && phoneOk
           if (!isValid) {
             console.log(`Invalid row ${index + 1}:`, a)
           }
@@ -794,9 +915,7 @@ export default function EventDetails() {
 
         if (invalidRows.length > 0) {
           const invalidEmails = invalidRows.map((r, index) => r.email || `Row ${index + 1}`).join(', ')
-          toast.error(
-            `Some rows have invalid data. Please check: ${invalidEmails}. Make sure all rows have name, email, and a valid guest type.`
-          )
+          toast.error(`Some rows have invalid data. Make sure all rows have name, email, phone, and a valid guest type.`)
           setIsImporting(false)
           return
         }
@@ -873,17 +992,85 @@ export default function EventDetails() {
       guest_types: guestTypes,
     })
     setEditImagePreview(
-      eventData.event_image
-        ? eventData.event_image.startsWith('http')
-          ? eventData.event_image
-          : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${eventData.event_image}`
-        : null
+      eventData.event_image ? getImageUrl(eventData.event_image) : null
     )
     setEditDialogOpen(true)
   }
 
   const handleEditInput = (field: string, value: any) => {
     setEditForm((prev: any) => ({ ...prev, [field]: value }))
+  }
+
+  // Handle session click to show checked-in guests
+  const handleSessionClick = async (session: any) => {
+    setSelectedSession(session)
+    setSessionGuestsDialogOpen(true)
+    setSessionGuestsLoading(true)
+    
+    try {
+      // Fetch session attendees (checked-in guests)
+      const response = await api.get(`/sessions/${session.session_id}/attendances`)
+      const attendances = response.data.data || []
+      
+      // Filter only checked-in attendees
+      const checkedInAttendances = attendances.filter((attendance: any) => attendance.checked_in)
+      
+      // Extract guest information
+      const guests = checkedInAttendances.map((attendance: any) => ({
+        id: attendance.attendee?.id,
+        name: attendance.attendee?.guest?.name,
+        email: attendance.attendee?.guest?.email,
+        phone: attendance.attendee?.guest?.phone,
+        company: attendance.attendee?.guest?.company,
+        jobtitle: attendance.attendee?.guest?.jobtitle,
+        gender: attendance.attendee?.guest?.gender,
+        country: attendance.attendee?.guest?.country,
+        guest_type: attendance.attendee?.guestType?.name,
+        check_in_time: attendance.check_in_time,
+        session_name: session.session_name
+      }))
+      
+      setSessionGuests(guests)
+    } catch (error) {
+      console.error('Error fetching session guests:', error)
+      toast.error('Failed to fetch session guests')
+      setSessionGuests([])
+    } finally {
+      setSessionGuestsLoading(false)
+    }
+  }
+
+  // Export session guests to CSV
+  const exportSessionGuests = () => {
+    if (sessionGuests.length === 0) {
+      toast.error('No guests to export')
+      return
+    }
+
+    const csvData = sessionGuests.map(guest => ({
+      'Name': guest.name || '',
+      'Email': guest.email || '',
+      'Phone': guest.phone || '',
+      'Company': guest.company || '',
+      'Job Title': guest.jobtitle || '',
+      'Gender': guest.gender || '',
+      'Country': guest.country || '',
+      'Guest Type': guest.guest_type || '',
+      'Check-in Time': guest.check_in_time ? new Date(guest.check_in_time).toLocaleString() : ''
+    }))
+
+    const csv = Papa.unparse(csvData)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `${selectedSession?.session_name || 'session'}_checked_in_guests.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    toast.success('Session guests exported successfully')
   }
 
   const handleEditFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1028,20 +1215,63 @@ export default function EventDetails() {
     setRemoveDialogOpen(true)
   }
 
+  const handleRemoveAttendee = (attendee: any) => {
+    setRemoveMember(attendee)
+    setRemoveDialogOpen(true)
+  }
+
   const handleRemoveConfirm = async () => {
     setRemoveLoading(true)
     try {
-      await api.delete(
-        `/organizers/${user.organizer_id}/contacts/${removeMember.id}`
-      )
-      toast.success('Team member removed!')
+      // Check if we're removing a team member or an attendee
+      if (removeMember.guest) {
+        // This is an attendee (has guest property)
+        await api.delete(`/events/${Number(eventId)}/attendees/${removeMember.id}`)
+        toast.success('Attendee removed from event!')
+        
+        // Refresh attendees list
+        const res = await api.get(`/events/${Number(eventId)}/attendees`)
+        setAttendees(res.data || [])
+      } else {
+        // This is a team member - check if it's a primary contact
+        if (removeMember.is_primary_contact) {
+          // Count primary contacts for this organizer
+          const primaryContactCount = teamMembers.filter((m: any) => m.is_primary_contact).length
+          
+          if (primaryContactCount <= 1) {
+            toast.error('Cannot remove the only primary contact. Please assign another primary contact first.')
+            setRemoveDialogOpen(false)
+            setRemoveMember(null)
+            setRemoveLoading(false)
+            return
+          }
+          
+          // Show confirmation for removing primary contact
+          if (!confirm(`Are you sure you want to remove ${removeMember.name} as a primary contact? This organizer has ${primaryContactCount} primary contact(s).`)) {
+            setRemoveDialogOpen(false)
+            setRemoveMember(null)
+            setRemoveLoading(false)
+            return
+          }
+        }
+        
+        await api.delete(
+          `/organizers/${user.organizer_id}/contacts/${removeMember.id}`
+        )
+        toast.success(removeMember.is_primary_contact ? 'Primary contact removed!' : 'Team member removed!')
+        
+        // Refresh team list
+        const res = await api.get(`/organizers/${user.organizer_id}/contacts`)
+        setTeamMembers(res.data)
+      }
+      
       setRemoveDialogOpen(false)
       setRemoveMember(null)
-      // Refresh team list
-      const res = await api.get(`/organizers/${user.organizer_id}/contacts`)
-      setTeamMembers(res.data)
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to remove team member')
+      const errorMessage = removeMember.guest 
+        ? 'Failed to remove attendee' 
+        : 'Failed to remove team member'
+      toast.error(err.response?.data?.error || errorMessage)
     } finally {
       setRemoveLoading(false)
     }
@@ -1145,7 +1375,7 @@ export default function EventDetails() {
       jobtitle: attendee.guest?.jobtitle || '',
       gender: attendee.guest?.gender || '',
       country: attendee.guest?.country || '',
-      guest_type_id: attendee.guest_type_id || attendee.guestType?.id || '',
+      guest_type_id: attendee.guest_type_id || (attendee.guestType || attendee.guest_type)?.id || '',
       ticket_type_id: attendee.ticket_type_id || attendee.ticketType?.id || '',
     })
     setEditAttendeeDialogOpen(true)
@@ -1199,8 +1429,14 @@ export default function EventDetails() {
   useEffect(() => {
     if (!eventId) return
     getEventUshers(Number(eventId))
-      .then((res) => setEventUshers(res.data))
-      .catch((err) => toast.error('Failed to fetch event ushers.'))
+      .then((res) => {
+        console.log('Event ushers loaded:', res.data)
+        setEventUshers(res.data)
+      })
+      .catch((err) => {
+        console.error('Failed to fetch event ushers:', err)
+        toast.error('Failed to fetch event ushers.')
+      })
   }, [eventId])
 
   const [checkinSearchTerm, setCheckinSearchTerm] = useState('')
@@ -1225,8 +1461,7 @@ export default function EventDetails() {
     }
   }, [printing, printRef.current]);
 
-  const [showTestBadge, setShowTestBadge] = useState(false)
-  const [testAttendee, setTestAttendee] = useState<any>(null)
+
 
   // Add a ref for the PDF badge area
   const pdfBadgeRef = useRef<HTMLDivElement>(null);
@@ -1237,15 +1472,52 @@ export default function EventDetails() {
     setTimeout(async () => {
       if (pdfBadgeRef.current) {
         const canvas = await html2canvas(pdfBadgeRef.current, { scale: 2 });
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [320, 480] });
-        pdf.addImage(imgData, 'PNG', 0, 0, 320, 480);
+        const imgData = canvas.toDataURL('image/jpeg', 0.9); // JPEG for smaller file size
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [400, 400] });
+        pdf.addImage(imgData, 'PNG', 0, 0, 400, 400);
         pdf.save(`${attendee.guest?.name || 'badge'}.pdf`);
-        pdf.autoPrint();
-        window.open(pdf.output('bloburl'));
+        // We will trigger print manually via iframe to avoid auto-closing behavior
+        const blob = pdf.output('blob');
+        const blobUrl = URL.createObjectURL(blob);
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.src = blobUrl;
+        document.body.appendChild(iframe);
+        iframe.onload = () => {
+          const cleanup = () => {
+            if (iframe.parentNode) document.body.removeChild(iframe);
+            URL.revokeObjectURL(blobUrl);
+            setSinglePrintAttendee(null);
+            document.removeEventListener('visibilitychange', handleVisibility);
+          };
+          const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+              setTimeout(cleanup, 300);
+            }
+          };
+          document.addEventListener('visibilitychange', handleVisibility);
+          try {
+            const cw = iframe.contentWindow;
+            cw?.focus();
+            setTimeout(() => cw?.print(), 400);
+          } catch (e) {
+            setTimeout(cleanup, 120000);
+          }
+          setTimeout(() => {
+            document.removeEventListener('visibilitychange', handleVisibility);
+            if (iframe.parentNode) document.body.removeChild(iframe);
+            URL.revokeObjectURL(blobUrl);
+            setSinglePrintAttendee(null);
+          }, 120000);
+        };
         setSinglePrintAttendee(null);
       }
-    }, 300);
+    }, 150); // Reduced timeout from 300ms to 150ms for faster response
   };
 
   // Add a ref for the hidden badge print area
@@ -1253,26 +1525,58 @@ export default function EventDetails() {
 
   const handleSingleBadgePrint = async (attendee: any) => {
     setSinglePrintAttendee(attendee)
-    // Wait for the badge to render
-    setTimeout(() => {
+    // Wait for the badge to render in the hidden printRef
+    setTimeout(async () => {
       if (singleBadgePrintRef.current) {
-        // Make sure the print area is visible and positioned correctly
-        singleBadgePrintRef.current.style.visibility = 'visible';
-        singleBadgePrintRef.current.style.position = 'absolute';
-        singleBadgePrintRef.current.style.left = '0';
-        singleBadgePrintRef.current.style.top = '0';
-        singleBadgePrintRef.current.style.width = '100vw';
-        singleBadgePrintRef.current.style.height = '100vh';
-        singleBadgePrintRef.current.style.zIndex = '9999';
-        singleBadgePrintRef.current.style.background = 'white';
-        
-        // Wait a bit more for badge to render, then print
-        setTimeout(() => {
-          window.print();
-          // Reset the print area after printing
-          singleBadgePrintRef.current!.style.visibility = 'hidden';
+        const badgeElement = singleBadgePrintRef.current.querySelector('.printable-badge-batch');
+        if (!badgeElement) {
+          toast.error('No badge found to print.');
           setSinglePrintAttendee(null);
-        }, 500);
+          return;
+        }
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [320, 480] });
+        const canvas = await html2canvas(badgeElement as HTMLElement, { scale: 2 });
+        const imgData = canvas.toDataURL('image/jpeg', 0.9); // JPEG for smaller file size
+        pdf.addImage(imgData, 'PNG', 0, 0, 320, 480);
+        // We will trigger print manually via iframe to avoid auto-closing behavior
+        const blob = pdf.output('blob');
+        const blobUrl = URL.createObjectURL(blob);
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.src = blobUrl;
+        document.body.appendChild(iframe);
+        iframe.onload = () => {
+          const cleanup = () => {
+            if (iframe.parentNode) document.body.removeChild(iframe);
+            URL.revokeObjectURL(blobUrl);
+        setSinglePrintAttendee(null);
+            document.removeEventListener('visibilitychange', handleVisibility);
+          };
+          const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+              setTimeout(cleanup, 300);
+            }
+          };
+          document.addEventListener('visibilitychange', handleVisibility);
+          try {
+            const cw = iframe.contentWindow;
+            cw?.focus();
+            setTimeout(() => cw?.print(), 400);
+          } catch (e) {
+            setTimeout(cleanup, 120000);
+          }
+          setTimeout(() => {
+            document.removeEventListener('visibilitychange', handleVisibility);
+            if (iframe.parentNode) document.body.removeChild(iframe);
+            URL.revokeObjectURL(blobUrl);
+            setSinglePrintAttendee(null);
+          }, 120000);
+        };
       }
     }, 300)
   }
@@ -1313,11 +1617,14 @@ export default function EventDetails() {
   const [statusLoading, setStatusLoading] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
 
-  const statusOptions = [
+  const statusOptionsBase = [
     { value: 'draft', label: 'Draft' },
     { value: 'active', label: 'Active' },
     { value: 'cancelled', label: 'Cancelled' },
   ];
+  const statusOptions = (eventData as any)?.status === 'active'
+    ? statusOptionsBase.filter(o => o.value !== 'draft')
+    : statusOptionsBase;
 
   const handleStatusChange = async (newStatus: string) => {
     if (!eventId) return;
@@ -1328,8 +1635,9 @@ export default function EventDetails() {
       setEventData((prev: any) => ({ ...prev, status: newStatus }));
       toast.success('Event status updated!');
     } catch (err: any) {
-      setStatusError(err.response?.data?.error || 'Failed to update status.');
-      toast.error(statusError || 'Failed to update status.');
+      const msg = err?.response?.data?.error || err?.response?.data?.message || 'Failed to update status.';
+      setStatusError(msg);
+      toast.error(msg);
     } finally {
       setStatusLoading(false);
     }
@@ -1394,7 +1702,8 @@ export default function EventDetails() {
       return;
     }
     setPrinting(true);
-    setTimeout(() => {
+    // Wait for the badges to render in the hidden printRef
+    setTimeout(async () => {
       if (printRef.current) {
         const badgeElements = Array.from(printRef.current.querySelectorAll('.printable-badge-batch'));
         if (badgeElements.length === 0) {
@@ -1402,33 +1711,101 @@ export default function EventDetails() {
           setPrinting(false);
           return;
         }
-        // Make sure the print area is visible and positioned correctly
-        printRef.current.style.visibility = 'visible';
-        printRef.current.style.position = 'absolute';
-        printRef.current.style.left = '0';
-        printRef.current.style.top = '0';
-        printRef.current.style.width = '100vw';
-        printRef.current.style.height = '100vh';
-        printRef.current.style.zIndex = '9999';
-        printRef.current.style.background = 'white';
-        
-        // Wait a bit more for badges to render, then print
-        setTimeout(() => {
-          // Check if badges are actually rendered
-          const renderedBadges = printRef.current!.querySelectorAll('.printable-badge-batch');
-          console.log('Rendered badges count:', renderedBadges.length);
-          if (renderedBadges.length > 0) {
-            window.print();
-          } else {
-            toast.error('Badges failed to render. Please try again.');
-          }
-          // Reset the print area after printing
-          printRef.current!.style.visibility = 'hidden';
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [400, 400] }); // UNIFIED: Same dimensions as single badge
+        for (let i = 0; i < badgeElements.length; i++) {
+          const el = badgeElements[i] as HTMLElement;
+          const canvas = await html2canvas(el, { 
+          scale: 1.5,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff'
+        });
+          const imgData = canvas.toDataURL('image/jpeg', 0.9); // JPEG for smaller file size
+          if (i > 0) pdf.addPage([400, 400], 'portrait'); // UNIFIED: Same dimensions as single badge
+          pdf.addImage(imgData, 'PNG', 0, 0, 400, 400); // UNIFIED: Same dimensions as single badge
+        }
+        // We will trigger print manually via iframe to avoid auto-closing behavior
+        const blob = pdf.output('blob');
+        const blobUrl = URL.createObjectURL(blob);
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.src = blobUrl;
+        document.body.appendChild(iframe);
+        iframe.onload = () => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } finally {
+            setTimeout(() => {
+              document.body.removeChild(iframe);
+              URL.revokeObjectURL(blobUrl);
+            }, 1000);
           setPrinting(false);
-        }, 500);
+          }
+        };
       }
-    }, 300);
+    }, 150); // Reduced timeout from 300ms to 150ms for faster response
   };
+
+  const exportAttendeesToCSV = async () => {
+    if (filteredAttendees.length === 0) {
+      toast.info('No attendees to export.')
+      return
+    }
+
+    const dataToExport = filteredAttendees.map((attendee) => {
+      // Handle guest type display properly for CSV export
+      let guestTypeName = 'N/A';
+      // Try both guestType and guest_type for compatibility
+      const guestType = attendee.guestType || attendee.guest_type;
+      if (guestType) {
+        if (typeof guestType === 'object' && guestType !== null) {
+          guestTypeName = guestType.name || guestType.id || 'N/A';
+        } else if (typeof guestType === 'string') {
+          guestTypeName = guestType;
+        } else {
+          guestTypeName = String(guestType);
+        }
+      }
+      
+      return {
+        'Attendee ID': attendee.id,
+        'Name': attendee.guest?.name || 'N/A',
+        'Email': attendee.guest?.email || 'N/A',
+        'Phone': attendee.guest?.phone || 'N/A',
+        'Company': attendee.guest?.company || 'N/A',
+        'Job Title': attendee.guest?.jobtitle || 'N/A',
+        'Gender': attendee.guest?.gender || 'N/A',
+        'Country': attendee.guest?.country || 'N/A',
+        'Guest Type': guestTypeName,
+        'Registration Date': attendee.created_at 
+          ? format(parseISO(attendee.created_at), 'MMM d, yyyy, h:mm a')
+          : 'N/A',
+        'Checked In': attendee.checked_in ? 'Yes' : 'No',
+        'Check-In Time': attendee.check_in_time
+          ? format(parseISO(attendee.check_in_time), 'MMM d, yyyy, h:mm a')
+          : 'N/A',
+      };
+    })
+
+    const csv = Papa.unparse(dataToExport)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `${eventData.name}_attendees.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    toast.success('Attendee data exported successfully.')
+  }
 
   return (
     <>
@@ -1524,11 +1901,7 @@ export default function EventDetails() {
       <div className="relative w-full h-72 rounded-2xl overflow-hidden mb-8 shadow-lg">
               {eventData.event_image && (
                 <img
-                  src={
-                    eventData.event_image.startsWith('http')
-                      ? eventData.event_image
-                      : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${eventData.event_image}`
-                  }
+                  src={getImageUrl(eventData.event_image)}
             alt={eventData.name}
             className="object-cover w-full h-full"
           />
@@ -1589,13 +1962,7 @@ export default function EventDetails() {
             {eventData.event_image && (
               <div className="w-full h-64 rounded-lg overflow-hidden mb-4 bg-gradient-to-r from-blue-100 to-purple-100 flex items-center justify-center">
                 <img
-                  src={
-                    eventData.event_image.startsWith('http')
-                      ? eventData.event_image
-                      : `${import.meta.env.VITE_API_BASE_URL || ''}/storage/${
-                          eventData.event_image
-                        }`
-                  }
+                  src={getImageUrl(eventData.event_image)}
                   alt={eventData.name}
                   className="object-cover w-full h-full"
                 />
@@ -2100,11 +2467,379 @@ export default function EventDetails() {
                   >
                     Analytics
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="sessions"
+                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
+                      ${activeTab === 'sessions' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                    `}
+                  >
+                    Sessions
+                  </TabsTrigger>
                 </>
               )}
           </TabsList>
             <TabsContent value="details">
               <div className="space-y-8">
+                {/* Actions Row - moved to top right */}
+                <div className="flex flex-wrap gap-4 mb-8 justify-end">
+                  {(user?.role === 'admin' || user?.role === 'superadmin' || (user?.role?.startsWith('organizer') && (user?.organizer_id === (eventData as any)?.organizer_id || user?.organizer_id === (eventData as any)?.organizer?.id))) && (
+                    <>
+                      <Button 
+                        onClick={openEditDialog}
+                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                      >
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit Event
+                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={eventData.status}
+                          onValueChange={handleStatusChange}
+                          disabled={statusLoading}
+                        >
+                          <SelectTrigger className="w-36">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statusOptions.map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {statusLoading && <Loader2 className="animate-spin w-4 h-4 text-blue-500" />}
+                        {statusError && <span className="text-red-500 text-xs ml-2">{statusError}</span>}
+                      </div>
+                    </>
+                  )}
+                  {(user?.role === 'admin' || user?.role === 'superadmin') && (
+                    <Button 
+                      onClick={openEditDialog}
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Event
+                    </Button>
+                  )}
+                  {user?.role !== 'usher' && (
+                    <>
+                      <Button variant="outline" onClick={exportCSV}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Export CSV
+                      </Button>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline">
+                            <QrCode className="w-4 h-4 mr-2" />
+                            Public Registration
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                              <QrCode className="w-5 h-5 text-blue-600" />
+                              Public Registration Link
+                            </DialogTitle>
+                            <DialogDescription className="text-sm">
+                              Share this registration link with potential attendees. The link allows public registration for this event.
+                            </DialogDescription>
+                          </DialogHeader>
+                          {eventData?.status?.toLowerCase().trim() === 'active' && eventData?.uuid ? (
+                            <div className="space-y-4 sm:space-y-6">
+                              {/* Registration Link Section */}
+                              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 sm:p-4 border border-blue-200">
+                                <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                                  <ExternalLink className="w-4 h-4" />
+                                  Registration Link
+                                </h3>
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                  <Input
+                                    value={`${window.location.origin}/register/${eventData.uuid}`}
+                                    readOnly
+                                    className="text-xs sm:text-sm bg-white border-blue-300 focus:border-blue-500 flex-1"
+                                    onClick={e => (e.target as HTMLInputElement).select()}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(`${window.location.origin}/register/${eventData.uuid}`)
+                                      toast.success('Registration link copied to clipboard!')
+                                    }}
+                                    variant="outline"
+                                    className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 whitespace-nowrap"
+                                  >
+                                    Copy
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* QR Code Section */}
+                              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 sm:p-4 border border-green-200">
+                                <h3 className="text-sm font-semibold text-green-900 mb-3 flex items-center gap-2">
+                                  <QrCode className="w-4 h-4" />
+                                  QR Code
+                                </h3>
+                                <div className="flex flex-col sm:flex-row items-center gap-4">
+                                  <div className="bg-white p-2 sm:p-3 rounded-lg border border-green-300">
+                                    <img 
+                                      id="public-registration-qr"
+                                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`} 
+                                      alt="QR Code for registration" 
+                                      className="w-20 h-20 sm:w-24 sm:h-24" 
+                                    />
+                                  </div>
+                                  <div className="flex flex-row sm:flex-col gap-2 w-full sm:w-auto">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        const link = document.createElement('a')
+                                        link.href = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`
+                                        link.download = `registration-qr-${eventData.name.replace(/[^a-zA-Z0-9]/g, '-')}.png`
+                                        link.click()
+                                        toast.success('QR code downloaded!')
+                                      }}
+                                      className="bg-white hover:bg-green-50 border-green-300 text-green-700 flex-1 sm:flex-none"
+                                    >
+                                      Download QR
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(`${window.location.origin}/register/${eventData.uuid}`)
+                                        toast.success('Link copied! Scan the QR code or share the link.')
+                                      }}
+                                      className="bg-white hover:bg-green-50 border-green-300 text-green-700 flex-1 sm:flex-none"
+                                    >
+                                      Copy Link
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Quick Share Section */}
+                              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 sm:p-4 border border-purple-200">
+                                <h3 className="text-sm font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                                  <Share2 className="w-4 h-4" />
+                                  Quick Share
+                                </h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 text-xs sm:text-sm"
+                                    onClick={async () => {
+                                      await trackShareAction('facebook')
+                                      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&quote=${encodeURIComponent('Register for ' + eventData.name)}`, '_blank')
+                                    }}
+                                  >
+                                    <Facebook className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                    <span className="hidden sm:inline">Facebook</span>
+                                    <span className="sm:hidden">FB</span>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 text-xs sm:text-sm"
+                                    onClick={async () => {
+                                      await trackShareAction('twitter')
+                                      window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&text=${encodeURIComponent('Register for ' + eventData.name)}&hashtags=event,registration`, '_blank')
+                                    }}
+                                  >
+                                    <Twitter className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                    <span className="hidden sm:inline">Twitter</span>
+                                    <span className="sm:hidden">X</span>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-white hover:bg-green-50 border-green-300 text-green-700 text-xs sm:text-sm"
+                                    onClick={async () => {
+                                      await trackShareAction('whatsapp')
+                                      window.open(`https://wa.me/?text=${encodeURIComponent('Register for ' + eventData.name + ': ' + window.location.origin + '/register/' + eventData.uuid)}`, '_blank')
+                                    }}
+                                  >
+                                    <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                    <span className="hidden sm:inline">WhatsApp</span>
+                                    <span className="sm:hidden">WA</span>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-white hover:bg-red-50 border-red-300 text-red-700 text-xs sm:text-sm"
+                                    onClick={async () => {
+                                      await trackShareAction('email')
+                                      const emailBody = `Hi,\n\nYou're invited to register for: ${eventData.name}\n\nRegistration Link: ${window.location.origin}/register/${eventData.uuid}\n\nBest regards`
+                                      window.open(`mailto:?subject=${encodeURIComponent('Registration Invitation: ' + eventData.name)}&body=${encodeURIComponent(emailBody)}`)
+                                    }}
+                                  >
+                                    <Mail className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                    <span className="hidden sm:inline">Email</span>
+                                    <span className="sm:hidden">Mail</span>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 text-xs sm:text-sm"
+                                    onClick={async () => {
+                                      await trackShareAction('linkedin')
+                                      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}`, '_blank')
+                                    }}
+                                  >
+                                    <Linkedin className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                    <span className="hidden sm:inline">LinkedIn</span>
+                                    <span className="sm:hidden">LI</span>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-white hover:bg-pink-50 border-pink-300 text-pink-700 text-xs sm:text-sm"
+                                    onClick={async () => {
+                                      await trackShareAction('copy_text')
+                                      const text = `Register for ${eventData.name}: ${window.location.origin}/register/${eventData.uuid}`
+                                      navigator.clipboard.writeText(text)
+                                      toast.success('Registration message copied to clipboard!')
+                                    }}
+                                  >
+                                    <Copy className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                    <span className="hidden sm:inline">Copy Text</span>
+                                    <span className="sm:hidden">Copy</span>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700 text-xs sm:text-sm"
+                                    onClick={async () => {
+                                      await trackShareAction('sms')
+                                      const smsText = `Register for ${eventData.name}: ${window.location.origin}/register/${eventData.uuid}`
+                                      window.open(`sms:?body=${encodeURIComponent(smsText)}`)
+                                    }}
+                                  >
+                                    <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                    <span className="hidden sm:inline">SMS</span>
+                                    <span className="sm:hidden">SMS</span>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-white hover:bg-teal-50 border-teal-300 text-teal-700 text-xs sm:text-sm"
+                                    onClick={async () => {
+                                      await trackShareAction('telegram')
+                                      const telegramText = `Register for ${eventData.name}: ${window.location.origin}/register/${eventData.uuid}`
+                                      window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + '/register/' + eventData.uuid)}&text=${encodeURIComponent('Register for ' + eventData.name)}`)
+                                    }}
+                                  >
+                                    <Send className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                    <span className="hidden sm:inline">Telegram</span>
+                                    <span className="sm:hidden">TG</span>
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Embeddable Section */}
+                              <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-3 sm:p-4 border border-orange-200">
+                                <h3 className="text-sm font-semibold text-orange-900 mb-3 flex items-center gap-2">
+                                  <Code className="w-4 h-4" />
+                                  Embed on Website
+                                </h3>
+                                <div className="space-y-3">
+                                  <div>
+                                    <label className="text-xs font-medium text-orange-800 mb-1 block">HTML Embed Code:</label>
+                                    <Input
+                                      value={`<iframe src='${window.location.origin}/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`}
+                                      readOnly
+                                      className="text-xs bg-white font-mono border-orange-300"
+                                      onClick={e => (e.target as HTMLInputElement).select()}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-xs font-medium text-orange-800 mb-1 block">Direct Link:</label>
+                                    <Input
+                                      value={`${window.location.origin}/register/${eventData.uuid}`}
+                                      readOnly
+                                      className="text-xs bg-white font-mono border-orange-300"
+                                      onClick={e => (e.target as HTMLInputElement).select()}
+                                    />
+                                  </div>
+                                  <div className="flex flex-col sm:flex-row gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={async () => {
+                                        await trackShareAction('embed')
+                                        const embedCode = `<iframe src='${window.location.origin}/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`
+                                        navigator.clipboard.writeText(embedCode)
+                                        toast.success('Embed code copied to clipboard!')
+                                      }}
+                                      className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700 flex-1 sm:flex-none"
+                                    >
+                                      Copy Embed Code
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={async () => {
+                                        await trackShareAction('link')
+                                        const link = `${window.location.origin}/register/${eventData.uuid}`
+                                        navigator.clipboard.writeText(link)
+                                        toast.success('Direct link copied to clipboard!')
+                                      }}
+                                      className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700 flex-1 sm:flex-none"
+                                    >
+                                      Copy Direct Link
+                                    </Button>
+                                  </div>
+                                  <p className="text-xs text-orange-700">
+                                    💡 <strong>Tip:</strong> Copy the HTML code and paste it into your website to embed the registration form directly.
+                                  </p>
+                                </div>
+                              </div>
+
+
+                            </div>
+                          ) : (
+                            <div className="text-center py-6 sm:py-8">
+                              <XCircle className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+                              <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">Event Not Active</h3>
+                              <p className="text-sm text-gray-500 mb-4">The event must be active to share the public registration link.</p>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  // Close dialog and navigate to edit event
+                                  // You can implement this based on your needs
+                                }}
+                              >
+                                Activate Event
+                              </Button>
+                            </div>
+                          )}
+                        </DialogContent>
+                      </Dialog>
+                      {/* <Button variant="outline" onClick={generateReport}>
+                        <BarChart3 className="w-4 h-4 mr-2" />
+                        Generate Report
+                      </Button> */}
+                      <UsherAssignmentDialog
+                        open={isAssignUsherDialogOpen}
+                        onOpenChange={setIsAssignUsherDialogOpen}
+                        eventId={eventData.id}
+                        eventName={eventData?.name || ''}
+                        trigger={
+                          <Button
+                            variant="default"
+                            className="flex items-center gap-2"
+                          >
+                            <UserPlus className="w-4 h-4" /> Assign Ushers
+                          </Button>
+                        }
+                      />
+                      <Button variant="destructive" onClick={handleDeleteEvent}>
+                        Move to Trash
+                      </Button>
+                    </>
+                  )}
+                </div>
+
                 {/* Event Overview Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {/* Event Type Card */}
@@ -2521,377 +3256,131 @@ export default function EventDetails() {
                     </div>
                   )}
                   
-                  {/* Actions Row - move to bottom left */}
-                  <div className="flex flex-wrap gap-4 mb-8 justify-start">
-                    {(user?.role === 'admin' || user?.role === 'superadmin' || (user?.role === 'organizer' && user?.organizer_id === eventData.organizer_id)) && (
-                      <>
-                        <Button 
-                          onClick={openEditDialog}
-                          className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
-                        >
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit Event
-                        </Button>
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={eventData.status}
-                            onValueChange={handleStatusChange}
-                            disabled={statusLoading}
-                          >
-                            <SelectTrigger className="w-36">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {statusOptions.map(opt => (
-                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {statusLoading && <Loader2 className="animate-spin w-4 h-4 text-blue-500" />}
-                          {statusError && <span className="text-red-500 text-xs ml-2">{statusError}</span>}
-                        </div>
-                      </>
-                    )}
-                    {(user?.role === 'admin' || user?.role === 'superadmin') && (
-                      <Button 
-                        onClick={openEditDialog}
-                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit Event
-                      </Button>
-                    )}
-                    {user?.role !== 'usher' && (
-                      <>
-                        <Button variant="outline" onClick={exportCSV}>
-                          <Download className="w-4 h-4 mr-2" />
-                          Export CSV
-                        </Button>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline">
-                              <QrCode className="w-4 h-4 mr-2" />
-                              Public Registration
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                              <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                                <QrCode className="w-5 h-5 text-blue-600" />
-                                Public Registration Link
-                              </DialogTitle>
-                              <DialogDescription className="text-sm">
-                                Share this registration link with potential attendees. The link allows public registration for this event.
-                              </DialogDescription>
-                            </DialogHeader>
-                            {eventData?.status?.toLowerCase().trim() === 'active' && eventData?.uuid ? (
-                              <div className="space-y-4 sm:space-y-6">
-                                {/* Registration Link Section */}
-                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 sm:p-4 border border-blue-200">
-                                  <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                                    <ExternalLink className="w-4 h-4" />
-                                    Registration Link
-                                  </h3>
-                                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                    <Input
-                                      value={`${window.location.origin}/register/${eventData.uuid}`}
-                                      readOnly
-                                      className="text-xs sm:text-sm bg-white border-blue-300 focus:border-blue-500 flex-1"
-                                      onClick={e => (e.target as HTMLInputElement).select()}
-                                    />
-                                    <Button
-                                      size="sm"
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(`${window.location.origin}/register/${eventData.uuid}`)
-                                        toast.success('Registration link copied to clipboard!')
-                                      }}
-                                      variant="outline"
-                                      className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 whitespace-nowrap"
-                                    >
-                                      Copy
-                                    </Button>
-                                  </div>
-                                </div>
 
-                                {/* QR Code Section */}
-                                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 sm:p-4 border border-green-200">
-                                  <h3 className="text-sm font-semibold text-green-900 mb-3 flex items-center gap-2">
-                                    <QrCode className="w-4 h-4" />
-                                    QR Code
-                                  </h3>
-                                  <div className="flex flex-col sm:flex-row items-center gap-4">
-                                    <div className="bg-white p-2 sm:p-3 rounded-lg border border-green-300">
-                                      <img 
-                                        id="public-registration-qr"
-                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`} 
-                                        alt="QR Code for registration" 
-                                        className="w-20 h-20 sm:w-24 sm:h-24" 
-                                      />
-                                    </div>
-                                    <div className="flex flex-row sm:flex-col gap-2 w-full sm:w-auto">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                          const link = document.createElement('a')
-                                          link.href = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`
-                                          link.download = `registration-qr-${eventData.name.replace(/[^a-zA-Z0-9]/g, '-')}.png`
-                                          link.click()
-                                          toast.success('QR code downloaded!')
-                                        }}
-                                        className="bg-white hover:bg-green-50 border-green-300 text-green-700 flex-1 sm:flex-none"
-                                      >
-                                        Download QR
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                          navigator.clipboard.writeText(`${window.location.origin}/register/${eventData.uuid}`)
-                                          toast.success('Link copied! Scan the QR code or share the link.')
-                                        }}
-                                        className="bg-white hover:bg-green-50 border-green-300 text-green-700 flex-1 sm:flex-none"
-                                      >
-                                        Copy Link
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Quick Share Section */}
-                                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 sm:p-4 border border-purple-200">
-                                  <h3 className="text-sm font-semibold text-purple-900 mb-3 flex items-center gap-2">
-                                    <Share2 className="w-4 h-4" />
-                                    Quick Share
-                                  </h3>
-                                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 text-xs sm:text-sm"
-                                      onClick={async () => {
-                                        await trackShareAction('facebook')
-                                        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&quote=${encodeURIComponent('Register for ' + eventData.name)}`, '_blank')
-                                      }}
-                                    >
-                                      <Facebook className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                      <span className="hidden sm:inline">Facebook</span>
-                                      <span className="sm:hidden">FB</span>
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 text-xs sm:text-sm"
-                                      onClick={async () => {
-                                        await trackShareAction('twitter')
-                                        window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&text=${encodeURIComponent('Register for ' + eventData.name)}&hashtags=event,registration`, '_blank')
-                                      }}
-                                    >
-                                      <Twitter className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                      <span className="hidden sm:inline">Twitter</span>
-                                      <span className="sm:hidden">X</span>
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="bg-white hover:bg-green-50 border-green-300 text-green-700 text-xs sm:text-sm"
-                                      onClick={async () => {
-                                        await trackShareAction('whatsapp')
-                                        window.open(`https://wa.me/?text=${encodeURIComponent('Register for ' + eventData.name + ': ' + window.location.origin + '/register/' + eventData.uuid)}`, '_blank')
-                                      }}
-                                    >
-                                      <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                      <span className="hidden sm:inline">WhatsApp</span>
-                                      <span className="sm:hidden">WA</span>
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="bg-white hover:bg-red-50 border-red-300 text-red-700 text-xs sm:text-sm"
-                                      onClick={async () => {
-                                        await trackShareAction('email')
-                                        const emailBody = `Hi,\n\nYou're invited to register for: ${eventData.name}\n\nRegistration Link: ${window.location.origin}/register/${eventData.uuid}\n\nBest regards`
-                                        window.open(`mailto:?subject=${encodeURIComponent('Registration Invitation: ' + eventData.name)}&body=${encodeURIComponent(emailBody)}`)
-                                      }}
-                                    >
-                                      <Mail className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                      <span className="hidden sm:inline">Email</span>
-                                      <span className="sm:hidden">Mail</span>
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 text-xs sm:text-sm"
-                                      onClick={async () => {
-                                        await trackShareAction('linkedin')
-                                        window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}`, '_blank')
-                                      }}
-                                    >
-                                      <Linkedin className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                      <span className="hidden sm:inline">LinkedIn</span>
-                                      <span className="sm:hidden">LI</span>
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="bg-white hover:bg-pink-50 border-pink-300 text-pink-700 text-xs sm:text-sm"
-                                      onClick={async () => {
-                                        await trackShareAction('copy_text')
-                                        const text = `Register for ${eventData.name}: ${window.location.origin}/register/${eventData.uuid}`
-                                        navigator.clipboard.writeText(text)
-                                        toast.success('Registration message copied to clipboard!')
-                                      }}
-                                    >
-                                      <Copy className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                      <span className="hidden sm:inline">Copy Text</span>
-                                      <span className="sm:hidden">Copy</span>
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700 text-xs sm:text-sm"
-                                      onClick={async () => {
-                                        await trackShareAction('sms')
-                                        const smsText = `Register for ${eventData.name}: ${window.location.origin}/register/${eventData.uuid}`
-                                        window.open(`sms:?body=${encodeURIComponent(smsText)}`)
-                                      }}
-                                    >
-                                      <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                      <span className="hidden sm:inline">SMS</span>
-                                      <span className="sm:hidden">SMS</span>
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="bg-white hover:bg-teal-50 border-teal-300 text-teal-700 text-xs sm:text-sm"
-                                      onClick={async () => {
-                                        await trackShareAction('telegram')
-                                        const telegramText = `Register for ${eventData.name}: ${window.location.origin}/register/${eventData.uuid}`
-                                        window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + '/register/' + eventData.uuid)}&text=${encodeURIComponent('Register for ' + eventData.name)}`)
-                                      }}
-                                    >
-                                      <Send className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                      <span className="hidden sm:inline">Telegram</span>
-                                      <span className="sm:hidden">TG</span>
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                {/* Embeddable Section */}
-                                <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-3 sm:p-4 border border-orange-200">
-                                  <h3 className="text-sm font-semibold text-orange-900 mb-3 flex items-center gap-2">
-                                    <Code className="w-4 h-4" />
-                                    Embed on Website
-                                  </h3>
-                                  <div className="space-y-3">
-                                    <div>
-                                      <label className="text-xs font-medium text-orange-800 mb-1 block">HTML Embed Code:</label>
-                                      <Input
-                                        value={`<iframe src='${window.location.origin}/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`}
-                                        readOnly
-                                        className="text-xs bg-white font-mono border-orange-300"
-                                        onClick={e => (e.target as HTMLInputElement).select()}
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="text-xs font-medium text-orange-800 mb-1 block">Direct Link:</label>
-                                      <Input
-                                        value={`${window.location.origin}/register/${eventData.uuid}`}
-                                        readOnly
-                                        className="text-xs bg-white font-mono border-orange-300"
-                                        onClick={e => (e.target as HTMLInputElement).select()}
-                                      />
-                                    </div>
-                                    <div className="flex flex-col sm:flex-row gap-2">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={async () => {
-                                          await trackShareAction('embed')
-                                          const embedCode = `<iframe src='${window.location.origin}/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`
-                                          navigator.clipboard.writeText(embedCode)
-                                          toast.success('Embed code copied to clipboard!')
-                                        }}
-                                        className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700 flex-1 sm:flex-none"
-                                      >
-                                        Copy Embed Code
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={async () => {
-                                          await trackShareAction('link')
-                                          const link = `${window.location.origin}/register/${eventData.uuid}`
-                                          navigator.clipboard.writeText(link)
-                                          toast.success('Direct link copied to clipboard!')
-                                        }}
-                                        className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700 flex-1 sm:flex-none"
-                                      >
-                                        Copy Direct Link
-                                      </Button>
-                                    </div>
-                                    <p className="text-xs text-orange-700">
-                                      💡 <strong>Tip:</strong> Copy the HTML code and paste it into your website to embed the registration form directly.
-                                    </p>
-                                  </div>
-                                </div>
-
-
-                              </div>
-                            ) : (
-                              <div className="text-center py-6 sm:py-8">
-                                <XCircle className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
-                                <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">Event Not Active</h3>
-                                <p className="text-sm text-gray-500 mb-4">The event must be active to share the public registration link.</p>
-                                <Button
-                                  variant="outline"
-                                  onClick={() => {
-                                    // Close dialog and navigate to edit event
-                                    // You can implement this based on your needs
-                                  }}
-                                >
-                                  Activate Event
-                                </Button>
-                              </div>
-                            )}
-                          </DialogContent>
-                        </Dialog>
-                        {/* <Button variant="outline" onClick={generateReport}>
-                          <BarChart3 className="w-4 h-4 mr-2" />
-                          Generate Report
-                        </Button> */}
-                        <UsherAssignmentDialog
-                          open={isAssignUsherDialogOpen}
-                          onOpenChange={setIsAssignUsherDialogOpen}
-                          eventId={eventData.id}
-                          trigger={
-                            <Button
-                              variant="default"
-                              className="flex items-center gap-2"
-                            >
-                              <UserPlus className="w-4 h-4" /> Assign Ushers
-                            </Button>
-                          }
-                        />
-                        <Button variant="destructive" onClick={handleDeleteEvent}>
-                          Move to Trash
-                        </Button>
-                      </>
-                    )}
-                  </div>
                 </div>
               </TabsContent>
             <TabsContent value="badges">
                   <div className="flex flex-col gap-6">
-                    <div className="flex flex-wrap gap-2 mb-2">
+                    {/* Header Section */}
+                    <div className="flex flex-wrap gap-4 justify-between items-start mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
+                          <Printer className="w-6 h-6 text-slate-700" />
+                        </div>
+                        <div>
+                          <h3 className="text-2xl font-bold text-slate-900">
+                            Badge Management
+                          </h3>
+                          <p className="text-slate-600 text-sm">
+                            Design, preview, and print attendee badges
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => navigate(`/events/${eventId}/badge-design`)}
+                          className="border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                        >
+                          <Palette className="w-4 h-4" /> Design Badge
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setBadgeDesignerOpen(true)}
+                          className="border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                        >
+                          <Palette className="w-4 h-4" /> Legacy Designer
+                        </Button>
+                        <Button 
+                          variant="default" 
+                          onClick={handleBadgeBatchPrintBadges} 
+                          disabled={badgeSelectedAttendees.size === 0}
+                          className="bg-slate-900 hover:bg-slate-800 shadow-sm flex items-center gap-2"
+                        >
+                          <Printer className="w-4 h-4" /> 
+                          Print Selected ({badgeSelectedAttendees.size})
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Statistics Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                      <div className="bg-white rounded-lg p-4 border border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-slate-600">Total Attendees</p>
+                            <p className="text-2xl font-bold text-slate-900">{filteredBadgesAttendees.length}</p>
+                          </div>
+                          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                            <Users className="w-5 h-5 text-blue-600" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 border border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-slate-600">Checked In</p>
+                            <p className="text-2xl font-bold text-emerald-600">
+                              {filteredBadgesAttendees.filter(a => a.checked_in).length}
+                            </p>
+                          </div>
+                          <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
+                            <CheckCircle className="w-5 h-5 text-emerald-600" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 border border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-slate-600">Pending Check-in</p>
+                            <p className="text-2xl font-bold text-amber-600">
+                              {filteredBadgesAttendees.filter(a => !a.checked_in).length}
+                            </p>
+                          </div>
+                          <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
+                            <Clock className="w-5 h-5 text-amber-600" />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 border border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-slate-600">Selected for Print</p>
+                            <p className="text-2xl font-bold text-slate-900">{badgeSelectedAttendees.size}</p>
+                          </div>
+                          <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-slate-600" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Search and Filters */}
+                    <div className="bg-white rounded-lg p-4 border border-slate-200">
+                      <div className="flex flex-wrap gap-4 items-center">
+                        <div className="relative flex-1 max-w-md">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                       <Input
-                        placeholder="Search attendees..."
+                            placeholder="Search attendees by name, email, or company..."
                         value={badgeSearchTerm}
                         onChange={e => setBadgeSearchTerm(e.target.value)}
-                        className="w-64"
-                      />
+                            className="pl-10 pr-4 py-2 w-full"
+                          />
+                          {badgeSearchTerm && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setBadgeSearchTerm('')}
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-slate-100"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
                       <Select value={badgeGuestTypeFilter} onValueChange={setBadgeGuestTypeFilter}>
-                        <SelectTrigger className="w-40"><SelectValue placeholder="All Types" /></SelectTrigger>
+                          <SelectTrigger className="w-40">
+                            <SelectValue placeholder="All Types" />
+                          </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Types</SelectItem>
                           {guestTypes.map(type => (
@@ -2900,70 +3389,151 @@ export default function EventDetails() {
                         </SelectContent>
                       </Select>
                       <Select value={badgeCheckedInFilter} onValueChange={setBadgeCheckedInFilter}>
-                        <SelectTrigger className="w-40"><SelectValue placeholder="All Status" /></SelectTrigger>
+                          <SelectTrigger className="w-40">
+                            <SelectValue placeholder="All Status" />
+                          </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Status</SelectItem>
                           <SelectItem value="checked-in">Checked In</SelectItem>
                           <SelectItem value="not-checked-in">Not Checked In</SelectItem>
                         </SelectContent>
                       </Select>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setBadgeSearchTerm('');
+                            setBadgeGuestTypeFilter('all');
+                            setBadgeCheckedInFilter('all');
+                          }}
+                          className="text-slate-500 hover:text-slate-700"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </Button>
                     </div>
-                    <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
-                      <h3 className="text-xl font-bold">Attendee Badges</h3>
-                      <Button variant="outline" onClick={handleBadgeBatchPrintBadges} className="flex items-center gap-2">
-                        <Printer className="w-4 h-4" /> Print Selected Badges
+                    </div>
+
+                    {/* Badge List View */}
+                    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                      <div className="p-4 border-b border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Checkbox 
+                              checked={badgeSelectedAttendees.size === filteredBadgesAttendees.length && filteredBadgesAttendees.length > 0} 
+                              onCheckedChange={handleBadgeSelectAllAttendees} 
+                            />
+                            <span className="text-sm text-slate-600">
+                              {badgeSelectedAttendees.size} of {filteredBadgesAttendees.length} selected
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setBadgeSelectedAttendees(new Set())}
+                              disabled={badgeSelectedAttendees.size === 0}
+                              className="text-slate-600 hover:text-slate-800"
+                            >
+                              Clear Selection
                       </Button>
                     </div>
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead><Checkbox checked={badgeSelectedAttendees.size === filteredBadgesAttendees.length && filteredBadgesAttendees.length > 0} onCheckedChange={handleBadgeSelectAllAttendees} /></TableHead>
-                            <TableHead>Attendee</TableHead>
-                            <TableHead>Email</TableHead>
-                            <TableHead>Guest Type</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Badge Preview</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                        </div>
+                      </div>
+                      
+                      {filteredBadgesAttendees.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                            <FileText className="w-8 h-8 text-slate-400" />
+                          </div>
+                          <h3 className="text-lg font-medium text-slate-900 mb-2">No attendees found</h3>
+                          <p className="text-slate-600 text-center max-w-md">
+                            {badgeSearchTerm || badgeGuestTypeFilter !== 'all' || badgeCheckedInFilter !== 'all' 
+                              ? 'Try adjusting your search or filters to find attendees.'
+                              : 'No attendees have been registered for this event yet.'
+                            }
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-slate-200">
                           {filteredBadgesAttendees.map(attendee => (
-                            <TableRow key={attendee.id}>
-                              <TableCell><Checkbox checked={badgeSelectedAttendees.has(attendee.id)} onCheckedChange={() => handleBadgeSelectAttendee(attendee.id)} /></TableCell>
-                              <TableCell>{attendee.guest?.name}</TableCell>
-                              <TableCell>{attendee.guest?.email}</TableCell>
-                              <TableCell>
-                                <Badge className={getGuestTypeBadgeClasses(attendee.guestType?.name)}>
-                                  {attendee.guestType?.name || 'Unknown'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                {attendee.checked_in ? (
-                                  <Badge className="bg-green-100 text-green-700">Checked In</Badge>
-                                ) : (
-                                  <Badge className="bg-gray-100 text-gray-700">Not Checked In</Badge>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <div className="w-32 h-20 bg-gray-50 border rounded flex items-center justify-center overflow-hidden">
-                                  <div style={{ transform: 'scale(0.2)', transformOrigin: 'top left', width: 400, height: 600 }}>
-                                    <BadgePrint attendee={attendee} />
+                            <div 
+                              key={attendee.id} 
+                              className={`p-4 transition-all duration-200 hover:bg-slate-50 ${
+                                badgeSelectedAttendees.has(attendee.id) 
+                                  ? 'bg-slate-50 border-l-4 border-slate-900' 
+                                  : 'border-l-4 border-transparent'
+                              }`}
+                            >
+                              <div className="flex items-center gap-4">
+                                {/* Selection Checkbox */}
+                                <div className="flex-shrink-0">
+                                  <Checkbox 
+                                    checked={badgeSelectedAttendees.has(attendee.id)} 
+                                    onCheckedChange={() => handleBadgeSelectAttendee(attendee.id)} 
+                                  />
+                                </div>
+
+                                {/* Badge Preview */}
+                                <div className="flex-shrink-0">
+                                  <div className="w-20 h-28 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center overflow-hidden">
+                                    <div style={{ transform: 'scale(0.12)', transformOrigin: 'top left', width: 400, height: 600 }}>
+                                      <BadgePrint attendee={attendee} />
+                                    </div>
                                   </div>
                                 </div>
-                              </TableCell>
-                              <TableCell>
-                                <Button size="sm" variant="outline" onClick={() => {
+
+                                {/* Attendee Info */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <h4 className="font-semibold text-slate-900 truncate">
+                                      {attendee.guest?.name || 'Unknown'}
+                                    </h4>
+                                    <Badge className={`text-xs ${getGuestTypeBadgeClasses((attendee.guestType || attendee.guest_type)?.name)}`}>
+                                  {(attendee.guestType || attendee.guest_type)?.name || 'General'}
+                                </Badge>
+                                {attendee.checked_in ? (
+                                      <Badge className="bg-emerald-50 text-emerald-700 text-xs border border-emerald-200">
+                                        <CheckCircle className="w-3 h-3 mr-1" />
+                                        Checked In
+                                      </Badge>
+                                ) : (
+                                      <Badge className="bg-amber-50 text-amber-700 text-xs border border-amber-200">
+                                        <Clock className="w-3 h-3 mr-1" />
+                                        Pending
+                                      </Badge>
+                                )}
+                                  </div>
+                                  <p className="text-sm text-slate-600 truncate">
+                                    {attendee.guest?.email || 'No email'}
+                                  </p>
+                                  {attendee.guest?.company && (
+                                    <p className="text-sm text-slate-500 truncate">
+                                      {attendee.guest.company}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex-shrink-0 flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => {
                                   setBadgeSelectedAttendees(new Set([attendee.id]));
                                   setPrinting(true);
-                                }} className="flex items-center gap-1 mb-1">
-                                  <Printer className="w-4 h-4" /> Print
+                                    }}
+                                    className="border-slate-200 text-slate-700 hover:bg-slate-50"
+                                  >
+                                    <Printer className="w-4 h-4 mr-1" />
+                                    Print
                                 </Button>
-                              </TableCell>
-                            </TableRow>
+
+                                </div>
+                              </div>
+                            </div>
                           ))}
-                        </TableBody>
-                      </Table>
+                        </div>
+                      )}
                     </div>
                     {/* Hidden print area for batch printing */}
                     <div
@@ -3024,23 +3594,63 @@ export default function EventDetails() {
                 <TabsContent value="attendees">
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
-                      <h3 className="text-xl font-bold">Attendee Management</h3>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-emerald-600 rounded-xl flex items-center justify-center">
+                          <Users className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                            Attendee Management
+                          </h3>
+                          <p className="text-gray-600 text-sm">
+                            Search, filter, and manage event attendees
+                          </p>
+                        </div>
+                      </div>
                       <div className="flex gap-2">
-                        <Button variant="default" onClick={() => setAddAttendeeDialogOpen(true)} className="flex items-center gap-2">
+                        <Button 
+                          variant="default" 
+                          onClick={() => setAddAttendeeDialogOpen(true)} 
+                          className="bg-gradient-to-r from-green-600 to-emerald-600 shadow-lg hover:shadow-xl flex items-center gap-2"
+                        >
                           <Plus className="w-4 h-4" /> Add Attendee
                         </Button>
-                        <Button variant="outline" onClick={() => setCsvUploadDialogOpen(true)} className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setCsvUploadDialogOpen(true)} 
+                          className="border-gray-200 hover:bg-gray-50 flex items-center gap-2"
+                        >
                           <Upload className="w-4 h-4" /> Upload CSV
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          onClick={exportAttendeesToCSV} 
+                          className="border-gray-200 hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <Download className="w-4 h-4" /> Export CSV
                         </Button>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 mb-2">
+                      <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                       <Input
-                        placeholder="Search attendees..."
+                          placeholder="Search by name, email, phone, company, job title, or country..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="w-64"
-                      />
+                          className="pl-10 pr-4 py-2 w-full"
+                        />
+                        {searchTerm && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSearchTerm('')}
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-gray-100"
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
                       <Select value={guestTypeFilter} onValueChange={setGuestTypeFilter}>
                         <SelectTrigger className="w-40"><SelectValue placeholder="All Types" /></SelectTrigger>
                         <SelectContent>
@@ -3059,122 +3669,282 @@ export default function EventDetails() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead>Attendee</TableHead>
-                            <TableHead>Company & Title</TableHead>
-                            <TableHead>Contact</TableHead>
-                            <TableHead>Guest Type</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Actions</TableHead>
+                            <TableRow className="bg-gray-50">
+                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Attendee</TableHead>
+                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Company & Title</TableHead>
+                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Contact</TableHead>
+                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Guest Type</TableHead>
+                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Status</TableHead>
+                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredAttendees.map(attendee => (
-                            <TableRow key={attendee.id}>
-                              <TableCell className="flex items-center gap-2">
-                                <img src={attendee.guest?.profile_picture || '/placeholder-avatar.png'} alt={attendee.guest?.name} className="w-8 h-8 rounded-full object-cover" />
+                            {filteredAttendees.length > 0 ? filteredAttendees.map(attendee => (
+                              <TableRow key={attendee.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                                <TableCell className="py-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm">
+                                      {attendee.guest?.name?.charAt(0)?.toUpperCase() || 'A'}
+                                    </div>
                                 <div>
-                                  <div className="font-semibold">{attendee.guest?.name}</div>
+                                      <div className="font-semibold text-gray-900">{attendee.guest?.name}</div>
                                   <div className="text-xs text-gray-500">{attendee.guest?.country}</div>
+                                    </div>
                                 </div>
                               </TableCell>
-                              <TableCell>
-                                <div className="font-medium">{attendee.guest?.company}</div>
+                                <TableCell className="py-4">
+                                  <div className="font-medium text-gray-900">{attendee.guest?.company}</div>
                                 <div className="text-xs text-gray-500">{attendee.guest?.jobtitle}</div>
                               </TableCell>
-                              <TableCell>
-                                <div className="text-xs flex items-center gap-1"><Mail className="w-3 h-3" /> {attendee.guest?.email}</div>
-                                <div className="text-xs flex items-center gap-1"><Phone className="w-3 h-3" /> {attendee.guest?.phone}</div>
+                                <TableCell className="py-4">
+                                  <div className="text-sm text-gray-900 flex items-center gap-1">
+                                    <Mail className="w-3 h-3 text-gray-400" /> 
+                                    {attendee.guest?.email}
+                                  </div>
+                                  {attendee.guest?.phone && (
+                                    <div className="text-sm text-gray-900 flex items-center gap-1 mt-1">
+                                      <Phone className="w-3 h-3 text-gray-400" /> 
+                                      {attendee.guest?.phone}
+                                    </div>
+                                  )}
                               </TableCell>
-                              <TableCell>
-                                <Badge className={getGuestTypeBadgeClasses(attendee.guestType?.name)}>
-                                  {attendee.guestType?.name || 'Unknown'}
+                                <TableCell className="py-4">
+                                <Badge className={getGuestTypeBadgeClasses((attendee.guestType || attendee.guest_type)?.name)}>
+                                  {(attendee.guestType || attendee.guest_type)?.name || 'General'}
                                 </Badge>
                               </TableCell>
-                              <TableCell>
+                                <TableCell className="py-4">
                                 {attendee.checked_in ? (
-                                  <Badge className="bg-green-100 text-green-700">Checked In</Badge>
+                                    <Badge className="bg-green-100 text-green-800 border border-green-200">
+                                      <CheckCircle className="w-3 h-3 mr-1" />
+                                      Checked In
+                                    </Badge>
                                 ) : (
-                                  <Badge className="bg-gray-100 text-gray-700">Not Checked In</Badge>
+                                    <Badge className="bg-gray-100 text-gray-800 border border-gray-200">
+                                      <Clock className="w-3 h-3 mr-1" />
+                                      Not Checked In
+                                    </Badge>
                                 )}
                               </TableCell>
-                              <TableCell className="flex flex-wrap gap-1">
-                                <Button size="sm" variant="outline" onClick={() => {
+                                <TableCell className="py-4">
+                                  <div className="flex items-center gap-2">
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      onClick={() => {
                                   setSelectedAttendees(new Set([attendee.id]));
                                   setPrinting(true);
-                                }}><Printer className="w-4 h-4" /></Button>
-                                <Button size="sm" variant="outline" onClick={() => testBadge(attendee)}><Eye className="w-4 h-4" /></Button>
-                                <Button size="sm" variant="outline" onClick={() => openEditAttendeeDialog(attendee)}><Edit className="w-4 h-4" /></Button>
-                                <Button size="sm" variant="destructive" onClick={() => handleRemoveMember(attendee)}><Trash2 className="w-4 h-4" /></Button>
+                                      }}
+                                      className="bg-white border-gray-200 hover:bg-gray-50"
+                                    >
+                                      <Printer className="w-3 h-3" />
+                                    </Button>
+
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      onClick={() => openEditAttendeeDialog(attendee)}
+                                      className="bg-white border-gray-200 hover:bg-gray-50"
+                                    >
+                                      <Edit className="w-3 h-3" />
+                                    </Button>
+                                {(user?.role === 'admin' || user?.role === 'superadmin' || 
+                                  (['organizer', 'organizer_admin'].includes(user?.role) && eventData?.organizer_id === user?.organizer_id)) && (
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline"
+                                        onClick={() => handleRemoveAttendee(attendee)}
+                                        className="bg-white border-red-200 text-red-600 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    )}
+                                  </div>
                               </TableCell>
                             </TableRow>
-                          ))}
+                            )) : (
+                              <TableRow>
+                                <TableCell colSpan={6} className="text-center py-12">
+                                  <div className="flex flex-col items-center space-y-3">
+                                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                                      <Search className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <div className="text-lg font-medium text-gray-900">
+                                      {searchTerm ? 'No attendees found' : 'No attendees'}
+                                    </div>
+                                    <div className="text-sm text-gray-600 max-w-md text-center">
+                                      {searchTerm 
+                                        ? `No attendees match your search for "${searchTerm}". Try adjusting your search terms or filters.`
+                                        : 'No attendees have been registered for this event yet.'
+                                      }
+                                    </div>
+                                    {searchTerm && (
+                                      <Button
+                                        variant="outline"
+                                        onClick={() => setSearchTerm('')}
+                                        className="mt-2"
+                                      >
+                                        Clear search
+                                      </Button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
                         </TableBody>
                       </Table>
                     </div>
-                    {/* Add/Edit Attendee Dialogs are already implemented elsewhere in the file */}
+                    </div>
                   </div>
                 </TabsContent>
             <TabsContent value="ushers">
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
-                      <h3 className="text-xl font-bold">Assigned Ushers</h3>
-                      <Button variant="default" onClick={() => setIsAssignUsherDialogOpen(true)} className="flex items-center gap-2">
-                        <Plus className="w-4 h-4" /> Add Usher
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+                          <Users className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                            Ushers & Tasks
+                          </h3>
+                          <p className="text-gray-600 text-sm">
+                            Manage usher assignments and task distribution
+                          </p>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="default" 
+                        onClick={() => setIsAssignUsherDialogOpen(true)} 
+                        className="bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg hover:shadow-xl flex items-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" /> Assign Ushers
                       </Button>
                     </div>
+
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Contact</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Tasks</TableHead>
-                            <TableHead>Actions</TableHead>
+                            <TableRow className="bg-gray-50">
+                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Usher</TableHead>
+                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Contact</TableHead>
+                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Status</TableHead>
+                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Assigned Tasks</TableHead>
+                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {eventUshers && eventUshers.length > 0 ? eventUshers.map(usher => (
-                            <TableRow key={usher.id}>
-                              <TableCell className="flex items-center gap-2">
-                                <img src={usher.profile_picture || '/placeholder-avatar.png'} alt={usher.name} className="w-8 h-8 rounded-full object-cover" />
+                            {eventUshers && eventUshers.length > 0 ? eventUshers.map(usher => {
+                              const tasks = Array.isArray(usher.pivot?.tasks) 
+                                ? usher.pivot.tasks 
+                                : (typeof usher.pivot?.tasks === 'string' 
+                                  ? JSON.parse(usher.pivot.tasks) 
+                                  : [])
+                              return (
+                                <TableRow key={usher.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                                  <TableCell className="py-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm">
+                                        {usher.name.charAt(0).toUpperCase()}
+                                      </div>
                                 <div>
-                                  <div className="font-semibold">{usher.name}</div>
-                                  <div className="text-xs text-gray-500">{usher.email}</div>
+                                        <div className="font-semibold text-gray-900">{usher.name}</div>
+                                        <div className="text-xs text-gray-500">
+                                          ID: {usher.id}
+                                        </div>
+                                      </div>
                                 </div>
                               </TableCell>
-                              <TableCell>
+                                  <TableCell className="py-4">
+                                    <div className="text-sm text-gray-900">{usher.email}</div>
+                                    {usher.phone && (
                                 <div className="text-xs text-gray-500">{usher.phone}</div>
+                                    )}
                               </TableCell>
-                              <TableCell>
-                                <Badge className={usher.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}>
-                                  {usher.status || 'available'}
+                                  <TableCell className="py-4">
+                                    <Badge className="bg-blue-100 text-blue-800 border border-blue-200">
+                                      <UserCheck className="w-3 h-3 mr-1" />
+                                      Assigned
                                 </Badge>
                               </TableCell>
-                              <TableCell>
+                                  <TableCell className="py-4">
                                 {editingUsherId === usher.id ? (
-                                  <div className="flex gap-2 items-center">
-                                    <Input
+                                      <div className="space-y-2">
+                                        <Textarea
                                       value={editTasks}
                                       onChange={e => setEditTasks(e.target.value)}
-                                      className="w-40"
-                                    />
-                                    <Button size="sm" variant="outline" onClick={async () => { await updateUsherTasks(Number(eventId), usher.id, editTasks.split(',').map(t => t.trim()).filter(Boolean)); setEditingUsherId(null); }}>Save</Button>
-                                    <Button size="sm" variant="ghost" onClick={() => setEditingUsherId(null)}>Cancel</Button>
+                                          placeholder="Enter tasks separated by commas"
+                                          className="w-full"
+                                          rows={3}
+                                        />
+                                        <div className="flex gap-2">
+                                          <Button 
+                                            size="sm" 
+                                            variant="outline" 
+                                            onClick={async () => { 
+                                              await updateUsherTasks(Number(eventId), usher.id, editTasks.split(',').map(t => t.trim()).filter(Boolean)); 
+                                              setEditingUsherId(null); 
+                                            }}
+                                            className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                                          >
+                                            Save
+                                          </Button>
+                                          <Button 
+                                            size="sm" 
+                                            variant="ghost" 
+                                            onClick={() => setEditingUsherId(null)}
+                                            className="text-gray-600"
+                                          >
+                                            Cancel
+                                          </Button>
+                                        </div>
                                   </div>
                                 ) : (
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs text-gray-700">{Array.isArray(usher.pivot?.tasks) ? usher.pivot.tasks.join(', ') : (typeof usher.pivot?.tasks === 'string' ? JSON.parse(usher.pivot.tasks).join(', ') : '')}</span>
-                                    <Button size="sm" variant="outline" onClick={() => { setEditingUsherId(usher.id); setEditTasks(Array.isArray(usher.pivot?.tasks) ? usher.pivot.tasks.join(', ') : (typeof usher.pivot?.tasks === 'string' ? JSON.parse(usher.pivot.tasks).join(', ') : '')); }}>Edit</Button>
+                                      <div className="space-y-2">
+                                        {tasks.length > 0 ? (
+                                          <div className="flex flex-wrap gap-1">
+                                            {tasks.map((task: string, index: number) => (
+                                              <Badge
+                                                key={index}
+                                                variant="outline"
+                                                className={`text-xs ${getTaskColor(task)}`}
+                                              >
+                                                {task}
+                                              </Badge>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <span className="text-gray-500 text-sm">
+                                            No tasks assigned
+                                          </span>
+                                        )}
+                                        <Button 
+                                          size="sm" 
+                                          variant="outline" 
+                                          onClick={() => { 
+                                            setEditingUsherId(usher.id); 
+                                            setEditTasks(tasks.join(', ')); 
+                                          }}
+                                          className="bg-white border-gray-200 hover:bg-gray-50 text-xs"
+                                        >
+                                          <Edit className="w-3 h-3 mr-1" />
+                                          Edit Tasks
+                                        </Button>
                                   </div>
                                 )}
                               </TableCell>
-                              <TableCell className="flex flex-wrap gap-1">
-                                <Button size="sm" variant="destructive" onClick={async () => {
+                                  <TableCell className="py-4">
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="bg-white border-gray-200 hover:bg-gray-50"
+                                        onClick={async () => {
                                   try {
                                     await api.delete(`/events/${Number(eventId)}/ushers/${usher.id}`);
                                     const eventRes = await getEventUshers(Number(eventId));
@@ -3183,16 +3953,33 @@ export default function EventDetails() {
                                   } catch (err: any) {
                                     toast.error(err.response?.data?.error || 'Failed to remove usher.');
                                   }
-                                }}>Remove</Button>
+                                        }}
+                                      >
+                                        <Trash2 className="w-3 h-3 mr-1" />
+                                        Remove
+                                      </Button>
+                                    </div>
                               </TableCell>
                             </TableRow>
-                          )) : (
+                              )
+                            }) : (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center text-gray-500">No ushers assigned to this event.</TableCell>
+                                <TableCell colSpan={5} className="text-center py-12">
+                                  <div className="flex flex-col items-center space-y-3">
+                                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                                      <Users className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <div className="text-lg font-medium text-gray-900">No ushers assigned</div>
+                                    <div className="text-sm text-gray-600 max-w-md text-center">
+                                      No ushers have been assigned to this event yet. Click "Assign Ushers" to get started.
+                                    </div>
+                                  </div>
+                                </TableCell>
                             </TableRow>
                           )}
                         </TableBody>
                       </Table>
+                      </div>
                     </div>
                     {/* Assign Usher Dialog is already implemented elsewhere in the file */}
                   </div>
@@ -3510,8 +4297,9 @@ export default function EventDetails() {
                             <BarChart3 className="w-4 h-4 text-white" />
                           </div>
                         </div>
+{analytics.registration_timeline && analytics.registration_timeline.length > 0 ? (
                         <ResponsiveContainer width="100%" height={280}>
-                          <LineChart data={analytics.registration_timeline || []}>
+                          <LineChart data={analytics.registration_timeline}>
                             <defs>
                               <linearGradient id="registrationGradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
@@ -3558,6 +4346,13 @@ export default function EventDetails() {
                             />
                           </LineChart>
                         </ResponsiveContainer>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                            <BarChart3 className="w-12 h-12 mb-4 opacity-50" />
+                            <p className="text-lg font-medium">No Registration Data</p>
+                            <p className="text-sm">Registration timeline will appear when attendees register for this event</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                     {/* Distribution Charts */}
@@ -3755,6 +4550,36 @@ export default function EventDetails() {
                           <FileText className="w-4 h-4 text-white" />
                         </div>
                       </div>
+                    
+                    {/* Search Results Counter */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="text-sm text-gray-600">
+                        {searchTerm || guestTypeFilter !== 'all' || checkedInFilter !== 'all' ? (
+                          <>
+                            Showing <span className="font-semibold text-gray-900">{filteredAttendees.length}</span> of{' '}
+                            <span className="font-semibold text-gray-900">{attendees.length}</span> attendees
+                            {searchTerm && (
+                              <span className="ml-2 text-gray-500">
+                                matching "{searchTerm}"
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="font-semibold text-gray-900">{attendees.length} attendees</span>
+                        )}
+                      </div>
+                      {searchTerm && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSearchTerm('')}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          Clear search
+                        </Button>
+                      )}
+                    </div>
+                    
                       <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
@@ -3773,8 +4598,8 @@ export default function EventDetails() {
                                 <TableCell className="text-gray-600">{attendee.guest?.email}</TableCell>
                                 <TableCell className="text-gray-600">{attendee.guest?.company}</TableCell>
                                 <TableCell>
-                                  <Badge className={getGuestTypeBadgeClasses(attendee.guestType?.name)}>
-                                    {attendee.guestType?.name || 'Unknown'}
+                                  <Badge className={getGuestTypeBadgeClasses((attendee.guestType || attendee.guest_type)?.name)}>
+                                    {(attendee.guestType || attendee.guest_type)?.name || 'General'}
                                   </Badge>
                                 </TableCell>
                                 <TableCell>
@@ -3801,6 +4626,227 @@ export default function EventDetails() {
                         )}
                       </div>
                     </div>
+
+                    {/* Session Analytics Section */}
+                    {analytics?.session_analytics && analytics.session_analytics.length > 0 && (
+                      <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+                        {/* Header */}
+                        <div className="bg-gray-50 border-b border-gray-200 p-6">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+                                <Calendar className="w-6 h-6 text-gray-600" />
+                              </div>
+                              <div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-1">Session Analytics</h3>
+                                <p className="text-gray-600 text-sm">Click on any session to view checked-in guests</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-gray-900">{analytics.session_analytics.length}</div>
+                              <div className="text-gray-600 text-sm">Total Sessions</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6">
+                          {/* Summary Cards */}
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                                  <Users className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="text-sm font-medium text-blue-700">Total Session Attendees</div>
+                              </div>
+                              <div className="text-xl font-bold text-blue-900">
+                                {analytics.session_analytics.reduce((sum: number, session: any) => sum + session.total_attendees, 0)}
+                              </div>
+                            </div>
+
+                            <div className="bg-green-50 rounded-xl p-4 border border-green-200">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                                  <CheckCircle className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="text-sm font-medium text-green-700">Total Checked In</div>
+                              </div>
+                              <div className="text-xl font-bold text-green-900">
+                                {analytics.session_analytics.reduce((sum: number, session: any) => sum + session.checked_in_attendees, 0)}
+                              </div>
+                            </div>
+
+                            <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                                  <TrendingUp className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="text-sm font-medium text-purple-700">Average Check-in Rate</div>
+                              </div>
+                              <div className="text-xl font-bold text-purple-900">
+                                {Math.round(analytics.session_analytics.reduce((sum: number, session: any) => sum + session.check_in_rate, 0) / analytics.session_analytics.length)}%
+                              </div>
+                            </div>
+
+                            <div className="bg-orange-50 rounded-xl p-4 border border-orange-200">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+                                  <BarChart3 className="w-4 h-4 text-white" />
+                                </div>
+                                <div className="text-sm font-medium text-orange-700">Capacity Utilization</div>
+                              </div>
+                              <div className="text-xl font-bold text-orange-900">
+                                {Math.round(analytics.session_analytics.reduce((sum: number, session: any) => {
+                                  if (session.max_capacity && session.max_capacity > 0) {
+                                    return sum + (session.total_attendees / session.max_capacity * 100);
+                                  }
+                                  return sum;
+                                }, 0) / analytics.session_analytics.filter((s: any) => s.max_capacity > 0).length)}%
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Session Cards */}
+                          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                            {analytics.session_analytics.map((session: any, index: number) => {
+                              const capacityPercentage = session.max_capacity ? (session.total_attendees / session.max_capacity) * 100 : 0;
+                              const checkInPercentage = session.total_attendees > 0 ? (session.checked_in_attendees / session.total_attendees) * 100 : 0;
+                              
+                              return (
+                                <div 
+                                  key={session.session_id} 
+                                  className="group relative bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer"
+                                  onClick={() => handleSessionClick(session)}
+                                >
+                                  {/* Status indicator */}
+                                  <div className={`absolute top-0 left-0 right-0 h-1 ${
+                                    session.status === 'completed' ? 'bg-green-500' :
+                                    session.status === 'cancelled' ? 'bg-red-500' :
+                                    session.status === 'scheduled' ? 'bg-blue-500' :
+                                    'bg-gray-500'
+                                  }`}></div>
+
+                                  {/* Card Header */}
+                                  <div className="p-5 pb-3">
+                                    <div className="flex items-start justify-between mb-3">
+                                      <div className="flex-1">
+                                        <h4 className="font-semibold text-gray-900 text-base mb-1 overflow-hidden text-ellipsis whitespace-nowrap">{session.session_name}</h4>
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Badge 
+                                            className={`text-xs font-medium ${
+                                              session.status === 'completed' ? 'bg-green-100 text-green-700 border-green-200' :
+                                              session.status === 'cancelled' ? 'bg-red-100 text-red-700 border-red-200' :
+                                              session.status === 'scheduled' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                              'bg-gray-100 text-gray-700 border-gray-200'
+                                            }`}
+                                          >
+                                            {session.status}
+                                          </Badge>
+                                          <Badge variant="outline" className="text-xs font-medium">
+                                            {session.session_type}
+                                          </Badge>
+                                        </div>
+                                      </div>
+                                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-gray-600 font-semibold text-sm">
+                                        {index + 1}
+                                      </div>
+                                    </div>
+
+                                    {/* Progress Bars */}
+                                    <div className="space-y-2">
+                                      {/* Check-in Progress */}
+                                      <div>
+                                        <div className="flex items-center justify-between text-sm mb-1">
+                                          <span className="text-gray-600 font-medium">Check-in Rate</span>
+                                          <span className="font-semibold text-gray-900">{session.check_in_rate}%</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-2">
+                                          <div 
+                                            className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                                            style={{ width: `${checkInPercentage}%` }}
+                                          ></div>
+                                        </div>
+                                      </div>
+
+                                      {/* Capacity Progress */}
+                                      {session.max_capacity && (
+                                        <div>
+                                          <div className="flex items-center justify-between text-sm mb-1">
+                                            <span className="text-gray-600 font-medium">Capacity</span>
+                                            <span className="font-semibold text-gray-900">{session.total_attendees}/{session.max_capacity}</span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 rounded-full h-2">
+                                            <div 
+                                              className={`h-2 rounded-full transition-all duration-300 ${
+                                                capacityPercentage > 90 ? 'bg-red-500' :
+                                                capacityPercentage > 70 ? 'bg-yellow-500' :
+                                                'bg-blue-500'
+                                              }`}
+                                              style={{ width: `${Math.min(capacityPercentage, 100)}%` }}
+                                            ></div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Metrics Grid */}
+                                  <div className="px-5 pb-5">
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div className="bg-blue-50 rounded-lg p-3 text-center border border-blue-200">
+                                        <div className="text-lg font-bold text-blue-900 mb-1">{session.total_attendees}</div>
+                                        <div className="text-xs font-medium text-blue-700">Total Attendees</div>
+                                      </div>
+                                      <div className="bg-green-50 rounded-lg p-3 text-center border border-green-200">
+                                        <div className="text-lg font-bold text-green-900 mb-1">{session.checked_in_attendees}</div>
+                                        <div className="text-xs font-medium text-green-700">Checked In</div>
+                                      </div>
+                                    </div>
+
+                                    {/* Session Details */}
+                                    <div className="mt-3 pt-3 border-t border-gray-100">
+                                      {session.location && (
+                                        <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+                                          <MapPin className="w-4 h-4 text-gray-400" />
+                                          <span className="truncate">{session.location}</span>
+                                        </div>
+                                      )}
+                                      {session.start_time && (
+                                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                                          <Clock className="w-4 h-4 text-gray-400" />
+                                          <span>{new Date(session.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Click indicator */}
+                                  <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
+                                      <ExternalLink className="w-3 h-3 text-gray-500" />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Empty State */}
+                          {analytics.session_analytics.length === 0 && (
+                            <div className="text-center py-12">
+                              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Calendar className="w-8 h-8 text-gray-400" />
+                              </div>
+                              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Sessions Found</h3>
+                              <p className="text-gray-600 max-w-md mx-auto">
+                                This event doesn't have any sessions configured yet. Create sessions to track detailed attendance analytics.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                         {/* Share Analytics Section */}
                         <div className="bg-white rounded-xl shadow p-6">
@@ -4040,9 +5086,14 @@ export default function EventDetails() {
                     )}
                   </div>
             </TabsContent>
+            <TabsContent value="sessions">
+              <div className="min-h-[200px]">
+                <EventSessions eventId={Number(eventId)} />
+              </div>
+            </TabsContent>
                 {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer') && (
             <TabsContent value="badge-designer">
-                    <BadgeDesignerTab eventId={eventId} />
+                    <BadgeDesignerTab />
             </TabsContent>
                 )}
         </Tabs>
@@ -4415,13 +5466,15 @@ export default function EventDetails() {
                             ? `${editEventRange[0].startDate.toLocaleDateString()} - ${editEventRange[0].endDate.toLocaleDateString()}`
                             : 'Select event date range'}
                         </Button>
-                        {showEditEventRange && createPortal(
-                          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
+                        {showEditEventRange && (
+                          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
                             <div className="bg-white border rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
                               <DateRange
                                 ranges={editEventRange}
                                 onChange={(item) => setEditEventRange([item.selection])}
-                                minDate={new Date()}
+                                editableDateInputs
+                                moveRangeOnFirstSelection={false}
+                                direction="horizontal"
                               />
                               <div className="flex justify-end gap-3 mt-6">
                                 <Button
@@ -4448,8 +5501,7 @@ export default function EventDetails() {
                                 </Button>
                               </div>
                             </div>
-                          </div>,
-                          document.body
+                          </div>
                         )}
                       </div>
                       <div>
@@ -4465,13 +5517,15 @@ export default function EventDetails() {
                             ? `${editRegRange[0].startDate.toLocaleDateString()} - ${editRegRange[0].endDate.toLocaleDateString()}`
                             : 'Select registration date range'}
                         </Button>
-                        {showEditRegRange && createPortal(
-                          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
+                        {showEditRegRange && (
+                          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
                             <div className="bg-white border rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
                               <DateRange
                                 ranges={editRegRange}
                                 onChange={(item) => setEditRegRange([item.selection])}
-                                minDate={new Date()}
+                                editableDateInputs
+                                moveRangeOnFirstSelection={false}
+                                direction="horizontal"
                               />
                               <div className="flex justify-end gap-3 mt-6">
                                 <Button
@@ -4498,8 +5552,7 @@ export default function EventDetails() {
                                 </Button>
                               </div>
                             </div>
-                          </div>,
-                          document.body
+                          </div>
                         )}
                       </div>
                     </div>
@@ -5099,165 +6152,330 @@ export default function EventDetails() {
           )}
           </div>
 
-          {/* Test badge display */}
-          {showTestBadge && testAttendee && (
-            <Dialog open={showTestBadge} onOpenChange={setShowTestBadge}>
-              <DialogContent className="max-w-4xl">
-                <DialogHeader>
-                  <DialogTitle>Test Badge Preview</DialogTitle>
-                  <DialogDescription>
-                    This is a preview of how the badge will look when printed.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="flex justify-center">
-                  <BadgePrint attendee={singlePrintAttendee} />
-                </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setShowTestBadge(false)}>
-                      Close
-                    </Button>
-                    <Button onClick={() => {
-                      setShowTestBadge(false)
-                      handleSingleBadgePrint(testAttendee)
-                    }} className="flex items-center gap-2">
-                      <Printer className="w-4 h-4" />
-                      Print Badge
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )}
+
 
             {/* CSV Upload Dialog */}
             <Dialog open={csvUploadDialogOpen} onOpenChange={setCsvUploadDialogOpen}>
-              <DialogContent className="max-w-lg w-full">
-                <DialogHeader>
-                  <DialogTitle>Import Attendees from CSV</DialogTitle>
-                  <DialogDescription>
-                    Upload a CSV file with guest information. You can download a sample template for the correct format.
-                  </DialogDescription>
-                </DialogHeader>
+              <DialogContent
+                className="w-full max-w-5xl min-w-[900px] p-0 overflow-visible rounded-2xl shadow-2xl border-0 bg-gradient-to-br from-white via-gray-50 to-gray-100"
+                style={{ width: '1100px', maxWidth: '99vw' }}
+              >
+                <div className="px-12 pt-10 pb-6 border-b bg-gradient-to-r from-white to-gray-50">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600">
+                        <Download className="w-5 h-5" />
+                      </span>
+                      Import Attendees from CSV
+                    </DialogTitle>
+                    <DialogDescription className="text-base text-gray-500 mt-2">
+                      Upload a CSV file with columns: <span className="font-medium text-gray-700">name</span>, <span className="font-medium text-gray-700">email</span>, <span className="font-medium text-gray-700">guest_type_name</span> (or <span className="font-medium text-gray-700">guest_type_id</span>). Extra columns are accepted.
+                    </DialogDescription>
+                  </DialogHeader>
+                </div>
+
+                {/* Step: Upload */}
                 {csvUploadStep === 'upload' && (
-                  <div className="space-y-4">
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        setCsvUploadStep('importing')
-                        setCsvUploadErrors([])
-                        setCsvUploadData([])
-                        setCsvUploadSuccess([])
-                        setCsvUploadWarnings([])
-                        // Parse CSV
-                        Papa.parse(file, {
-                          header: true,
-                          skipEmptyLines: true,
-                          complete: (results) => {
-                            if (!results.data || results.data.length === 0) {
-                              setCsvUploadErrors(['CSV file is empty or contains no valid data.'])
-                              setCsvUploadStep('upload')
+                  <div className="p-12 space-y-10 bg-gradient-to-br from-white via-gray-50 to-gray-100">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+                      <div className="md:col-span-2 flex flex-col justify-center">
+                        <label className="block">
+                          <div className="w-full border-2 border-dashed border-blue-200 rounded-2xl p-12 text-center bg-white hover:bg-blue-50 transition cursor-pointer flex flex-col items-center gap-2 shadow-sm">
+                            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mb-2">
+                              <Download className="w-6 h-6 text-blue-500" />
+                            </div>
+                            <div className="font-semibold text-lg text-blue-700 mb-1">Select CSV file</div>
+                            <div className="text-sm text-gray-500">Drag &amp; drop or click to choose</div>
+                          </div>
+                          <input
+                            type="file"
+                            accept=".csv"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0]
+                              if (!file) return
+                              setCsvUploadStep('importing')
+                              setCsvUploadErrors([])
+                              setCsvUploadData([])
+                              setCsvUploadSuccess([])
+                              setCsvUploadWarnings([])
+                              Papa.parse(file, {
+                                header: true,
+                                skipEmptyLines: true,
+                                complete: (results) => {
+                                  if (!results.data || results.data.length === 0) {
+                                    setCsvUploadErrors(['CSV file is empty or contains no valid data.'])
+                                    setCsvUploadStep('upload')
+                                    return
+                                  }
+                                  const rawHeaders = (results.meta.fields || []) as string[]
+                                  const headerMap: Record<string, string> = {}
+                                  rawHeaders.forEach((h) => {
+                                    const norm = String(h)
+                                      .trim()
+                                      .toLowerCase()
+                                      .replace(/\s+/g, '_')
+                                      .replace(/[^a-z0-9_]/g, '')
+                                    let mapped = norm
+                                    if (mapped === 'guesttype' || mapped === 'type' || mapped === 'guest_type') mapped = 'guest_type_name'
+                                    if (mapped === 'job' || mapped === 'title' || mapped === 'job_title') mapped = 'jobtitle'
+                                    headerMap[h] = mapped
+                                  })
+                                  const normalizedRows = (results.data as any[]).map((row) => {
+                                    const pairs = Object.entries(row).map(([k, v]) => {
+                                      const key = headerMap[k as string] || String(k).trim().toLowerCase()
+                                      const val = typeof v === 'string' ? v.trim() : v
+                                      return [key, val]
+                                    })
+                                    return Object.fromEntries(pairs)
+                                  })
+                                  setCsvUploadData(normalizedRows)
+                                  setCsvUploadStep('review')
+                                },
+                                error: (error) => {
+                                  setCsvUploadErrors([`Failed to parse CSV: ${error.message}`])
+                                  setCsvUploadStep('upload')
+                                },
+                              })
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <div className="md:col-span-1">
+                        <div className="h-full bg-gray-50 rounded-xl border p-4">
+                          <div className="text-sm font-medium mb-2">Tips</div>
+                          <ul className="text-xs text-gray-600 space-y-1 list-disc pl-4">
+                            <li>Required: name, email, guest_type_name or guest_type_id</li>
+                            <li>Guest types are case-insensitive</li>
+                            <li>Extra columns are ignored</li>
+                          </ul>
+                          <Button variant="outline" className="w-full mt-3" onClick={downloadSampleCSV}>
+                            <Download className="mr-2 h-4 w-4" /> Sample CSV
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {csvUploadErrors.length > 0 && (
+                      <div className="rounded-md border border-red-200 bg-red-50 text-red-700 text-sm p-3">
+                        {csvUploadErrors.map((err, i) => (
+                          <div key={i}>{err}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {csvUploadStep === 'review' && (
+                  <div className="p-6 space-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="rounded-lg border p-3">
+                        <div className="text-xs text-gray-500">Rows</div>
+                        <div className="text-lg font-semibold">{csvUploadData.length}</div>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="text-xs text-gray-500">Guest Types</div>
+                        <div className="text-xs text-gray-700 truncate">
+                          {guestTypes.map((gt: any) => gt.name).join(', ') || '—'}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-3">
+                        <div className="text-xs text-gray-500">Issues</div>
+                        <div className="text-lg font-semibold">{csvUploadErrors.length}</div>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto max-h-72 border rounded">
+                      <table className="min-w-full text-xs">
+                        <thead className="bg-gray-50 sticky top-0">
+                          <tr>
+                            {Object.keys(csvUploadData[0] || {}).map((h) => (
+                              <th key={h} className="border px-2 py-1 text-left">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {csvUploadData.slice(0, 15).map((row, idx) => (
+                            <tr key={idx}>
+                              {Object.keys(csvUploadData[0] || {}).map((h) => (
+                                <td key={h} className="border px-2 py-1">{row[h]}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {csvUploadErrors.length > 0 && (
+                      <div className="rounded-md border border-red-200 bg-red-50 text-red-700 text-xs p-3">
+                        {csvUploadErrors.map((err, i) => (
+                          <div key={i}>{String(err)}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => setCsvUploadStep('upload')}>Back</Button>
+                      <Button
+                        onClick={async () => {
+                          setCsvUploadStep('importing')
+                          try {
+                            // Build a robust guest type map (supports objects or strings). Fallback to API with IDs.
+                            let mapSource: any[] = []
+                            if (Array.isArray(guestTypes) && guestTypes.length > 0) {
+                              mapSource = guestTypes
+                            }
+                            // If we don't have objects with id, fetch from API
+                            if (!mapSource.length || (typeof mapSource[0] !== 'object') || (mapSource[0] && mapSource[0].id == null)) {
+                              try {
+                                const res = await api.get(`/events/${Number(eventId)}/guest-types`)
+                                if (Array.isArray(res.data) && res.data.length > 0) {
+                                  mapSource = res.data
+                                }
+                              } catch (e) {
+                                // ignore; we'll try to map using available data
+                              }
+                            }
+                            const guestTypeMap = new Map<string, string>()
+                            mapSource.forEach((gt: any) => {
+                              if (gt == null) return
+                              if (typeof gt === 'object') {
+                                const name = String(gt.name ?? gt.title ?? '').toLowerCase().trim()
+                                const id = gt.id != null ? String(gt.id) : ''
+                                if (name && id) guestTypeMap.set(name, id)
+                              } else {
+                                const name = String(gt).toLowerCase().trim()
+                                // no id available; will not add mapping
+                              }
+                            })
+                            const attendeesToImport = csvUploadData.map((row: any) => {
+                              const name = row.name?.trim() || `${(row.first_name || '').toString().trim()} ${(row.last_name || '').toString().trim()}`.trim()
+                              const email = row.email?.trim()
+                              const phone = row.phone?.trim() || null
+                              const company = row.company?.trim() || null
+                              const jobtitle = row.jobtitle?.trim() || null
+                              const gender = row.gender?.trim() || null
+                              const country = row.country?.trim() || null
+                              const explicitGuestTypeId = row.guest_type_id ? String(row.guest_type_id).trim() : ''
+                              const guestTypeName = row.guest_type_name ? String(row.guest_type_name).toLowerCase().trim() : ''
+                              const mappedGuestTypeId = explicitGuestTypeId || (guestTypeName ? (guestTypeMap.get(guestTypeName) || '') : '')
+                              return { name, email, phone, company, jobtitle, gender, country, guest_type_id: mappedGuestTypeId }
+                            })
+                            const invalidRows = attendeesToImport.filter((a: any) => {
+                              const emailOk = !!a.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(a.email))
+                              const phoneStr = (a.phone || '').toString().replace(/\s|-/g, '')
+                              const phoneOk = !!phoneStr && /^\+?[0-9]{7,15}$/.test(phoneStr)
+                              return !(a.guest_type_id && a.name && emailOk && phoneOk)
+                            })
+                            if (invalidRows.length > 0) {
+                              setCsvUploadErrors(['Some rows have invalid data. Make sure all rows have name, email, phone, and a valid guest type.'])
+                              setCsvUploadStep('review')
                               return
                             }
-                            setCsvUploadData(results.data)
+                            const response = await api.post(`/events/${Number(eventId)}/attendees/batch`, { attendees: attendeesToImport })
+                            const { created, errors } = response.data
+                            if (created && created.length > 0) {
+                              const res = await api.get(`/events/${Number(eventId)}/attendees`)
+                              setAttendees(res.data)
+                              setCsvUploadSuccess(created)
+                            }
+                            if (errors && errors.length > 0) {
+                              setCsvUploadWarnings(errors)
+                            }
+                            setCsvUploadStep('complete')
+                          } catch (err: any) {
+                            setCsvUploadErrors([err.response?.data?.error || 'Failed to import CSV.'])
                             setCsvUploadStep('review')
-                          },
-                          error: (error) => {
-                            setCsvUploadErrors([`Failed to parse CSV: ${error.message}`])
-                            setCsvUploadStep('upload')
-                          },
-                        })
-                      }}
-                    />
-                    <Button variant="outline" onClick={downloadSampleCSV}>
-                      <Download className="mr-2 h-4 w-4" />
-                      Download Sample CSV
-                    </Button>
-                    {csvUploadErrors.length > 0 && (
-                      <div className="text-red-600 text-sm">
-                        {csvUploadErrors.map((err, i) => (
-                          <div key={i}>{err}</div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {csvUploadStep === 'review' && (
-                  <div className="space-y-4">
-                    <div className="text-sm text-gray-700">
-                      {csvUploadData.length} rows parsed. Ready to import?
+                          }
+                        }}
+                        disabled={csvUploadData.length === 0}
+                      >
+                        Import
+                      </Button>
                     </div>
-                    <Button
-                      onClick={async () => {
-                        setCsvUploadStep('importing')
-                        try {
-                          const guestTypeMap = new Map(guestTypes.map((gt) => [gt.name.toLowerCase(), gt.id]))
-                          const attendeesToImport = csvUploadData.map((row) => ({
-                            name: row.name?.trim(),
-                            email: row.email?.trim(),
-                            phone: row.phone?.trim() || null,
-                            company: row.company?.trim() || null,
-                            jobtitle: row.jobtitle?.trim() || null,
-                            gender: row.gender?.trim() || null,
-                            country: row.country?.trim() || null,
-                            guest_type_id: guestTypeMap.get(row.guest_type_name?.toLowerCase()),
-                          }))
-                          const invalidRows = attendeesToImport.filter((a) => !(a.guest_type_id && a.name && a.email))
-                          if (invalidRows.length > 0) {
-                            setCsvUploadErrors(['Some rows have invalid data. Make sure all rows have name, email, and a valid guest type.'])
-                            setCsvUploadStep('review')
-                            return
-                          }
-                          const response = await api.post(`/events/${Number(eventId)}/attendees/batch`, { attendees: attendeesToImport })
-                          const { created, errors } = response.data
-                          if (created && created.length > 0) {
-                            const res = await api.get(`/events/${Number(eventId)}/attendees`)
-                            setAttendees(res.data)
-                            setCsvUploadSuccess(created)
-                          }
-                          if (errors && errors.length > 0) {
-                            setCsvUploadWarnings(errors)
-                          }
-                          setCsvUploadStep('complete')
-                        } catch (err: any) {
-                          setCsvUploadErrors([err.response?.data?.error || 'Failed to import CSV.'])
-                          setCsvUploadStep('review')
-                        }
-                      }}
-                    >
-                      Import
-                    </Button>
-                    <Button variant="outline" onClick={() => setCsvUploadStep('upload')}>Back</Button>
-                    {csvUploadErrors.length > 0 && (
-                      <div className="text-red-600 text-sm">
-                        {csvUploadErrors.map((err, i) => (
-                          <div key={i}>{err}</div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 )}
+
                 {csvUploadStep === 'importing' && (
-                  <div className="text-center py-8">Importing attendees...</div>
+                  <div className="p-8 text-center">
+                    <div className="mx-auto mb-3 w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+                    <div className="text-sm text-gray-600">Importing attendees...</div>
+                  </div>
                 )}
+
                 {csvUploadStep === 'complete' && (
-                  <div className="space-y-4">
+                  <div className="p-10 space-y-6 bg-gradient-to-br from-white via-gray-50 to-gray-100">
                     {csvUploadSuccess.length > 0 && (
-                      <div className="text-green-700 text-sm">
-                        {csvUploadSuccess.length} attendees imported successfully.
+                      <div className="rounded-xl border border-green-200 bg-green-50 text-green-800 p-4">
+                        <div className="font-semibold mb-1">
+                          {csvUploadSuccess.length} attendees imported successfully
+                        </div>
+                        <div className="text-xs text-green-700">Your attendee list has been updated.</div>
                       </div>
                     )}
+
                     {csvUploadWarnings.length > 0 && (
-                      <div className="text-yellow-700 text-sm">
-                        {csvUploadWarnings.length} attendees failed to import.<br />
-                        {csvUploadWarnings.map((w, i) => (
-                          <div key={i}>{w.email}: {w.error}</div>
-                        ))}
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-900 p-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="font-semibold text-amber-900">
+                            {csvUploadWarnings.length} attendees failed to import
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                // Download a CSV of failed rows with reasons
+                                const rows = csvUploadWarnings.map((w: any) => ({ email: w.email, error: w.error }))
+                                const csv = Papa.unparse(rows)
+                                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+                                const a = document.createElement('a')
+                                const url = URL.createObjectURL(blob)
+                                a.href = url
+                                a.download = 'failed_attendees.csv'
+                                a.click()
+                                URL.revokeObjectURL(url)
+                              }}
+                            >
+                              Download Errors
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCsvUploadStep('upload')}
+                            >
+                              Try Again
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="max-h-64 overflow-auto rounded border bg-white">
+                          <table className="min-w-full text-xs">
+                            <thead className="bg-gray-50 sticky top-0">
+                              <tr>
+                                <th className="border px-2 py-1 text-left">Email</th>
+                                <th className="border px-2 py-1 text-left">Reason</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {csvUploadWarnings.map((w: any, i: number) => (
+                                <tr key={i} className="odd:bg-white even:bg-gray-50">
+                                  <td className="border px-2 py-1 font-medium text-gray-800">{w.email}</td>
+                                  <td className="border px-2 py-1 text-gray-700">{w.error}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="text-xs text-amber-800 mt-2">
+                          Tip: Ensure guest_type_name matches an event guest type or include guest_type_id.
+                        </div>
                       </div>
                     )}
-                    <Button onClick={() => setCsvUploadDialogOpen(false)}>Close</Button>
-                    <Button variant="outline" onClick={() => setCsvUploadStep('upload')}>Import Another</Button>
+
+                    <div className="flex justify-end gap-3">
+                      <Button onClick={() => setCsvUploadDialogOpen(false)} className="">Close</Button>
+                      <Button variant="outline" onClick={() => setCsvUploadStep('upload')}>Import Another</Button>
+                    </div>
                   </div>
                 )}
               </DialogContent>
@@ -5268,8 +6486,45 @@ export default function EventDetails() {
               eventName={eventData?.name || ''}
               open={isAssignUsherDialogOpen}
               onOpenChange={setIsAssignUsherDialogOpen}
-              onSuccess={() => setIsAssignUsherDialogOpen(false)}
+              onSuccess={async () => {
+                setIsAssignUsherDialogOpen(false)
+                // Refresh the event ushers list
+                try {
+                  const res = await getEventUshers(Number(eventId))
+                  console.log('Refreshed event ushers:', res.data)
+                  setEventUshers(res.data)
+                } catch (err) {
+                  console.error('Failed to refresh event ushers:', err)
+                }
+              }}
             />
+
+            {/* Remove Attendee/Member Confirmation Dialog */}
+            <AlertDialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {removeMember?.guest ? 'Remove Attendee' : 'Remove Team Member'}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {removeMember?.guest 
+                      ? `Are you sure you want to remove ${removeMember?.guest?.name || 'this attendee'} from the event? This action cannot be undone.`
+                      : `Are you sure you want to remove ${removeMember?.name || 'this team member'}? This action cannot be undone.`
+                    }
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={removeLoading}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={handleRemoveConfirm} 
+                    disabled={removeLoading} 
+                    className="bg-red-600 text-white hover:bg-red-700"
+                  >
+                    {removeLoading ? 'Removing...' : (removeMember?.guest ? 'Remove Attendee' : 'Remove Member')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* Add a hidden badge area for PDF generation */}
             <div
@@ -5304,6 +6559,117 @@ export default function EventDetails() {
             </div>
           </>
         )}
+
+        {/* Session Guests Dialog */}
+        <Dialog open={sessionGuestsDialogOpen} onOpenChange={setSessionGuestsDialogOpen}>
+          <DialogContent className="max-w-6xl w-full h-[90vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <DialogTitle className="text-2xl font-bold text-gray-900">
+                    Checked-in Guests - {selectedSession?.session_name}
+                  </DialogTitle>
+                  <DialogDescription className="text-gray-600 mt-1">
+                    View and export checked-in guests for this session
+                  </DialogDescription>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <div className="text-sm text-gray-600">Total Checked-in</div>
+                    <div className="text-2xl font-bold text-green-600">{sessionGuests.length}</div>
+                  </div>
+                  <Button 
+                    onClick={exportSessionGuests}
+                    disabled={sessionGuests.length === 0}
+                    className="flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export CSV
+                  </Button>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-hidden">
+              {sessionGuestsLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+                    <div className="text-gray-600">Loading session guests...</div>
+                  </div>
+                </div>
+              ) : sessionGuests.length > 0 ? (
+                <div className="h-full overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="font-semibold">Name</TableHead>
+                        <TableHead className="font-semibold">Email</TableHead>
+                        <TableHead className="font-semibold">Phone</TableHead>
+                        <TableHead className="font-semibold">Company</TableHead>
+                        <TableHead className="font-semibold">Job Title</TableHead>
+                        <TableHead className="font-semibold">Guest Type</TableHead>
+                        <TableHead className="font-semibold">Check-in Time</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sessionGuests.map((guest, index) => (
+                        <TableRow key={guest.id || index} className="hover:bg-gray-50">
+                          <TableCell className="font-medium">{guest.name || 'N/A'}</TableCell>
+                          <TableCell className="text-gray-600">{guest.email || 'N/A'}</TableCell>
+                          <TableCell className="text-gray-600">{guest.phone || 'N/A'}</TableCell>
+                          <TableCell className="text-gray-600">{guest.company || 'N/A'}</TableCell>
+                          <TableCell className="text-gray-600">{guest.jobtitle || 'N/A'}</TableCell>
+                          <TableCell>
+                            <Badge className={getGuestTypeBadgeClasses(guest.guest_type)}>
+                              {guest.guest_type || 'General'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-gray-600">
+                            {guest.check_in_time ? new Date(guest.check_in_time).toLocaleString() : 'N/A'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Users className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Checked-in Guests</h3>
+                    <p className="text-gray-600">
+                      No guests have checked in for this session yet.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="flex-shrink-0 border-t border-gray-200 pt-4">
+              <div className="flex items-center justify-between w-full">
+                <div className="text-sm text-gray-600">
+                  Showing {sessionGuests.length} checked-in guests
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setSessionGuestsDialogOpen(false)}>
+                    Close
+                  </Button>
+                  <Button 
+                    onClick={exportSessionGuests}
+                    disabled={sessionGuests.length === 0}
+                    className="flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export CSV
+                  </Button>
+                </div>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </>
   )

@@ -2,11 +2,14 @@ import React from 'react';
 import QRCode from 'react-qr-code';
 import { Attendee } from '@/types/attendee';
 import { BadgeTemplate } from '@/types/badge';
-
+import { calculateNameFontSize, calculateCompanyFontSize, calculateJobTitleFontSize } from '@/lib/nameSizing';
+import SimpleBadge from './SimpleBadge';
+import { BadgeElement } from './SimpleBadgeDesigner';
 
 interface BadgeProps {
   attendee: Attendee;
   template?: BadgeTemplate | null;
+  customTemplate?: BadgeElement[]; // New prop for custom template elements
 }
 
 // Helper function to replace template placeholders with actual data
@@ -41,7 +44,7 @@ const replaceTemplateFields = (content: string, attendee: Attendee): string => {
     .replace(/{profilePicture}/g, guest?.profile_picture || '');
 };
 
-// Legacy badge component (fallback)
+// Legacy badge component (fallback) - Updated for 4"x4" (100mm x 100mm)
 const LegacyBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
   const name = attendee.guest?.name || '';
   const company = attendee.guest?.company || '';
@@ -56,45 +59,102 @@ const LegacyBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
   }
   const uuid = (attendee.guest?.uuid || '').slice(0, 12);
 
+  // Calculate dynamic font sizes based on text length
+  const nameFontSize = calculateNameFontSize(name);
+  const companyFontSize = calculateCompanyFontSize(company);
+  const jobTitleFontSize = calculateJobTitleFontSize(jobtitle);
+
   return (
     <div
-      className="flex flex-col items-center border rounded-xl shadow-lg bg-white relative"
-      style={{ width: 320, height: 480, padding: 0 }}
+      className="flex flex-col items-center border rounded-lg shadow-lg bg-white relative"
+      style={{ 
+        width: 400, // 4 inches = 400 points (100mm)
+        height: 400, // 4 inches = 400 points (100mm)
+        padding: 0 
+      }}
     >
-      {/* Name */}
-      <div className="w-full text-center font-bold" style={{ fontSize: 40, marginTop: 32, marginBottom: 16, lineHeight: 1.1 }}>
-        {name}
-      </div>
-      {/* Company, Job Title, Country */}
-      <div className="w-full text-center" style={{ fontSize: 22, marginBottom: 4 }}>{company}</div>
-      <div className="w-full text-center" style={{ fontSize: 20, marginBottom: 4 }}>{jobtitle}</div>
-      <div className="w-full text-center" style={{ fontSize: 20, marginBottom: 20 }}>{country}</div>
-      {/* QR code */}
-      <div className="flex justify-center" style={{ marginBottom: 0 }}>
-        <QRCode value={String(uuid)} size={140} />
-      </div>
-      {/* Guest type at the bottom, no background */}
-      <div style={{
-        position: 'absolute',
-        bottom: 24,
-        left: 0,
-        width: '100%',
-        height: 100,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderBottomLeftRadius: 12,
-        borderBottomRightRadius: 12,
+      {/* Main content area - now uses full space */}
+      <div className="flex flex-col items-center justify-center px-6 py-8" style={{ 
+        width: '100%', 
+        height: '100%',
+        minHeight: 0 
       }}>
-        <span style={{ color: '#111', fontWeight: 700, fontSize: 32, letterSpacing: 2 }}>
-          {guest_type ? guest_type.toUpperCase() : ''}
-        </span>
+        {/* Name - dynamic sizing based on length */}
+        <div className="w-full text-center font-bold mb-4" style={{ 
+          fontSize: nameFontSize, 
+          lineHeight: 1.1,
+          color: '#1e293b',
+          fontFamily: 'Helvetica, Arial, sans-serif'
+        }}>
+          {name}
+        </div>
+        
+        {/* Company and Job Title - dynamic sizing */}
+        <div className="w-full text-center mb-6">
+          <div style={{ 
+            fontSize: companyFontSize, 
+            color: '#475569', 
+            marginBottom: 4, 
+            fontWeight: 600,
+            fontFamily: 'Helvetica, Arial, sans-serif'
+          }}>
+            {company}
+          </div>
+          <div style={{ 
+            fontSize: jobTitleFontSize, 
+            color: '#64748b', 
+            fontWeight: 500,
+            fontFamily: 'Helvetica, Arial, sans-serif'
+          }}>
+            {jobtitle}
+          </div>
+        {/* Guest Country - if available */}
+        {country && (
+          <div style={{ 
+            fontSize: 15,
+            color: '#1e293b',
+            fontWeight: 400,
+            fontFamily: 'Helvetica, Arial, sans-serif',
+            marginTop: 2
+          }}>
+            {country}
+          </div>
+        )}
+        </div>
+
+        {/* QR code - larger to fill more space */}
+        <div className="flex justify-center mb-4">
+          <QRCode value={String(uuid)} size={140} />
+        </div>
+
+        {/* Badge ID */}
+        <div style={{ 
+          fontSize: 14, 
+          color: '#64748b', 
+          marginBottom: 6, 
+          fontWeight: 500,
+          fontFamily: 'Helvetica, Arial, sans-serif'
+        }}>
+          ID: {uuid}
+        </div>
+
+        {/* Guest type - bolder and more prominent */}
+        <div style={{ 
+          fontSize: 22, 
+          fontWeight: 800, 
+          color: '#1e40af',
+          textTransform: 'uppercase',
+          letterSpacing: 2,
+          fontFamily: 'Helvetica, Arial, sans-serif'
+        }}>
+          {guest_type ? guest_type : 'VISITOR'}
+        </div>
       </div>
     </div>
   );
 };
 
-const Badge: React.FC<BadgeProps> = ({ attendee }) => {
+const Badge: React.FC<BadgeProps> = ({ attendee, template, customTemplate }) => {
   // Validate attendee data
   if (!attendee || !attendee.guest) {
     return (
@@ -103,7 +163,13 @@ const Badge: React.FC<BadgeProps> = ({ attendee }) => {
       </div>
     )
   }
-  // Always use the legacy badge (basic design)
+
+  // Use custom template if provided, otherwise fall back to legacy badge
+  if (customTemplate && customTemplate.length > 0) {
+    return <SimpleBadge attendee={attendee} template={customTemplate} />;
+  }
+
+  // Always use the legacy badge (basic design) as fallback
   return <LegacyBadge attendee={attendee} />;
 };
 

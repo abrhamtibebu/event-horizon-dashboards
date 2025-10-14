@@ -51,7 +51,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
 import api from '@/lib/api'
-import { getGuestTypeBadgeClasses } from '@/lib/utils'
+import { getGuestTypeBadgeClasses, getCheckInBadgeClasses } from '@/lib/utils'
 import { useReactToPrint } from 'react-to-print'
 import BadgePrint from '@/components/Badge'
 import BadgeTest from '@/components/BadgeTest'
@@ -60,12 +60,10 @@ import {
   getBadgeTemplates,
 } from '@/lib/badgeTemplates'
 import { BadgeTemplate } from '@/types/badge'
-import dynamic from 'next/dynamic'
 import React, { Suspense } from 'react'
 import Papa from 'papaparse';
 import { postAttendeesBatch } from '@/lib/api';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { generateSingleBadgePDF, generateBatchBadgePDF, printPDFBlob, waitForElement } from '@/lib/badgeUtils';
 
 const QrReader = React.lazy(() =>
   import('@blackbox-vision/react-qr-reader').then((mod) => ({
@@ -92,6 +90,7 @@ export default function UsherEventManagement() {
 
   // Search and filters
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [guestTypeFilter, setGuestTypeFilter] = useState('all')
   const [checkedInFilter, setCheckedInFilter] = useState('all')
 
@@ -114,6 +113,14 @@ export default function UsherEventManagement() {
     guest_type_id: '',
   })
   const [addAttendeeLoading, setAddAttendeeLoading] = useState(false)
+  const [validationStatus, setValidationStatus] = useState<{
+    email: 'idle' | 'checking' | 'valid' | 'invalid' | 'duplicate';
+    phone: 'idle' | 'checking' | 'valid' | 'invalid' | 'duplicate';
+  }>({
+    email: 'idle',
+    phone: 'idle'
+  });
+  const [existingGuestInfo, setExistingGuestInfo] = useState<any>(null);
 
   // Badge printing
   const [badgeTemplate, setBadgeTemplate] = useState<BadgeTemplate | null>(null)
@@ -135,6 +142,14 @@ export default function UsherEventManagement() {
   const [csvFailure, setCsvFailure] = useState<string | null>(null);
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [csvHeaderMap, setCsvHeaderMap] = useState<Record<string, string>>({});
+  const [csvPreviewRows, setCsvPreviewRows] = useState<any[]>([]);
+  const [csvUnmatchedCount, setCsvUnmatchedCount] = useState<number>(0);
+
+  // Attendee removal state
+  const [removeAttendeeDialogOpen, setRemoveAttendeeDialogOpen] = useState(false);
+  const [attendeeToRemove, setAttendeeToRemove] = useState<any>(null);
+  const [removeAttendeeLoading, setRemoveAttendeeLoading] = useState(false);
 
   const requiredHeaders = [
     'name',
@@ -164,12 +179,55 @@ export default function UsherEventManagement() {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
 
+  const checkExistingGuest = async (email: string, phone: string) => {
+    if (!eventId || (!email && !phone)) return;
+    
+    try {
+      setValidationStatus(prev => ({ ...prev, email: 'checking', phone: 'checking' }));
+      
+      const response = await api.post(`/events/${eventId}/attendees/check-guest`, {
+        email: email || '',
+        phone: phone || ''
+      });
+      
+      const { exists, already_registered, guest_info } = response.data;
+      
+      if (exists) {
+        if (already_registered) {
+          setValidationStatus(prev => ({ ...prev, email: 'duplicate', phone: 'duplicate' }));
+          toast({
+            title: 'Already Registered',
+            description: 'This guest is already registered for this event.',
+            variant: 'destructive',
+          });
+        } else {
+          setValidationStatus(prev => ({ ...prev, email: 'duplicate', phone: 'duplicate' }));
+          setExistingGuestInfo(guest_info);
+          toast({
+            title: 'Existing Guest Found',
+            description: 'We found an existing guest with this email/phone. We will update their information.',
+            variant: 'default',
+          });
+        }
+      } else {
+        setValidationStatus(prev => ({ ...prev, email: 'valid', phone: 'valid' }));
+        setExistingGuestInfo(null);
+      }
+    } catch (error) {
+      console.error('Validation error:', error);
+      setValidationStatus(prev => ({ ...prev, email: 'invalid', phone: 'invalid' }));
+    }
+  };
+
   const handleCSVFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCsvSuccess(null);
     setCsvFailure(null);
     setCsvErrors([]);
     setCsvRows([]);
     setCsvFileName(null);
+    setCsvHeaderMap({});
+    setCsvPreviewRows([]);
+    setCsvUnmatchedCount(0);
     const file = e.target.files?.[0];
     if (!file) return;
     setCsvFileName(file.name);
@@ -180,23 +238,47 @@ export default function UsherEventManagement() {
         const rows = results.data as any[];
         const errors: any[] = [];
         // Check headers
-        const headers = results.meta.fields || [];
-        const missingHeaders = requiredHeaders.filter((h) => !headers.includes(h));
+        const rawHeaders = (results.meta.fields || []) as string[];
+        const headers = rawHeaders.map((h: any) => String(h).trim().toLowerCase());
+        // Build a header map for common variants to required header names
+        const headerMap: Record<string, string> = {};
+        headers.forEach((h, idx) => {
+          let mapped = h
+            .replace(/\s+/g, '_')
+            .replace(/[^a-z0-9_]/g, '')
+            .toLowerCase();
+          // heuristics
+          if (mapped === 'guesttype' || mapped === 'type' || mapped === 'guest_type') mapped = 'guest_type_name';
+          if (mapped === 'job' || mapped === 'title' || mapped === 'job_title') mapped = 'jobtitle';
+          headerMap[rawHeaders[idx]] = mapped;
+        });
+        // verify coverage
+        const normalizedSet = new Set(Object.values(headerMap));
+        const missingHeaders = requiredHeaders.filter((h) => !normalizedSet.has(h));
         if (missingHeaders.length > 0) {
-          setCsvErrors([
-            { row: 'Header', error: `Missing headers: ${missingHeaders.join(', ')}` },
-          ]);
-          return;
+          setCsvErrors([{ row: 'Header', error: `Missing headers: ${missingHeaders.join(', ')}` }]);
+          // Continue to allow user to map, but flag error
         }
+        // Normalize rows: trim keys/values and lowercase header keys
+        const normalizedRows = rows.map((row) => {
+          const entryPairs = Object.entries(row).map(([k, v]) => {
+            const rawKey = String(k);
+            const key = headerMap[rawKey] || String(rawKey).trim().toLowerCase();
+            const value = typeof v === 'string' ? v.trim() : v;
+            return [key, value];
+          });
+          return Object.fromEntries(entryPairs);
+        });
+
         // Validate rows
-        const validatedRows = rows.map((row, idx) => {
+        const validatedRows = normalizedRows.map((row, idx) => {
           const rowErrors: string[] = [];
           requiredHeaders.forEach((h) => {
             if (!row[h] && ['name', 'email', 'guest_type_name'].includes(h)) {
               rowErrors.push(`${h} is required`);
             }
           });
-          if (row.email && !validateEmail(row.email)) {
+          if (row.email && !validateEmail(String(row.email))) {
             rowErrors.push('Invalid email format');
           }
           // Optionally: validate phone, gender, etc.
@@ -206,6 +288,8 @@ export default function UsherEventManagement() {
           return row;
         });
         setCsvRows(validatedRows);
+        setCsvHeaderMap(headerMap);
+        setCsvPreviewRows(validatedRows.slice(0, 10));
         setCsvErrors(errors);
       },
       error: (err) => {
@@ -227,19 +311,44 @@ export default function UsherEventManagement() {
       setCsvLoading(false);
       return;
     }
+    if (!guestTypes || guestTypes.length === 0) {
+      setCsvFailure('Guest types are not loaded for this event. Please try again in a moment.');
+      setCsvLoading(false);
+      return;
+    }
     // Map guest_type_name to guest_type_id
     const guestTypeMap: Record<string, string> = {};
     guestTypes.forEach((gt: any) => {
-      guestTypeMap[gt.name] = gt.id;
+      if (gt && gt.name != null && gt.id != null) {
+        guestTypeMap[String(gt.name).trim().toLowerCase()] = String(gt.id);
+      }
     });
-    const attendees = validRows.map((row) => ({
-      ...row,
-      guest_type_id: guestTypeMap[row.guest_type_name],
-    }));
+    const attendees = validRows.map((row) => {
+      const name = typeof row.name === 'string' ? row.name.trim() : row.name;
+      const email = typeof row.email === 'string' ? row.email.trim() : row.email;
+      const phone = typeof row.phone === 'string' ? row.phone.trim() : row.phone;
+      const company = typeof row.company === 'string' ? row.company.trim() : row.company;
+      const jobtitle = typeof row.jobtitle === 'string' ? row.jobtitle.trim() : row.jobtitle;
+      const gender = typeof row.gender === 'string' ? row.gender.trim() : row.gender;
+      const country = typeof row.country === 'string' ? row.country.trim() : row.country;
+      const guestTypeName = typeof row.guest_type_name === 'string' ? row.guest_type_name.trim().toLowerCase() : '';
+      const explicitGuestTypeId = row.guest_type_id != null ? String(row.guest_type_id).trim() : '';
+      const mappedGuestTypeId = explicitGuestTypeId || guestTypeMap[guestTypeName] || '';
+      return {
+        name,
+        email,
+        phone,
+        company,
+        jobtitle,
+        gender,
+        country,
+        guest_type_id: mappedGuestTypeId,
+      };
+    });
     // Remove rows with missing guest_type_id
     const finalAttendees = attendees.filter((a) => a.guest_type_id);
     if (finalAttendees.length === 0) {
-      setCsvFailure('No valid guest_type_name found in uploaded rows.');
+      setCsvFailure('Some rows have invalid data. Make sure all rows have name, email, and a valid guest type.');
       setCsvLoading(false);
       return;
     }
@@ -331,6 +440,14 @@ export default function UsherEventManagement() {
     fetchEventData()
   }, [eventId])
 
+  // Debounce search term for faster, non-janky filtering
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm.trim().toLowerCase())
+    }, 250)
+    return () => clearTimeout(handle)
+  }, [searchTerm])
+
   // Fetch attendees
   useEffect(() => {
     if (!eventId) return
@@ -339,7 +456,15 @@ export default function UsherEventManagement() {
       try {
         setAttendeesLoading(true)
         const response = await api.get(`/events/${eventId}/attendees`)
-        setAttendees(response.data)
+        // Precompute a lowercase search blob for faster includes matching
+        const indexed = (response.data || []).map((a: any) => {
+          const name = a?.guest?.name ? String(a.guest.name) : ''
+          const email = a?.guest?.email ? String(a.guest.email) : ''
+          const company = a?.guest?.company ? String(a.guest.company) : ''
+          const blob = `${name} ${email} ${company}`.toLowerCase()
+          return { ...a, _search: blob }
+        })
+        setAttendees(indexed)
         setAttendeesError(null)
       } catch (err: any) {
         setAttendeesError(
@@ -473,13 +598,44 @@ export default function UsherEventManagement() {
     }
   }
 
-  // Filter attendees
+  // Handle attendee removal
+  const handleRemoveAttendee = (attendee: any) => {
+    setAttendeeToRemove(attendee);
+    setRemoveAttendeeDialogOpen(true);
+  };
+
+  const handleRemoveAttendeeConfirm = async () => {
+    if (!attendeeToRemove || !eventId) return;
+    
+    setRemoveAttendeeLoading(true);
+    try {
+      await api.delete(`/events/${eventId}/attendees/${attendeeToRemove.id}`);
+      
+      // Remove from local state
+      setAttendees(prev => prev.filter(a => a.id !== attendeeToRemove.id));
+      
+      toast({
+        title: 'Success',
+        description: 'Attendee removed from event successfully!',
+      });
+      
+      setRemoveAttendeeDialogOpen(false);
+      setAttendeeToRemove(null);
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.response?.data?.error || 'Failed to remove attendee',
+        variant: 'destructive',
+      });
+    } finally {
+      setRemoveAttendeeLoading(false);
+    }
+  };
+
+  // Filter attendees (fast path uses precomputed _search and debounced term)
   const filteredAttendees = attendees.filter((attendee) => {
     const matchesSearch =
-      !searchTerm ||
-      attendee.guest?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      attendee.guest?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      attendee.guest?.company?.toLowerCase().includes(searchTerm.toLowerCase())
+      !debouncedSearchTerm || attendee._search?.includes(debouncedSearchTerm)
 
     const matchesGuestType =
       guestTypeFilter === 'all' ||
@@ -528,7 +684,7 @@ export default function UsherEventManagement() {
     return true
   }
 
-  // Generate single badge
+  // Generate single badge (matches attendees tab)
   const generateBadge = async (attendee: any) => {
     if (!validateBadgeTemplate(badgeTemplate)) {
       return
@@ -544,9 +700,10 @@ export default function UsherEventManagement() {
     }
 
     setSinglePrintAttendee(attendee);
-    setTimeout(() => {
+    // Optimized: Use utility function for faster badge generation
+    setTimeout(async () => {
       if (singlePrintRef.current) {
-        const badgeElement = singlePrintRef.current.querySelector('.printable-badge-batch');
+        const badgeElement = await waitForElement('.printable-badge-batch', singlePrintRef.current);
         if (!badgeElement) {
           toast({
             title: 'Error',
@@ -556,25 +713,21 @@ export default function UsherEventManagement() {
           setSinglePrintAttendee(null);
           return;
         }
-        // Make sure the print area is visible and positioned correctly
-        singlePrintRef.current.style.visibility = 'visible';
-        singlePrintRef.current.style.position = 'absolute';
-        singlePrintRef.current.style.left = '0';
-        singlePrintRef.current.style.top = '0';
-        singlePrintRef.current.style.width = '100vw';
-        singlePrintRef.current.style.height = '100vh';
-        singlePrintRef.current.style.zIndex = '9999';
-        singlePrintRef.current.style.background = 'white';
         
-        // Wait a bit more for badge to render, then print
-        setTimeout(() => {
-          window.print();
-          // Reset the print area after printing
-          singlePrintRef.current!.style.visibility = 'hidden';
+        try {
+          const blob = await generateSingleBadgePDF(badgeElement);
+          printPDFBlob(blob);
           setSinglePrintAttendee(null);
-        }, 500);
+        } catch (error) {
+          toast({
+            title: 'Error',
+            description: 'Failed to generate badge PDF.',
+            variant: 'destructive',
+          });
+          setSinglePrintAttendee(null);
+        }
       }
-    }, 300);
+    }, 100); // Further reduced timeout for faster response
   }
 
   // Test badge
@@ -614,9 +767,10 @@ export default function UsherEventManagement() {
     }
 
     setPrinting(true);
-    setTimeout(() => {
+    // Optimized: Use utility function for faster batch badge generation
+    setTimeout(async () => {
       if (printRef.current) {
-        const badgeElements = Array.from(printRef.current.querySelectorAll('.printable-badge-batch'));
+        const badgeElements = Array.from(printRef.current.querySelectorAll('.printable-badge-batch')) as HTMLElement[];
         if (badgeElements.length === 0) {
           toast({
             title: 'Error',
@@ -626,25 +780,21 @@ export default function UsherEventManagement() {
           setPrinting(false);
           return;
         }
-        // Make sure the print area is visible and positioned correctly
-        printRef.current.style.visibility = 'visible';
-        printRef.current.style.position = 'absolute';
-        printRef.current.style.left = '0';
-        printRef.current.style.top = '0';
-        printRef.current.style.width = '100vw';
-        printRef.current.style.height = '100vh';
-        printRef.current.style.zIndex = '9999';
-        printRef.current.style.background = 'white';
         
-        // Wait a bit more for badges to render, then print
-        setTimeout(() => {
-          window.print();
-          // Reset the print area after printing
-          printRef.current!.style.visibility = 'hidden';
+        try {
+          const blob = await generateBatchBadgePDF(badgeElements);
+          printPDFBlob(blob);
           setPrinting(false);
-        }, 500);
+        } catch (error) {
+          toast({
+            title: 'Error',
+            description: 'Failed to generate batch badge PDF.',
+            variant: 'destructive',
+          });
+          setPrinting(false);
+        }
       }
-    }, 300);
+    }, 100); // Further reduced timeout for faster response
   }
 
   // Handler for QR scan
@@ -680,6 +830,65 @@ export default function UsherEventManagement() {
     setQrScanStatus('QR scanner error. Please try again.')
   }
 
+  const exportAttendeesToCSV = () => {
+    if (filteredAttendees.length === 0) {
+      toast({
+        title: 'Info',
+        description: 'No attendees to export.',
+      })
+      return
+    }
+
+    const dataToExport = filteredAttendees.map((attendee) => {
+      // Handle guest type display properly for CSV export
+      let guestTypeName = 'N/A';
+      if (attendee.guest_type) {
+        if (typeof attendee.guest_type === 'object' && attendee.guest_type !== null) {
+          guestTypeName = attendee.guest_type.name || attendee.guest_type.id || 'N/A';
+        } else if (typeof attendee.guest_type === 'string') {
+          guestTypeName = attendee.guest_type;
+        } else {
+          guestTypeName = String(attendee.guest_type);
+        }
+      }
+      
+      return {
+        'Attendee ID': attendee.id,
+        'Name': attendee.guest?.name || 'N/A',
+        'Email': attendee.guest?.email || 'N/A',
+        'Phone': attendee.guest?.phone || 'N/A',
+        'Company': attendee.guest?.company || 'N/A',
+        'Job Title': attendee.guest?.jobtitle || 'N/A',
+        'Gender': attendee.guest?.gender || 'N/A',
+        'Country': attendee.guest?.country || 'N/A',
+        'Guest Type': guestTypeName,
+        'Registration Date': attendee.created_at 
+          ? new Date(attendee.created_at).toLocaleString()
+          : 'N/A',
+        'Checked In': attendee.checked_in ? 'Yes' : 'No',
+        'Check-In Time': attendee.check_in_time
+          ? new Date(attendee.check_in_time).toLocaleString()
+          : 'N/A',
+      };
+    })
+
+    const csv = Papa.unparse(dataToExport)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `${eventData.name}_attendees.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    toast({
+      title: 'Success',
+      description: 'Attendee data exported successfully.',
+    })
+  }
+
   if (eventLoading)
     return <div className="p-8 text-center">Loading event...</div>
   if (eventError)
@@ -687,7 +896,7 @@ export default function UsherEventManagement() {
   if (!eventData) return <div className="p-8 text-center">Event not found.</div>
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-3 md:px-6 max-w-[1400px] mx-auto w-full">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -776,6 +985,14 @@ export default function UsherEventManagement() {
                   Attendees ({attendees.length})
                 </span>
                 <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={exportAttendeesToCSV}
+                    className="flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export CSV
+                  </Button>
                   <Button
                     variant="outline"
                     onClick={handleBatchPrintBadges}
@@ -882,7 +1099,13 @@ export default function UsherEventManagement() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredAttendees.map((attendee) => (
+                      filteredAttendees.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                            No matching guests found for "{searchTerm}".
+                          </TableCell>
+                        </TableRow>
+                      ) : filteredAttendees.map((attendee) => (
                         <TableRow key={attendee.id}>
                           <TableCell>
                             <Checkbox
@@ -910,19 +1133,8 @@ export default function UsherEventManagement() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant={
-                                attendee.checked_in ? 'default' : 'secondary'
-                              }
-                              className={
-                                attendee.checked_in
-                                  ? 'bg-green-100 text-green-800'
-                                  : ''
-                              }
-                            >
-                              {attendee.checked_in
-                                ? 'Checked In'
-                                : 'Registered'}
+                            <Badge className={getCheckInBadgeClasses(attendee.checked_in)}>
+                              {attendee.checked_in ? 'Checked In' : 'Registered'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
@@ -945,6 +1157,18 @@ export default function UsherEventManagement() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
+                              {(user?.role === 'admin' || user?.role === 'superadmin' || 
+                                (['organizer', 'organizer_admin'].includes(user?.role) && eventData?.organizer_id === user?.organizer_id)) && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveAttendee(attendee)}
+                                  title="Remove Attendee"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -997,7 +1221,10 @@ export default function UsherEventManagement() {
                 </div>
               )}
               {csvRows.length > 0 && (
-                <div className="overflow-x-auto mb-2">
+                <div className="overflow-x-auto mb-2 space-y-2">
+                  <div className="text-sm text-gray-700">
+                    Previewing first {csvPreviewRows.length} of {csvRows.length} rows.
+                  </div>
                   <table className="min-w-full text-xs border">
                     <thead>
                       <tr>
@@ -1007,7 +1234,7 @@ export default function UsherEventManagement() {
                       </tr>
                     </thead>
                     <tbody>
-                      {csvRows.map((row, idx) => (
+                      {csvPreviewRows.map((row, idx) => (
                         <tr key={idx} className={csvErrors.some((err) => err.row === idx + 2) ? 'bg-red-50' : ''}>
                           {requiredHeaders.map((h) => (
                             <td key={h} className="border px-2 py-1">{row[h]}</td>
@@ -1019,13 +1246,23 @@ export default function UsherEventManagement() {
                 </div>
               )}
               {csvRows.length > 0 && (
-                <Button
-                  onClick={handleUploadCSV}
-                  disabled={csvLoading || csvErrors.length > 0}
-                  className="mt-2"
-                >
-                  {csvLoading ? 'Uploading...' : 'Confirm Upload'}
-                </Button>
+                <div className="flex items-center gap-3 mt-2">
+                  <Button
+                    onClick={handleUploadCSV}
+                    disabled={csvLoading || csvErrors.length > 0}
+                  >
+                    {csvLoading ? 'Uploading...' : 'Confirm Upload'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setCsvRows([]); setCsvErrors([]); setCsvFileName(null); setCsvPreviewRows([]); setCsvSuccess(null); setCsvFailure(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </div>
               )}
               {csvSuccess && <div className="text-green-600 mt-2 text-sm">{csvSuccess}</div>}
               {csvFailure && <div className="text-red-600 mt-2 text-sm">{csvFailure}</div>}
@@ -1169,14 +1406,7 @@ export default function UsherEventManagement() {
                   </TableHeader>
                   <TableBody>
                     {attendees
-                      .filter((a) => {
-                        const q = searchTerm.toLowerCase()
-                        return (
-                          a.guest?.name?.toLowerCase().includes(q) ||
-                          a.guest?.email?.toLowerCase().includes(q) ||
-                          a.guest?.company?.toLowerCase().includes(q)
-                        )
-                      })
+                      .filter((a) => !debouncedSearchTerm || a._search?.includes(debouncedSearchTerm))
                       .map((a) => (
                         <TableRow key={a.id}>
                           <TableCell>{a.guest?.name}</TableCell>
@@ -1245,6 +1475,28 @@ export default function UsherEventManagement() {
             {/* Walk-In Registration */}
             <div className="mb-6">
               <h4 className="font-semibold mb-2">Walk-In Registration</h4>
+              
+              {/* Existing Guest Info Banner */}
+              {existingGuestInfo && (
+                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4 rounded">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <div className="w-5 h-5 bg-blue-400 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs">ℹ</span>
+                      </div>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-blue-800">
+                        <strong>Existing guest found!</strong> We found a guest with this email/phone number. 
+                        We'll update their information with the latest details you provide.
+                      </p>
+                      <div className="mt-2 text-xs text-blue-700">
+                        <p><strong>Previous info:</strong> {existingGuestInfo.name} • {existingGuestInfo.company} • {existingGuestInfo.jobtitle}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               <form
                 className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 p-4 rounded border"
                 onSubmit={async (e) => {
@@ -1324,23 +1576,69 @@ export default function UsherEventManagement() {
                   placeholder="Email"
                   type="email"
                   value={addAttendeeForm.email}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setAddAttendeeForm((f: any) => ({
                       ...f,
                       email: e.target.value,
-                    }))
-                  }
+                    }));
+                    
+                    // Check for existing guest when email changes
+                    const email = e.target.value;
+                    const phone = addAttendeeForm.phone;
+                    
+                    // Debounce the validation
+                    const timeoutId = setTimeout(() => {
+                      if (email || phone) {
+                        checkExistingGuest(email, phone);
+                      }
+                    }, 500);
+                    
+                    return () => clearTimeout(timeoutId);
+                  }}
                   required
+                  className={`${
+                    validationStatus.email === 'valid' ? 'border-green-500 focus:border-green-500 focus:ring-green-200' : ''
+                  } ${
+                    validationStatus.email === 'checking' ? 'border-blue-500 focus:border-blue-500 focus:ring-blue-200' : ''
+                  } ${
+                    validationStatus.email === 'duplicate' ? 'border-orange-500 focus:border-orange-500 focus:ring-orange-200' : ''
+                  }`}
                 />
+                {validationStatus.email === 'checking' && (
+                  <div className="col-span-2 flex items-center gap-2 text-blue-600 text-sm">
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Checking availability...</span>
+                  </div>
+                )}
                 <Input
                   placeholder="Phone"
                   value={addAttendeeForm.phone}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setAddAttendeeForm((f: any) => ({
                       ...f,
                       phone: e.target.value,
-                    }))
-                  }
+                    }));
+                    
+                    // Check for existing guest when phone changes
+                    const email = addAttendeeForm.email;
+                    const phone = e.target.value;
+                    
+                    // Debounce the validation
+                    const timeoutId = setTimeout(() => {
+                      if (email || phone) {
+                        checkExistingGuest(email, phone);
+                      }
+                    }, 500);
+                    
+                    return () => clearTimeout(timeoutId);
+                  }}
+                  className={`${
+                    validationStatus.phone === 'valid' ? 'border-green-500 focus:border-green-500 focus:ring-green-200' : ''
+                  } ${
+                    validationStatus.phone === 'checking' ? 'border-blue-500 focus:border-blue-500 focus:ring-blue-200' : ''
+                  } ${
+                    validationStatus.phone === 'duplicate' ? 'border-orange-500 focus:border-orange-500 focus:ring-orange-200' : ''
+                  }`}
                 />
                 <Input
                   placeholder="Company"
@@ -1938,6 +2236,34 @@ export default function UsherEventManagement() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Remove Attendee Confirmation Dialog */}
+      <Dialog open={removeAttendeeDialogOpen} onOpenChange={setRemoveAttendeeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Attendee</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove {attendeeToRemove?.guest?.name || 'this attendee'} from the event? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRemoveAttendeeDialogOpen(false)}
+              disabled={removeAttendeeLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRemoveAttendeeConfirm}
+              disabled={removeAttendeeLoading}
+            >
+              {removeAttendeeLoading ? 'Removing...' : 'Remove Attendee'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

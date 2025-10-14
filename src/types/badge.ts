@@ -51,7 +51,7 @@ export interface QRElement extends BaseElement {
 
 export interface ShapeElement extends BaseElement {
   type: 'shape'
-  shapeType: 'rectangle' | 'ellipse'
+  shapeType: 'rectangle' | 'ellipse' | 'circle' | 'line'
   backgroundColor: string
   borderColor: string
   borderWidth: number

@@ -15,6 +15,7 @@ import {
   DollarSign,
   Package,
 } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -115,6 +116,8 @@ export default function CreateTicketedEvent() {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
+
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -156,6 +159,12 @@ export default function CreateTicketedEvent() {
       return
     }
 
+    // Validate location data
+    if (!formData.city || !formData.venue) {
+      toast.error('Please fill in both city and venue.')
+      return
+    }
+
     setIsSubmitting(true)
     
     try {
@@ -165,7 +174,7 @@ export default function CreateTicketedEvent() {
         end_date: eventRange[0].endDate.toISOString(),
         registration_start_date: regRange[0].startDate.toISOString(),
         registration_end_date: regRange[0].endDate.toISOString(),
-        location: `${formData.city}, ${formData.venue}`,
+        location: formData.city && formData.venue ? `${formData.city}, ${formData.venue}` : formData.venue || formData.city || '',
         max_guests: parseInt(formData.max_guests, 10),
         ...(user?.role !== 'organizer' && { organizer_id: formData.organizer_id }),
         event_type: 'ticketed',
@@ -191,9 +200,13 @@ export default function CreateTicketedEvent() {
           }
         })
         headers = { 'Content-Type': 'multipart/form-data' }
+      } else {
+        // If no image is uploaded, add the default banner path
+        processedFormData.event_image = '/banner.png'
+        payload = processedFormData
       }
 
-      await api.post('/events/ticketed', payload, { headers })
+      await api.post('/events/ticketed/add', payload, { headers })
       toast.success('Ticketed event created successfully!')
       navigate('/dashboard/events')
     } catch (error: any) {
@@ -345,17 +358,18 @@ export default function CreateTicketedEvent() {
               </div>
               
               <div>
-                <Label className="flex items-center gap-2 text-gray-700 font-medium">
-                  <MapPin className="w-4 h-4 text-green-500" /> City
+                <Label htmlFor="city" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <MapPin className="w-4 h-4 text-blue-500" /> City
                 </Label>
                 <Select
                   value={formData.city}
                   onValueChange={(value) => handleInputChange('city', value)}
+                  required
                 >
-                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl">
+                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl">
                     <SelectValue placeholder="Select a city" />
                   </SelectTrigger>
-                  <SelectContent className="max-h-60">
+                  <SelectContent>
                     {ETHIOPIAN_CITIES.map((city) => (
                       <SelectItem key={city} value={city}>
                         {city}
@@ -373,7 +387,8 @@ export default function CreateTicketedEvent() {
                   id="venue"
                   value={formData.venue}
                   onChange={(e) => handleInputChange('venue', e.target.value)}
-                  placeholder="e.g. Grand Convention Center"
+                  placeholder="Enter venue name"
+                  required
                   className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl"
                 />
               </div>
@@ -391,6 +406,101 @@ export default function CreateTicketedEvent() {
                   className="mt-2 h-12 border-gray-300 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Event Image Upload */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                <Image className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Event Image</h3>
+                <p className="text-gray-500 text-sm">Upload an image for your event (optional)</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <Label htmlFor="event_image" className="flex items-center gap-2 text-gray-700 font-medium">
+                    <Upload className="w-4 h-4 text-purple-500" /> Event Image
+                  </Label>
+                  <div className="mt-2">
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      id="event_image"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => imageInputRef.current?.click()}
+                        className="flex items-center gap-2 border-2 border-dashed border-gray-300 hover:border-purple-500 hover:bg-purple-50 transition-all duration-200"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Choose Image
+                      </Button>
+                      {formData.event_image && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, event_image: null }))
+                            if (imageInputRef.current) {
+                              imageInputRef.current.value = ''
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Maximum file size: 2MB. Supported formats: JPG, PNG, GIF
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Image Preview */}
+                <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center">
+                  {formData.event_image ? (
+                    <img
+                      src={URL.createObjectURL(formData.event_image)}
+                      alt="Event preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-center text-gray-400">
+                      <Image className="w-8 h-8 mx-auto mb-2" />
+                      <p className="text-xs">No image</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {!formData.event_image && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Image className="w-3 h-3 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">Default Image</p>
+                      <p className="text-sm text-blue-700 mt-1">
+                        If no image is uploaded, the default banner image will be used for your event.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

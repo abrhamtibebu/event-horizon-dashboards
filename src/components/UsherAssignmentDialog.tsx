@@ -28,6 +28,8 @@ interface UsherAssignmentDialogProps {
   eventName: string
   trigger?: React.ReactNode
   onSuccess?: () => void
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 interface UsherAssignment {
@@ -40,8 +42,12 @@ export function UsherAssignmentDialog({
   eventName,
   trigger,
   onSuccess,
+  open: externalOpen,
+  onOpenChange: externalOnOpenChange,
 }: UsherAssignmentDialogProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = externalOpen !== undefined ? externalOpen : internalOpen
+  const setOpen = externalOnOpenChange || setInternalOpen
   const [availableUshers, setAvailableUshers] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [assigning, setAssigning] = useState(false)
@@ -129,7 +135,7 @@ export function UsherAssignmentDialog({
         if (response.status >= 200 && response.status < 300) {
           toast.success('Ushers assigned successfully!');
           setOpen(false);
-        setUsherAssignments([{ usherId: '', tasks: '' }]);
+          setUsherAssignments([{ usherId: '', tasks: '' }]);
           onSuccess?.();
           return;
         }
@@ -154,14 +160,11 @@ export function UsherAssignmentDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button variant="outline" className="w-full justify-start">
-            <UserPlus className="w-4 h-4 mr-2" />
-            Assign Ushers
-          </Button>
-        )}
-      </DialogTrigger>
+      {trigger && (
+        <DialogTrigger asChild>
+          {trigger}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Assign Ushers to Event</DialogTitle>

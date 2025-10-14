@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import {
   Users,
   UserPlus,
@@ -58,6 +58,9 @@ import api, {
   updateUsherTasks,
   getMyEvents,
   getAllOrganizers,
+  getUsherRegistrations,
+  exportUsherRegistrations,
+  updateUsherRegistrationStatus,
 } from '@/lib/api'
 import { format, parseISO } from 'date-fns'
 
@@ -90,6 +93,9 @@ export default function UsherManagement() {
   const [bulkAssignDialogOpen, setBulkAssignDialogOpen] = useState(false)
   const [bulkTasks, setBulkTasks] = useState('')
   const [bulkAssigning, setBulkAssigning] = useState(false)
+  const [currentEventDate, setCurrentEventDate] = useState<string>('')
+  const [registeredUshers, setRegisteredUshers] = useState<any[]>([])
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -97,8 +103,15 @@ export default function UsherManagement() {
 
   useEffect(() => {
     if (selectedEvent) {
+      console.log('Selected event changed to:', selectedEvent, 'loading event ushers...')
       loadEventUshers(selectedEvent)
       loadUsherTaskStatuses(selectedEvent)
+      loadRegisteredUshers(Number(selectedEvent))
+      // Get the current event's date for availability checking
+      const event = events.find(e => e.id.toString() === selectedEvent)
+      if (event?.start_date) {
+        setCurrentEventDate(new Date(event.start_date).toISOString().split('T')[0])
+      }
     }
   }, [selectedEvent])
 
@@ -109,6 +122,13 @@ export default function UsherManagement() {
   useEffect(() => {
     calculateStats()
   }, [ushers, eventUshers, usherTaskStatuses])
+
+  // Debug logging for usher details
+  useEffect(() => {
+    if (selectedUsherDetails) {
+      console.log('Checking assignments for usher', selectedUsherDetails.id, 'eventUshers:', eventUshers)
+    }
+  }, [selectedUsherDetails, eventUshers])
 
   const loadData = async () => {
     setLoading(true)
@@ -159,10 +179,36 @@ export default function UsherManagement() {
   const loadEventUshers = async (eventId: string) => {
     try {
       const response = await getEventUshers(Number(eventId))
+      console.log('Event ushers loaded for event', eventId, ':', response.data)
       setEventUshers(response.data)
     } catch (error) {
-      console.error('Failed to load event ushers:', error)
+      console.error('Failed to load event ushers for event', eventId, ':', error)
       toast.error('Failed to load event ushers')
+      setEventUshers([])
+    }
+  }
+
+  const loadRegisteredUshers = async (eventIdNum: number) => {
+    try {
+      const res = await getUsherRegistrations(eventIdNum)
+      setRegisteredUshers(Array.isArray(res.data) ? res.data : (res.data?.data ?? []))
+    } catch (e) {
+      setRegisteredUshers([])
+    }
+  }
+
+  const handleUpdateRegistrationStatus = async (registrationId: number, status: string) => {
+    if (!selectedEvent) return
+    
+    try {
+      await updateUsherRegistrationStatus(Number(selectedEvent), registrationId, status)
+      toast.success(`Usher registration ${status} successfully!`)
+      
+      // Reload the registered ushers list
+      await loadRegisteredUshers(Number(selectedEvent))
+    } catch (error) {
+      console.error('Failed to update registration status:', error)
+      toast.error('Failed to update registration status')
     }
   }
 
@@ -177,7 +223,7 @@ export default function UsherManagement() {
 
   const loadUsherAvailability = async () => {
     try {
-      const response = await api.get('/ushers/available')
+      const response = await api.get('/ushers/assignments-with-dates')
       setUsherAvailability(response.data)
     } catch (error) {
       console.error('Failed to load usher availability:', error)
@@ -188,7 +234,21 @@ export default function UsherManagement() {
   const calculateStats = () => {
     const totalUshers = ushers.length
     const assignedUshers = eventUshers.length
-    const availableUshers = totalUshers - assignedUshers
+    
+    console.log('Calculating stats - totalUshers:', totalUshers, 'assignedUshers:', assignedUshers, 'eventUshers:', eventUshers)
+    
+    // Calculate truly available ushers (not assigned to current event AND not assigned to other event on same date)
+    const availableUshers = ushers.filter(usher => {
+      const isAssigned = eventUshers.some(eu => eu.id === usher.id)
+      const isAssignedToOtherEventOnSameDate = usherAvailability.some(availability => {
+        if (availability.usher_id === usher.id && availability.event_id !== parseInt(selectedEvent || '0')) {
+          const otherEventDate = new Date(availability.event_start_date).toISOString().split('T')[0]
+          return otherEventDate === currentEventDate
+        }
+        return false
+      })
+      return !isAssigned && !isAssignedToOtherEventOnSameDate
+    }).length
     
     let completedTasks = 0
     let totalTasks = 0
@@ -223,7 +283,10 @@ export default function UsherManagement() {
       setEditDialogOpen(false)
       setEditingTasks('')
       setSelectedUsher(null)
-      loadEventUshers(selectedEvent)
+      console.log('Tasks updated, refreshing data...')
+      await loadEventUshers(selectedEvent)
+      await loadUsherTaskStatuses(selectedEvent)
+      calculateStats()
     } catch (error) {
       console.error('Failed to update tasks:', error)
       toast.error('Failed to update tasks')
@@ -238,7 +301,11 @@ export default function UsherManagement() {
     try {
       await api.delete(`/events/${selectedEvent}/ushers/${usherId}`)
       toast.success('Usher removed from event')
-      loadEventUshers(selectedEvent)
+      console.log('Usher removed, refreshing data...')
+      await loadEventUshers(selectedEvent)
+      await loadUsherTaskStatuses(selectedEvent)
+      await loadUsherAvailability()
+      calculateStats()
     } catch (error) {
       console.error('Failed to remove usher:', error)
       toast.error('Failed to remove usher')
@@ -265,7 +332,11 @@ export default function UsherManagement() {
       setBulkAssignDialogOpen(false)
       setBulkTasks('')
       setSelectedUshersForBulk(new Set())
-      loadEventUshers(selectedEvent)
+      console.log('Bulk assignment successful, refreshing data...')
+      await loadEventUshers(selectedEvent)
+      await loadUsherTaskStatuses(selectedEvent)
+      await loadUsherAvailability()
+      calculateStats()
     } catch (error) {
       console.error('Failed to bulk assign ushers:', error)
       toast.error('Failed to assign ushers')
@@ -305,6 +376,49 @@ export default function UsherManagement() {
     }
   }
 
+  // Function to get color coding for tasks based on task type
+  const getTaskColor = (task: string) => {
+    const taskLower = task.toLowerCase().trim()
+    
+    // Check-in related tasks
+    if (taskLower.includes('check-in') || taskLower.includes('checkin') || taskLower.includes('registration')) {
+      return 'bg-blue-100 text-blue-800 border-blue-200'
+    }
+    
+    // Security related tasks
+    if (taskLower.includes('security') || taskLower.includes('guard') || taskLower.includes('safety')) {
+      return 'bg-red-100 text-red-800 border-red-200'
+    }
+    
+    // Guest assistance tasks
+    if (taskLower.includes('guest') || taskLower.includes('assistance') || taskLower.includes('help') || taskLower.includes('support')) {
+      return 'bg-green-100 text-green-800 border-green-200'
+    }
+    
+    // Crowd control tasks
+    if (taskLower.includes('crowd') || taskLower.includes('control') || taskLower.includes('manage')) {
+      return 'bg-purple-100 text-purple-800 border-purple-200'
+    }
+    
+    // Communication tasks
+    if (taskLower.includes('communication') || taskLower.includes('announcement') || taskLower.includes('coordination')) {
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+    }
+    
+    // Technical tasks
+    if (taskLower.includes('technical') || taskLower.includes('equipment') || taskLower.includes('setup') || taskLower.includes('audio') || taskLower.includes('video')) {
+      return 'bg-indigo-100 text-indigo-800 border-indigo-200'
+    }
+    
+    // Emergency tasks
+    if (taskLower.includes('emergency') || taskLower.includes('first aid') || taskLower.includes('medical')) {
+      return 'bg-orange-100 text-orange-800 border-orange-200'
+    }
+    
+    // Default color for other tasks
+    return 'bg-gray-100 text-gray-800 border-gray-200'
+  }
+
   const filteredUshers = ushers.filter((usher) => {
     const matchesSearch =
       usher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -322,6 +436,11 @@ export default function UsherManagement() {
   })
 
   const currentEvent = events.find((e) => e.id.toString() === selectedEvent)
+
+  // Debug logging for ushers table rendering (after filteredUshers is defined)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Rendering ushers table, filteredUshers:', filteredUshers.length, 'eventUshers:', eventUshers.length)
+  }
 
   if (loading) {
     return (
@@ -367,7 +486,7 @@ export default function UsherManagement() {
         
         {/* Action Button */}
         {currentEvent && (
-          <div className="mt-6">
+          <div className="mt-6 flex gap-3 flex-wrap">
             <UsherAssignmentDialog
               eventId={Number(selectedEvent)}
               eventName={currentEvent.name}
@@ -377,8 +496,24 @@ export default function UsherManagement() {
                   Assign Ushers
                 </Button>
               }
-              onSuccess={() => loadEventUshers(selectedEvent)}
+              onSuccess={async () => {
+                console.log('Usher assignment successful, refreshing data...')
+                await loadEventUshers(selectedEvent)
+                await loadUsherTaskStatuses(selectedEvent)
+                await loadUsherAvailability()
+                calculateStats()
+              }}
             />
+            <Link to={`/dashboard/usher-management/register?eventId=${selectedEvent}`}>
+              <Button variant="outline" className="shadow-sm">
+                Register Ushers
+              </Button>
+            </Link>
+            <Link to="/dashboard/usher-management/links">
+              <Button variant="outline" className="shadow-sm">
+                Manage Links
+              </Button>
+            </Link>
           </div>
         )}
       </div>
@@ -529,6 +664,138 @@ export default function UsherManagement() {
         </div>
       </div>
 
+      {/* Registered Ushers Section */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Registered Ushers</h3>
+            <p className="text-sm text-gray-600">Ushers who registered via the generated link</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" disabled={!selectedEvent || exporting} onClick={async () => {
+              if (!selectedEvent) return
+              try {
+                setExporting(true)
+                const resp = await exportUsherRegistrations(Number(selectedEvent))
+                const blob = new Blob([resp.data], { type: 'text/csv;charset=utf-8;' })
+                const url = window.URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `registered_ushers_event_${selectedEvent}.csv`
+                a.click()
+                window.URL.revokeObjectURL(url)
+              } catch (e) {
+                toast.error('Failed to export')
+              } finally {
+                setExporting(false)
+              }
+            }}>Export</Button>
+          </div>
+        </div>
+
+        {registeredUshers.length === 0 ? (
+          <div className="text-sm text-gray-600">No registrations yet.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Payment Method</TableHead>
+                  <TableHead>Bank Info</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Payment Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                  <TableHead>Registered At</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {registeredUshers.map((u: any) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">{u.name}</TableCell>
+                    <TableCell>{u.email}</TableCell>
+                    <TableCell>{u.phone || '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {u.payment_method?.replace('_', ' ') || 'cash'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {u.payment_method === 'bank_transfer' && u.bank_name && u.bank_account ? (
+                        <div className="text-sm">
+                          <div className="font-medium">{u.bank_name}</div>
+                          <div className="text-gray-600">{u.bank_account}</div>
+                        </div>
+                      ) : u.payment_method === 'mobile_money' && u.mobile_wallet ? (
+                        <div className="text-sm">{u.mobile_wallet}</div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`${
+                        u.status === 'approved' ? 'bg-green-100 text-green-800 border-green-200' :
+                        u.status === 'rejected' ? 'bg-red-100 text-red-800 border-red-200' :
+                        'bg-blue-100 text-blue-800 border-blue-200'
+                      }`}>
+                        {(u.status || 'pending').toString()}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={`${
+                        u.payment_status === 'paid' ? 'bg-green-50 text-green-700 border-green-200' :
+                        u.payment_status === 'failed' ? 'bg-red-50 text-red-700 border-red-200' :
+                        u.payment_status === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                        'bg-gray-50 text-gray-700 border-gray-200'
+                      }`}>
+                        {u.payment_status || 'n/a'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {u.status === 'pending' && (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-green-600 border-green-200 hover:bg-green-50"
+                            onClick={() => handleUpdateRegistrationStatus(u.id, 'approved')}
+                          >
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 border-red-200 hover:bg-red-50"
+                            onClick={() => handleUpdateRegistrationStatus(u.id, 'rejected')}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      )}
+                      {u.status === 'approved' && (
+                        <Badge className="bg-green-100 text-green-800 border-green-200">
+                          Accepted
+                        </Badge>
+                      )}
+                      {u.status === 'rejected' && (
+                        <Badge className="bg-red-100 text-red-800 border-red-200">
+                          Rejected
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-600">
+                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
       {/* Filters and Search */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
         <div className="flex items-center justify-between mb-6">
@@ -651,6 +918,18 @@ export default function UsherManagement() {
                     const assignedUsher = eventUshers.find(
                       (eu) => eu.id === usher.id
                     )
+                    
+                    // Check if usher is assigned to any other event on the same date
+                    const isAssignedToOtherEventOnSameDate = usherAvailability.some((availability) => {
+                      if (availability.usher_id === usher.id && availability.event_id !== parseInt(selectedEvent)) {
+                        const otherEventDate = new Date(availability.event_start_date).toISOString().split('T')[0]
+                        return otherEventDate === currentEventDate
+                      }
+                      return false
+                    })
+                    
+                    // Usher is available if not assigned to current event AND not assigned to other event on same date
+                    const isAvailable = !isAssigned && !isAssignedToOtherEventOnSameDate
                     const tasks = assignedUsher?.pivot?.tasks
                       ? Array.isArray(assignedUsher.pivot.tasks)
                         ? assignedUsher.pivot.tasks
@@ -658,48 +937,20 @@ export default function UsherManagement() {
                       : []
                     let statusBadge = null
                     if (isAssigned) {
-                      const usherStatus = usherTaskStatuses.find(
-                        (u: any) => u.usher_id === usher.id
+                      // For UsherManagement page, show simple "Assigned" status for all assigned ushers
+                      statusBadge = (
+                        <Badge className="bg-blue-100 text-blue-800 border border-blue-200">
+                          <UserCheck className="w-3 h-3 mr-1" />
+                          Assigned
+                        </Badge>
                       )
-                      if (usherStatus && usherStatus.tasks.length > 0) {
-                        const completion = usherStatus.task_completion || {}
-                        const allComplete =
-                          usherStatus.tasks.length > 0 &&
-                          Object.values(completion).length > 0 &&
-                          Object.values(completion).every((v: any) => v)
-                        const anyComplete = Object.values(completion).some(
-                          (v: any) => v
-                        )
-                        if (allComplete) {
-                          statusBadge = (
-                            <Badge className="bg-green-100 text-green-800 border border-green-200">
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              All Tasks Complete
-                            </Badge>
-                          )
-                        } else if (anyComplete) {
-                          statusBadge = (
-                            <Badge className="bg-yellow-100 text-yellow-800 border border-yellow-200">
-                              <Clock className="w-3 h-3 mr-1" />
-                              In Progress
-                            </Badge>
-                          )
-                        } else {
-                          statusBadge = (
-                            <Badge className="bg-blue-100 text-blue-800 border border-blue-200">
-                              <UserCheck className="w-3 h-3 mr-1" />
-                              Assigned
-                            </Badge>
-                          )
-                        }
-                      } else {
-                        statusBadge = (
-                          <Badge className="bg-gray-100 text-gray-800 border border-gray-200">
-                            <UserCheck className="w-3 h-3 mr-1" />
-                            No Tasks Assigned
-                          </Badge>
-                        )
-                      }
+                    } else if (isAssignedToOtherEventOnSameDate) {
+                      statusBadge = (
+                        <Badge className="bg-orange-100 text-orange-800 border border-orange-200">
+                          <Calendar className="w-3 h-3 mr-1" />
+                          Assigned to Other Event
+                        </Badge>
+                      )
                     } else {
                       statusBadge = (
                         <Badge className="bg-gray-100 text-gray-800 border border-gray-200">
@@ -742,7 +993,7 @@ export default function UsherManagement() {
                                 <Badge
                                   key={index}
                                   variant="outline"
-                                  className="text-xs bg-gray-50 border-gray-200"
+                                  className={`text-xs ${getTaskColor(task)}`}
                                 >
                                   {task}
                                 </Badge>
@@ -888,6 +1139,28 @@ export default function UsherManagement() {
                 onChange={(e) => setBulkTasks(e.target.value)}
                 rows={4}
               />
+              {bulkTasks.trim() && (
+                <div className="mt-2">
+                  <Label className="text-sm text-gray-600">Task Preview:</Label>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {bulkTasks.split(',').map((task: string, index: number) => {
+                      const trimmedTask = task.trim()
+                      if (trimmedTask) {
+                        return (
+                          <Badge
+                            key={index}
+                            variant="outline"
+                            className={`text-xs ${getTaskColor(trimmedTask)}`}
+                          >
+                            {trimmedTask}
+                          </Badge>
+                        )
+                      }
+                      return null
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             
             <div>
@@ -973,7 +1246,20 @@ export default function UsherManagement() {
                           <div key={assignedUsher.id} className="p-3 border rounded-lg">
                             <div className="font-medium">{currentEvent?.name}</div>
                             <div className="text-sm text-gray-600 mt-1">
-                              Tasks: {tasks.join(', ') || 'No tasks assigned'}
+                              Tasks: 
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {tasks.length > 0 ? tasks.map((task: string, index: number) => (
+                                  <Badge
+                                    key={index}
+                                    variant="outline"
+                                    className={`text-xs ${getTaskColor(task)}`}
+                                  >
+                                    {task}
+                                  </Badge>
+                                )) : (
+                                  <span className="text-gray-500">No tasks assigned</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )
@@ -1001,9 +1287,12 @@ export default function UsherManagement() {
                               ) : (
                                 <Clock className="w-4 h-4 text-yellow-500" />
                               )}
-                              <span className={isCompleted ? 'line-through text-gray-500' : ''}>
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${getTaskColor(task)} ${isCompleted ? 'opacity-50' : ''}`}
+                              >
                                 {task}
-                              </span>
+                              </Badge>
                             </div>
                           )
                         })}

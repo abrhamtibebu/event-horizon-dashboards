@@ -35,6 +35,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { mockData, isMockMode, getMockData } from '@/lib/mockData'
 
 export default function OrganizerDashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null)
@@ -101,9 +102,17 @@ export default function OrganizerDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
-      const response = await api.get('/dashboard/organizer')
-      setDashboardData(response.data)
-      setError(null)
+      
+      if (isMockMode()) {
+        // Use mock data in development mode
+        const mockDashboardData = await getMockData(mockData.dashboardData)
+        setDashboardData(mockDashboardData)
+        setError(null)
+      } else {
+        const response = await api.get('/dashboard/organizer')
+        setDashboardData(response.data)
+        setError(null)
+      }
     } catch (err: any) {
       let message = 'Failed to fetch organizer dashboard data.'
       if (err.response && err.response.data && err.response.data.error) {
@@ -130,14 +139,20 @@ export default function OrganizerDashboard() {
   useEffect(() => {
     const start = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1)
     const end = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0)
-    api.get('/organizer/events', {
-      params: {
-        start_date: start.toISOString().slice(0, 10),
-        end_date: end.toISOString().slice(0, 10),
-      },
-    })
-      .then((res) => setMonthEvents(res.data))
-      .catch(() => setMonthEvents([]))
+    
+    if (isMockMode()) {
+      // Use mock data in development mode
+      setMonthEvents(mockData.events)
+    } else {
+      api.get('/organizer/events', {
+        params: {
+          start_date: start.toISOString().slice(0, 10),
+          end_date: end.toISOString().slice(0, 10),
+        },
+      })
+        .then((res) => setMonthEvents(res.data))
+        .catch(() => setMonthEvents([]))
+    }
   }, [calendarMonth])
 
   // Fetch events for selected date
@@ -219,8 +234,14 @@ export default function OrganizerDashboard() {
       setEventsLoading(true);
       setEventsError(null);
       try {
-        const res = await api.get('/events');
-        setAllEvents(res.data);
+        if (isMockMode()) {
+          // Use mock data in development mode
+          const mockEventsData = await getMockData(mockData.events)
+          setAllEvents(mockEventsData);
+        } else {
+          const res = await api.get('/events');
+          setAllEvents(res.data);
+        }
       } catch (err: any) {
         setEventsError(err.response?.data?.message || 'Failed to fetch events');
       } finally {
@@ -292,36 +313,47 @@ export default function OrganizerDashboard() {
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
-        const [summaryRes, eventsRes] = await Promise.all([
-          api.get('/reports/summary'),
-          api.get('/events'),
-        ]);
-        // Guest type distribution
-        if (summaryRes.data.guest_type_breakdown) {
-          const processedData = Object.entries(summaryRes.data.guest_type_breakdown)
-            .map(([name, value]) => ({ 
-              name: name || 'Unknown', 
-              value: typeof value === 'number' ? value : parseInt(value) || 0 
-            }))
-            .filter(item => item.value > 0); // Only include items with positive values
-          setGuestTypeDistribution(processedData);
+        if (isMockMode()) {
+          // Use mock data in development mode
+          const mockAnalyticsData = await getMockData(mockData.analytics)
+          setGuestTypeDistribution([
+            { name: 'VIP', value: 25 },
+            { name: 'Standard', value: 75 },
+            { name: 'Student', value: 50 }
+          ]);
+          setEventPopularity(mockAnalyticsData.top_events);
         } else {
-          setGuestTypeDistribution([]);
-        }
-        // Event popularity (top events by attendance)
-        if (summaryRes.data.top_events_by_attendance && Array.isArray(eventsRes.data)) {
-          const eventIdToName: Record<string, string> = {};
-          eventsRes.data.forEach((event: any) => {
-            eventIdToName[String(event.id)] = event.name;
-          });
-          setEventPopularity(
-            Object.entries(summaryRes.data.top_events_by_attendance).map(([id, attendees]) => ({
-              name: eventIdToName[id] || `Event #${id}`,
-              attendees,
-            }))
-          );
-        } else {
-          setEventPopularity([]);
+          const [summaryRes, eventsRes] = await Promise.all([
+            api.get('/reports/summary'),
+            api.get('/events'),
+          ]);
+          // Guest type distribution
+          if (summaryRes.data.guest_type_breakdown) {
+            const processedData = Object.entries(summaryRes.data.guest_type_breakdown)
+              .map(([name, value]) => ({ 
+                name: name || 'Unknown', 
+                value: typeof value === 'number' ? value : parseInt(value) || 0 
+              }))
+              .filter(item => item.value > 0); // Only include items with positive values
+            setGuestTypeDistribution(processedData);
+          } else {
+            setGuestTypeDistribution([]);
+          }
+          // Event popularity (top events by attendance)
+          if (summaryRes.data.top_events_by_attendance && Array.isArray(eventsRes.data)) {
+            const eventIdToName: Record<string, string> = {};
+            eventsRes.data.forEach((event: any) => {
+              eventIdToName[String(event.id)] = event.name;
+            });
+            setEventPopularity(
+              Object.entries(summaryRes.data.top_events_by_attendance).map(([id, attendees]) => ({
+                name: eventIdToName[id] || `Event #${id}`,
+                attendees,
+              }))
+            );
+          } else {
+            setEventPopularity([]);
+          }
         }
       } catch (err) {
         setGuestTypeDistribution([]);
@@ -364,7 +396,7 @@ export default function OrganizerDashboard() {
   };
 
   // Get current chart data based on zoom level
-  const currentChartData = getChartDataByZoomLevel(eventPerformance || [], chartZoomLevel);
+  const currentChartData = getChartDataByZoomLevel(Array.isArray(eventPerformance) ? eventPerformance : [], chartZoomLevel);
 
   // Filtered events/messages by search
   const filteredEvents = searchQuery && myEvents
@@ -1179,6 +1211,9 @@ export default function OrganizerDashboard() {
                 <div className="text-sm font-medium text-orange-700">Peak Month</div>
                 <div className="text-lg font-bold text-orange-900">
                   {(() => {
+                    if (!currentChartData || currentChartData.length === 0) {
+                      return 'N/A';
+                    }
                     const peakMonth = currentChartData.reduce((max, item) => 
                       (item.registrations || 0) > (max.registrations || 0) ? item : max
                     );
