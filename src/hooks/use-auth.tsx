@@ -51,23 +51,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // For development, if no token exists, go directly to mock mode
       // But only if we haven't just logged out (check for a logout flag)
-      if (!token && import.meta.env.DEV && !sessionStorage.getItem('just_logged_out')) {
-        console.log('[Auth] No token found, entering mock authentication mode for development')
-        localStorage.setItem('mock_auth', 'true')
-        setUser({
-          id: '6',
-          email: 'test@organizer.com',
-          role: 'organizer',
-          organizer_id: 1,
-          organizer: {
-            id: 1,
-            name: 'Test Organizer',
-            status: 'active'
-          }
-        })
-        setIsLoading(false)
-        return
-      }
+      // DISABLED: Don't automatically enter mock mode to allow real API calls
+      // if (!token && import.meta.env.DEV && !sessionStorage.getItem('just_logged_out')) {
+      //   console.log('[Auth] No token found, entering mock authentication mode for development')
+      //   localStorage.setItem('mock_auth', 'true')
+      //   setUser({
+      //     id: '6',
+      //     email: 'test@organizer.com',
+      //     role: 'organizer',
+      //     organizer_id: 1,
+      //     organizer: {
+      //       id: 1,
+      //       name: 'Test Organizer',
+      //       status: 'active'
+      //     }
+      //   })
+      //   setIsLoading(false)
+      //   return
+      // }
       
       if (token) {
         try {
@@ -75,8 +76,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const { data } = await api.get('/me')
           console.log('[Auth] User data received:', data)
           setUser(data)
-          // Clear mock auth flag if we successfully authenticated
-          localStorage.removeItem('mock_auth')
+      // Clear mock auth flag if we successfully authenticated
+      localStorage.removeItem('mock_auth')
+      // Also clear it on initialization to ensure we're not in mock mode
+      localStorage.removeItem('mock_auth')
         } catch (error) {
           console.error('[Auth] Session expired or invalid:', error)
           // For development, create a mock user if API fails

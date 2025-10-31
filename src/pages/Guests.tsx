@@ -25,6 +25,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import Pagination from '@/components/Pagination';
+import { usePagination } from '@/hooks/usePagination';
+import { useModernAlerts } from '@/hooks/useModernAlerts';
 
 interface Guest {
   id: string;
@@ -46,7 +49,23 @@ export default function Guests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  
+  // Modern alerts system
+  const { showSuccess, showError, showInfo } = useModernAlerts();
   const { user } = useAuth();
+  
+  // Pagination hook
+  const {
+    currentPage,
+    perPage,
+    totalPages,
+    totalRecords,
+    setTotalPages,
+    setTotalRecords,
+    handlePageChange,
+    handlePerPageChange,
+    resetPagination
+  } = usePagination({ defaultPerPage: 15, searchParamPrefix: 'guests' });
 
   // Add a mapping from guest ID to event names
   const [guestEvents, setGuestEvents] = useState<Record<string, string[]>>({});
@@ -66,22 +85,27 @@ export default function Guests() {
         setLoading(true);
         setError(null);
         const eventsRes = await getMyEvents('active,upcoming,completed');
-        const events = eventsRes.data || [];
+        // Handle paginated response structure
+        const events = eventsRes.data.data || eventsRes.data || [];
         const allAttendees: any[] = [];
         const guestEventMap: Record<string, string[]> = {};
         for (const event of events) {
           try {
             const attendeesRes = await api.get(`/events/${event.id}/attendees`);
-            if (Array.isArray(attendeesRes.data)) {
-              attendeesRes.data.forEach(att => {
+            // Handle paginated response structure
+            const attendees = attendeesRes.data.data || attendeesRes.data || [];
+            if (Array.isArray(attendees)) {
+              attendees.forEach(att => {
                 if (att.guest && att.guest.id) {
                   if (!guestEventMap[att.guest.id]) guestEventMap[att.guest.id] = [];
                   guestEventMap[att.guest.id].push(event.name);
                 }
               });
-              allAttendees.push(...attendeesRes.data);
+              allAttendees.push(...attendees);
             }
-          } catch (e) {}
+          } catch (e) {
+            console.error(`Failed to fetch attendees for event ${event.id}:`, e);
+          }
         }
         const guestMap: Record<string, Guest> = {};
         allAttendees.forEach(att => {
@@ -93,8 +117,14 @@ export default function Guests() {
         });
         setGuests(Object.values(guestMap));
         setGuestEvents(guestEventMap);
+        setTotalPages(1);
+        setTotalRecords(Object.values(guestMap).length);
       } catch (err) {
+        console.error('Failed to fetch guests:', err);
         setError('Failed to fetch guests.');
+        setGuests([]);
+        setTotalPages(1);
+        setTotalRecords(0);
       } finally {
         setLoading(false);
       }
@@ -106,14 +136,17 @@ export default function Guests() {
         setError(null);
         // Fetch all events
         const eventsRes = await api.get('/events');
-        const events = eventsRes.data || [];
+        // Handle paginated response structure
+        const events = eventsRes.data.data || eventsRes.data || [];
         const allAttendees: any[] = [];
         const guestEventMap: Record<string, Set<string>> = {};
         for (const event of events) {
           try {
             const attendeesRes = await api.get(`/events/${event.id}/attendees`);
-            if (Array.isArray(attendeesRes.data)) {
-              attendeesRes.data.forEach(att => {
+            // Handle paginated response structure
+            const attendees = attendeesRes.data.data || attendeesRes.data || [];
+            if (Array.isArray(attendees)) {
+              attendees.forEach(att => {
                 if (att.guest && att.guest.id) {
                   if (!guestEventMap[att.guest.id]) guestEventMap[att.guest.id] = new Set();
                   guestEventMap[att.guest.id].add(event.name);
@@ -121,7 +154,9 @@ export default function Guests() {
                 }
               });
             }
-          } catch (e) {}
+          } catch (e) {
+            console.error(`Failed to fetch attendees for event ${event.id}:`, e);
+          }
         }
         // Aggregate unique guests
         const guestMap: Record<string, Guest> = {};
@@ -139,8 +174,14 @@ export default function Guests() {
           guestEventArrMap[id] = Array.from(guestEventMap[id]);
         });
         setGuestEvents(guestEventArrMap);
+        setTotalPages(1);
+        setTotalRecords(Object.values(guestMap).length);
       } catch (err) {
+        console.error('Failed to fetch guests:', err);
         setError('Failed to fetch guests.');
+        setGuests([]);
+        setTotalPages(1);
+        setTotalRecords(0);
       } finally {
         setLoading(false);
       }
@@ -153,59 +194,44 @@ export default function Guests() {
     }
   }, [user]);
 
-  const filteredGuests = guests.filter(g => {
-    const search = filter.toLowerCase();
-    
-    // Text search filter
-    const matchesSearch = (
-      g.name?.toLowerCase().includes(search) ||
-      g.email?.toLowerCase().includes(search) ||
-      g.phone?.toLowerCase().includes(search) ||
-      g.company?.toLowerCase().includes(search) ||
-      g.jobtitle?.toLowerCase().includes(search) ||
-      g.gender?.toLowerCase().includes(search) ||
-      g.country?.toLowerCase().includes(search)
-    );
+  // Handle search and filter changes with pagination reset
+  const handleSearchChange = (value: string) => {
+    setFilter(value);
+    resetPagination();
+  };
 
-    if (!matchesSearch) return false;
+  const handleEventFilterChange = (value: string) => {
+    setEventFilter(value);
+    resetPagination();
+  };
 
-    // Event filter
-    if (eventFilter !== 'all') {
-      const guestEventNames = guestEvents[g.id] || [];
-      if (!guestEventNames.some(eventName => 
-        eventName.toLowerCase().includes(eventFilter.toLowerCase())
-      )) {
-        return false;
-      }
-    }
+  const handleJobTitleFilterChange = (value: string) => {
+    setJobTitleFilter(value);
+    resetPagination();
+  };
 
-    // Job title filter
-    if (jobTitleFilter !== 'all' && g.jobtitle !== jobTitleFilter) {
-      return false;
-    }
+  const handleCompanyFilterChange = (value: string) => {
+    setCompanyFilter(value);
+    resetPagination();
+  };
 
-    // Company filter
-    if (companyFilter !== 'all' && g.company !== companyFilter) {
-      return false;
-    }
+  const handleCountryFilterChange = (value: string) => {
+    setCountryFilter(value);
+    resetPagination();
+  };
 
-    // Country filter
-    if (countryFilter !== 'all' && g.country !== countryFilter) {
-      return false;
-    }
+  const handleGenderFilterChange = (value: string) => {
+    setGenderFilter(value);
+    resetPagination();
+  };
 
-    // Gender filter
-    if (genderFilter !== 'all' && g.gender !== genderFilter) {
-      return false;
-    }
+  const handleGuestTypeFilterChange = (value: string) => {
+    setGuestTypeFilter(value);
+    resetPagination();
+  };
 
-    // Guest type filter
-    if (guestTypeFilter !== 'all' && g.guest_type?.name !== guestTypeFilter) {
-      return false;
-    }
-
-    return true;
-  });
+  // Since we're now using server-side pagination, we don't need client-side filtering
+  const filteredGuests = guests;
 
   // Helper functions to get unique values for filters
   const getUniqueJobTitles = () => {
@@ -261,10 +287,10 @@ export default function Guests() {
 
   // Placeholder handlers for actions
   const handleSendEmail = (ids: string[]) => {
-    alert(`Send email to: ${ids.join(', ')}`);
+    showInfo('Email Recipients', `Send email to: ${ids.join(', ')}`);
   };
   const handleSendSMS = (ids: string[]) => {
-    alert(`Send SMS to: ${ids.join(', ')}`);
+    showInfo('SMS Recipients', `Send SMS to: ${ids.join(', ')}`);
   };
 
   const clearAllFilters = () => {
@@ -279,7 +305,7 @@ export default function Guests() {
 
   const exportGuestsToCSV = () => {
     if (filteredGuests.length === 0) {
-      alert('No guests to export.');
+      showError('Export Failed', 'No guests to export.');
       return;
     }
 
@@ -310,7 +336,7 @@ export default function Guests() {
     link.click();
     document.body.removeChild(link);
 
-    alert('Guest data exported successfully.');
+    showSuccess('Export Successful', 'Guest data exported successfully.');
   };
 
   return (
@@ -393,7 +419,7 @@ export default function Guests() {
         <Input
                 placeholder="Search guests by name, email, company..."
           value={filter}
-          onChange={e => setFilter(e.target.value)}
+          onChange={e => handleSearchChange(e.target.value)}
                 className="pl-10 bg-gray-50 border-gray-200 focus:bg-white"
         />
             </div>
@@ -418,7 +444,7 @@ export default function Guests() {
             {/* Event Filter */}
             <div>
               <Label className="text-sm font-medium text-gray-700 mb-2 block">Event Attendance</Label>
-              <Select value={eventFilter} onValueChange={setEventFilter}>
+              <Select value={eventFilter} onValueChange={handleEventFilterChange}>
                 <SelectTrigger className="bg-gray-50 border-gray-200 focus:bg-white">
                   <SelectValue placeholder="All Events" />
                 </SelectTrigger>
@@ -434,7 +460,7 @@ export default function Guests() {
             {/* Job Title Filter */}
             <div>
               <Label className="text-sm font-medium text-gray-700 mb-2 block">Job Title</Label>
-              <Select value={jobTitleFilter} onValueChange={setJobTitleFilter}>
+              <Select value={jobTitleFilter} onValueChange={handleJobTitleFilterChange}>
                 <SelectTrigger className="bg-gray-50 border-gray-200 focus:bg-white">
                   <SelectValue placeholder="All Job Titles" />
                 </SelectTrigger>
@@ -450,7 +476,7 @@ export default function Guests() {
             {/* Company Filter */}
             <div>
               <Label className="text-sm font-medium text-gray-700 mb-2 block">Company</Label>
-              <Select value={companyFilter} onValueChange={setCompanyFilter}>
+              <Select value={companyFilter} onValueChange={handleCompanyFilterChange}>
                 <SelectTrigger className="bg-gray-50 border-gray-200 focus:bg-white">
                   <SelectValue placeholder="All Companies" />
                 </SelectTrigger>
@@ -466,7 +492,7 @@ export default function Guests() {
             {/* Country Filter */}
             <div>
               <Label className="text-sm font-medium text-gray-700 mb-2 block">Country</Label>
-              <Select value={countryFilter} onValueChange={setCountryFilter}>
+              <Select value={countryFilter} onValueChange={handleCountryFilterChange}>
                 <SelectTrigger className="bg-gray-50 border-gray-200 focus:bg-white">
                   <SelectValue placeholder="All Countries" />
                 </SelectTrigger>
@@ -482,7 +508,7 @@ export default function Guests() {
             {/* Gender Filter */}
             <div>
               <Label className="text-sm font-medium text-gray-700 mb-2 block">Gender</Label>
-              <Select value={genderFilter} onValueChange={setGenderFilter}>
+              <Select value={genderFilter} onValueChange={handleGenderFilterChange}>
                 <SelectTrigger className="bg-gray-50 border-gray-200 focus:bg-white">
                   <SelectValue placeholder="All Genders" />
                 </SelectTrigger>
@@ -498,7 +524,7 @@ export default function Guests() {
             {/* Guest Type Filter */}
             <div>
               <Label className="text-sm font-medium text-gray-700 mb-2 block">Guest Type</Label>
-              <Select value={guestTypeFilter} onValueChange={setGuestTypeFilter}>
+              <Select value={guestTypeFilter} onValueChange={handleGuestTypeFilterChange}>
                 <SelectTrigger className="bg-gray-50 border-gray-200 focus:bg-white">
                   <SelectValue placeholder="All Guest Types" />
                 </SelectTrigger>
@@ -682,6 +708,18 @@ export default function Guests() {
             </Table>
           </div>
         </div>
+      )}
+
+      {/* Pagination Component */}
+      {!loading && !error && filteredGuests.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalRecords={totalRecords}
+          perPage={perPage}
+          onPageChange={handlePageChange}
+          onPerPageChange={handlePerPageChange}
+        />
       )}
 
       {/* Empty State */}

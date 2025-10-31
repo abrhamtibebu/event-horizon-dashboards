@@ -8,6 +8,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle } from 'lucide-react';
+import { PublicTicketSelector } from '@/components/public/PublicTicketSelector';
+import { PublicPaymentSelector } from '@/components/public/PublicPaymentSelector';
+import { PublicTicketDisplay } from '@/components/public/PublicTicketDisplay';
+import { PaymentProcessingModal } from '@/components/payments/PaymentProcessingModal';
+import { usePublicEventTickets, useInitiateGuestPayment } from '@/lib/api/publicTickets';
+import { useAuth } from '@/hooks/use-auth';
+import type { PaymentMethod, PaymentStatus } from '@/types/tickets';
+import type { PublicTicketType } from '@/types/publicTickets';
 
 export default function PublicEventRegister() {
   const { eventUuid } = useParams();
@@ -17,6 +25,7 @@ export default function PublicEventRegister() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [invitationCode, setInvitationCode] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -43,6 +52,46 @@ export default function PublicEventRegister() {
     phone: 'idle'
   });
   const [existingGuestInfo, setExistingGuestInfo] = useState<any>(null);
+  
+  // Ticketing state
+  const { isAuthenticated } = useAuth();
+  const [purchaseStep, setPurchaseStep] = useState<'tickets' | 'payment' | 'confirmation'>('tickets');
+  const [selectedTickets, setSelectedTickets] = useState<Array<{
+    ticket_type_id: number;
+    quantity: number;
+    ticketType: PublicTicketType;
+  }>>([]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [purchasedTickets, setPurchasedTickets] = useState<any[]>([]);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
+  const [paymentMessage, setPaymentMessage] = useState('');
+  const [paymentProgress, setPaymentProgress] = useState(0);
+  const [ticketGuestInfo, setTicketGuestInfo] = useState({
+    name: '',
+    email: '',
+    phone: '',
+  });
+
+  // Check if event is ticketed
+  const isTicketedEvent = event?.event_type === 'ticketed';
+
+  // Fetch ticket types for ticketed events
+  const { data: ticketTypesData, isLoading: ticketTypesLoading } = usePublicEventTickets(
+    (isTicketedEvent && eventUuid) ? eventUuid : ''
+  );
+
+  // Redirect all users (authenticated or not) to the public ticket purchase page for ticketed events
+  useEffect(() => {
+    if (isTicketedEvent && event?.id) {
+      // Preserve invitation code in URL if present
+      const invCode = searchParams.get('inv');
+      const redirectUrl = invCode 
+        ? `/tickets/purchase/${event.id}?inv=${invCode}`
+        : `/tickets/purchase/${event.id}`;
+      navigate(redirectUrl, { replace: true });
+    }
+  }, [isTicketedEvent, event, navigate, searchParams]);
   
   const genderOptions = ['Male', 'Female', 'Other'];
   const countryOptions = [
@@ -103,25 +152,63 @@ export default function PublicEventRegister() {
     }
   }, [searchParams, eventUuid]);
 
+  // Extract invitation code from URL parameters and track click
+  useEffect(() => {
+    const invParam = searchParams.get('inv');
+    if (invParam) {
+      setInvitationCode(invParam);
+      console.log('[Invitation] Invitation code detected:', invParam);
+      
+      // Track invitation link click
+      const trackInvitationClick = async () => {
+        try {
+          await api.post('/invitations/track-click', {
+            invitation_code: invParam,
+            user_agent: navigator.userAgent,
+            ip_address: '', // Will be captured on backend
+            referrer: document.referrer
+          });
+          console.log('[Invitation] Click tracked successfully');
+        } catch (error) {
+          console.warn('[Invitation] Failed to track click:', error);
+        }
+      };
+      
+      trackInvitationClick();
+    }
+  }, [searchParams, eventUuid]);
+
   useEffect(() => {
     if (!eventUuid) return;
     setLoading(true);
     api.get(`/public/events/${eventUuid}`)
-      .then(res => setEvent(res.data))
-      .catch(err => setError('Event not found or not accepting registrations.'))
+      .then(res => {
+        // Handle both data and data.data response structures
+        const eventData = res.data?.data || res.data;
+        console.log('[PublicEventRegister] Event data received:', eventData);
+        setEvent(eventData);
+      })
+      .catch(err => {
+        console.error('[PublicEventRegister] Error fetching event:', err);
+        setError('Event not found or not accepting registrations.');
+      })
       .finally(() => setLoading(false));
   }, [eventUuid]);
 
   useEffect(() => {
     if (!event || !event.uuid) return;
     api.get(`/public/events/${event.uuid}/guest-types`).then(res => {
+      // Handle both data and data.data response structures
+      const guestTypes = res.data?.data || res.data;
+      console.log('[PublicEventRegister] Guest types received:', guestTypes);
+      
       // Look for 'visitor' first, then 'regular', then use the first available guest type
-      let guestType = res.data.find((gt: any) => gt.name.toLowerCase() === 'visitor');
+      let guestType = guestTypes.find((gt: any) => gt.name.toLowerCase() === 'visitor');
       if (!guestType) {
-        guestType = res.data.find((gt: any) => gt.name.toLowerCase() === 'regular');
+        guestType = guestTypes.find((gt: any) => gt.name.toLowerCase() === 'regular');
       }
-      if (!guestType && res.data.length > 0) {
-        guestType = res.data[0]; // Use first available guest type
+      if (!guestType && guestTypes.length > 0) {
+        guestType = guestTypes[0]; // Use first available guest type
       }
       if (guestType) setVisitorGuestTypeId(guestType.id);
     }).catch(err => {
@@ -283,6 +370,7 @@ export default function PublicEventRegister() {
         ...form,
         guest_type_id: visitorGuestTypeId,
         referral_code: referralCode, // Include referral code in registration
+        invitation_code: invitationCode, // Include invitation code in registration
       };
 
       const response = await api.post(`/public/events/${event.uuid}/register`, registrationData);
@@ -341,6 +429,143 @@ export default function PublicEventRegister() {
       setSubmitting(false);
     }
   };
+
+  // Ticketing handlers
+  const handleContinueToPayment = () => {
+    setPurchaseStep('payment');
+  };
+
+  const handleBackToTickets = () => {
+    setPurchaseStep('tickets');
+    setSelectedPaymentMethod(null);
+  };
+
+  const handlePaymentConfirm = async () => {
+    if (!selectedPaymentMethod || !event?.uuid || selectedTickets.length === 0) {
+      toast.error('Please complete all required fields');
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    setPaymentStatus('pending');
+    setPaymentMessage('Processing your payment...');
+    setPaymentProgress(0);
+
+    try {
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setPaymentProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 300);
+
+      // Initiate payment
+      const paymentResponse = await api.post('/guest/payments/initiate', {
+        event_uuid: event.uuid,
+        tickets: selectedTickets.map(t => ({
+          ticket_type_id: t.ticket_type_id,
+          quantity: t.quantity,
+        })),
+        attendee_details: {
+          name: ticketGuestInfo.name,
+          email: ticketGuestInfo.email,
+          phone: ticketGuestInfo.phone,
+          agreed_to_terms: true,
+        },
+        payment_method: selectedPaymentMethod,
+      });
+
+      if (!paymentResponse.data?.success) {
+        throw new Error('Payment initiation failed');
+      }
+
+      const paymentId = paymentResponse.data.data.payment_id;
+
+      // Poll payment status (simulating payment processing)
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      const checkStatus = async (): Promise<void> => {
+        attempts++;
+        
+        try {
+          const statusResponse = await api.get(`/guest/payments/${paymentId}`);
+          const payment = statusResponse.data.data;
+
+          if (payment.status === 'success') {
+            clearInterval(progressInterval);
+            setPaymentProgress(100);
+            setPaymentStatus('success');
+            setPaymentMessage('Payment successful! Your tickets have been generated.');
+
+            // Confirm payment to get tickets
+            const confirmResponse = await api.post(`/guest/payments/${paymentId}/confirm`);
+            if (confirmResponse.data?.success) {
+              setPurchasedTickets(confirmResponse.data.data.tickets || []);
+              setPurchaseStep('confirmation');
+            }
+            return;
+          }
+
+          if (payment.status === 'failed' || payment.status === 'cancelled') {
+            clearInterval(progressInterval);
+            setPaymentStatus('failed');
+            setPaymentMessage('Payment failed. Please try again.');
+            return;
+          }
+
+          // Still pending, check again
+          if (attempts < maxAttempts) {
+            setTimeout(checkStatus, 2000);
+          } else {
+            clearInterval(progressInterval);
+            setPaymentStatus('failed');
+            setPaymentMessage('Payment timeout. Please check your email or contact support.');
+          }
+        } catch (error) {
+          clearInterval(progressInterval);
+          setPaymentStatus('failed');
+          setPaymentMessage('Payment verification failed. Please try again.');
+        }
+      };
+
+      // Start checking status after 2 seconds
+      setTimeout(checkStatus, 2000);
+
+    } catch (error: any) {
+      setIsProcessingPayment(false);
+      setPaymentStatus('failed');
+      setPaymentMessage(error.response?.data?.message || 'Payment failed. Please try again.');
+      toast.error('Payment failed');
+    }
+  };
+
+  const handleClosePaymentModal = () => {
+    setIsProcessingPayment(false);
+    setPaymentProgress(0);
+    setPaymentStatus('pending');
+  };
+
+  const handleRetryPayment = () => {
+    handleClosePaymentModal();
+    setPurchaseStep('payment');
+  };
+
+  // Show redirecting message for authenticated users on ticketed events
+  if (isTicketedEvent && isAuthenticated && event?.id) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Redirecting to ticket purchase...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -566,38 +791,88 @@ export default function PublicEventRegister() {
             )}
           </div>
 
-          {/* Right Column - Registration Form */}
+          {/* Right Column - Ticketing or Registration Form */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 lg:p-8">
-              {/* Form Header */}
-              <div className="mb-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <User className="w-5 h-5 text-gray-400" />
-                  <h2 className="text-2xl font-bold text-gray-900">Register for {event.name}</h2>
-                </div>
-                <p className="text-gray-600">
-                  Secure your spot at this exclusive industry event. Complete the form below to join this premium experience with limited availability.
-                </p>
-                
-                {/* Referral Indicator */}
-                {referralCode && (
-                  <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center">
-                        <Star className="w-3 h-3 text-purple-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-purple-800">
-                          You were referred to this event!
-                        </p>
-                        <p className="text-xs text-purple-600">
-                          Referral Code: <span className="font-mono font-semibold">{referralCode}</span>
-                        </p>
-                      </div>
-                    </div>
+              {/* Ticketed Event Flow */}
+              {isTicketedEvent && purchaseStep === 'tickets' && (
+                <>
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Purchase Tickets</h2>
+                    <p className="text-gray-600">
+                      Select your tickets and provide your information to complete your purchase.
+                    </p>
                   </div>
-                )}
-              </div>
+                  <PublicTicketSelector
+                    ticketTypes={ticketTypesData?.ticket_types || []}
+                    selections={selectedTickets}
+                    onSelectionsChange={setSelectedTickets}
+                    guestInfo={ticketGuestInfo}
+                    onGuestInfoChange={setTicketGuestInfo}
+                    onContinue={handleContinueToPayment}
+                    loading={ticketTypesLoading}
+                  />
+                </>
+              )}
+
+              {isTicketedEvent && purchaseStep === 'payment' && (
+                <PublicPaymentSelector
+                  selected={selectedPaymentMethod}
+                  onSelect={setSelectedPaymentMethod}
+                  onBack={handleBackToTickets}
+                  onConfirm={handlePaymentConfirm}
+                  totalAmount={selectedTickets.reduce((sum, t) => sum + t.ticketType.price * t.quantity, 0)}
+                  loading={isProcessingPayment}
+                />
+              )}
+
+              {isTicketedEvent && purchaseStep === 'confirmation' && (
+                <PublicTicketDisplay
+                  tickets={purchasedTickets}
+                  event={{
+                    name: event.name,
+                    start_date: event.start_date,
+                    location: event.location || event.venue_name || 'TBD',
+                  }}
+                  guestInfo={{
+                    name: ticketGuestInfo.name,
+                    email: ticketGuestInfo.email,
+                  }}
+                />
+              )}
+
+              {/* Free Event Registration Form */}
+              {!isTicketedEvent && (
+                <>
+                  {/* Form Header */}
+                  <div className="mb-6">
+                    <div className="flex items-center gap-3 mb-2">
+                      <User className="w-5 h-5 text-gray-400" />
+                      <h2 className="text-2xl font-bold text-gray-900">Register for {event.name}</h2>
+                    </div>
+                    <p className="text-gray-600">
+                      Secure your spot at this exclusive industry event. Complete the form below to join this premium experience with limited availability.
+                    </p>
+                    
+                    {/* Referral Indicator */}
+                    {referralCode && (
+                      <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center">
+                            <Star className="w-3 h-3 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-purple-800">
+                              You were referred to this event!
+                            </p>
+                            <p className="text-xs text-purple-600">
+                              Referral Code: <span className="font-mono font-semibold">{referralCode}</span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
               {/* Registration Form */}
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -819,10 +1094,22 @@ export default function PublicEventRegister() {
                   </a>
                 </p>
               </form>
+              </>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Payment Processing Modal */}
+      <PaymentProcessingModal
+        open={isProcessingPayment}
+        status={paymentStatus}
+        message={paymentMessage}
+        progress={paymentProgress}
+        onClose={handleClosePaymentModal}
+        onRetry={handleRetryPayment}
+      />
     </div>
   );
 } 

@@ -15,6 +15,8 @@ import {
   ZoomOut,
   Maximize2,
   Calendar as CalendarIcon2,
+  LayoutGrid,
+  List,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { MetricCard } from '@/components/MetricCard'
@@ -35,7 +37,11 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { mockData, isMockMode, getMockData } from '@/lib/mockData'
+import { RecentActivity } from '@/components/RecentActivity'
+import { EventFilterChips } from '@/components/EventFilterChips'
+import { EnhancedEventCalendar } from '@/components/EnhancedEventCalendar'
 
 export default function OrganizerDashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null)
@@ -71,10 +77,72 @@ export default function OrganizerDashboard() {
   const [editForm, setEditForm] = useState<any>(null);
   const [editLoading, setEditLoading] = useState(false);
 
+  // Calendar view state
+  const [activeView, setActiveView] = useState<'calendar' | 'list'>(() => {
+    return (localStorage.getItem('organizerDashboardView') as 'calendar' | 'list') || 'calendar'
+  });
+  const [eventFilters, setEventFilters] = useState<string[]>([]);
+
   // Handler to open edit dialog with event data
   const openEditDialog = (event: any) => {
     setEditForm({ ...event });
     setEditDialogOpen(true);
+  };
+
+  // Handler for view change with localStorage persistence
+  const handleViewChange = (view: 'calendar' | 'list') => {
+    setActiveView(view);
+    localStorage.setItem('organizerDashboardView', view);
+  };
+
+  // Handler for event click in calendar - navigate to event details with error handling
+  const handleCalendarEventClick = async (event: any) => {
+    console.log('[Dashboard] Clicked event:', event)
+    console.log('[Dashboard] Event organizer_id:', event.organizer_id)
+    console.log('[Dashboard] User organizer_id:', user?.organizer_id)
+    
+    // Pre-check: Verify the event belongs to this organizer
+    if (user?.organizer_id && event.organizer_id !== user.organizer_id) {
+      console.error('[Dashboard] Event does not belong to this organizer')
+      toast.toast({
+        title: 'Access Denied',
+        description: 'This event belongs to another organizer and cannot be accessed.',
+        variant: 'destructive'
+      })
+      return
+    }
+    
+    try {
+      // Check if user has permission to view this event
+      const response = await api.get(`/events/${event.id}`)
+      if (response.data) {
+        console.log('[Dashboard] Permission check passed, navigating...')
+        navigate(`/dashboard/events/${event.id}`)
+      }
+    } catch (error: any) {
+      console.error('[Dashboard] Error accessing event:', error)
+      console.error('[Dashboard] Error response:', error.response?.data)
+      
+      if (error.response?.status === 403) {
+        toast.toast({
+          title: 'Access Denied',
+          description: 'You do not have permission to view this event. It may belong to another organizer.',
+          variant: 'destructive'
+        })
+      } else if (error.response?.status === 404) {
+        toast.toast({
+          title: 'Event Not Found',
+          description: 'This event no longer exists or has been deleted.',
+          variant: 'destructive'
+        })
+      } else {
+        toast.toast({
+          title: 'Error',
+          description: 'Failed to load event details. Please try again.',
+          variant: 'destructive'
+        })
+      }
+    }
   };
 
   // Handler to update edit form fields
@@ -229,32 +297,57 @@ export default function OrganizerDashboard() {
   const [eventsError, setEventsError] = useState<string | null>(null);
   const eventsIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    const fetchEvents = async () => {
-      setEventsLoading(true);
-      setEventsError(null);
-      try {
-        if (isMockMode()) {
-          // Use mock data in development mode
-          const mockEventsData = await getMockData(mockData.events)
-          setAllEvents(mockEventsData);
-        } else {
-          const res = await api.get('/events');
-          setAllEvents(res.data);
-        }
-      } catch (err: any) {
-        setEventsError(err.response?.data?.message || 'Failed to fetch events');
-      } finally {
-        setEventsLoading(false);
+  const fetchEvents = async () => {
+    setEventsLoading(true);
+    setEventsError(null);
+    try {
+      if (isMockMode()) {
+        // Use mock data in development mode
+        const mockEventsData = await getMockData(mockData.events)
+        setAllEvents(mockEventsData);
+      } else {
+        const res = await api.get('/events');
+        console.log('[Dashboard] Fetched events:', res.data.length)
+        console.log('[Dashboard] User organizer_id:', user?.organizer_id)
+        
+        // Filter events to only show those belonging to current organizer
+        const filteredEvents = res.data.filter((event: any) => {
+          // If user has organizer_id, only show events from their organization
+          if (user?.organizer_id) {
+            const matches = event.organizer_id === user.organizer_id
+            if (!matches) {
+              console.log('[Dashboard] Filtering out event:', event.id, 'organizer:', event.organizer_id)
+            }
+            return matches
+          }
+          // Admin/superadmin can see all events
+          console.log('[Dashboard] Admin mode - showing all events')
+          return true
+        });
+        
+        console.log('[Dashboard] Filtered events:', filteredEvents.length)
+        setAllEvents(filteredEvents);
       }
-    };
-    fetchEvents();
+    } catch (err: any) {
+      console.error('[Dashboard] Error fetching events:', err)
+      setEventsError(err.response?.data?.message || 'Failed to fetch events');
+    } finally {
+      setEventsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Only fetch events after user data is loaded
+    if (user) {
+      console.log('[Dashboard] User loaded, fetching events for organizer:', user.organizer_id)
+      fetchEvents();
+    }
     // Temporarily disabled polling to prevent reloading issues
     // eventsIntervalRef.current = setInterval(fetchEvents, 150000);
     return () => {
       if (eventsIntervalRef.current) clearInterval(eventsIntervalRef.current);
     };
-  }, []);
+  }, [user]);
 
   // Helper for status color (reuse from Events page)
   const getStatusColor = (status: string) => {
@@ -626,50 +719,144 @@ export default function OrganizerDashboard() {
             </div>
           </div>
 
-          {/* Upcoming Events (Realtime) */}
+          {/* Events Section with Calendar/List Tabs */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Upcoming Events</h3>
-                <p className="text-sm text-gray-600">Real-time event monitoring</p>
+                <h3 className="text-lg font-semibold text-gray-900">My Events</h3>
+                <p className="text-sm text-gray-600">Manage and view your events</p>
               </div>
               <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                <Clock className="w-4 h-4 text-white" />
+                <CalendarIcon className="w-4 h-4 text-white" />
               </div>
             </div>
-            
-            {eventsLoading && (
-              <div className="flex flex-col items-center justify-center py-12">
-                <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3"></div>
-                <div className="text-sm text-gray-600">Loading events...</div>
-              </div>
-            )}
-            {eventsError && (
-              <div className="flex flex-col items-center justify-center py-12">
-                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mb-3">
-                  <Clock className="w-4 h-4 text-red-600" />
+
+            {/* Event Filters */}
+            <div className="mb-6">
+              <EventFilterChips 
+                selectedFilters={eventFilters}
+                onFilterChange={setEventFilters}
+              />
+            </div>
+
+            {/* Tabs for Calendar/List View */}
+            <Tabs value={activeView} onValueChange={(val) => handleViewChange(val as 'calendar' | 'list')}>
+              <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+                <TabsTrigger value="calendar" className="flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4" />
+                  Calendar View
+                </TabsTrigger>
+                <TabsTrigger value="list" className="flex items-center gap-2">
+                  <List className="w-4 h-4" />
+                  List View
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Calendar View Content */}
+              <TabsContent value="calendar" className="mt-0">
+                <EnhancedEventCalendar
+                  events={allEvents}
+                  onEventClick={handleCalendarEventClick}
+                  selectedFilters={eventFilters}
+                />
+              </TabsContent>
+
+              {/* List View Content */}
+              <TabsContent value="list" className="mt-0">
+                {eventsLoading && (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3"></div>
+                    <div className="text-sm text-gray-600">Loading events...</div>
+                  </div>
+                )}
+                {eventsError && (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mb-3">
+                      <Clock className="w-4 h-4 text-red-600" />
+                    </div>
+                    <div className="text-sm text-red-600">{eventsError}</div>
+                  </div>
+                )}
+                
+                {/* Table for desktop */}
+                <div className="hidden lg:block overflow-x-auto">
+                  <Table className="min-w-full">
+                    <TableHeader>
+                      <TableRow className="bg-gray-50">
+                        <TableHead className="font-semibold text-gray-700 text-sm py-4">Name</TableHead>
+                        <TableHead className="font-semibold text-gray-700 text-sm py-4">Status</TableHead>
+                        <TableHead className="font-semibold text-gray-700 text-sm py-4">Date</TableHead>
+                        <TableHead className="font-semibold text-gray-700 text-sm py-4">Location</TableHead>
+                        <TableHead className="font-semibold text-gray-700 text-sm py-4">Attendees</TableHead>
+                        <TableHead className="font-semibold text-gray-700 text-sm py-4">Progress</TableHead>
+                        <TableHead className="font-semibold text-gray-700 text-sm py-4">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allEvents
+                        .filter(event => {
+                          const matchesFilter = eventFilters.length === 0 || eventFilters.includes(event.status)
+                          return matchesFilter
+                        })
+                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                        .map(event => {
+                          const attendeeCount = event.attendee_count || 0;
+                          const attendeeLimit = event.max_guests || 500;
+                          const registrationProgress = Math.min(
+                            Math.round((attendeeCount / attendeeLimit) * 100),
+                            100
+                          );
+                          return (
+                            <TableRow key={event.id} className="hover:bg-gray-50 transition-colors group border-b border-gray-100">
+                              <TableCell className="font-medium text-gray-900 py-4 group-hover:text-blue-700 transition-colors">{event.name}</TableCell>
+                              <TableCell className="py-4">
+                                <Badge className={`${getStatusColor(event.status)} text-xs font-medium`}>{event.status}</Badge>
+                              </TableCell>
+                              <TableCell className="text-gray-600 py-4">{event.date} {event.time}</TableCell>
+                              <TableCell className="text-gray-600 py-4">{event.location || 'Convention Center'}</TableCell>
+                              <TableCell className="text-gray-600 py-4">{attendeeCount}/{attendeeLimit}</TableCell>
+                              <TableCell className="py-4">
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                    <span>{registrationProgress}%</span>
+                                  </div>
+                                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div className="h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300" style={{ width: `${registrationProgress}%` }}></div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-4">
+                                <Button size="sm" variant="outline" className="bg-white border-gray-200 hover:bg-gray-50" onClick={() => navigate(`/dashboard/events/${event.id}`)}>
+                                  <Eye className="w-4 h-4 mr-2" /> View Details
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      {allEvents.filter(event => {
+                        const matchesFilter = eventFilters.length === 0 || eventFilters.includes(event.status)
+                        return matchesFilter
+                      }).length === 0 && !eventsLoading && !eventsError && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-12 text-gray-400">
+                            <div className="flex flex-col items-center">
+                              <Clock className="w-8 h-8 text-gray-300 mb-2" />
+                              <span>No events match the selected filters</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
-                <div className="text-sm text-red-600">{eventsError}</div>
-              </div>
-            )}
-            
-            {/* Table for desktop */}
-            <div className="hidden lg:block overflow-x-auto">
-              <Table className="min-w-full">
-                <TableHeader>
-                  <TableRow className="bg-gray-50">
-                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Name</TableHead>
-                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Status</TableHead>
-                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Date</TableHead>
-                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Location</TableHead>
-                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Attendees</TableHead>
-                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Progress</TableHead>
-                    <TableHead className="font-semibold text-gray-700 text-sm py-4">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                
+                {/* Card view for mobile/tablet */}
+                <div className="lg:hidden space-y-4">
                   {allEvents
-                    .filter(event => event.status === 'active' || event.status === 'upcoming')
+                    .filter(event => {
+                      const matchesFilter = eventFilters.length === 0 || eventFilters.includes(event.status)
+                      return matchesFilter
+                    })
                     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                     .map(event => {
                       const attendeeCount = event.attendee_count || 0;
@@ -679,95 +866,47 @@ export default function OrganizerDashboard() {
                         100
                       );
                       return (
-                        <TableRow key={event.id} className="hover:bg-gray-50 transition-colors group border-b border-gray-100">
-                          <TableCell className="font-medium text-gray-900 py-4 group-hover:text-blue-700 transition-colors">{event.name}</TableCell>
-                          <TableCell className="py-4">
-                            <Badge className={`${getStatusColor(event.status)} text-xs font-medium`}>{event.status}</Badge>
-                          </TableCell>
-                          <TableCell className="text-gray-600 py-4">{event.date} {event.time}</TableCell>
-                          <TableCell className="text-gray-600 py-4">{event.location || 'Convention Center'}</TableCell>
-                          <TableCell className="text-gray-600 py-4">{attendeeCount}/{attendeeLimit}</TableCell>
-                          <TableCell className="py-4">
-                            <div className="flex flex-col gap-1">
-                              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                                <span>{registrationProgress}%</span>
-                              </div>
-                              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div className="h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300" style={{ width: `${registrationProgress}%` }}></div>
-                              </div>
+                        <div key={event.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900 text-sm mb-1">{event.name}</h4>
+                              <p className="text-xs text-gray-600">{event.date} {event.time} • {event.location || 'Convention Center'}</p>
+                          </div>
+                            <Badge className={`${getStatusColor(event.status)} text-xs font-medium ml-3`}>{event.status}</Badge>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-gray-600 mb-3">
+                            <div className="w-5 h-5 bg-purple-100 rounded-lg flex items-center justify-center">
+                              <Users className="w-3 h-3 text-purple-600" />
                             </div>
-                          </TableCell>
-                          <TableCell className="py-4">
-                            <Button size="sm" variant="outline" className="bg-white border-gray-200 hover:bg-gray-50" onClick={() => navigate(`/dashboard/events/${event.id}`)}>
-                              <Eye className="w-4 h-4 mr-2" /> View Details
+                            <span>{attendeeCount}/{attendeeLimit} Attendees</span>
+                          </div>
+                          <div className="mb-3">
+                            <div className="flex justify-between text-xs text-gray-500 mb-1">
+                            <span>Progress:</span>
+                            <span>{registrationProgress}%</span>
+                            </div>
+                            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div className="h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300" style={{ width: `${registrationProgress}%` }}></div>
+                          </div>
+                          </div>
+                          <Button size="sm" variant="outline" className="w-full bg-white border-gray-200 hover:bg-gray-50" onClick={() => navigate(`/dashboard/events/${event.id}`)}>
+                            <Eye className="w-4 h-4 mr-2" /> View Details
                             </Button>
-                          </TableCell>
-                        </TableRow>
+                        </div>
                       );
                     })}
-                  {allEvents.filter(event => event.status === 'active' || event.status === 'upcoming').length === 0 && !eventsLoading && !eventsError && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-12 text-gray-400">
-                        <div className="flex flex-col items-center">
-                          <Clock className="w-8 h-8 text-gray-300 mb-2" />
-                          <span>No upcoming events</span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            
-            {/* Card view for mobile/tablet */}
-            <div className="lg:hidden space-y-4">
-              {allEvents
-                .filter(event => event.status === 'active' || event.status === 'upcoming')
-                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                .map(event => {
-                  const attendeeCount = event.attendee_count || 0;
-                  const attendeeLimit = event.max_guests || 500;
-                  const registrationProgress = Math.min(
-                    Math.round((attendeeCount / attendeeLimit) * 100),
-                    100
-                  );
-                  return (
-                    <div key={event.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 text-sm mb-1">{event.name}</h4>
-                          <p className="text-xs text-gray-600">{event.date} {event.time} • {event.location || 'Convention Center'}</p>
-                      </div>
-                        <Badge className={`${getStatusColor(event.status)} text-xs font-medium ml-3`}>{event.status}</Badge>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-gray-600 mb-3">
-                        <div className="w-5 h-5 bg-purple-100 rounded-lg flex items-center justify-center">
-                          <Users className="w-3 h-3 text-purple-600" />
-                        </div>
-                        <span>{attendeeCount}/{attendeeLimit} Attendees</span>
-                      </div>
-                      <div className="mb-3">
-                        <div className="flex justify-between text-xs text-gray-500 mb-1">
-                        <span>Progress:</span>
-                        <span>{registrationProgress}%</span>
-                        </div>
-                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div className="h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300" style={{ width: `${registrationProgress}%` }}></div>
-                      </div>
-                      </div>
-                      <Button size="sm" variant="outline" className="w-full bg-white border-gray-200 hover:bg-gray-50" onClick={() => navigate(`/dashboard/events/${event.id}`)}>
-                        <Eye className="w-4 h-4 mr-2" /> View Details
-                        </Button>
+                  {allEvents.filter(event => {
+                    const matchesFilter = eventFilters.length === 0 || eventFilters.includes(event.status)
+                    return matchesFilter
+                  }).length === 0 && !eventsLoading && !eventsError && (
+                    <div className="text-center py-12 text-gray-400">
+                      <Clock className="w-8 h-8 mx-auto mb-2" />
+                      <span>No events match the selected filters</span>
                     </div>
-                  );
-                })}
-              {allEvents.filter(event => event.status === 'active' || event.status === 'upcoming').length === 0 && !eventsLoading && !eventsError && (
-                <div className="text-center py-12 text-gray-400">
-                  <Clock className="w-8 h-8 mx-auto mb-2" />
-                  <span>No upcoming events</span>
+                  )}
                 </div>
-              )}
-            </div>
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Tasks & Ushers */}
@@ -943,41 +1082,8 @@ export default function OrganizerDashboard() {
               </ResponsiveContainer>
             </div>
           </div>
-          {/* Recent Activity / Messages */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
-                <p className="text-sm text-gray-600">Latest messages and updates</p>
-              </div>
-              <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg flex items-center justify-center">
-                <MessageSquare className="w-4 h-4 text-white" />
-              </div>
-            </div>
-            <div className="space-y-4">
-              {filteredMessages?.length === 0 && (
-                <div className="text-center py-8 text-gray-400">
-                  <MessageSquare className="w-8 h-8 mx-auto mb-2" />
-                  <span>No recent messages</span>
-                </div>
-              )}
-              {filteredMessages?.map((message: any) => (
-                <div key={message.id} className="flex items-start gap-4 p-3 rounded-lg bg-gray-50 border border-gray-100">
-                  {message.unread && <div className="w-2.5 h-2.5 rounded-full bg-blue-600 mt-1.5 flex-shrink-0"></div>}
-                  <div className={!message.unread ? 'ml-5' : ''}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-semibold text-gray-900">{message.from}</p>
-                      <p className="text-xs text-gray-500">{message.time}</p>
-                    </div>
-                    <p className="text-sm text-gray-600">{message.message}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Link to="/messages" className="block mt-4" tabIndex={-1} aria-disabled="true" title="Coming Soon!" onClick={e => e.preventDefault()}>
-              <Button variant="outline" size="sm" className="w-full bg-white border-gray-200 hover:bg-gray-50">Messages (Coming Soon)</Button>
-            </Link>
-          </div>
+          {/* Recent Activity */}
+          <RecentActivity limit={8} />
           
           {/* Quick Actions */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">

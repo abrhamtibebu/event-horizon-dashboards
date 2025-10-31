@@ -20,6 +20,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import api from '@/lib/api'
+import Pagination from '@/components/Pagination'
+import { usePagination } from '@/hooks/usePagination'
 
 export default function AuditLogs() {
   const [logs, setLogs] = useState<any[]>([])
@@ -28,13 +30,57 @@ export default function AuditLogs() {
   const [searchTerm, setSearchTerm] = useState('')
   const [actionFilter, setActionFilter] = useState('all')
   const [severityFilter, setSeverityFilter] = useState('all')
+  
+  // Pagination hook
+  const {
+    currentPage,
+    perPage,
+    totalPages,
+    totalRecords,
+    setTotalPages,
+    setTotalRecords,
+    handlePageChange,
+    handlePerPageChange,
+    resetPagination
+  } = usePagination({ defaultPerPage: 20, searchParamPrefix: 'audit_logs' });
 
   useEffect(() => {
     const fetchAuditLogs = async () => {
       try {
         setLoading(true)
-        const response = await api.get('/audit-logs')
-        setLogs(response.data.data)
+        
+        // Build query parameters for pagination and filtering
+        const params = new URLSearchParams({
+          page: currentPage.toString(),
+          per_page: perPage.toString(),
+        });
+        
+        if (searchTerm) {
+          params.append('search', searchTerm);
+        }
+        
+        if (actionFilter !== 'all') {
+          params.append('action', actionFilter);
+        }
+        
+        if (severityFilter !== 'all') {
+          params.append('severity', severityFilter);
+        }
+        
+        const response = await api.get(`/audit-logs?${params.toString()}`)
+        
+        // Handle paginated response
+        if (response.data.data) {
+          setLogs(response.data.data)
+          setTotalPages(response.data.last_page || 1)
+          setTotalRecords(response.data.total || 0)
+        } else {
+          // Fallback for non-paginated response
+          setLogs(response.data.data || response.data)
+          setTotalPages(1)
+          setTotalRecords(response.data.data?.length || response.data.length || 0)
+        }
+        
         setError(null)
       } catch (err) {
         setError('Failed to fetch audit logs.')
@@ -45,7 +91,7 @@ export default function AuditLogs() {
     }
 
     fetchAuditLogs()
-  }, [])
+  }, [currentPage, perPage, searchTerm, actionFilter, severityFilter])
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -72,18 +118,24 @@ export default function AuditLogs() {
     return <Activity className="w-4 h-4" />
   }
 
-  const filteredLogs = logs.filter((log) => {
-    const matchesSearch =
-      log.user?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.target_type.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesAction =
-      actionFilter === 'all' ||
-      log.action.toLowerCase().includes(actionFilter.toLowerCase())
-    const matchesSeverity =
-      severityFilter === 'all' || log.severity === severityFilter
-    return matchesSearch && matchesAction && matchesSeverity
-  })
+  // Handle search and filter changes with pagination reset
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    resetPagination();
+  };
+
+  const handleActionFilterChange = (value: string) => {
+    setActionFilter(value);
+    resetPagination();
+  };
+
+  const handleSeverityFilterChange = (value: string) => {
+    setSeverityFilter(value);
+    resetPagination();
+  };
+
+  // Since we're now using server-side pagination, we don't need client-side filtering
+  const filteredLogs = logs;
 
   const logStats = {
     total: logs.length,
@@ -148,11 +200,11 @@ export default function AuditLogs() {
           <Input
             placeholder="Search logs..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10"
           />
         </div>
-        <Select value={actionFilter} onValueChange={setActionFilter}>
+        <Select value={actionFilter} onValueChange={handleActionFilterChange}>
           <SelectTrigger className="w-40">
             <Filter className="w-4 h-4 mr-2" />
             <SelectValue placeholder="All Actions" />
@@ -165,7 +217,7 @@ export default function AuditLogs() {
             <SelectItem value="login">Login</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={severityFilter} onValueChange={setSeverityFilter}>
+        <Select value={severityFilter} onValueChange={handleSeverityFilterChange}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="All Severity" />
           </SelectTrigger>
@@ -233,6 +285,18 @@ export default function AuditLogs() {
           </TableBody>
         </Table>
       </DashboardCard>
+
+      {/* Pagination Component */}
+      {!loading && !error && filteredLogs.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalRecords={totalRecords}
+          perPage={perPage}
+          onPageChange={handlePageChange}
+          onPerPageChange={handlePerPageChange}
+        />
+      )}
 
       {filteredLogs.length === 0 && (
         <div className="text-center py-12">

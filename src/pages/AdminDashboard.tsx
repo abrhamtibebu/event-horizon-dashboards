@@ -24,6 +24,7 @@ import { Link, useOutletContext } from 'react-router-dom'
 import api from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, PieChart, Pie, Cell, BarChart, Bar } from 'recharts'
+import { RecentActivity } from '@/components/RecentActivity'
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<any>(null)
@@ -77,12 +78,16 @@ export default function AdminDashboard() {
       try {
         setPendingEventsLoading(true)
         const response = await api.get('/events')
-        const pending = response.data.filter((event: any) => 
+        // Handle paginated response structure
+        const eventsData = response.data.data || response.data || []
+        const events = Array.isArray(eventsData) ? eventsData : []
+        const pending = events.filter((event: any) => 
           event.advertisement_status === 'pending'
         )
         setPendingEvents(pending.slice(0, 3)) // Show only first 3 pending events
       } catch (error) {
         console.error('Failed to fetch pending events:', error)
+        setPendingEvents([])
       } finally {
         setPendingEventsLoading(false)
       }
@@ -117,11 +122,20 @@ export default function AdminDashboard() {
       api.get('/organizers?status=active'),
     ])
       .then(([pendingRes, approvedRes]) => {
-        setPendingOrganizers(pendingRes.data)
-        setApprovedOrganizers(approvedRes.data)
+        // Handle paginated response structure
+        const pendingData = pendingRes.data.data || pendingRes.data || []
+        const approvedData = approvedRes.data.data || approvedRes.data || []
+        
+        setPendingOrganizers(Array.isArray(pendingData) ? pendingData : [])
+        setApprovedOrganizers(Array.isArray(approvedData) ? approvedData : [])
         setOrganizerError(null)
       })
-      .catch((err) => setOrganizerError('Failed to fetch organizers'))
+      .catch((err) => {
+        console.error('Failed to fetch organizers:', err)
+        setOrganizerError('Failed to fetch organizers')
+        setPendingOrganizers([])
+        setApprovedOrganizers([])
+      })
       .finally(() => setOrganizerLoading(false))
   }, [])
 
@@ -143,7 +157,9 @@ export default function AdminDashboard() {
     ])
       .then(([summaryRes, eventsRes]) => {
         setReportSummary(summaryRes.data)
-        setEventsList(eventsRes.data)
+        // Handle paginated response structure for events
+        const eventsData = eventsRes.data.data || eventsRes.data || []
+        setEventsList(Array.isArray(eventsData) ? eventsData : [])
         setReportError(null)
       })
       .catch(() => setReportError('Failed to fetch report summary'))
@@ -735,42 +751,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Recent Activity */}
-          <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
-                <p className="text-sm text-gray-600">Latest system activity</p>
-              </div>
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                <MessageSquare className="w-4 h-4 text-white" />
-              </div>
-            </div>
-          <div className="space-y-4">
-            {filteredActivities?.length === 0 && (
-                <div className="text-center py-8 text-gray-400">
-                  <MessageSquare className="w-8 h-8 mx-auto mb-2" />
-                  <span>No recent activity</span>
-                </div>
-            )}
-            {filteredActivities?.map((activity: any) => (
-                <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
-                <div className="p-2 bg-gray-100 rounded-full">
-                    {activity.type === 'event' ? <Calendar className="w-4 h-4" /> :
-                     activity.type === 'user' ? <Users className="w-4 h-4" /> :
-                     activity.type === 'approval' ? <UserCheck className="w-4 h-4" /> :
-                     activity.type === 'report' ? <FileText className="w-4 h-4" /> :
-                     <AlertCircle className="w-4 h-4" />}
-                </div>
-                <div>
-                  <p className="text-sm font-medium">
-                    {activity.description || activity.action}
-                  </p>
-                  <p className="text-xs text-gray-500">{activity.timestamp || activity.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          </div>
+          <RecentActivity limit={6} />
         </div>
       </div>
     </div>

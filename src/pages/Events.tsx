@@ -37,6 +37,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import Pagination from '@/components/Pagination'
+import { usePagination } from '@/hooks/usePagination'
 
 export default function Events() {
   const [events, setEvents] = useState<any[]>([])
@@ -50,6 +52,19 @@ export default function Events() {
   const { user } = useAuth()
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Pagination hook
+  const {
+    currentPage,
+    perPage,
+    totalPages,
+    totalRecords,
+    setTotalPages,
+    setTotalRecords,
+    handlePageChange,
+    handlePerPageChange,
+    resetPagination
+  } = usePagination({ defaultPerPage: 10, searchParamPrefix: 'events' });
+  
   // Debug logging
   console.log('Events component rendered, user:', user?.id)
 
@@ -59,10 +74,38 @@ export default function Events() {
       setLoading(true)
       setError(null)
       try {
-        // All users now use the same endpoint, but the backend handles role-based filtering
-        const res = await api.get('/events')
+        // Build query parameters for pagination and filtering
+        const params = new URLSearchParams({
+          page: currentPage.toString(),
+          per_page: perPage.toString(),
+        });
+        
+        if (searchTerm) {
+          params.append('search', searchTerm);
+        }
+        
+        if (statusFilter !== 'all') {
+          params.append('status', statusFilter);
+        }
+        
+        if (pricingFilter !== 'all') {
+          params.append('pricing', pricingFilter);
+        }
+        
+        const res = await api.get(`/events?${params.toString()}`)
         console.log('[Events] API Response:', res.data)
-        setEvents(res.data)
+        
+        // Handle paginated response
+        if (res.data.data) {
+          setEvents(res.data.data)
+          setTotalPages(res.data.last_page || 1)
+          setTotalRecords(res.data.total || 0)
+        } else {
+          // Fallback for non-paginated response
+          setEvents(res.data)
+          setTotalPages(1)
+          setTotalRecords(res.data.length || 0)
+        }
       } catch (err: any) {
         setError(err.response?.data?.message || 'Failed to fetch events')
       } finally {
@@ -80,7 +123,7 @@ export default function Events() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [user?.id]) // Only depend on user ID, not the entire user object
+  }, [user?.id, currentPage, perPage, searchTerm, statusFilter, pricingFilter]) // Include pagination dependencies
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -97,16 +140,24 @@ export default function Events() {
     }
   }
 
-  const filteredEvents = events.filter((event) => {
-    const matchesSearch =
-      event.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      event.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus =
-      statusFilter === 'all' || event.status === statusFilter
-    const matchesPricing =
-      pricingFilter === 'all' || event.event_type === pricingFilter
-    return matchesSearch && matchesStatus && matchesPricing
-  })
+  // Handle search and filter changes with pagination reset
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    resetPagination();
+  };
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    resetPagination();
+  };
+
+  const handlePricingFilterChange = (value: string) => {
+    setPricingFilter(value);
+    resetPagination();
+  };
+
+  // Since we're now using server-side pagination, we don't need client-side filtering
+  const filteredEvents = events;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
@@ -181,11 +232,11 @@ export default function Events() {
                 <Input
                   placeholder="Search events by name or description..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-10 bg-gray-50 border-gray-200 focus:bg-white"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
                 <SelectTrigger className="w-48 bg-gray-50 border-gray-200 focus:bg-white">
                   <Filter className="w-4 h-4 mr-2" />
                   <SelectValue placeholder="Filter by status" />
@@ -198,7 +249,7 @@ export default function Events() {
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={pricingFilter} onValueChange={setPricingFilter}>
+              <Select value={pricingFilter} onValueChange={handlePricingFilterChange}>
                 <SelectTrigger className="w-48 bg-gray-50 border-gray-200 focus:bg-white">
                   <DollarSign className="w-4 h-4 mr-2" />
                   <SelectValue placeholder="Filter by pricing" />
@@ -664,6 +715,18 @@ export default function Events() {
                 </>
               )}
             </div>
+          )}
+
+          {/* Pagination Component */}
+          {!loading && !error && filteredEvents.length > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalRecords={totalRecords}
+              perPage={perPage}
+              onPageChange={handlePageChange}
+              onPerPageChange={handlePerPageChange}
+            />
           )}
 
           {!loading && !error && filteredEvents.length === 0 && (

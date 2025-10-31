@@ -41,12 +41,11 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { CampaignsList } from '@/components/marketing/CampaignsList';
-import { CreateCampaign } from '@/components/marketing/CreateCampaign';
+import { CampaignWizard } from '@/components/marketing/CampaignWizard';
 import { CreateTemplate } from '@/components/marketing/CreateTemplate';
 import { CreateSegment } from '@/components/marketing/CreateSegment';
-import { TemplatesList } from '@/components/marketing/TemplatesList';
-import { SegmentsList } from '@/components/marketing/SegmentsList';
-import { MarketingAnalytics } from '@/components/marketing/MarketingAnalytics';
+import { LibraryView } from '@/components/marketing/LibraryView';
+import { EnhancedAnalytics } from '@/components/marketing/EnhancedAnalytics';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 
@@ -63,8 +62,8 @@ interface MarketingStats {
 }
 
 export default function Marketing() {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [showCreateCampaign, setShowCreateCampaign] = useState(false);
+  const [activeTab, setActiveTab] = useState('campaigns'); // Changed from 'overview' to 'campaigns'
+  const [showCampaignWizard, setShowCampaignWizard] = useState(false);
   const [showCreateTemplate, setShowCreateTemplate] = useState(false);
   const [showCreateSegment, setShowCreateSegment] = useState(false);
   const [stats, setStats] = useState<MarketingStats>({
@@ -257,12 +256,12 @@ export default function Marketing() {
                 Refresh
               </Button>
             <Button 
-              onClick={() => setShowCreateCampaign(true)}
+              onClick={() => setShowCampaignWizard(true)}
               size="lg"
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
             >
               <Plus className="w-5 h-5 mr-2" />
-              New Campaign
+              Create Campaign
             </Button>
             </div>
           </div>
@@ -363,108 +362,49 @@ export default function Marketing() {
           </Card>
         </div>
 
-        {/* Main Content Tabs */}
+        {/* Main Content Tabs - Simplified to 3 tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid bg-white shadow-sm">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" />
-              Overview
-            </TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid bg-white shadow-sm">
             <TabsTrigger value="campaigns" className="flex items-center gap-2">
               <Send className="w-4 h-4" />
               Campaigns
-            </TabsTrigger>
-            <TabsTrigger value="templates" className="flex items-center gap-2">
-              <Layout className="w-4 h-4" />
-              Templates
-            </TabsTrigger>
-            <TabsTrigger value="segments" className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              Segments
             </TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
               Analytics
             </TabsTrigger>
+            <TabsTrigger value="library" className="flex items-center gap-2">
+              <Layout className="w-4 h-4" />
+              Library
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Recent Campaigns */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-blue-600" />
-                    Recent Campaigns
-                  </CardTitle>
-                  <CardDescription>Your latest marketing activities</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-100 rounded-lg">
-                            <Mail className="w-4 h-4 text-blue-600" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm">Sample Campaign {i}</p>
-                            <p className="text-xs text-gray-500">2 hours ago</p>
-                          </div>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          Sent
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Performance Chart Placeholder */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-green-600" />
-                    Performance Trends
-                  </CardTitle>
-                  <CardDescription>Campaign performance over time</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                    <div className="text-center text-gray-500">
-                      <BarChart3 className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                      <p>Chart visualization coming soon</p>
-                      <p className="text-sm">Install chart library for detailed analytics</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          <TabsContent value="campaigns" className="mt-6">
+            <CampaignsList onCreateNew={() => setShowCampaignWizard(true)} />
           </TabsContent>
 
-          <TabsContent value="campaigns">
-            <CampaignsList onCreateNew={() => setShowCreateCampaign(true)} />
+          <TabsContent value="analytics" className="mt-6">
+            <EnhancedAnalytics />
           </TabsContent>
 
-          <TabsContent value="templates">
-            <TemplatesList />
-          </TabsContent>
-
-          <TabsContent value="segments">
-            <SegmentsList />
-          </TabsContent>
-
-          <TabsContent value="analytics">
-            <MarketingAnalytics />
+          <TabsContent value="library" className="mt-6">
+            <LibraryView 
+              onNewTemplate={() => setShowCreateTemplate(true)}
+              onNewSegment={() => setShowCreateSegment(true)}
+            />
           </TabsContent>
         </Tabs>
 
-        {/* Create Campaign Dialog */}
-        {showCreateCampaign && (
-          <CreateCampaign 
-            open={showCreateCampaign} 
-            onClose={() => setShowCreateCampaign(false)} 
+        {/* Campaign Wizard Dialog */}
+        {showCampaignWizard && (
+          <CampaignWizard 
+            open={showCampaignWizard} 
+            onClose={() => setShowCampaignWizard(false)}
+            onComplete={() => {
+              setShowCampaignWizard(false)
+              toast.success('Campaign created successfully!')
+              fetchStats() // Refresh the stats
+            }}
           />
         )}
 
@@ -485,6 +425,6 @@ export default function Marketing() {
         )}
       </div>
     </div>
-  );
+  )
 }
 

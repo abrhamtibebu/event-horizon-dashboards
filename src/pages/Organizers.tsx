@@ -61,6 +61,8 @@ import {
 } from '@/components/ui/tooltip'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import Pagination from '@/components/Pagination'
+import { usePagination } from '@/hooks/usePagination'
 
 export default function Organizers() {
   const [organizers, setOrganizers] = useState<any[]>([])
@@ -68,6 +70,20 @@ export default function Organizers() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  
+  // Pagination hook
+  const {
+    currentPage,
+    perPage,
+    totalPages,
+    totalRecords,
+    setTotalPages,
+    setTotalRecords,
+    handlePageChange,
+    handlePerPageChange,
+    resetPagination
+  } = usePagination({ defaultPerPage: 15, searchParamPrefix: 'organizers' });
+  
   const { toast } = useToast()
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [selectedOrganizer, setSelectedOrganizer] = useState<any>(null)
@@ -106,8 +122,33 @@ export default function Organizers() {
       setLoading(true)
       setError(null)
       try {
-        const res = await api.get('/organizers')
-        setOrganizers(res.data)
+        // Build query parameters for pagination and filtering
+        const params = new URLSearchParams({
+          page: currentPage.toString(),
+          per_page: perPage.toString(),
+        });
+        
+        if (searchTerm) {
+          params.append('search', searchTerm);
+        }
+        
+        if (statusFilter !== 'all') {
+          params.append('status', statusFilter);
+        }
+        
+        const res = await api.get(`/organizers?${params.toString()}`)
+        
+        // Handle paginated response
+        if (res.data.data) {
+          setOrganizers(res.data.data)
+          setTotalPages(res.data.last_page || 1)
+          setTotalRecords(res.data.total || 0)
+        } else {
+          // Fallback for non-paginated response
+          setOrganizers(res.data)
+          setTotalPages(1)
+          setTotalRecords(res.data.length || 0)
+        }
       } catch (err: any) {
         setError(err.response?.data?.message || 'Failed to fetch organizers')
       } finally {
@@ -115,7 +156,7 @@ export default function Organizers() {
       }
     }
     fetchOrganizers()
-  }, [])
+  }, [currentPage, perPage, searchTerm, statusFilter])
 
   useEffect(() => {
     if (assignDialogOpen) {
@@ -159,17 +200,19 @@ export default function Organizers() {
     }
   }
 
-  const filteredOrganizers = organizers.filter((organizer) => {
-    const matchesSearch =
-      organizer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      organizer.contactPerson
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      organizer.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus =
-      statusFilter === 'all' || organizer.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  // Handle search and filter changes with pagination reset
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    resetPagination();
+  };
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    resetPagination();
+  };
+
+  // Since we're now using server-side pagination, we don't need client-side filtering
+  const filteredOrganizers = organizers;
 
   const organizerStats = {
     total: organizers.length,
@@ -505,12 +548,12 @@ export default function Organizers() {
             <Input
               placeholder="Search organizers..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-12 w-full py-3 rounded-xl text-lg shadow-md"
             />
           </div>
           <div className="w-full sm:w-48">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
               <SelectTrigger className="w-full py-3 rounded-xl text-lg shadow-md">
                 <Filter className="w-5 h-5 mr-2" />
                 <SelectValue placeholder="All Status" />
@@ -758,6 +801,18 @@ export default function Organizers() {
               </table>
             </CardContent>
           </Card>
+        )}
+
+        {/* Pagination Component */}
+        {!loading && !error && filteredOrganizers.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalRecords={totalRecords}
+            perPage={perPage}
+            onPageChange={handlePageChange}
+            onPerPageChange={handlePerPageChange}
+          />
         )}
 
         {/* Assign Contacts Dialog */}

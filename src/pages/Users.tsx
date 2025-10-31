@@ -69,6 +69,8 @@ import { useAuth } from '@/hooks/use-auth'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import Pagination from '@/components/Pagination'
+import { usePagination } from '@/hooks/usePagination'
 import {
   Tooltip,
   TooltipContent,
@@ -83,6 +85,20 @@ export default function Users() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  
+  // Pagination hook
+  const {
+    currentPage,
+    perPage,
+    totalPages,
+    totalRecords,
+    setTotalPages,
+    setTotalRecords,
+    handlePageChange,
+    handlePerPageChange,
+    resetPagination
+  } = usePagination({ defaultPerPage: 15, searchParamPrefix: 'users' });
+  
   const [addOpen, setAddOpen] = useState(false)
   const [addLoading, setAddLoading] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
@@ -123,8 +139,37 @@ export default function Users() {
       setLoading(true)
       setError(null)
       try {
-        const res = await api.get('/users')
-        setUsers(res.data)
+        // Build query parameters for pagination and filtering
+        const params = new URLSearchParams({
+          page: currentPage.toString(),
+          per_page: perPage.toString(),
+        });
+        
+        if (searchTerm) {
+          params.append('search', searchTerm);
+        }
+        
+        if (roleFilter !== 'all') {
+          params.append('role', roleFilter);
+        }
+        
+        if (statusFilter !== 'all') {
+          params.append('status', statusFilter);
+        }
+        
+        const res = await api.get(`/users?${params.toString()}`)
+        
+        // Handle paginated response
+        if (res.data.data) {
+          setUsers(res.data.data)
+          setTotalPages(res.data.last_page || 1)
+          setTotalRecords(res.data.total || 0)
+        } else {
+          // Fallback for non-paginated response
+          setUsers(res.data)
+          setTotalPages(1)
+          setTotalRecords(res.data.length || 0)
+        }
       } catch (err: any) {
         setError(
           'Failed to fetch users. This feature may not be implemented in the backend.'
@@ -134,7 +179,7 @@ export default function Users() {
       }
     }
     fetchUsers()
-  }, [])
+  }, [currentPage, perPage, searchTerm, roleFilter, statusFilter])
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -164,14 +209,24 @@ export default function Users() {
     }
   }
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter
-    return matchesSearch && matchesRole && matchesStatus
-  })
+  // Handle search and filter changes with pagination reset
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    resetPagination();
+  };
+
+  const handleRoleFilterChange = (value: string) => {
+    setRoleFilter(value);
+    resetPagination();
+  };
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
+    resetPagination();
+  };
+
+  // Since we're now using server-side pagination, we don't need client-side filtering
+  const filteredUsers = users;
 
   const userStats = {
     total: users.length,
@@ -513,12 +568,12 @@ export default function Users() {
           <Input
             placeholder="Search users..."
             value={searchTerm ?? ''}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-12 w-full py-3 rounded-xl text-lg shadow-md"
           />
         </div>
           <div className="w-full sm:w-48">
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
+        <Select value={roleFilter} onValueChange={handleRoleFilterChange}>
               <SelectTrigger className="w-full py-3 rounded-xl text-lg shadow-md">
                 <Filter className="w-5 h-5 mr-2" />
             <SelectValue placeholder="All Roles" />
@@ -533,7 +588,7 @@ export default function Users() {
         </Select>
           </div>
           <div className="w-full sm:w-48">
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
               <SelectTrigger className="w-full py-3 rounded-xl text-lg shadow-md">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
@@ -680,6 +735,18 @@ export default function Users() {
               </table>
             </CardContent>
           </Card>
+        )}
+
+        {/* Pagination Component */}
+        {!loading && !error && filteredUsers.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalRecords={totalRecords}
+            perPage={perPage}
+            onPageChange={handlePageChange}
+            onPerPageChange={handlePerPageChange}
+          />
         )}
 
         {filteredUsers.length === 0 && !loading && (

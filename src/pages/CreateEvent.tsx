@@ -320,7 +320,7 @@ export default function CreateEvent() {
         max_guests: parseInt(formData.max_guests, 10),
         // Only include organizer_id if not an organizer (backend sets it for organizers)
         ...(user?.role !== 'organizer' && { organizer_id: formData.organizer_id }),
-        ticket_types: formData.event_type === 'ticketed' ? ticketTypes.map(t => JSON.stringify(t)) : [],
+        ticket_types: formData.event_type === 'ticketed' ? ticketTypes : [],
         guest_types: formData.event_type === 'free'
           ? selectedGuestTypes
           : ticketTypes.map((t) => t.name), // <-- send ticket type names as guest_types for ticketed events
@@ -336,9 +336,12 @@ export default function CreateEvent() {
             )
           } else if (key === 'ticket_types') {
             if (Array.isArray(value)) {
-              value.forEach((ticketType: any) =>
-                payload.append('ticket_types[]', JSON.stringify(ticketType))
-              )
+              value.forEach((ticketType: any) => {
+                // Send each field separately for FormData
+                Object.keys(ticketType).forEach(field => {
+                  payload.append(`ticket_types[${ticketTypes.indexOf(ticketType)}][${field}]`, ticketType[field] || '')
+                })
+              })
             }
           } else if (key === 'guest_types_custom') {
             if (Array.isArray(value)) {
@@ -930,10 +933,24 @@ export default function CreateEvent() {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-gray-900">
-                      Ticket Types
+                      Ticket Types <span className="text-sm font-normal text-gray-500">(Optional)</span>
                     </h3>
                     <p className="text-gray-500 text-sm">
-                      Configure ticket types for your event
+                      You can add ticket types now or later in Ticket Management
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info Alert */}
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="text-blue-600 mt-0.5">ℹ️</div>
+                  <div>
+                    <p className="text-sm text-blue-900 font-medium">Ticket types are optional during event creation</p>
+                    <p className="text-sm text-blue-700 mt-1">
+                      You can skip this section and add ticket types later through the <strong>Ticket Management</strong> dashboard. 
+                      This allows you to configure pricing and availability after your event is created.
                     </p>
                   </div>
                 </div>

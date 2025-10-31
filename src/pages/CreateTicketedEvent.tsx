@@ -10,10 +10,6 @@ import {
   FileText,
   Image,
   Ticket,
-  Plus,
-  Trash2,
-  DollarSign,
-  Package,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -39,15 +35,6 @@ const ETHIOPIAN_CITIES = [
   'Addis Ababa', 'Dire Dawa', 'Mekelle', 'Gondar', 'Adama',
   'Hawassa', 'Bahir Dar', 'Jimma', 'Dessie', 'Jijiga'
 ]
-
-interface TicketType {
-  name: string
-  description: string
-  price: number
-  quantity: number | null
-  sales_end_date: string | null
-  benefits: string[]
-}
 
 export default function CreateTicketedEvent() {
   const navigate = useNavigate()
@@ -79,8 +66,6 @@ export default function CreateTicketedEvent() {
     endDate: new Date(),
     key: 'selection',
   }])
-
-  const [ticketTypes, setTicketTypes] = useState<TicketType[]>([])
   const [loading, setLoading] = useState({
     eventTypes: true,
     eventCategories: true,
@@ -129,35 +114,8 @@ export default function CreateTicketedEvent() {
     }
   }
 
-  const addTicketType = () => {
-    const newTicketType: TicketType = {
-      name: '',
-      description: '',
-      price: 0,
-      quantity: null,
-      sales_end_date: null,
-      benefits: [],
-    }
-    setTicketTypes(prev => [...prev, newTicketType])
-  }
-
-  const updateTicketType = (index: number, field: string, value: any) => {
-    setTicketTypes(prev => prev.map((type, i) => 
-      i === index ? { ...type, [field]: value } : type
-    ))
-  }
-
-  const removeTicketType = (index: number) => {
-    setTicketTypes(prev => prev.filter((_, i) => i !== index))
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (ticketTypes.length === 0) {
-      toast.error('Please add at least one ticket type.')
-      return
-    }
 
     // Validate location data
     if (!formData.city || !formData.venue) {
@@ -178,10 +136,9 @@ export default function CreateTicketedEvent() {
         max_guests: parseInt(formData.max_guests, 10),
         ...(user?.role !== 'organizer' && { organizer_id: formData.organizer_id }),
         event_type: 'ticketed',
-        ticket_types: ticketTypes,
       }
 
-      let payload = processedFormData
+      let payload: any
       let headers = {}
 
       if (formData.event_image) {
@@ -189,12 +146,6 @@ export default function CreateTicketedEvent() {
         Object.entries(processedFormData).forEach(([key, value]) => {
           if (key === 'event_image' && value) {
             payload.append('event_image', value)
-          } else if (key === 'ticket_types') {
-            if (Array.isArray(value)) {
-              value.forEach((ticketType: TicketType) =>
-                payload.append('ticket_types[]', JSON.stringify(ticketType))
-              )
-            }
           } else {
             payload.append(key, value as any)
           }
@@ -202,8 +153,10 @@ export default function CreateTicketedEvent() {
         headers = { 'Content-Type': 'multipart/form-data' }
       } else {
         // If no image is uploaded, add the default banner path
-        processedFormData.event_image = '/banner.png'
-        payload = processedFormData
+        payload = {
+          ...processedFormData,
+          event_image: '/banner.png'
+        }
       }
 
       await api.post('/events/ticketed/add', payload, { headers })
@@ -543,111 +496,23 @@ export default function CreateTicketedEvent() {
             </div>
           </div>
 
-          {/* Ticket Types */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                  <Ticket className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Ticket Types</h3>
-                  <p className="text-gray-500 text-sm">Configure different ticket tiers and pricing</p>
-                </div>
+          {/* Info Message */}
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+            <div className="flex items-start gap-3">
+              <div className="text-blue-600 text-2xl">ℹ️</div>
+              <div>
+                <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                  Ticket Types Configuration
+                </h3>
+                <p className="text-blue-800">
+                  After creating your event, you can add ticket types through the <strong>Ticket Management</strong> dashboard. 
+                  This allows you to configure pricing, quantities, and benefits for each ticket tier.
+                </p>
+                <p className="text-blue-700 text-sm mt-2">
+                  Navigate to: Dashboard → Ticket Management → Select Your Event → Create Ticket Type
+                </p>
               </div>
-              <Button
-                type="button"
-                onClick={addTicketType}
-                className="bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Ticket Type
-              </Button>
             </div>
-            
-            {ticketTypes.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <Ticket className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p>No ticket types added yet</p>
-                <p className="text-sm">Click "Add Ticket Type" to get started</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {ticketTypes.map((ticketType, index) => (
-                  <div key={index} className="border border-gray-200 rounded-xl p-6 bg-gray-50">
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-lg font-semibold text-gray-900">
-                        Ticket Type {index + 1}
-                      </h4>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeTicketType(index)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Name</Label>
-                        <Input
-                          value={ticketType.name}
-                          onChange={(e) => updateTicketType(index, 'name', e.target.value)}
-                          placeholder="e.g. VIP, Standard, Early Bird"
-                          className="mt-1"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Price (ETB)</Label>
-                        <Input
-                          type="number"
-                          value={ticketType.price}
-                          onChange={(e) => updateTicketType(index, 'price', parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          className="mt-1"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Quantity</Label>
-                        <Input
-                          type="number"
-                          value={ticketType.quantity || ''}
-                          onChange={(e) => updateTicketType(index, 'quantity', e.target.value ? parseInt(e.target.value) : null)}
-                          placeholder="Unlimited"
-                          className="mt-1"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Sales End Date</Label>
-                        <Input
-                          type="date"
-                          value={ticketType.sales_end_date || ''}
-                          onChange={(e) => updateTicketType(index, 'sales_end_date', e.target.value || null)}
-                          className="mt-1"
-                        />
-                      </div>
-                      
-                      <div className="md:col-span-2">
-                        <Label className="text-sm font-medium text-gray-700">Description</Label>
-                        <Textarea
-                          value={ticketType.description}
-                          onChange={(e) => updateTicketType(index, 'description', e.target.value)}
-                          placeholder="Describe what's included with this ticket..."
-                          rows={3}
-                          className="mt-1"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Action Buttons */}
@@ -662,7 +527,7 @@ export default function CreateTicketedEvent() {
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || ticketTypes.length === 0}
+              disabled={isSubmitting}
               className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
             >
               {isSubmitting ? (

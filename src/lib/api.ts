@@ -30,9 +30,17 @@ api.interceptors.request.use(
     const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
     const isMockAuth = localStorage.getItem('mock_auth') === 'true'
     
-    // Allow public endpoints even in mock mode
-    const isPublicEndpoint = config.url?.startsWith('/public/') || 
+    // Allow public endpoints even in mock mode  
+    // Check if URL matches public event patterns: /events/{id} or /events/{id}/ticket-types/available
+    const isPublicEventEndpoint = config.url?.match(/^\/events\/\d+$/) || 
+                                   config.url?.includes('/ticket-types/available') ||
+                                   config.url?.includes('/share-analytics')
+    
+    const isPublicEndpoint = config.url?.startsWith('/public/') ||
+                            config.url?.startsWith('/guest/') ||
                             config.url?.startsWith('/events/uuid/') ||
+                            config.url?.startsWith('/invitations/track') ||
+                            config.url?.startsWith('/invitation/track') ||
                             config.url?.includes('/register') ||
                             config.url?.includes('/guest-types') ||
                             config.url === '/login' ||
@@ -40,15 +48,19 @@ api.interceptors.request.use(
                             config.url === '/forgot-password' ||
                             config.url === '/reset-password' ||
                             config.url === '/refresh' ||
-                            config.url?.startsWith('/analytics/')
+                            config.url?.startsWith('/analytics/') ||
+                            isPublicEventEndpoint
     
-    if (isMockAuth && !isPublicEndpoint) {
-      // In mock mode, reject non-public API calls to prevent 401 errors
-      console.log('[API] Mock authentication mode - rejecting API call to prevent 401 errors')
-      return Promise.reject(new Error('Mock authentication mode - API calls disabled'))
-    } else if (token) {
+    // DISABLED: Allow API calls even in mock mode for development
+    // if (isMockAuth && !isPublicEndpoint) {
+    //   // In mock mode, reject non-public API calls to prevent 401 errors
+    //   console.log('[API] Mock authentication mode - rejecting API call to prevent 401 errors')
+    //   return Promise.reject(new Error('Mock authentication mode - API calls disabled'))
+    // } else 
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`
     } else if (!isPublicEndpoint && !isMockAuth) {
+      // Only warn for non-public endpoints
       console.warn('[API] No JWT token found in localStorage or sessionStorage. Requests may fail with 401 Unauthorized.')
     }
     return config
@@ -78,15 +90,18 @@ export default api
 export const getBadgeTemplates = (eventId: string) =>
   api.get(`/events/${eventId}/badge-templates`)
 
+export const getBadgeTemplate = (eventId: string, templateId: string) =>
+  api.get(`/events/${eventId}/badge-templates/${templateId}`)
+
 export const createBadgeTemplate = (
   eventId: string,
-  data: { name: string; template_json: any }
+  data: { name: string; template_json: any; is_default?: boolean }
 ) => api.post(`/events/${eventId}/badge-templates`, data)
 
 export const updateBadgeTemplate = (
   eventId: string,
   templateId: string,
-  data: { name?: string; template_json?: any }
+  data: { name?: string; template_json?: any; is_default?: boolean }
 ) => api.put(`/events/${eventId}/badge-templates/${templateId}`, data)
 
 export const deleteBadgeTemplate = (eventId: string, templateId: string) =>
@@ -111,7 +126,119 @@ export const getUnreadMessageCount = () => api.get('/messages/unread/count')
 
 export const getUnreadMessages = () => api.get('/messages/unread')
 
+// Enhanced messaging API functions
+export const getConversations = () => api.get('/messages/conversations')
+
+export const getDirectMessages = (userId: string, page = 1, perPage = 50) =>
+  api.get(`/messages/direct/${userId}?page=${page}&per_page=${perPage}`)
+
+export const sendDirectMessage = (data: {
+  recipient_id: number
+  content: string
+  parent_message_id?: number
+  file?: File
+}) => {
+  const formData = new FormData()
+  formData.append('recipient_id', data.recipient_id.toString())
+  formData.append('content', data.content)
+  if (data.parent_message_id) {
+    formData.append('parent_message_id', data.parent_message_id.toString())
+  }
+  if (data.file) {
+    formData.append('file', data.file)
+  }
+  return api.post('/messages/direct', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+}
+
+export const sendEventMessageWithAttachment = (
+  eventId: string,
+  data: {
+    recipient_id: number
+    content: string
+    parent_message_id?: number
+    file?: File
+  }
+) => {
+  const formData = new FormData()
+  formData.append('recipient_id', data.recipient_id.toString())
+  formData.append('content', data.content)
+  if (data.parent_message_id) {
+    formData.append('parent_message_id', data.parent_message_id.toString())
+  }
+  if (data.file) {
+    formData.append('file', data.file)
+  }
+  return api.post(`/events/${eventId}/messages`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+}
+
+export const uploadMessageAttachment = (file: File) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post('/messages/attachment', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+}
+
+export const searchMessages = (query: string, filters: {
+  type?: 'all' | 'event' | 'direct'
+  per_page?: number
+  page?: number
+} = {}) => {
+  const params = new URLSearchParams({ q: query })
+  if (filters.type && filters.type !== 'all') {
+    params.append('type', filters.type)
+  }
+  if (filters.per_page) {
+    params.append('per_page', filters.per_page.toString())
+  }
+  if (filters.page) {
+    params.append('page', filters.page.toString())
+  }
+  return api.get(`/messages/search?${params.toString()}`)
+}
+
+export const getConversationPartners = () => api.get('/messages/partners')
+
+export const markConversationRead = (data: {
+  other_user_id?: number
+  event_id?: number
+}) => api.post('/messages/conversation/read', data)
+
+export const deleteMessage = (messageId: string) =>
+  api.delete(`/messages/${messageId}`)
+
+// Message pinning
+export const pinMessage = (messageId: number) =>
+  api.post(`/messages/${messageId}/pin`)
+
+export const unpinMessage = (messageId: number) =>
+  api.delete(`/messages/${messageId}/pin`)
+
+export const getPinnedMessages = (conversationId: string) => {
+  // Extract conversation type and ID
+  if (conversationId.startsWith('event_')) {
+    const eventId = conversationId.replace('event_', '')
+    return api.get(`/events/${eventId}/messages/pinned`)
+  } else if (conversationId.startsWith('direct_')) {
+    const userId = conversationId.replace('direct_', '')
+    return api.get(`/messages/direct/${userId}/pinned`)
+  }
+  return Promise.reject(new Error('Invalid conversation ID'))
+}
+
 export const getAllUsers = () => api.get('/users')
+
+export const getMessagingContacts = () => api.get('/users/messaging-contacts')
 
 export const getEventUshers = (eventId: number) =>
   api.get(`/events/${eventId}/ushers`)
@@ -355,5 +482,47 @@ export const updateDeliverable = (id: number, data: any) => api.put(`/deliverabl
 export const deleteDeliverable = (id: number) => api.delete(`/deliverables/${id}`)
 export const bulkUpdateDeliverableStatus = (ids: number[], status: string) => api.post('/deliverables/bulk-update-status', { deliverable_ids: ids, status })
 export const getVendorEventDeliverables = (vendorId: number, eventId: number) => api.get(`/vendors/${vendorId}/events/${eventId}/deliverables`)
+
+// Pre-generated Badges API
+export const bulkGenerateBadges = (eventId: number, data: { guest_type_id: number; quantity: number }) =>
+  api.post(`/events/${eventId}/pre-generated-badges/bulk-generate`, data)
+
+export const getPreGeneratedBadges = (eventId: number, filters?: { 
+  guest_type_id?: number; 
+  status?: string; 
+  search?: string; 
+  per_page?: number 
+}) =>
+  api.get(`/events/${eventId}/pre-generated-badges`, { params: filters })
+
+export const assignPreGeneratedBadge = (eventId: number, data: {
+  badge_code: string
+  guest_id?: number
+  first_name?: string
+  last_name?: string
+  email?: string
+  phone?: string
+  company?: string
+  job_title?: string
+}) =>
+  api.post(`/events/${eventId}/pre-generated-badges/assign`, data)
+
+export const unassignPreGeneratedBadge = (eventId: number, badgeId: number) =>
+  api.delete(`/events/${eventId}/pre-generated-badges/${badgeId}/unassign`)
+
+export const getPreGeneratedBadgeStats = (eventId: number) =>
+  api.get(`/events/${eventId}/pre-generated-badges/statistics`)
+
+export const exportPreGeneratedBadges = (eventId: number, format: 'csv' | 'pdf', guestTypeId?: number) =>
+  api.get(`/events/${eventId}/pre-generated-badges/export`, { 
+    params: { format, guest_type_id: guestTypeId }, 
+    responseType: 'blob' 
+  })
+
+export const generatePrintableBadges = (eventId: number, badgeIds: number[]) =>
+  api.post(`/events/${eventId}/pre-generated-badges/generate-printables`, 
+    { badge_ids: badgeIds },
+    { responseType: 'blob' }
+  )
 
 export { api }

@@ -113,9 +113,13 @@ export default function CreateFreeEvent() {
       try {
         setLoading(prev => ({ ...prev, [loaderKey]: true }))
         const response = await api.get(endpoint)
-        setData(response.data)
+        // Ensure we always set an array - handle both response.data and response.data.data
+        const data = Array.isArray(response.data) ? response.data : (response.data?.data || [])
+        setData(data)
       } catch (err: any) {
         console.error(`Error fetching ${endpoint}:`, err)
+        // Set empty array on error to prevent .map errors
+        setData([])
       } finally {
         setLoading(prev => ({ ...prev, [loaderKey]: false }))
       }

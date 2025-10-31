@@ -12,6 +12,7 @@ import {
   Search,
   Filter,
   RefreshCw,
+  MessageCircle,
 } from 'lucide-react'
 import { MetricCard } from '@/components/MetricCard'
 import { DashboardCard } from '@/components/DashboardCard'
@@ -28,9 +29,10 @@ import {
 } from '@/components/ui/select'
 import api from '@/lib/api'
 import { getGuestTypeBadgeClasses } from '@/lib/utils'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useNavigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { Checkbox } from '@/components/ui/checkbox'
+import { RecentActivity } from '@/components/RecentActivity'
 import { QrReader } from '@blackbox-vision/react-qr-reader';
 // Suppress defaultProps warning for QrReader (temporary workaround)
 if (QrReader && QrReader.defaultProps) {
@@ -166,6 +168,47 @@ export default function UsherDashboard() {
   const handleQrError = (err: any) => {
     setQrScanStatus('QR scanner error. Please try again.');
   };
+
+  // Handler for navigating to event messaging
+  const handleEventMessage = (eventId: string | number) => {
+    navigate(`/dashboard/messages?eventId=${eventId}&conversationId=event_${eventId}`)
+  }
+
+  // Handler for messaging event organizer directly
+  const handleMessageOrganizer = async (event: any) => {
+    try {
+      // Fetch event details to get organizer_id
+      const eventResponse = await api.get(`/events/${event.id}`)
+      const fullEvent = eventResponse.data
+      
+      if (fullEvent?.organizer_id) {
+        // Fetch organizer details
+        const organizerResponse = await api.get(`/organizers/${fullEvent.organizer_id}`)
+        const organizer = organizerResponse.data
+        
+        // Fetch organizer's users to find primary contact or first user
+        if (organizer) {
+          const usersResponse = await api.get(`/organizers/${fullEvent.organizer_id}/users`)
+          const users = Array.isArray(usersResponse.data) ? usersResponse.data : (usersResponse.data?.data || [])
+          
+          // Find primary contact or use first user
+          const organizerUser = users.find((u: any) => u.is_primary_contact) || users[0]
+          
+          if (organizerUser?.id) {
+            navigate(`/dashboard/messages?userId=${organizerUser.id}&conversationId=direct_${organizerUser.id}`)
+            return
+          }
+        }
+      }
+      
+      // Fallback to event conversation if organizer not found
+      handleEventMessage(event.id)
+    } catch (err) {
+      console.error('Failed to get organizer:', err)
+      // Fallback to event conversation
+      handleEventMessage(event.id)
+    }
+  }
 
   // Accept job
   const handleAcceptJob = async (eventId: string) => {
@@ -335,9 +378,23 @@ export default function UsherDashboard() {
                       }
                       className="h-2"
                     />
-                    <Link to={`/dashboard/events/${event.id}/messages`} tabIndex={-1} aria-disabled="true" title="Coming Soon!" onClick={e => e.preventDefault()}>
-                      <Button className="mt-2 w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-sm py-2">Message (Coming Soon)</Button>
-                    </Link>
+                    <div className="flex gap-2 mt-2">
+                      <Button 
+                        onClick={() => handleEventMessage(event.id)}
+                        className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-sm py-2"
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        Event Chat
+                      </Button>
+                      <Button 
+                        onClick={() => handleMessageOrganizer(event)}
+                        variant="outline"
+                        className="flex-1 text-sm py-2"
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        Message Organizer
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="mt-4">
@@ -620,6 +677,11 @@ export default function UsherDashboard() {
             Report New Issue
           </Button>
         </DashboardCard>
+
+        {/* Recent Activity */}
+        <div className="col-span-1 lg:col-span-2">
+          <RecentActivity limit={6} />
+        </div>
       </div>
 
       {/* Example usage of filteredAssignedEvents and filteredCheckIns */}

@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Briefcase,
   Mail,
+  Palette,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -33,6 +34,7 @@ import {
 } from '@/components/ui/sidebar'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/hooks/use-auth'
+import { useUnreadCount } from '@/hooks/use-messages'
 import api from '@/lib/api'
 
 const allItems = [
@@ -80,6 +82,12 @@ const allItems = [
     roles: ['superadmin', 'admin', 'organizer'],
   },
   {
+    title: 'Salesperson Management',
+    url: '/dashboard/salesperson-management',
+    icon: Users,
+    roles: ['superadmin', 'admin'],
+  },
+  {
     title: 'Tasks & Deliverables',
     url: '/dashboard/tasks',
     icon: ClipboardList,
@@ -93,9 +101,9 @@ const allItems = [
   },
   {
     title: 'Badge Designer',
-    url: '/apps/badge-designer',
-    icon: ClipboardList,
-    roles: ['superadmin', 'admin', ''],
+    url: '/badge-designer',
+    icon: Palette,
+    roles: ['superadmin', 'admin', 'organizer'],
   },
   {
     title: 'Marketing',
@@ -107,8 +115,7 @@ const allItems = [
     title: 'Messages',
     url: '/dashboard/messages',
     icon: MessageSquare,
-    roles: ['superadmin', 'admin', 'organizer'],
-    comingSoon: true,
+    roles: ['superadmin', 'admin', 'organizer', 'usher'],
   },
   {
     title: 'Event Analytics',
@@ -127,6 +134,18 @@ const allItems = [
     url: '/dashboard/check-in',
     icon: UserCheck,
     roles: ['usher'],
+  },
+  {
+    title: 'Ticket Management',
+    url: '/dashboard/ticket-management',
+    icon: Ticket,
+    roles: ['organizer', 'admin', 'superadmin'],
+  },
+  {
+    title: 'Ticket Validator',
+    url: '/dashboard/ticket-validator',
+    icon: UserCheck,
+    roles: ['usher', 'organizer', 'admin', 'superadmin'],
   },
   {
     title: 'My Tickets',
@@ -168,6 +187,10 @@ export function AppSidebar() {
   const isCollapsed = state === 'collapsed'
   const [trashCount, setTrashCount] = useState(0)
   const location = useLocation()
+  
+  // Get unread message count
+  const { data: unreadData } = useUnreadCount()
+  const unreadCount = unreadData?.unread_count || 0
 
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
     isActive
@@ -235,7 +258,6 @@ export function AppSidebar() {
                       to={item.url}
                       end={item.url === '/dashboard'}
                       className={getNavCls}
-                      title={item.comingSoon ? 'Coming Soon!' : undefined}
                     >
                       <div className="flex items-center justify-between w-full">
                         <div className="flex items-center">
@@ -243,22 +265,29 @@ export function AppSidebar() {
                           {!isCollapsed && (
                             <span className="ml-3 font-medium">
                               {item.title}
-                              {item.comingSoon && (
-                                <span className="ml-2 px-2 py-0.5 rounded-full bg-yellow-200 text-yellow-800 text-xs font-semibold animate-pulse">Soon</span>
-                              )}
                             </span>
                           )}
                         </div>
-                        {!isCollapsed &&
-                          item.title === 'Trash' &&
-                          trashCount > 0 && (
-                            <Badge
-                              variant="destructive"
-                              className="ml-2 text-xs"
-                            >
-                              {trashCount}
-                            </Badge>
-                          )}
+                        {!isCollapsed && (
+                          <>
+                            {item.title === 'Trash' && trashCount > 0 && (
+                              <Badge
+                                variant="destructive"
+                                className="ml-2 text-xs"
+                              >
+                                {trashCount}
+                              </Badge>
+                            )}
+                            {item.title === 'Messages' && unreadCount > 0 && (
+                              <Badge
+                                variant="destructive"
+                                className="ml-2 text-xs"
+                              >
+                                {unreadCount}
+                              </Badge>
+                            )}
+                          </>
+                        )}
                       </div>
                     </NavLink>
                   </SidebarMenuButton>

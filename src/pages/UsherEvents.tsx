@@ -9,12 +9,11 @@ import { useAuth } from '@/hooks/use-auth'
 import api from '@/lib/api'
 import { getGuestTypeBadgeClasses, getCheckInBadgeClasses } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Printer } from 'lucide-react'
+import { Printer, QrCode, Search } from 'lucide-react'
 import BadgePrint from '@/components/Badge'
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Label } from '@/components/ui/label'
-import { Search } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { QrReader } from '@blackbox-vision/react-qr-reader';
 // Suppress defaultProps warning for QrReader (temporary workaround)
@@ -64,6 +63,9 @@ export default function UsherEvents() {
     guest_type_id: '',
   })
   const [addAttendeeLoading, setAddAttendeeLoading] = useState(false)
+  const [badgeCode, setBadgeCode] = useState('')
+  const [badgeInfo, setBadgeInfo] = useState<any>(null)
+  const [loadingBadgeInfo, setLoadingBadgeInfo] = useState(false)
   // Edit form state
   const [editForm, setEditForm] = useState({
     name: '',
@@ -114,7 +116,9 @@ export default function UsherEvents() {
     setLoading(true)
     api.get(`/events/${selectedEventId}/attendees`)
       .then(res => {
-        const indexed = (res.data || []).map((a: any) => {
+        // Handle paginated response
+        const data = res.data?.data ? res.data.data : res.data
+        const indexed = (Array.isArray(data) ? data : []).map((a: any) => {
           const name = a?.guest?.name ? String(a.guest.name) : ''
           const email = a?.guest?.email ? String(a.guest.email) : ''
           const company = a?.guest?.company ? String(a.guest.company) : ''
@@ -125,7 +129,9 @@ export default function UsherEvents() {
         setError(null)
       })
       .catch(err => {
-        setError('Failed to fetch guests for this event.')
+        console.error('Failed to fetch attendees:', err)
+        const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch guests for this event.'
+        setError(errorMessage)
         setAttendees([])
       })
       .finally(() => setLoading(false))
@@ -141,9 +147,57 @@ export default function UsherEvents() {
   useEffect(() => {
     if (!selectedEventId) return
     api.get(`/events/${selectedEventId}/guest-types`)
-      .then(res => setGuestTypes(res.data))
+      .then(res => {
+        // Deduplicate guest types by ID to prevent duplicate key warnings
+        const uniqueGuestTypes = Array.from(
+          new Map(res.data.map((type: any) => [type.id, type])).values()
+        )
+        setGuestTypes(uniqueGuestTypes)
+      })
       .catch(() => setGuestTypes([]))
   }, [selectedEventId])
+
+  // Fetch badge information when badge code is entered
+  useEffect(() => {
+    if (!selectedEventId || !badgeCode.trim()) {
+      setBadgeInfo(null)
+      return
+    }
+
+    // Debounce the API call
+    const timeoutId = setTimeout(() => {
+      setLoadingBadgeInfo(true)
+      api.get(`/events/${selectedEventId}/pre-generated-badges`, {
+        params: { search: badgeCode.trim(), per_page: 1 }
+      })
+        .then(res => {
+          const badges = res.data?.data || res.data
+          if (badges && badges.length > 0) {
+            const badge = badges[0]
+            setBadgeInfo(badge)
+            
+            // Auto-select the guest type if badge is found and has a guest_type_id
+            if (badge.guest_type_id) {
+              setAddForm(prev => ({
+                ...prev,
+                guest_type_id: String(badge.guest_type_id)
+              }))
+            }
+          } else {
+            setBadgeInfo(null)
+          }
+        })
+        .catch(err => {
+          console.error('Failed to fetch badge info:', err)
+          setBadgeInfo(null)
+        })
+        .finally(() => {
+          setLoadingBadgeInfo(false)
+        })
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [badgeCode, selectedEventId])
 
   // Instant search handler (debounced)
   useEffect(() => {
@@ -156,7 +210,9 @@ export default function UsherEvents() {
     searchTimeout.current = setTimeout(() => {
       api.get(`/events/${selectedEventId}/attendees`)
         .then(res => {
-          const all = res.data || []
+          // Handle paginated response
+          const data = res.data?.data ? res.data.data : res.data
+          const all = Array.isArray(data) ? data : []
           const search = searchTerm.toLowerCase()
           const filtered = all.filter((a: any) =>
             a.guest?.name?.toLowerCase().includes(search) ||
@@ -183,7 +239,26 @@ export default function UsherEvents() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     setSearchPerformed(true)
-    setAttendees(suggestions)
+    
+    // If search term exists, filter the already-loaded attendees
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase()
+      const filtered = attendees.filter((a: any) =>
+        a._search?.includes(search) || // Use _search blob for faster filtering
+        a.guest?.name?.toLowerCase().includes(search) ||
+        a.guest?.email?.toLowerCase().includes(search) ||
+        a.guest?.phone?.toLowerCase().includes(search) ||
+        a.guest?.company?.toLowerCase().includes(search) ||
+        a.guest?.jobtitle?.toLowerCase().includes(search) ||
+        a.guest?.gender?.toLowerCase().includes(search) ||
+        a.guest?.country?.toLowerCase().includes(search) ||
+        (a.guest?.uuid && a.guest?.uuid.toLowerCase().includes(search))
+      )
+      setAttendees(filtered)
+    } else {
+      // If no search term, use suggestions if available, otherwise show empty
+      setAttendees(suggestions.length > 0 ? suggestions : attendees)
+    }
   }
 
   // Add attendee handler
@@ -192,17 +267,88 @@ export default function UsherEvents() {
     if (!selectedEventId) return
     try {
       setAddAttendeeLoading(true)
-      const payload = {
-        ...addForm,
-        name: `${addForm.first_name} ${addForm.last_name}`.trim(),
+      
+      // If badge code is provided, assign badge first
+      if (badgeCode.trim()) {
+        try {
+          await api.post(`/events/${selectedEventId}/pre-generated-badges/assign`, {
+            badge_code: badgeCode.trim(),
+            first_name: addForm.first_name,
+            last_name: addForm.last_name,
+            email: addForm.email || undefined,
+            phone: addForm.phone || undefined,
+            company: addForm.company || undefined,
+            job_title: addForm.jobtitle || undefined,
+          })
+          
+          toast({ title: 'Success', description: 'Attendee registered with pre-generated badge!' })
+        } catch (badgeErr: any) {
+          // If badge assignment fails, try regular attendee creation
+          console.warn('Badge assignment failed:', badgeErr)
+          toast({
+            title: 'Warning',
+            description: badgeErr.response?.data?.error || 'Could not assign badge, creating attendee without badge',
+          })
+          
+          // Fall through to regular attendee creation
+          const payload = {
+            ...addForm,
+            name: `${addForm.first_name} ${addForm.last_name}`.trim(),
+          }
+          
+          await api.post(`/events/${selectedEventId}/attendees`, payload)
+          toast({ title: 'Success', description: 'Attendee added successfully (without badge)!' })
+        }
+      } else {
+        // No badge code - create attendee normally
+        const payload = {
+          ...addForm,
+          name: `${addForm.first_name} ${addForm.last_name}`.trim(),
+        }
+        await api.post(`/events/${selectedEventId}/attendees`, payload)
+        toast({ title: 'Success', description: 'Attendee added!' })
       }
-      await api.post(`/events/${selectedEventId}/attendees`, payload)
-      toast({ title: 'Success', description: 'Attendee added!' })
+
       setAddDialogOpen(false)
+      setBadgeCode('')
+      setBadgeInfo(null)
       setAddForm({ first_name: '', last_name: '', email: '', phone: '', company: '', jobtitle: '', gender: '', country: '', guest_type_id: '' })
-      // Refresh attendees
-      const res = await api.get(`/events/${selectedEventId}/attendees`)
-      setAttendees(res.data)
+      
+      // Reload attendees and preserve search if it was active
+      setLoading(true)
+      try {
+        const res = await api.get(`/events/${selectedEventId}/attendees`)
+        const data = res.data?.data ? res.data.data : res.data
+        const indexed = (Array.isArray(data) ? data : []).map((a: any) => {
+          const name = a?.guest?.name ? String(a.guest.name) : ''
+          const email = a?.guest?.email ? String(a.guest.email) : ''
+          const company = a?.guest?.company ? String(a.guest.company) : ''
+          const blob = `${name} ${email} ${company}`.toLowerCase()
+          return { ...a, _search: blob }
+        })
+        
+        // If there was an active search, re-filter the results
+        if (searchPerformed && searchTerm.trim()) {
+          const search = searchTerm.toLowerCase()
+          const filtered = indexed.filter((a: any) =>
+            a._search?.includes(search) ||
+            a.guest?.name?.toLowerCase().includes(search) ||
+            a.guest?.email?.toLowerCase().includes(search) ||
+            a.guest?.phone?.toLowerCase().includes(search) ||
+            a.guest?.company?.toLowerCase().includes(search) ||
+            a.guest?.jobtitle?.toLowerCase().includes(search) ||
+            a.guest?.gender?.toLowerCase().includes(search) ||
+            a.guest?.country?.toLowerCase().includes(search) ||
+            (a.guest?.uuid && a.guest?.uuid.toLowerCase().includes(search))
+          )
+          setAttendees(filtered)
+        } else {
+          // Clear results if no search was performed
+          setAttendees([])
+        }
+      } catch (err) {
+        console.error('Failed to reload attendees:', err)
+      }
     } catch (err: any) {
       toast({ title: 'Error', description: err.response?.data?.error || 'Failed to add attendee' })
     } finally {
@@ -221,9 +367,41 @@ export default function UsherEvents() {
       toast({ title: 'Success', description: 'Attendee updated!' })
       setEditDialogOpen(false)
       setEditAttendee(null)
-      // Refresh attendees
-      const res = await api.get(`/events/${selectedEventId}/attendees`)
-      setAttendees(res.data)
+      
+      // Reload attendees and preserve search if it was active
+      try {
+        const res = await api.get(`/events/${selectedEventId}/attendees`)
+        const data = res.data?.data ? res.data.data : res.data
+        const indexed = (Array.isArray(data) ? data : []).map((a: any) => {
+          const name = a?.guest?.name ? String(a.guest.name) : ''
+          const email = a?.guest?.email ? String(a.guest.email) : ''
+          const company = a?.guest?.company ? String(a.guest.company) : ''
+          const blob = `${name} ${email} ${company}`.toLowerCase()
+          return { ...a, _search: blob }
+        })
+        
+        // If there was an active search, re-filter the results
+        if (searchPerformed && searchTerm.trim()) {
+          const search = searchTerm.toLowerCase()
+          const filtered = indexed.filter((a: any) =>
+            a._search?.includes(search) ||
+            a.guest?.name?.toLowerCase().includes(search) ||
+            a.guest?.email?.toLowerCase().includes(search) ||
+            a.guest?.phone?.toLowerCase().includes(search) ||
+            a.guest?.company?.toLowerCase().includes(search) ||
+            a.guest?.jobtitle?.toLowerCase().includes(search) ||
+            a.guest?.gender?.toLowerCase().includes(search) ||
+            a.guest?.country?.toLowerCase().includes(search) ||
+            (a.guest?.uuid && a.guest?.uuid.toLowerCase().includes(search))
+          )
+          setAttendees(filtered)
+        } else {
+          // Clear results if no search was performed
+          setAttendees([])
+        }
+      } catch (err) {
+        console.error('Failed to reload attendees:', err)
+      }
     } catch (err: any) {
       toast({ title: 'Error', description: err.response?.data?.error || 'Failed to update attendee' })
     } finally {
@@ -327,7 +505,9 @@ export default function UsherEvents() {
       if (!attendee) {
         // Try to fetch all attendees in case not loaded
         const res = await api.get(`/events/${selectedEventId}/attendees`);
-        attendee = res.data.find((a: any) => a.id?.toString() === data || a.guest?.email === data);
+        const attendeesData = res.data?.data ? res.data.data : res.data
+        const allAttendees = Array.isArray(attendeesData) ? attendeesData : []
+        attendee = allAttendees.find((a: any) => a.id?.toString() === data || a.guest?.email === data);
       }
       if (!attendee) {
         setQrScanStatus('No matching attendee found for this QR code.');
@@ -471,6 +651,21 @@ export default function UsherEvents() {
             <Button type="submit" className="rounded-full px-6 py-3 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow">
               Search
             </Button>
+            {searchPerformed && (
+              <Button 
+                onClick={() => {
+                  setSearchPerformed(false)
+                  setSearchTerm('')
+                  setSuggestions([])
+                  setAttendees([]) // Clear the displayed results
+                }} 
+                type="button" 
+                variant="outline" 
+                className="rounded-full px-6 py-3 text-lg border-red-200 hover:bg-red-50 shadow"
+              >
+                Clear
+              </Button>
+            )}
             <Button onClick={() => setAddDialogOpen(true)} type="button" variant="outline" className="rounded-full px-6 py-3 text-lg border-blue-200 shadow">
               Add Attendee
             </Button>
@@ -595,13 +790,38 @@ export default function UsherEvents() {
         <div id="usher-print-area">
         {singlePrintAttendee && (
           <div className="printable-badge-batch">
-            <BadgePrint attendee={singlePrintAttendee} />
+            <BadgePrint 
+              attendee={{
+                ...singlePrintAttendee,
+                guest: {
+                  ...singlePrintAttendee.guest,
+                  // Ensure we use the latest guest data with complete information
+                  name: singlePrintAttendee.guest?.name || 'Participant',
+                  company: singlePrintAttendee.guest?.company || '',
+                  jobtitle: singlePrintAttendee.guest?.jobtitle || '',
+                  email: singlePrintAttendee.guest?.email || '',
+                  phone: singlePrintAttendee.guest?.phone || '',
+                  country: singlePrintAttendee.guest?.country || '',
+                  uuid: singlePrintAttendee.guest?.uuid || '',
+                },
+                // Include attendee ID for the badge
+                id: singlePrintAttendee.id,
+              }} 
+            />
           </div>
         )}
         </div>
       </div>
       {/* Add Attendee Dialog */}
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+      <Dialog open={addDialogOpen} onOpenChange={(open) => {
+        setAddDialogOpen(open)
+        if (!open) {
+          // Reset form and badge info when dialog closes
+          setBadgeCode('')
+          setBadgeInfo(null)
+          setAddForm({ first_name: '', last_name: '', email: '', phone: '', company: '', jobtitle: '', gender: '', country: '', guest_type_id: '' })
+        }
+      }}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Add New Attendee</DialogTitle>
@@ -610,6 +830,53 @@ export default function UsherEvents() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddAttendee} className="space-y-4 py-4">
+            {/* Badge Code Input */}
+            <div>
+              <Label htmlFor="badge_code" className="flex items-center gap-2">
+                <QrCode className="h-4 w-4" />
+                Badge QR Code (Optional)
+              </Label>
+              <div className="relative">
+                <Input
+                  id="badge_code"
+                  value={badgeCode}
+                  onChange={(e) => setBadgeCode(e.target.value)}
+                  placeholder="Scan or enter badge code to assign pre-generated badge"
+                  className="font-mono"
+                />
+                {loadingBadgeInfo && (
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                    <svg className="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                )}
+              </div>
+              {loadingBadgeInfo && (
+                <p className="text-xs text-blue-500 mt-1">Looking up badge...</p>
+              )}
+              {!loadingBadgeInfo && badgeInfo && (
+                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                  <p className="text-green-700 font-semibold">✓ Badge found: {badgeInfo.badge_code}</p>
+                  {badgeInfo.guest_type && (
+                    <p className="text-green-600">Guest Type auto-selected: {badgeInfo.guest_type.name}</p>
+                  )}
+                  {badgeInfo.status !== 'available' && (
+                    <p className="text-orange-600">Status: {badgeInfo.status}</p>
+                  )}
+                </div>
+              )}
+              {!loadingBadgeInfo && badgeCode.trim() && !badgeInfo && (
+                <p className="text-xs text-orange-500 mt-1">Badge code not found. You can still proceed without a pre-generated badge.</p>
+              )}
+              {!badgeCode.trim() && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave blank to register without a pre-generated badge
+                </p>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="first_name">First Name</Label>
@@ -699,7 +966,7 @@ export default function UsherEvents() {
                     {[
                       "Ethiopia", "United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium", "Switzerland", "Austria", "Sweden", "Norway", "Denmark", "Finland", "Poland", "Czech Republic", "Hungary", "Romania", "Bulgaria", "Greece", "Portugal", "Ireland", "New Zealand", "Japan", "South Korea", "China", "India", "Brazil", "Argentina", "Mexico", "Chile", "Colombia", "Peru", "Venezuela", "Ecuador", "Bolivia", "Paraguay", "Uruguay", "Guyana", "Suriname", "French Guiana", "South Africa", "Egypt", "Nigeria", "Kenya", "Ghana", "Uganda", "Tanzania", "Morocco", "Algeria", "Tunisia", "Libya", "Sudan", "Somalia", "Djibouti", "Eritrea", "Saudi Arabia", "United Arab Emirates", "Qatar", "Kuwait", "Bahrain", "Oman", "Yemen", "Jordan", "Lebanon", "Syria", "Iraq", "Iran", "Afghanistan", "Pakistan", "Bangladesh", "Sri Lanka", "Nepal", "Bhutan", "Maldives", "Myanmar", "Thailand", "Laos", "Cambodia", "Vietnam", "Malaysia", "Singapore", "Indonesia", "Philippines", "Brunei", "East Timor", "Papua New Guinea", "Fiji", "Solomon Islands", "Vanuatu", "New Caledonia", "French Polynesia", "Samoa", "Tonga", "Kiribati", "Tuvalu", "Nauru", "Palau", "Micronesia", "Marshall Islands", "Cook Islands", "Niue", "Tokelau", "American Samoa", "Guam", "Northern Mariana Islands", "Puerto Rico", "U.S. Virgin Islands", "British Virgin Islands", "Anguilla", "Montserrat", "Saint Kitts and Nevis"
                     ].map((country, idx) => (
-                      <SelectItem key={`${country}-${idx}`} value={country}>{country}</SelectItem>
+                      <SelectItem key={`country-${idx}`} value={country}>{country}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -800,7 +1067,7 @@ export default function UsherEvents() {
                     <SelectValue placeholder={editForm.guest_type_id ? undefined : 'Select Guest Type'} />
               </SelectTrigger>
               <SelectContent>
-                {guestTypes.map(gt => (
+                {guestTypes.map((gt) => (
                   <SelectItem key={gt.id} value={gt.id.toString()}>{gt.name}</SelectItem>
                 ))}
               </SelectContent>

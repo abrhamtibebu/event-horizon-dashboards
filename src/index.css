@@ -149,4 +149,111 @@
       transform: translateY(0);
     }
   }
+
+  /* Message bubble width constraints */
+  .message-bubble {
+    max-width: 280px !important;
+    word-break: break-all !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  @media (min-width: 1024px) {
+    .message-bubble {
+      max-width: 320px !important;
+    }
+  }
+
+  /* Elegant scrollbar styling - WhatsApp inspired */
+  .elegant-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.2) transparent;
+  }
+
+  .elegant-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .elegant-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .elegant-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.2);
+    border-radius: 2px;
+    transition: all 0.2s ease;
+  }
+
+  .elegant-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.4);
+    width: 6px;
+  }
+
+  .elegant-scrollbar::-webkit-scrollbar-thumb:active {
+    background-color: rgba(156, 163, 175, 0.6);
+  }
+
+  /* Dark theme scrollbar */
+  .dark .elegant-scrollbar {
+    scrollbar-color: rgba(75, 85, 99, 0.3) transparent;
+  }
+
+  .dark .elegant-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(75, 85, 99, 0.3);
+  }
+
+  .dark .elegant-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(75, 85, 99, 0.5);
+    width: 6px;
+  }
+
+  .dark .elegant-scrollbar::-webkit-scrollbar-thumb:active {
+    background-color: rgba(75, 85, 99, 0.7);
+  }
+
+  /* Message thread specific scrollbar - more subtle */
+  .message-thread-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.15) transparent;
+  }
+
+  .message-thread-scrollbar::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .message-thread-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .message-thread-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.15);
+    border-radius: 1.5px;
+    transition: all 0.2s ease;
+  }
+
+  .message-thread-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(156, 163, 175, 0.3);
+    width: 5px;
+  }
+
+  .message-thread-scrollbar::-webkit-scrollbar-thumb:active {
+    background-color: rgba(156, 163, 175, 0.5);
+  }
+
+  /* Dark theme for message thread scrollbar */
+  .dark .message-thread-scrollbar {
+    scrollbar-color: rgba(75, 85, 99, 0.2) transparent;
+  }
+
+  .dark .message-thread-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(75, 85, 99, 0.2);
+  }
+
+  .dark .message-thread-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(75, 85, 99, 0.4);
+    width: 5px;
+  }
+
+  .dark .message-thread-scrollbar::-webkit-scrollbar-thumb:active {
+    background-color: rgba(75, 85, 99, 0.6);
+  }
 }

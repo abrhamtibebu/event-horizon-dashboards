@@ -9,6 +9,7 @@ import { Attendee } from '@/types/attendee';
 import { v4 as uuidv4 } from 'uuid';
 import { getBadgeTemplates, getOfficialBadgeTemplate } from '@/lib/badgeTemplates';
 import { calculateNameFontSize, calculateCompanyFontSize, calculateJobTitleFontSize } from '@/lib/nameSizing';
+import { convertBadgeDesignerToLegacy } from '@/lib/badge-designer/utils/templateConverter';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -92,17 +93,27 @@ const BadgePage = () => {
     if (!eventId) return;
     setTemplateError(null);
     
-    // First try to get the official template
+    // First try to get the default badge template
     getOfficialBadgeTemplate(Number(eventId))
       .then(res => {
-        setTemplate(res.data);
+        if (res.data) {
+          // Convert new badge designer format to legacy format
+          const convertedTemplate = convertBadgeDesignerToLegacy(res.data);
+          console.log('Using default badge template:', res.data.name, 'is_default:', res.data.is_default);
+          setTemplate(convertedTemplate);
+        } else {
+          // No default template found
+          setTemplate(createDefaultTemplate());
+          setTemplateError('No default badge template found. Using built-in template.');
+        }
       })
       .catch(() => {
         // If no official template, try to get any template
         getBadgeTemplates(Number(eventId))
           .then(res => {
             if (Array.isArray(res.data) && res.data.length > 0) {
-              setTemplate(res.data[0]);
+              const convertedTemplate = convertBadgeDesignerToLegacy(res.data[0]);
+              setTemplate(convertedTemplate);
             } else {
               setTemplate(createDefaultTemplate());
               setTemplateError('No badge templates found. Using default template.');
@@ -113,7 +124,8 @@ const BadgePage = () => {
             const saved = localStorage.getItem(`badge_templates_${eventId}`);
             if (saved) {
               const templates = JSON.parse(saved);
-              setTemplate(templates[0]);
+              const convertedTemplate = convertBadgeDesignerToLegacy(templates[0]);
+              setTemplate(convertedTemplate);
             } else {
               setTemplate(createDefaultTemplate());
               setTemplateError('Failed to load badge template from backend and local storage. Using default.');

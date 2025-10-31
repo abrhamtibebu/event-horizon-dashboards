@@ -32,10 +32,17 @@ export const publishBadgeTemplate = (eventId: number, templateId: number) =>
 
 export const getOfficialBadgeTemplate = async (eventId: number) => {
   try {
-    return await api.get<BadgeTemplate>(`/events/${eventId}/badge-templates-official`);
+    // Get all templates for the event
+    const response = await api.get<any>(`/events/${eventId}/badge-templates`);
+    const templates = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+    
+    // Find the default template or return the first one
+    const defaultTemplate = templates.find((t: any) => t.is_default) || templates[0];
+    
+    return { data: defaultTemplate || null };
   } catch (error: any) {
     if (error?.response?.status === 404) {
-      // No official template found, return null or a default
+      // No templates found, return null
       return { data: null };
     }
     throw error;

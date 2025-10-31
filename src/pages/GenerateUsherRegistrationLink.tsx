@@ -322,7 +322,7 @@ export default function GenerateUsherRegistrationLink() {
                   <div className="mt-2">
                     <span className="font-medium">Public Registration:</span>
                     <div className="text-xs break-all bg-slate-50 border rounded p-2 mt-1">
-                      {`${window.location.origin}/register/${eventDetails.uuid}`}
+                      {`${window.location.origin}/event/register/${eventDetails.uuid}`}
                     </div>
                   </div>
                 )}

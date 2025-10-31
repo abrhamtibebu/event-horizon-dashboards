@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, Link, Navigate } from 'react-router-dom'
+import { useParams, Link, Navigate, useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import {
   Calendar,
@@ -34,7 +34,6 @@ import {
   Trash2,
   User,
   UserCog,
-
   UserCheck,
   Image,
   Loader2,
@@ -98,7 +97,11 @@ import api, {
 import { format, parseISO } from 'date-fns'
 import { getGuestTypeBadgeClasses, getImageUrl } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import Pagination from '@/components/Pagination'
+import { usePagination } from '@/hooks/usePagination'
 import EventSessions from '@/components/EventSessions'
+import { InvitationsTab } from '@/components/event-invitations/InvitationsTab'
+import { BulkBadgesTab } from '@/components/BulkBadgesTab'
 import { useAuth } from '@/hooks/use-auth'
 import { Checkbox } from '@/components/ui/checkbox'
 import Papa from 'papaparse'
@@ -117,7 +120,8 @@ import {
   Bar,
   Area,
 } from 'recharts'
-import BadgeDesignerTab from '@/pages/BadgeDesignerTab'
+// Badge Designer is now a standalone app - no longer imported here
+// import BadgeDesignerTab from '@/pages/BadgeDesignerTab'
 import { UsherAssignmentDialog } from '@/components/UsherAssignmentDialog'
 import React from 'react'
 import BadgePrint from '@/components/Badge'
@@ -125,6 +129,7 @@ import BadgeTest from '@/components/BadgeTest'
 import { getOfficialBadgeTemplate, getBadgeTemplates } from '@/lib/badgeTemplates'
 import { BadgeTemplate } from '@/types/badge'
 import { DateRange } from 'react-date-range'
+import { useModernAlerts } from '@/hooks/useModernAlerts'
 import 'react-date-range/dist/styles.css'
 import 'react-date-range/dist/theme/default.css'
 import { useInterval } from '@/hooks/use-interval'
@@ -139,6 +144,7 @@ const PREDEFINED_GUEST_TYPES = [
 
 export default function EventDetails() {
   const { eventId } = useParams()
+  const navigate = useNavigate()
 
   // Function to get color coding for tasks based on task type
   const getTaskColor = (task: string) => {
@@ -185,6 +191,23 @@ export default function EventDetails() {
   const [searchTerm, setSearchTerm] = useState('')
   const [guestTypeFilter, setGuestTypeFilter] = useState('all')
   const [checkedInFilter, setCheckedInFilter] = useState('all')
+  
+  // Pagination hook for attendees
+  const {
+    currentPage,
+    perPage,
+    totalPages,
+    totalRecords,
+    setTotalPages,
+    setTotalRecords,
+    handlePageChange,
+    handlePerPageChange,
+    resetPagination
+  } = usePagination({ defaultPerPage: 15, searchParamPrefix: 'attendees' });
+  
+  // Modern alerts system
+  const { confirmAction } = useModernAlerts();
+  
   const [isAssignUsherDialogOpen, setIsAssignUsherDialogOpen] = useState(false)
   const [isNewConversationDialogOpen, setIsNewConversationDialogOpen] =
     useState(false)
@@ -239,12 +262,14 @@ export default function EventDetails() {
   // Badge template state
   const [badgeTemplate, setBadgeTemplate] = useState<BadgeTemplate | null>(null)
   const [badgeTemplateLoading, setBadgeTemplateLoading] = useState(false)
-  const [badgeDesignerOpen, setBadgeDesignerOpen] = useState(false)
+  // Legacy badge designer state removed - now using standalone app
 
   const { user } = useAuth()
   const [isUsherAssigned, setIsUsherAssigned] = useState(false)
 
   const [addAttendeeDialogOpen, setAddAttendeeDialogOpen] = useState(false)
+  const [createParticipantDialogOpen, setCreateParticipantDialogOpen] = useState(false)
+  const [participantCount, setParticipantCount] = useState(1)
   const [addAttendeeForm, setAddAttendeeForm] = useState<any>({
     first_name: '',
     last_name: '',
@@ -366,29 +391,63 @@ export default function EventDetails() {
     if (!eventId) return
     setAttendeesLoading(true)
     setAttendeesError(null)
+    
+    // Build query parameters for pagination and filtering
+    const params = new URLSearchParams({
+      page: currentPage.toString(),
+      per_page: perPage.toString(),
+    });
+    
+    if (searchTerm) {
+      params.append('search', searchTerm);
+    }
+    
+    if (guestTypeFilter !== 'all') {
+      params.append('guest_type', guestTypeFilter);
+    }
+    
+    if (checkedInFilter !== 'all') {
+      params.append('checked_in', checkedInFilter === 'checked-in' ? 'true' : 'false');
+    }
+    
     api
-      .get(`/events/${Number(eventId)}/attendees`)
+      .get(`/events/${Number(eventId)}/attendees?${params.toString()}`)
       .then((res) => {
         console.log('Attendees response:', res.data)
-        // The backend should already include guestType relationship
-        // Just log and set the data as-is
-        if (res.data && res.data.length > 0) {
+        
+        // Handle paginated response
+        if (res.data.data) {
+          setAttendees(res.data.data)
+          setTotalPages(res.data.last_page || 1)
+          setTotalRecords(res.data.total || 0)
+        } else {
+          // Fallback for non-paginated response
+          setAttendees(res.data || [])
+          setTotalPages(1)
+          setTotalRecords(res.data?.length || 0)
+        }
+        
+        // Log first attendee structure for debugging
+        const attendeesData = res.data.data || res.data || []
+        if (attendeesData.length > 0) {
           console.log('First attendee structure:', {
-            id: res.data[0].id,
-            guest_type_id: res.data[0].guest_type_id,
-            guestType: res.data[0].guestType,
-            guest_type: res.data[0].guest_type,
-            guest: res.data[0].guest
+            id: attendeesData[0].id,
+            guest_type_id: attendeesData[0].guest_type_id,
+            guestType: attendeesData[0].guestType,
+            guest_type: attendeesData[0].guest_type,
+            guest: attendeesData[0].guest
           })
         }
-        setAttendees(res.data || [])
       })
       .catch((err) => {
         console.error('Failed to fetch attendees:', err)
         setAttendeesError('Failed to fetch attendees.')
+        setAttendees([])
+        setTotalPages(1)
+        setTotalRecords(0)
       })
       .finally(() => setAttendeesLoading(false))
-  }, [eventId])
+  }, [eventId, currentPage, perPage, searchTerm, guestTypeFilter, checkedInFilter])
 
   // Set guest types and ticket types from event data
   useEffect(() => {
@@ -590,41 +649,24 @@ export default function EventDetails() {
 
  
 
-  const filteredAttendees = attendees.filter((attendee) => {
-    const searchTermLower = searchTerm.toLowerCase().trim()
-    
-    const matchesSearch = searchTermLower === '' || 
-      attendee.guest?.name?.toLowerCase().includes(searchTermLower) ||
-      attendee.guest?.email?.toLowerCase().includes(searchTermLower) ||
-      attendee.guest?.phone?.toLowerCase().includes(searchTermLower) ||
-      attendee.guest?.company?.toLowerCase().includes(searchTermLower) ||
-      attendee.guest?.jobtitle?.toLowerCase().includes(searchTermLower) ||
-      attendee.guest?.country?.toLowerCase().includes(searchTermLower)
-    
-    // Handle guest type filtering properly
-    let guestTypeName = '';
-    // Try both guestType and guest_type for compatibility
-    const guestType = attendee.guestType || attendee.guest_type;
-    if (guestType) {
-      if (typeof guestType === 'object' && guestType !== null) {
-        guestTypeName = (guestType.name || guestType.id || '').toLowerCase();
-      } else if (typeof guestType === 'string') {
-        guestTypeName = guestType.toLowerCase();
-      } else {
-        guestTypeName = String(guestType).toLowerCase();
-      }
-    }
-    
-    const matchesGuestType =
-      guestTypeFilter === 'all' ||
-      guestTypeName === guestTypeFilter
-    
-    const matchesCheckedIn =
-      checkedInFilter === 'all' ||
-      (checkedInFilter === 'checked-in' && attendee.checked_in) ||
-      (checkedInFilter === 'not-checked-in' && !attendee.checked_in)
-    return matchesSearch && matchesGuestType && matchesCheckedIn
-  })
+  // Handle search and filter changes with pagination reset
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    resetPagination();
+  };
+
+  const handleGuestTypeFilterChange = (value: string) => {
+    setGuestTypeFilter(value);
+    resetPagination();
+  };
+
+  const handleCheckedInFilterChange = (value: string) => {
+    setCheckedInFilter(value);
+    resetPagination();
+  };
+
+  // Since we're now using server-side pagination, we don't need client-side filtering
+  const filteredAttendees = attendees;
 
 
 
@@ -1183,6 +1225,92 @@ export default function EventDetails() {
     }
   }
 
+  const handleCreateParticipant = async () => {
+    if (participantCount < 1 || participantCount > 100) {
+      toast.error('Please enter a number between 1 and 100')
+      return
+    }
+
+    setAddAttendeeLoading(true)
+
+    try {
+      const createdParticipants = []
+      let successCount = 0
+      let failCount = 0
+
+      // Create multiple participants
+      for (let i = 0; i < participantCount; i++) {
+        try {
+          // Create attendee with name "PARTICIPANT"
+          // All participants have the same name but different UUIDs/QR codes
+          // Use special email format to signal to backend that these are participants
+          const payload = {
+            first_name: 'PARTICIPANT',
+            last_name: '',
+            name: 'PARTICIPANT',
+            email: `participant-${Date.now()}-${i}@noreply.local`, // Valid email format with marker for backend
+            phone: '', // Empty phone for participants
+            company: '',
+            jobtitle: '',
+            gender: '',
+            country: '',
+            guest_type_id: addAttendeeForm.guest_type_id || guestTypes?.[0]?.id || '',
+            ticket_type_id: addAttendeeForm.ticket_type_id || '',
+          }
+
+          const response = await api.post(`/events/${Number(eventId)}/attendees`, payload, {
+            validateStatus: function (status) {
+              return status < 500; // Don't throw on client errors
+            }
+          })
+          
+          if (response.status === 201 || response.status === 200) {
+            const newAttendee = response.data
+            createdParticipants.push(newAttendee)
+            successCount++
+          } else {
+            failCount++
+          }
+        } catch (err) {
+          failCount++
+        }
+      }
+
+      // Refresh attendees list
+      if (createdParticipants.length > 0) {
+        const attendeesResponse = await api.get(`/events/${Number(eventId)}/attendees`)
+        const data = attendeesResponse.data?.data ? attendeesResponse.data.data : attendeesResponse.data
+        const indexed = (Array.isArray(data) ? data : []).map((a: any) => {
+          const name = a?.guest?.name ? String(a.guest.name) : ''
+          const email = a?.guest?.email ? String(a.guest.email) : ''
+          const company = a?.guest?.company ? String(a.guest.company) : ''
+          const blob = `${name} ${email} ${company}`.toLowerCase()
+          return { ...a, _search: blob }
+        })
+        setAttendees(indexed)
+      }
+
+      // Show results
+      if (successCount > 0) {
+        if (failCount > 0) {
+          toast.success(`Successfully created ${successCount} participant(s). ${failCount} failed.`)
+        } else {
+          toast.success(`Successfully created ${successCount} participant(s)!`)
+        }
+      } else {
+        toast.error('Failed to create participants')
+      }
+
+      // Close dialog and reset
+      setCreateParticipantDialogOpen(false)
+      setParticipantCount(1)
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to create participants')
+    } finally {
+      setAddAttendeeLoading(false)
+    }
+  }
+
   const handleEditMember = (member: any) => {
     setEditMember({ ...member })
     setEditDialogOpen(true)
@@ -1247,7 +1375,17 @@ export default function EventDetails() {
           }
           
           // Show confirmation for removing primary contact
-          if (!confirm(`Are you sure you want to remove ${removeMember.name} as a primary contact? This organizer has ${primaryContactCount} primary contact(s).`)) {
+          const confirmed = await confirmAction(
+            'Remove Primary Contact',
+            `Are you sure you want to remove ${removeMember.name} as a primary contact? This organizer has ${primaryContactCount} primary contact(s).`,
+            'Remove Contact',
+            'warning',
+            async () => {
+              // Continue with removal logic
+            }
+          );
+          
+          if (!confirmed) {
             setRemoveDialogOpen(false)
             setRemoveMember(null)
             setRemoveLoading(false)
@@ -1335,16 +1473,6 @@ export default function EventDetails() {
     }
   }
 
-  // Check-in attendee function
-  const handleCheckIn = async (attendeeId: number) => {
-    try {
-      await api.post(`/events/${Number(eventId)}/attendees/${attendeeId}/check-in`, { checked_in: true })
-      setAttendees(prev => prev.map(attendee => attendee.id === attendeeId ? { ...attendee, checked_in: true } : attendee))
-      toast.success('Attendee checked in successfully!')
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to check in attendee.')
-    }
-  }
 
   // Edit attendee function
   const handleEditAttendee = async (attendeeId: number, updatedData: any) => {
@@ -1439,21 +1567,6 @@ export default function EventDetails() {
       })
   }, [eventId])
 
-  const [checkinSearchTerm, setCheckinSearchTerm] = useState('')
-  const [checkinStatusFilter, setCheckinStatusFilter] = useState('all')
-  const [showQrScanner, setShowQrScanner] = useState(false)
-
-  const filteredCheckinAttendees = attendees.filter((attendee) => {
-    const matchesSearch =
-      attendee.guest?.name?.toLowerCase().includes(checkinSearchTerm.toLowerCase()) ||
-      attendee.guest?.email?.toLowerCase().includes(checkinSearchTerm.toLowerCase()) ||
-      attendee.guest?.phone?.toLowerCase().includes(checkinSearchTerm.toLowerCase())
-    const matchesStatus =
-      checkinStatusFilter === 'all' ||
-      (checkinStatusFilter === 'checkedin' && attendee.checked_in) ||
-      (checkinStatusFilter === 'notcheckedin' && !attendee.checked_in)
-    return matchesSearch && matchesStatus
-  })
 
   useEffect(() => {
     if (printing && printRef.current) {
@@ -2043,7 +2156,7 @@ export default function EventDetails() {
                           </h3>
                           <div className="flex items-center gap-2">
                             <Input
-                              value={`${window.location.origin}/register/${eventData.uuid}`}
+                              value={`${window.location.origin}/event/register/${eventData.uuid}`}
                               readOnly
                               className="text-sm bg-white border-blue-300 focus:border-blue-500"
                               onClick={e => (e.target as HTMLInputElement).select()}
@@ -2051,7 +2164,7 @@ export default function EventDetails() {
                             <Button
                               size="sm"
                               onClick={() => {
-                                navigator.clipboard.writeText(`${window.location.origin}/register/${eventData.uuid}`)
+                                navigator.clipboard.writeText(`${window.location.origin}event/register/${eventData.uuid}`)
                                 toast.success('Registration link copied to clipboard!')
                               }}
                               variant="outline"
@@ -2072,7 +2185,7 @@ export default function EventDetails() {
                             <div className="bg-white p-3 rounded-lg border border-green-300">
                               <img 
                                 id="public-registration-qr"
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`} 
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`} 
                                 alt="QR Code for registration" 
                                 className="w-24 h-24" 
                               />
@@ -2083,7 +2196,7 @@ export default function EventDetails() {
                                 variant="outline"
                                 onClick={() => {
                                   const link = document.createElement('a')
-                                  link.href = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`
+                                  link.href = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`
                                   link.download = `registration-qr-${eventData.name.replace(/[^a-zA-Z0-9]/g, '-')}.png`
                                   link.click()
                                   toast.success('QR code downloaded!')
@@ -2096,7 +2209,7 @@ export default function EventDetails() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => {
-                                  navigator.clipboard.writeText(`${window.location.origin}/register/${eventData.uuid}`)
+                                  navigator.clipboard.writeText(`${window.location.origin}/event/register/${eventData.uuid}`)
                                   toast.success('Link copied! Scan the QR code or share the link.')
                                 }}
                                 className="bg-white hover:bg-green-50 border-green-300 text-green-700"
@@ -2120,7 +2233,7 @@ export default function EventDetails() {
                               className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700"
                               onClick={async () => {
                                 await trackShareAction('facebook')
-                                window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&quote=${encodeURIComponent('Register for ' + eventData.name)}`, '_blank')
+                                window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&quote=${encodeURIComponent('Register for ' + eventData.name)}`, '_blank')
                               }}
                             >
                               <Facebook className="w-4 h-4 mr-1" />
@@ -2132,7 +2245,7 @@ export default function EventDetails() {
                               className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700"
                               onClick={async () => {
                                 await trackShareAction('twitter')
-                                window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&text=${encodeURIComponent('Register for ' + eventData.name)}&hashtags=event,registration`, '_blank')
+                                window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&text=${encodeURIComponent('Register for ' + eventData.name)}&hashtags=event,registration`, '_blank')
                               }}
                             >
                               <Twitter className="w-4 h-4 mr-1" />
@@ -2144,7 +2257,7 @@ export default function EventDetails() {
                               className="bg-white hover:bg-green-50 border-green-300 text-green-700"
                               onClick={async () => {
                                 await trackShareAction('whatsapp')
-                                window.open(`https://wa.me/?text=${encodeURIComponent('Register for ' + eventData.name + ': ' + window.location.origin + '/register/' + eventData.uuid)}`, '_blank')
+                                window.open(`https://wa.me/?text=${encodeURIComponent('Register for ' + eventData.name + ': ' + window.location.origin + '/event/register/' + eventData.uuid)}`, '_blank')
                               }}
                             >
                               <MessageCircle className="w-4 h-4 mr-1" />
@@ -2156,7 +2269,7 @@ export default function EventDetails() {
                               className="bg-white hover:bg-red-50 border-red-300 text-red-700"
                               onClick={async () => {
                                 await trackShareAction('email')
-                                const emailBody = `Hi,\n\nYou're invited to register for: ${eventData.name}\n\nRegistration Link: ${window.location.origin}/register/${eventData.uuid}\n\nBest regards`
+                                const emailBody = `Hi,\n\nYou're invited to register for: ${eventData.name}\n\nRegistration Link: ${window.location.origin}/event/register/${eventData.uuid}\n\nBest regards`
                                 window.open(`mailto:?subject=${encodeURIComponent('Registration Invitation: ' + eventData.name)}&body=${encodeURIComponent(emailBody)}`)
                               }}
                             >
@@ -2169,7 +2282,7 @@ export default function EventDetails() {
                               className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700"
                               onClick={async () => {
                                 await trackShareAction('linkedin')
-                                window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}`, '_blank')
+                                window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}`, '_blank')
                               }}
                             >
                               <Linkedin className="w-4 h-4 mr-1" />
@@ -2181,7 +2294,7 @@ export default function EventDetails() {
                               className="bg-white hover:bg-pink-50 border-pink-300 text-pink-700"
                               onClick={async () => {
                                 await trackShareAction('copy_text')
-                                const text = `Register for ${eventData.name}: ${window.location.origin}/register/${eventData.uuid}`
+                                const text = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
                                 navigator.clipboard.writeText(text)
                                 toast.success('Registration message copied to clipboard!')
                               }}
@@ -2195,7 +2308,7 @@ export default function EventDetails() {
                               className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700"
                               onClick={async () => {
                                 await trackShareAction('sms')
-                                const smsText = `Register for ${eventData.name}: ${window.location.origin}/register/${eventData.uuid}`
+                                const smsText = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
                                 window.open(`sms:?body=${encodeURIComponent(smsText)}`)
                               }}
                             >
@@ -2208,8 +2321,8 @@ export default function EventDetails() {
                               className="bg-white hover:bg-teal-50 border-teal-300 text-teal-700"
                               onClick={async () => {
                                 await trackShareAction('telegram')
-                                const telegramText = `Register for ${eventData.name}: ${window.location.origin}/register/${eventData.uuid}`
-                                window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + '/register/' + eventData.uuid)}&text=${encodeURIComponent('Register for ' + eventData.name)}`)
+                                const telegramText = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
+                                window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + '/event/register/' + eventData.uuid)}&text=${encodeURIComponent('Register for ' + eventData.name)}`)
                               }}
                             >
                               <Send className="w-4 h-4 mr-1" />
@@ -2228,7 +2341,7 @@ export default function EventDetails() {
                             <div>
                               <label className="text-xs font-medium text-orange-800 mb-1 block">HTML Embed Code:</label>
                               <Input
-                                value={`<iframe src='${window.location.origin}/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`}
+                                value={`<iframe src='${window.location.origin}/event/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`}
                                 readOnly
                                 className="text-xs bg-white font-mono border-orange-300"
                                 onClick={e => (e.target as HTMLInputElement).select()}
@@ -2237,7 +2350,7 @@ export default function EventDetails() {
                             <div>
                               <label className="text-xs font-medium text-orange-800 mb-1 block">Direct Link:</label>
                               <Input
-                                value={`${window.location.origin}/register/${eventData.uuid}`}
+                                value={`${window.location.origin}/event/register/${eventData.uuid}`}
                                 readOnly
                                 className="text-xs bg-white font-mono border-orange-300"
                                 onClick={e => (e.target as HTMLInputElement).select()}
@@ -2249,7 +2362,7 @@ export default function EventDetails() {
                                 variant="outline"
                                 onClick={async () => {
                                   await trackShareAction('embed')
-                                  const embedCode = `<iframe src='${window.location.origin}/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`
+                                  const embedCode = `<iframe src='${window.location.origin}/event/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`
                                   navigator.clipboard.writeText(embedCode)
                                   toast.success('Embed code copied to clipboard!')
                                 }}
@@ -2262,7 +2375,7 @@ export default function EventDetails() {
                                 variant="outline"
                                 onClick={async () => {
                                   await trackShareAction('link')
-                                  const link = `${window.location.origin}/register/${eventData.uuid}`
+                                  const link = `${window.location.origin}/event/register/${eventData.uuid}`
                                   navigator.clipboard.writeText(link)
                                   toast.success('Direct link copied to clipboard!')
                                 }}
@@ -2382,22 +2495,6 @@ export default function EventDetails() {
                   >
                     Badges
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="checkins"
-                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'checkins' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
-                    `}
-                  >
-                    Check-ins
-                  </TabsTrigger>
-                  {/* <TabsTrigger
-                    value="badge-designer"
-                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'badge-designer' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
-                    `}
-                  >
-                    Badge Designer
-                  </TabsTrigger> */}
                 </>
               ) : (
                 <>
@@ -2417,6 +2514,16 @@ export default function EventDetails() {
                   >
                     Badges
                   </TabsTrigger>
+                  {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer') && (
+                    <TabsTrigger
+                      value="bulk-badges"
+                      className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
+                        ${activeTab === 'bulk-badges' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                      `}
+                    >
+                      Bulk Badges
+                    </TabsTrigger>
+                  )}
                   {(user?.role === 'admin' || user?.role === 'superadmin') && (
                     <TabsTrigger
                       value="badge-designer"
@@ -2452,14 +2559,6 @@ export default function EventDetails() {
                     Team
                   </TabsTrigger>
                   <TabsTrigger
-                    value="checkins"
-                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'checkins' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
-                    `}
-                  >
-                    Check-ins
-                  </TabsTrigger>
-                  <TabsTrigger
                     value="analytics"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
                       ${activeTab === 'analytics' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
@@ -2474,6 +2573,15 @@ export default function EventDetails() {
                     `}
                   >
                     Sessions
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="invitations"
+                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
+                      ${activeTab === 'invitations' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                    `}
+                  >
+                    <Share2 className="w-4 h-4 mr-1 inline" />
+                    Invitations
                   </TabsTrigger>
                 </>
               )}
@@ -2553,7 +2661,7 @@ export default function EventDetails() {
                                 </h3>
                                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                   <Input
-                                    value={`${window.location.origin}/register/${eventData.uuid}`}
+                                    value={`${window.location.origin}/event/register/${eventData.uuid}`}
                                     readOnly
                                     className="text-xs sm:text-sm bg-white border-blue-300 focus:border-blue-500 flex-1"
                                     onClick={e => (e.target as HTMLInputElement).select()}
@@ -2561,7 +2669,7 @@ export default function EventDetails() {
                                   <Button
                                     size="sm"
                                     onClick={() => {
-                                      navigator.clipboard.writeText(`${window.location.origin}/register/${eventData.uuid}`)
+                                      navigator.clipboard.writeText(`${window.location.origin}/event/register/${eventData.uuid}`)
                                       toast.success('Registration link copied to clipboard!')
                                     }}
                                     variant="outline"
@@ -2582,7 +2690,7 @@ export default function EventDetails() {
                                   <div className="bg-white p-2 sm:p-3 rounded-lg border border-green-300">
                                     <img 
                                       id="public-registration-qr"
-                                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`} 
+                                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`} 
                                       alt="QR Code for registration" 
                                       className="w-20 h-20 sm:w-24 sm:h-24" 
                                     />
@@ -2593,7 +2701,7 @@ export default function EventDetails() {
                                       variant="outline"
                                       onClick={() => {
                                         const link = document.createElement('a')
-                                        link.href = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`
+                                        link.href = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`
                                         link.download = `registration-qr-${eventData.name.replace(/[^a-zA-Z0-9]/g, '-')}.png`
                                         link.click()
                                         toast.success('QR code downloaded!')
@@ -2606,7 +2714,7 @@ export default function EventDetails() {
                                       size="sm"
                                       variant="outline"
                                       onClick={() => {
-                                        navigator.clipboard.writeText(`${window.location.origin}/register/${eventData.uuid}`)
+                                        navigator.clipboard.writeText(`${window.location.origin}/event/register/${eventData.uuid}`)
                                         toast.success('Link copied! Scan the QR code or share the link.')
                                       }}
                                       className="bg-white hover:bg-green-50 border-green-300 text-green-700 flex-1 sm:flex-none"
@@ -2630,7 +2738,7 @@ export default function EventDetails() {
                                     className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 text-xs sm:text-sm"
                                     onClick={async () => {
                                       await trackShareAction('facebook')
-                                      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&quote=${encodeURIComponent('Register for ' + eventData.name)}`, '_blank')
+                                      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&quote=${encodeURIComponent('Register for ' + eventData.name)}`, '_blank')
                                     }}
                                   >
                                     <Facebook className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
@@ -2643,7 +2751,7 @@ export default function EventDetails() {
                                     className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 text-xs sm:text-sm"
                                     onClick={async () => {
                                       await trackShareAction('twitter')
-                                      window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}&text=${encodeURIComponent('Register for ' + eventData.name)}&hashtags=event,registration`, '_blank')
+                                      window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&text=${encodeURIComponent('Register for ' + eventData.name)}&hashtags=event,registration`, '_blank')
                                     }}
                                   >
                                     <Twitter className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
@@ -2656,7 +2764,7 @@ export default function EventDetails() {
                                     className="bg-white hover:bg-green-50 border-green-300 text-green-700 text-xs sm:text-sm"
                                     onClick={async () => {
                                       await trackShareAction('whatsapp')
-                                      window.open(`https://wa.me/?text=${encodeURIComponent('Register for ' + eventData.name + ': ' + window.location.origin + '/register/' + eventData.uuid)}`, '_blank')
+                                      window.open(`https://wa.me/?text=${encodeURIComponent('Register for ' + eventData.name + ': ' + window.location.origin + '/event/register/' + eventData.uuid)}`, '_blank')
                                     }}
                                   >
                                     <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
@@ -2669,7 +2777,7 @@ export default function EventDetails() {
                                     className="bg-white hover:bg-red-50 border-red-300 text-red-700 text-xs sm:text-sm"
                                     onClick={async () => {
                                       await trackShareAction('email')
-                                      const emailBody = `Hi,\n\nYou're invited to register for: ${eventData.name}\n\nRegistration Link: ${window.location.origin}/register/${eventData.uuid}\n\nBest regards`
+                                      const emailBody = `Hi,\n\nYou're invited to register for: ${eventData.name}\n\nRegistration Link: ${window.location.origin}/event/register/${eventData.uuid}\n\nBest regards`
                                       window.open(`mailto:?subject=${encodeURIComponent('Registration Invitation: ' + eventData.name)}&body=${encodeURIComponent(emailBody)}`)
                                     }}
                                   >
@@ -2683,7 +2791,7 @@ export default function EventDetails() {
                                     className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 text-xs sm:text-sm"
                                     onClick={async () => {
                                       await trackShareAction('linkedin')
-                                      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${window.location.origin}/register/${eventData.uuid}`)}`, '_blank')
+                                      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}`, '_blank')
                                     }}
                                   >
                                     <Linkedin className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
@@ -2696,7 +2804,7 @@ export default function EventDetails() {
                                     className="bg-white hover:bg-pink-50 border-pink-300 text-pink-700 text-xs sm:text-sm"
                                     onClick={async () => {
                                       await trackShareAction('copy_text')
-                                      const text = `Register for ${eventData.name}: ${window.location.origin}/register/${eventData.uuid}`
+                                      const text = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
                                       navigator.clipboard.writeText(text)
                                       toast.success('Registration message copied to clipboard!')
                                     }}
@@ -2711,7 +2819,7 @@ export default function EventDetails() {
                                     className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700 text-xs sm:text-sm"
                                     onClick={async () => {
                                       await trackShareAction('sms')
-                                      const smsText = `Register for ${eventData.name}: ${window.location.origin}/register/${eventData.uuid}`
+                                      const smsText = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
                                       window.open(`sms:?body=${encodeURIComponent(smsText)}`)
                                     }}
                                   >
@@ -2725,8 +2833,8 @@ export default function EventDetails() {
                                     className="bg-white hover:bg-teal-50 border-teal-300 text-teal-700 text-xs sm:text-sm"
                                     onClick={async () => {
                                       await trackShareAction('telegram')
-                                      const telegramText = `Register for ${eventData.name}: ${window.location.origin}/register/${eventData.uuid}`
-                                      window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + '/register/' + eventData.uuid)}&text=${encodeURIComponent('Register for ' + eventData.name)}`)
+                                      const telegramText = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
+                                      window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + '/event/register/' + eventData.uuid)}&text=${encodeURIComponent('Register for ' + eventData.name)}`)
                                     }}
                                   >
                                     <Send className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
@@ -2746,7 +2854,7 @@ export default function EventDetails() {
                                   <div>
                                     <label className="text-xs font-medium text-orange-800 mb-1 block">HTML Embed Code:</label>
                                     <Input
-                                      value={`<iframe src='${window.location.origin}/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`}
+                                      value={`<iframe src='${window.location.origin}/event/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`}
                                       readOnly
                                       className="text-xs bg-white font-mono border-orange-300"
                                       onClick={e => (e.target as HTMLInputElement).select()}
@@ -2755,7 +2863,7 @@ export default function EventDetails() {
                                   <div>
                                     <label className="text-xs font-medium text-orange-800 mb-1 block">Direct Link:</label>
                                     <Input
-                                      value={`${window.location.origin}/register/${eventData.uuid}`}
+                                      value={`${window.location.origin}/event/register/${eventData.uuid}`}
                                       readOnly
                                       className="text-xs bg-white font-mono border-orange-300"
                                       onClick={e => (e.target as HTMLInputElement).select()}
@@ -2767,7 +2875,7 @@ export default function EventDetails() {
                                       variant="outline"
                                       onClick={async () => {
                                         await trackShareAction('embed')
-                                        const embedCode = `<iframe src='${window.location.origin}/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`
+                                        const embedCode = `<iframe src='${window.location.origin}/event/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`
                                         navigator.clipboard.writeText(embedCode)
                                         toast.success('Embed code copied to clipboard!')
                                       }}
@@ -2780,7 +2888,7 @@ export default function EventDetails() {
                                       variant="outline"
                                       onClick={async () => {
                                         await trackShareAction('link')
-                                        const link = `${window.location.origin}/register/${eventData.uuid}`
+                                        const link = `${window.location.origin}/event/register/${eventData.uuid}`
                                         navigator.clipboard.writeText(link)
                                         toast.success('Direct link copied to clipboard!')
                                       }}
@@ -3279,18 +3387,12 @@ export default function EventDetails() {
                       <div className="flex gap-3">
                         <Button 
                           variant="outline" 
-                          onClick={() => navigate(`/events/${eventId}/badge-design`)}
+                          onClick={() => navigate(`/badge-designer/templates/${eventId}`)}
                           className="border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                         >
                           <Palette className="w-4 h-4" /> Design Badge
                         </Button>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => setBadgeDesignerOpen(true)}
-                          className="border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                        >
-                          <Palette className="w-4 h-4" /> Legacy Designer
-                        </Button>
+                        {/* Legacy designer removed - now using standalone Fabric.js app */}
                         <Button 
                           variant="default" 
                           onClick={handleBadgeBatchPrintBadges} 
@@ -3617,6 +3719,14 @@ export default function EventDetails() {
                         </Button>
                         <Button 
                           variant="outline" 
+                          onClick={() => setCreateParticipantDialogOpen(true)}
+                          className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 flex items-center gap-2"
+                        >
+                          <UserPlus className="w-4 h-4" /> 
+                          Create Participant
+                        </Button>
+                        <Button 
+                          variant="outline" 
                           onClick={() => setCsvUploadDialogOpen(true)} 
                           className="border-gray-200 hover:bg-gray-50 flex items-center gap-2"
                         >
@@ -3629,6 +3739,15 @@ export default function EventDetails() {
                         >
                           <Download className="w-4 h-4" /> Export CSV
                         </Button>
+                        <Button 
+                          variant="default" 
+                          onClick={handleBatchPrintBadges} 
+                          disabled={selectedAttendees.size === 0}
+                          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl flex items-center gap-2"
+                        >
+                          <Printer className="w-4 h-4" /> 
+                          Print Selected ({selectedAttendees.size})
+                        </Button>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 mb-2">
@@ -3637,21 +3756,21 @@ export default function EventDetails() {
                       <Input
                           placeholder="Search by name, email, phone, company, job title, or country..."
                         value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
+                        onChange={e => handleSearchChange(e.target.value)}
                           className="pl-10 pr-4 py-2 w-full"
                         />
                         {searchTerm && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setSearchTerm('')}
+                            onClick={() => handleSearchChange('')}
                             className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-gray-100"
                           >
                             <X className="w-3 h-3" />
                           </Button>
                         )}
                       </div>
-                      <Select value={guestTypeFilter} onValueChange={setGuestTypeFilter}>
+                      <Select value={guestTypeFilter} onValueChange={handleGuestTypeFilterChange}>
                         <SelectTrigger className="w-40"><SelectValue placeholder="All Types" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Types</SelectItem>
@@ -3660,7 +3779,7 @@ export default function EventDetails() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <Select value={checkedInFilter} onValueChange={setCheckedInFilter}>
+                      <Select value={checkedInFilter} onValueChange={handleCheckedInFilterChange}>
                         <SelectTrigger className="w-40"><SelectValue placeholder="All Status" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Status</SelectItem>
@@ -3674,6 +3793,12 @@ export default function EventDetails() {
                       <Table>
                         <TableHeader>
                             <TableRow className="bg-gray-50">
+                              <TableHead className="font-semibold text-gray-700 text-sm py-4 w-12">
+                                <Checkbox 
+                                  checked={selectedAttendees.size === filteredAttendees.length && filteredAttendees.length > 0} 
+                                  onCheckedChange={handleSelectAllAttendees} 
+                                />
+                              </TableHead>
                               <TableHead className="font-semibold text-gray-700 text-sm py-4">Attendee</TableHead>
                               <TableHead className="font-semibold text-gray-700 text-sm py-4">Company & Title</TableHead>
                               <TableHead className="font-semibold text-gray-700 text-sm py-4">Contact</TableHead>
@@ -3685,6 +3810,12 @@ export default function EventDetails() {
                         <TableBody>
                             {filteredAttendees.length > 0 ? filteredAttendees.map(attendee => (
                               <TableRow key={attendee.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                                <TableCell className="py-4">
+                                  <Checkbox 
+                                    checked={selectedAttendees.has(attendee.id)} 
+                                    onCheckedChange={() => handleSelectAttendee(attendee.id)} 
+                                  />
+                                </TableCell>
                                 <TableCell className="py-4">
                                   <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm">
@@ -3768,7 +3899,7 @@ export default function EventDetails() {
                             </TableRow>
                             )) : (
                               <TableRow>
-                                <TableCell colSpan={6} className="text-center py-12">
+                                <TableCell colSpan={7} className="text-center py-12">
                                   <div className="flex flex-col items-center space-y-3">
                                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
                                       <Search className="w-8 h-8 text-gray-400" />
@@ -3799,6 +3930,18 @@ export default function EventDetails() {
                       </Table>
                     </div>
                     </div>
+                    
+                    {/* Pagination Component */}
+                    {!attendeesLoading && !attendeesError && filteredAttendees.length > 0 && (
+                      <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalRecords={totalRecords}
+                        perPage={perPage}
+                        onPageChange={handlePageChange}
+                        onPerPageChange={handlePerPageChange}
+                      />
+                    )}
                   </div>
                 </TabsContent>
             <TabsContent value="ushers">
@@ -4039,89 +4182,6 @@ export default function EventDetails() {
                       </Table>
                     </div>
                     {/* Add/Edit Team Member Dialogs are implemented elsewhere in the file */}
-                  </div>
-            </TabsContent>
-            <TabsContent value="checkins">
-                  <div className="flex flex-col gap-6">
-                    <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
-                      <h3 className="text-xl font-bold">Guest Check-in</h3>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Search by name, email, or phone..."
-                          value={checkinSearchTerm}
-                          onChange={e => setCheckinSearchTerm(e.target.value)}
-                          className="w-64"
-                        />
-                        <Select value={checkinStatusFilter} onValueChange={setCheckinStatusFilter}>
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Filter by status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All</SelectItem>
-                            <SelectItem value="checkedin">Checked In</SelectItem>
-                            <SelectItem value="notcheckedin">Not Checked In</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button variant="outline" onClick={() => setShowQrScanner(true)} className="flex items-center gap-2">
-                          <QrCode className="w-4 h-4" /> Scan QR
-                        </Button>
-                      </div>
-                    </div>
-                    {/* QR Scanner Dialog */}
-                    <Dialog open={showQrScanner} onOpenChange={setShowQrScanner}>
-                      <DialogContent className="max-w-lg">
-                        <DialogHeader>
-                          <DialogTitle>Scan Guest QR Code</DialogTitle>
-                        </DialogHeader>
-                        {/* QR code scanner component goes here (implement with a library like react-qr-reader) */}
-                        <div className="flex flex-col items-center justify-center h-64">
-                          <span className="text-gray-500">[QR Scanner Placeholder]</span>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Email</TableHead>
-                            <TableHead>Phone</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {attendees.length > 0 ? attendees.map(attendee => (
-                            <TableRow key={attendee.id}>
-                              <TableCell>{attendee.guest?.name}</TableCell>
-                              <TableCell>{attendee.guest?.email}</TableCell>
-                              <TableCell>{attendee.guest?.phone}</TableCell>
-                              <TableCell>
-                                {attendee.checked_in ? (
-                                  <Badge className="bg-green-100 text-green-700">Checked In</Badge>
-                                ) : (
-                                  <Badge className="bg-gray-100 text-gray-700">Not Checked In</Badge>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <Button
-                                  size="sm"
-                                  variant={attendee.checked_in ? 'outline' : 'default'}
-                                  onClick={() => handleCheckIn(attendee.id)}
-                                  disabled={attendee.checked_in}
-                                >
-                                  {attendee.checked_in ? 'Checked In' : 'Check In'}
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          )) : (
-                            <TableRow>
-                              <TableCell colSpan={5} className="text-center text-gray-500">No attendees found.</TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
                   </div>
             </TabsContent>
             <TabsContent value="analytics">
@@ -5091,9 +5151,44 @@ export default function EventDetails() {
                 <EventSessions eventId={Number(eventId)} />
               </div>
             </TabsContent>
+            <TabsContent value="invitations">
+              <InvitationsTab
+                eventId={Number(eventId)}
+                eventUuid={eventData?.uuid || ''}
+                eventName={eventData?.name || ''}
+                eventType={eventData?.event_type as 'free' | 'ticketed' || 'free'}
+                isOrganizer={user?.role === 'organizer' || user?.role === 'admin' || user?.role === 'superadmin'}
+              />
+            </TabsContent>
+            {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer') && (
+            <TabsContent value="bulk-badges">
+              <BulkBadgesTab 
+                eventId={Number(eventId)}
+                guestTypes={guestTypes || []}
+                eventName={eventData?.name}
+              />
+            </TabsContent>
+            )}
                 {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer') && (
             <TabsContent value="badge-designer">
-                    <BadgeDesignerTab />
+                    <div className="flex flex-col items-center justify-center py-16 px-4">
+                      <div className="max-w-2xl text-center">
+                        <Palette className="w-16 h-16 mx-auto mb-6 text-blue-600" />
+                        <h2 className="text-2xl font-bold mb-4">Badge Designer</h2>
+                        <p className="text-gray-600 mb-8">
+                          The Badge Designer is now a standalone application with enhanced features including 
+                          Fabric.js canvas editing, dynamic fields, QR codes, and more.
+                        </p>
+                        <Button 
+                          size="lg"
+                          onClick={() => navigate(`/badge-designer/templates/${eventId}`)}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          <Palette className="w-5 h-5 mr-2" />
+                          Open Badge Designer
+                        </Button>
+                      </div>
+                    </div>
             </TabsContent>
                 )}
         </Tabs>
@@ -5614,6 +5709,111 @@ export default function EventDetails() {
                 </div>
             </form>
               )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Create Participant Dialog */}
+          <Dialog
+            open={createParticipantDialogOpen}
+            onOpenChange={setCreateParticipantDialogOpen}
+          >
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Create Participants</DialogTitle>
+                <DialogDescription>
+                  Create participant attendees with the name "PARTICIPANT". These will be accessible in the bulk badges tab for assignment and printing.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div>
+                  <Label htmlFor="participant_count">Number of Participants</Label>
+                  <Input
+                    id="participant_count"
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={participantCount}
+                    onChange={(e) => setParticipantCount(parseInt(e.target.value) || 1)}
+                    className="mt-1"
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Enter the number of participants to create (1-100)
+                  </p>
+                </div>
+                
+                {guestTypes && guestTypes.length > 0 && (
+                  <div>
+                    <Label htmlFor="participant_guest_type">Guest Type</Label>
+                    <Select
+                      value={addAttendeeForm.guest_type_id || ''}
+                      onValueChange={(value) => handleAddAttendeeInput('guest_type_id', value)}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select a guest type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {guestTypes
+                          .filter((type) => type.id !== undefined && type.id !== null && type.id !== '')
+                          .map((type) => (
+                            <SelectItem key={type.id} value={String(type.id)}>
+                              {type.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Select the guest type for all participants
+                    </p>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setCreateParticipantDialogOpen(false)
+                    setParticipantCount(1)
+                  }}
+                  disabled={addAttendeeLoading}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="button"
+                  onClick={handleCreateParticipant}
+                  disabled={addAttendeeLoading}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {addAttendeeLoading ? (
+                    <>
+                      <svg
+                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Participants'
+                  )}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
 
@@ -6147,7 +6347,24 @@ export default function EventDetails() {
           >
           {singlePrintAttendee && (
             <div className="printable-badge-batch">
-              <BadgePrint attendee={singlePrintAttendee} />
+              <BadgePrint 
+                attendee={{
+                  ...singlePrintAttendee,
+                  guest: {
+                    ...singlePrintAttendee.guest,
+                    // Ensure we use the latest guest data with complete information
+                    name: singlePrintAttendee.guest?.name || 'Participant',
+                    company: singlePrintAttendee.guest?.company || '',
+                    jobtitle: singlePrintAttendee.guest?.jobtitle || '',
+                    email: singlePrintAttendee.guest?.email || '',
+                    phone: singlePrintAttendee.guest?.phone || '',
+                    country: singlePrintAttendee.guest?.country || '',
+                    uuid: singlePrintAttendee.guest?.uuid || '',
+                  },
+                  // Include attendee ID for the badge
+                  id: singlePrintAttendee.id,
+                }} 
+              />
             </div>
           )}
           </div>
@@ -6552,7 +6769,24 @@ export default function EventDetails() {
             }
           `}</style>
           <div id="single-badge-print-area" ref={singleBadgePrintRef}>
-            <BadgePrint attendee={singlePrintAttendee} />
+            <BadgePrint 
+              attendee={{
+                ...singlePrintAttendee,
+                guest: {
+                  ...singlePrintAttendee?.guest,
+                  // Ensure we use the latest guest data with complete information
+                  name: singlePrintAttendee?.guest?.name || 'Participant',
+                  company: singlePrintAttendee?.guest?.company || '',
+                  jobtitle: singlePrintAttendee?.guest?.jobtitle || '',
+                  email: singlePrintAttendee?.guest?.email || '',
+                  phone: singlePrintAttendee?.guest?.phone || '',
+                  country: singlePrintAttendee?.guest?.country || '',
+                  uuid: singlePrintAttendee?.guest?.uuid || '',
+                },
+                // Include attendee ID for the badge
+                id: singlePrintAttendee?.id,
+              }} 
+            />
           </div>
         </>
       )}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Calendar,
@@ -64,6 +64,7 @@ import React, { Suspense } from 'react'
 import Papa from 'papaparse';
 import { postAttendeesBatch } from '@/lib/api';
 import { generateSingleBadgePDF, generateBatchBadgePDF, printPDFBlob, waitForElement } from '@/lib/badgeUtils';
+import { BadgeAssignmentDialog } from '@/components/BadgeAssignmentDialog';
 
 const QrReader = React.lazy(() =>
   import('@blackbox-vision/react-qr-reader').then((mod) => ({
@@ -100,6 +101,7 @@ export default function UsherEventManagement() {
   )
 
   // Add attendee dialog
+  const [assignBadgeDialogOpen, setAssignBadgeDialogOpen] = useState(false)
   const [addAttendeeDialogOpen, setAddAttendeeDialogOpen] = useState(false)
   const [addAttendeeForm, setAddAttendeeForm] = useState<any>({
     first_name: '',
@@ -111,8 +113,10 @@ export default function UsherEventManagement() {
     gender: '',
     country: '',
     guest_type_id: '',
+    badge_code: '',
   })
   const [addAttendeeLoading, setAddAttendeeLoading] = useState(false)
+  const [badgeCode, setBadgeCode] = useState('')
   const [validationStatus, setValidationStatus] = useState<{
     email: 'idle' | 'checking' | 'valid' | 'invalid' | 'duplicate';
     phone: 'idle' | 'checking' | 'valid' | 'invalid' | 'duplicate';
@@ -448,36 +452,108 @@ export default function UsherEventManagement() {
     return () => clearTimeout(handle)
   }, [searchTerm])
 
-  // Fetch attendees
-  useEffect(() => {
+  // Reusable function to fetch attendees with current filters
+  const fetchAttendeesWithFilters = useCallback(async (searchTermToUse?: string, guestTypeToUse?: string, checkedInToUse?: string) => {
     if (!eventId) return
 
-    const fetchAttendees = async () => {
-      try {
-        setAttendeesLoading(true)
-        const response = await api.get(`/events/${eventId}/attendees`)
-        // Precompute a lowercase search blob for faster includes matching
-        const indexed = (response.data || []).map((a: any) => {
-          const name = a?.guest?.name ? String(a.guest.name) : ''
-          const email = a?.guest?.email ? String(a.guest.email) : ''
-          const company = a?.guest?.company ? String(a.guest.company) : ''
-          const blob = `${name} ${email} ${company}`.toLowerCase()
-          return { ...a, _search: blob }
-        })
-        setAttendees(indexed)
-        setAttendeesError(null)
-      } catch (err: any) {
-        setAttendeesError(
-          err.response?.data?.error || 'Failed to fetch attendees'
-        )
-        console.error(err)
-      } finally {
-        setAttendeesLoading(false)
+    try {
+      setAttendeesLoading(true)
+      const effectiveSearch = searchTermToUse ?? debouncedSearchTerm
+      const effectiveGuestType = guestTypeToUse ?? guestTypeFilter
+      const effectiveCheckedIn = checkedInToUse ?? checkedInFilter
+      
+      let allAttendees: any[] = []
+      
+      // When searching, fetch ALL pages to get all matching results
+      // The backend caps per_page at 100, so we need to paginate through all results
+      if (effectiveSearch) {
+        let currentPage = 1
+        let hasMorePages = true
+        const perPage = 100 // Use max allowed per_page from backend
+        
+        while (hasMorePages) {
+          const params = new URLSearchParams()
+          params.append('page', currentPage.toString())
+          params.append('per_page', perPage.toString())
+          params.append('search', effectiveSearch)
+          
+          // Add filters
+          if (effectiveGuestType !== 'all') {
+            params.append('guest_type', effectiveGuestType)
+          }
+          
+          if (effectiveCheckedIn !== 'all') {
+            params.append('checked_in', effectiveCheckedIn === 'checked-in' ? 'true' : 'false')
+          }
+          
+          const response = await api.get(`/events/${eventId}/attendees?${params.toString()}`)
+          
+          // Handle paginated response
+          let pageData: any[] = []
+          if (response.data?.data) {
+            // Paginated response
+            pageData = response.data.data
+            const totalPages = response.data.last_page || 1
+            hasMorePages = currentPage < totalPages
+          } else if (Array.isArray(response.data)) {
+            // Non-paginated array response
+            pageData = response.data
+            hasMorePages = false
+          } else {
+            // Single object or unexpected format
+            hasMorePages = false
+          }
+          
+          allAttendees = [...allAttendees, ...pageData]
+          
+          if (hasMorePages) {
+            currentPage++
+          }
+        }
+      } else {
+        // Non-search: use default pagination
+        const params = new URLSearchParams()
+        params.append('per_page', '100') // Use max allowed
+        
+        // Add filters
+        if (effectiveGuestType !== 'all') {
+          params.append('guest_type', effectiveGuestType)
+        }
+        
+        if (effectiveCheckedIn !== 'all') {
+          params.append('checked_in', effectiveCheckedIn === 'checked-in' ? 'true' : 'false')
+        }
+        
+        const response = await api.get(`/events/${eventId}/attendees?${params.toString()}`)
+        // Handle paginated response
+        allAttendees = response.data?.data ? response.data.data : (Array.isArray(response.data) ? response.data : [])
       }
+      
+      // Precompute a lowercase search blob for faster includes matching
+      const indexed = allAttendees.map((a: any) => {
+        const name = a?.guest?.name ? String(a.guest.name) : ''
+        const email = a?.guest?.email ? String(a.guest.email) : ''
+        const company = a?.guest?.company ? String(a.guest.company) : ''
+        const blob = `${name} ${email} ${company}`.toLowerCase()
+        return { ...a, _search: blob }
+      })
+      
+      setAttendees(indexed)
+      setAttendeesError(null)
+    } catch (err: any) {
+      setAttendeesError(
+        err.response?.data?.error || 'Failed to fetch attendees'
+      )
+      console.error(err)
+    } finally {
+      setAttendeesLoading(false)
     }
+  }, [eventId, debouncedSearchTerm, guestTypeFilter, checkedInFilter])
 
-    fetchAttendees()
-  }, [eventId])
+  // Fetch attendees
+  useEffect(() => {
+    fetchAttendeesWithFilters()
+  }, [fetchAttendeesWithFilters])
 
   // Fetch guest types
   useEffect(() => {
@@ -486,7 +562,11 @@ export default function UsherEventManagement() {
     const fetchGuestTypes = async () => {
       try {
         const response = await api.get(`/events/${eventId}/guest-types`)
-        setGuestTypes(response.data)
+        // Deduplicate guest types by ID to prevent duplicate key warnings
+        const uniqueGuestTypes = Array.from(
+          new Map(response.data.map((type: any) => [type.id, type])).values()
+        )
+        setGuestTypes(uniqueGuestTypes)
       } catch (err) {
         console.error('Failed to fetch guest types:', err)
       }
@@ -530,22 +610,82 @@ export default function UsherEventManagement() {
     e.preventDefault()
     setAddAttendeeLoading(true)
 
-    const payload = {
-      ...addAttendeeForm,
-      name: `${addAttendeeForm.first_name} ${addAttendeeForm.last_name}`.trim(),
-    }
-
     try {
-      const response = await api.post(`/events/${eventId}/attendees`, payload)
-      const newAttendee = response.data
+      // If badge code is provided, assign badge first
+      if (badgeCode.trim()) {
+        try {
+          const assignResponse = await api.post(`/events/${eventId}/pre-generated-badges/assign`, {
+            badge_code: badgeCode.trim(),
+            first_name: addAttendeeForm.first_name,
+            last_name: addAttendeeForm.last_name,
+            email: addAttendeeForm.email || undefined,
+            phone: addAttendeeForm.phone || undefined,
+            company: addAttendeeForm.company || undefined,
+            job_title: addAttendeeForm.jobtitle || undefined,
+          })
+          
+          // Refresh attendees list
+          const attendeesResponse = await api.get(`/events/${eventId}/attendees`)
+          // Handle paginated response
+          const data = attendeesResponse.data?.data ? attendeesResponse.data.data : attendeesResponse.data
+          const indexed = (Array.isArray(data) ? data : []).map((a: any) => {
+            const name = a?.guest?.name ? String(a.guest.name) : ''
+            const email = a?.guest?.email ? String(a.guest.email) : ''
+            const company = a?.guest?.company ? String(a.guest.company) : ''
+            const blob = `${name} ${email} ${company}`.toLowerCase()
+            return { ...a, _search: blob }
+          })
+          setAttendees(indexed)
+          
+          toast({
+            title: 'Success',
+            description: 'Attendee registered with pre-generated badge!',
+          })
+        } catch (badgeErr: any) {
+          // If badge assignment fails, try regular attendee creation
+          console.warn('Badge assignment failed:', badgeErr)
+          toast({
+            title: 'Warning',
+            description: badgeErr.response?.data?.error || 'Could not assign badge, creating attendee without badge',
+            variant: 'default',
+          })
+          
+          // Fall through to regular attendee creation
+          const payload = {
+            ...addAttendeeForm,
+            name: `${addAttendeeForm.first_name} ${addAttendeeForm.last_name}`.trim(),
+          }
+          
+          const response = await api.post(`/events/${eventId}/attendees`, payload)
+          const newAttendee = response.data
+          
+          setAttendees((prevAttendees) => [...prevAttendees, newAttendee])
+          
+          toast({
+            title: 'Success',
+            description: 'Attendee added successfully (without badge)!',
+          })
+        }
+      } else {
+        // No badge code - create attendee normally
+        const payload = {
+          ...addAttendeeForm,
+          name: `${addAttendeeForm.first_name} ${addAttendeeForm.last_name}`.trim(),
+        }
 
-      setAttendees((prevAttendees) => [...prevAttendees, newAttendee])
+        const response = await api.post(`/events/${eventId}/attendees`, payload)
+        const newAttendee = response.data
 
-      toast({
-        title: 'Success',
-        description: 'Attendee added successfully!',
-      })
+        setAttendees((prevAttendees) => [...prevAttendees, newAttendee])
+
+        toast({
+          title: 'Success',
+          description: 'Attendee added successfully!',
+        })
+      }
+
       setAddAttendeeDialogOpen(false)
+      setBadgeCode('')
       setAddAttendeeForm({
         first_name: '',
         last_name: '',
@@ -556,6 +696,7 @@ export default function UsherEventManagement() {
         gender: '',
         country: '',
         guest_type_id: '',
+        badge_code: '',
       })
     } catch (err: any) {
       if (err.response?.status === 409 && err.response?.data?.error) {
@@ -632,22 +773,10 @@ export default function UsherEventManagement() {
     }
   };
 
-  // Filter attendees (fast path uses precomputed _search and debounced term)
-  const filteredAttendees = attendees.filter((attendee) => {
-    const matchesSearch =
-      !debouncedSearchTerm || attendee._search?.includes(debouncedSearchTerm)
-
-    const matchesGuestType =
-      guestTypeFilter === 'all' ||
-      attendee.guest_type_id?.toString() === guestTypeFilter
-
-    const matchesCheckIn =
-      checkedInFilter === 'all' ||
-      (checkedInFilter === 'checked-in' && attendee.checked_in) ||
-      (checkedInFilter === 'not-checked-in' && !attendee.checked_in)
-
-    return matchesSearch && matchesGuestType && matchesCheckIn
-  })
+  // Filter attendees - API handles search, guest_type, and checked_in filters server-side
+  // Client-side filtering is no longer needed since API applies all filters
+  // Just use attendees directly as they're already filtered by the API
+  const filteredAttendees = attendees
 
   // Validate badge template
   const validateBadgeTemplate = (template: BadgeTemplate | null): boolean => {
@@ -1027,8 +1156,8 @@ export default function UsherEventManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Types</SelectItem>
-                    {guestTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id.toString()}>
+                    {guestTypes.map((type, idx) => (
+                      <SelectItem key={`${type.id}-${idx}`} value={type.id.toString()}>
                         {type.name}
                       </SelectItem>
                     ))}
@@ -1183,6 +1312,15 @@ export default function UsherEventManagement() {
 
         {/* Registration Tab */}
         <TabsContent value="registration" className="space-y-4">
+          <div className="flex justify-end mb-4">
+            <Button
+              onClick={() => setAssignBadgeDialogOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <QrCode className="h-4 w-4 mr-2" />
+              Assign Pre-Generated Badge
+            </Button>
+          </div>
           <Card className="mb-4">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1694,8 +1832,8 @@ export default function UsherEventManagement() {
                     <SelectValue placeholder="Guest Type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {guestTypes.map((type: any) => (
-                      <SelectItem key={type.id} value={String(type.id)}>
+                    {guestTypes.map((type: any, idx: number) => (
+                      <SelectItem key={`${type.id}-${idx}`} value={String(type.id)}>
                         {type.name}
                       </SelectItem>
                     ))}
@@ -1729,6 +1867,24 @@ export default function UsherEventManagement() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddAttendee} className="space-y-4 py-4">
+            {/* Badge Code Input */}
+            <div>
+              <Label htmlFor="badge_code" className="flex items-center gap-2">
+                <QrCode className="h-4 w-4" />
+                Badge QR Code (Optional)
+              </Label>
+              <Input
+                id="badge_code"
+                value={badgeCode}
+                onChange={(e) => setBadgeCode(e.target.value)}
+                placeholder="Scan or enter badge code to assign pre-generated badge"
+                className="font-mono"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Leave blank to register without a pre-generated badge
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="first_name">First Name</Label>
@@ -2089,8 +2245,8 @@ export default function UsherEventManagement() {
                         type.id !== null &&
                         type.id !== ''
                     )
-                    .map((type) => (
-                      <SelectItem key={type.id} value={String(type.id)}>
+                    .map((type, idx) => (
+                      <SelectItem key={`${type.id}-${idx}`} value={String(type.id)}>
                         {type.name}
                       </SelectItem>
                     ))}
@@ -2264,6 +2420,17 @@ export default function UsherEventManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Badge Assignment Dialog */}
+      <BadgeAssignmentDialog
+        open={assignBadgeDialogOpen}
+        onOpenChange={setAssignBadgeDialogOpen}
+        eventId={Number(eventId)}
+        onSuccess={() => {
+          // Refresh attendees list after assignment
+          fetchAttendees()
+        }}
+      />
     </div>
   )
 }
