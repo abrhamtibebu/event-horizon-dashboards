@@ -25,10 +25,17 @@ import {
   UserPlus,
   Settings,
   Key,
+  Star,
+  RefreshCw,
+  MoreVertical,
+  FileText,
+  FileSpreadsheet,
 } from 'lucide-react'
+import Breadcrumbs from '@/components/Breadcrumbs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { DashboardCard } from '@/components/DashboardCard'
 import {
   Select,
@@ -69,6 +76,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Spinner } from '@/components/ui/spinner'
 import Pagination from '@/components/Pagination'
 import { usePagination } from '@/hooks/usePagination'
 import {
@@ -77,6 +85,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 export default function Users() {
   const [users, setUsers] = useState<any[]>([])
@@ -85,6 +100,7 @@ export default function Users() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [selected, setSelected] = useState<string[]>([])
   
   // Pagination hook
   const {
@@ -127,6 +143,10 @@ export default function Users() {
   const [resetPassword, setResetPassword] = useState('')
   const [resetPasswordConfirm, setResetPasswordConfirm] = useState('')
   const [resetError, setResetError] = useState<string | null>(null)
+  const [showResetPassword, setShowResetPassword] = useState(false)
+  const [showResetPasswordConfirm, setShowResetPasswordConfirm] = useState(false)
+  const [viewUserId, setViewUserId] = useState<string | null>(null)
+  const [viewUser, setViewUser] = useState<any>(null)
 
   useEffect(() => {
     if (searchParams.get('add') === '1') {
@@ -187,12 +207,14 @@ export default function Users() {
         return 'bg-red-100 text-red-800 border-red-200'
       case 'admin':
         return 'bg-purple-100 text-purple-800 border-purple-200'
+      case 'organizer_admin':
+        return 'bg-indigo-100 text-indigo-800 border-indigo-200'
       case 'organizer':
         return 'bg-blue-100 text-blue-800 border-blue-200'
       case 'usher':
         return 'bg-green-100 text-green-800 border-green-200'
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+        return 'bg-muted text-muted-foreground border-border'
     }
   }
 
@@ -201,11 +223,11 @@ export default function Users() {
       case 'active':
         return 'bg-green-100 text-green-800 border-green-200'
       case 'inactive':
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+        return 'bg-muted text-muted-foreground border-border'
       case 'suspended':
         return 'bg-red-100 text-red-800 border-red-200'
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+        return 'bg-muted text-muted-foreground border-border'
     }
   }
 
@@ -232,6 +254,7 @@ export default function Users() {
     total: users.length,
     superadmins: users.filter((u) => u.role === 'superadmin').length,
     admins: users.filter((u) => u.role === 'admin').length,
+    organizerAdmins: users.filter((u) => u.role === 'organizer_admin').length,
     organizers: users.filter((u) => u.role === 'organizer').length,
     ushers: users.filter((u) => u.role === 'usher').length,
     active: users.filter((u) => u.status === 'active').length,
@@ -253,7 +276,28 @@ export default function Users() {
     setAddLoading(true)
     setAddError(null)
     try {
-      await api.post('/users', addForm)
+      // Split name into first_name and last_name
+      const nameParts = addForm.name.trim().split(/\s+/)
+      const first_name = nameParts[0] || ''
+      const last_name = nameParts.slice(1).join(' ') || ''
+      
+      // Prepare form data with required fields for backend
+      const formData: any = {
+        first_name,
+        last_name,
+        email: addForm.email,
+        password: addForm.password,
+        password_confirmation: addForm.password_confirmation,
+        role: addForm.role,
+        phone: addForm.phone || '',
+        bio: addForm.bio || '',
+        payment_methods: [{
+          method: 'telebirr',
+          account_number: '0000000000'
+        }]
+      }
+      
+      await api.post('/users', formData)
       setAddOpen(false)
       setAddForm({
         name: '',
@@ -271,7 +315,7 @@ export default function Users() {
       setLoading(false)
       toast.success('User added successfully!')
     } catch (err: any) {
-      setAddError(err.response?.data?.error || 'Failed to add user')
+      setAddError(err.response?.data?.error || err.response?.data?.message || 'Failed to add user')
       toast.error('Failed to add user')
     } finally {
       setAddLoading(false)
@@ -373,6 +417,11 @@ export default function Users() {
       setResetLoading(false)
       return
     }
+    if (resetPassword.length < 6) {
+      setResetError('Password must be at least 6 characters')
+      setResetLoading(false)
+      return
+    }
     try {
       await api.post(`/admin/users/${resetUserId}/reset-password`, {
         new_password: resetPassword,
@@ -382,359 +431,465 @@ export default function Users() {
       setResetUserId(null)
       setResetPassword('')
       setResetPasswordConfirm('')
+      setResetError(null)
     } catch (err: any) {
-      setResetError(err.response?.data?.error || 'Failed to reset password')
-      toast.error('Failed to reset password')
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || 'Failed to reset password'
+      setResetError(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setResetLoading(false)
     }
   }
 
+  const handleViewUser = async (userId: string) => {
+    try {
+      const res = await api.get(`/users/${userId}`)
+      setViewUser(res.data)
+      setViewUserId(userId)
+    } catch (err: any) {
+      toast.error('Failed to load user details')
+    }
+  }
+
+  const exportToPDF = () => {
+    // Placeholder for PDF export
+    toast.info('PDF export functionality coming soon')
+  };
+
+  const exportToExcel = () => {
+    // Placeholder for Excel export
+    toast.info('Excel export functionality coming soon')
+  };
+
   return (
     <TooltipProvider>
-      <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8 px-2 sm:px-6 lg:px-12">
-      {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <div>
-            <h1 className="text-4xl font-extrabold text-gray-900 drop-shadow-sm">User Management</h1>
-            <p className="text-lg text-gray-600 mt-2">Manage users, roles, permissions, and access control</p>
-        </div>
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg text-lg px-6 py-3 rounded-xl">
-                <UserPlus className="w-5 h-5 mr-2" /> Add User
+      <div className="min-h-screen w-full bg-background p-6">
+      {/* Breadcrumbs */}
+      <Breadcrumbs 
+        items={[
+          { label: 'User Management', href: '/dashboard/users' },
+          { label: 'Users List' }
+        ]}
+        className="mb-4"
+      />
+
+      {/* Page Header */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-card rounded-lg flex items-center justify-center border border-border">
+              <UsersIcon className="w-7 h-7 text-foreground" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                Users List
+                <Star className="w-5 h-5 text-muted-foreground" />
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                <RefreshCw className="w-3 h-3" />
+                Auto-updates in 2 min
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Dialog open={addOpen} onOpenChange={setAddOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-success hover:bg-success/90 text-white">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  + Add New User
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold">Add New User</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleAdd} className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Name</label>
+                    <Input
+                      name="name"
+                      placeholder="Enter full name"
+                      value={addForm.name ?? ''}
+                      onChange={handleAddChange}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Email</label>
+                    <Input
+                      name="email"
+                      type="email"
+                      placeholder="Enter email address"
+                      value={addForm.email ?? ''}
+                      onChange={handleAddChange}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Password</label>
+                    <div className="relative">
+                      <Input
+                        name="password"
+                        type={showAddPassword ? 'text' : 'password'}
+                        placeholder="Enter password"
+                        value={addForm.password ?? ''}
+                        onChange={handleAddChange}
+                        required
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        onClick={() => setShowAddPassword((v) => !v)}
+                      >
+                        {showAddPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Confirm Password</label>
+                    <div className="relative">
+                      <Input
+                        name="password_confirmation"
+                        type={showAddPasswordConfirm ? 'text' : 'password'}
+                        placeholder="Confirm password"
+                        value={addForm.password_confirmation ?? ''}
+                        onChange={handleAddChange}
+                        required
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        onClick={() => setShowAddPasswordConfirm((v) => !v)}
+                      >
+                        {showAddPasswordConfirm ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Role</label>
+                    <Select value={addForm.role} onValueChange={handleAddRole}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="organizer_admin">Organizer Admin</SelectItem>
+                        <SelectItem value="organizer">Organizer</SelectItem>
+                        <SelectItem value="usher">Usher</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Phone (Optional)</label>
+                    <Input
+                      name="phone"
+                      placeholder="Enter phone number"
+                      value={addForm.phone ?? ''}
+                      onChange={handleAddChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Bio (Optional)</label>
+                    <Input
+                      name="bio"
+                      placeholder="Enter bio"
+                      value={addForm.bio ?? ''}
+                      onChange={handleAddChange}
+                    />
+                  </div>
+                  {addError && (
+                    <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{addError}</div>
+                  )}
+                  <DialogFooter>
+                    <Button type="submit" disabled={addLoading} className="w-full">
+                      {addLoading ? 'Adding User...' : 'Add User'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+            <Button variant="ghost" size="icon" className="hover:bg-accent">
+              <MoreVertical className="w-5 h-5" />
             </Button>
-          </DialogTrigger>
-            <DialogContent className="max-w-md">
-            <DialogHeader>
-                <DialogTitle className="text-xl font-bold">Add New User</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleAdd} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Name</label>
-              <Input
-                name="name"
-                    placeholder="Enter full name"
-                value={addForm.name ?? ''}
-                onChange={handleAddChange}
-                required
-              />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Email</label>
-              <Input
-                name="email"
-                type="email"
-                    placeholder="Enter email address"
-                value={addForm.email ?? ''}
-                onChange={handleAddChange}
-                required
-              />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Password</label>
-              <div className="relative">
-                <Input
-                  name="password"
-                  type={showAddPassword ? 'text' : 'password'}
-                      placeholder="Enter password"
-                  value={addForm.password ?? ''}
-                  onChange={handleAddChange}
-                  required
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                  onClick={() => setShowAddPassword((v) => !v)}
-                >
-                  {showAddPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Confirm Password</label>
-              <div className="relative">
-                <Input
-                  name="password_confirmation"
-                  type={showAddPasswordConfirm ? 'text' : 'password'}
-                      placeholder="Confirm password"
-                  value={addForm.password_confirmation ?? ''}
-                  onChange={handleAddChange}
-                  required
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700"
-                  onClick={() => setShowAddPasswordConfirm((v) => !v)}
-                >
-                  {showAddPasswordConfirm ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Role</label>
-              <Select value={addForm.role} onValueChange={handleAddRole}>
-                <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="organizer">Organizer</SelectItem>
-                  <SelectItem value="usher">Usher</SelectItem>
-                </SelectContent>
-              </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Phone (Optional)</label>
-              <Input
-                name="phone"
-                    placeholder="Enter phone number"
-                value={addForm.phone ?? ''}
-                onChange={handleAddChange}
-              />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Bio (Optional)</label>
-              <Input
-                name="bio"
-                    placeholder="Enter bio"
-                value={addForm.bio ?? ''}
-                onChange={handleAddChange}
-              />
-                </div>
-              {addError && (
-                  <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{addError}</div>
-              )}
-              <DialogFooter>
-                  <Button type="submit" disabled={addLoading} className="w-full">
-                    {addLoading ? 'Adding User...' : 'Add User'}
-                  </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-blue-200 text-center">
-            <CardHeader>
-              <CardTitle className="text-blue-600 text-lg font-semibold">Total Users</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{userStats.total}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-purple-200 text-center">
-            <CardHeader>
-              <CardTitle className="text-purple-600 text-lg font-semibold">Administrators</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{userStats.admins + userStats.superadmins}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-green-200 text-center">
-            <CardHeader>
-              <CardTitle className="text-green-600 text-lg font-semibold">Active Users</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{userStats.active}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-orange-200 text-center">
-            <CardHeader>
-              <CardTitle className="text-orange-600 text-lg font-semibold">Organizers</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{userStats.organizers}</div>
-            </CardContent>
-          </Card>
-      </div>
-
-      {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 w-full mb-8">
-          <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            placeholder="Search users..."
-            value={searchTerm ?? ''}
-            onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-12 w-full py-3 rounded-xl text-lg shadow-md"
-          />
+          </div>
         </div>
-          <div className="w-full sm:w-48">
-        <Select value={roleFilter} onValueChange={handleRoleFilterChange}>
-              <SelectTrigger className="w-full py-3 rounded-xl text-lg shadow-md">
-                <Filter className="w-5 h-5 mr-2" />
-            <SelectValue placeholder="All Roles" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="bg-card rounded-lg border border-border p-4 mb-6">
+        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={roleFilter} onValueChange={handleRoleFilterChange}>
+              <SelectTrigger className="w-[140px] bg-background border-border">
+                <SelectValue placeholder="All Staff" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Staff</SelectItem>
                 <SelectItem value="superadmin">Super Admin</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="organizer">Organizer</SelectItem>
-            <SelectItem value="usher">Usher</SelectItem>
-          </SelectContent>
-        </Select>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="organizer_admin">Organizer Admin</SelectItem>
+                <SelectItem value="organizer">Organizer</SelectItem>
+                <SelectItem value="usher">Usher</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
+              <SelectTrigger className="w-[120px] bg-background border-border">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="suspended">Suspended</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select>
+              <SelectTrigger className="w-[120px] bg-background border-border">
+                <SelectValue placeholder="Monthly" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="this-month">This Month</SelectItem>
+                <SelectItem value="last-month">Last Month</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="ghost" size="icon" className="hover:bg-accent">
+              <Filter className="w-4 h-4" />
+            </Button>
           </div>
-          <div className="w-full sm:w-48">
-        <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-              <SelectTrigger className="w-full py-3 rounded-xl text-lg shadow-md">
-            <SelectValue placeholder="All Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-            <SelectItem value="suspended">Suspended</SelectItem>
-          </SelectContent>
-        </Select>
+
+          {/* Search and Export */}
+          <div className="flex items-center gap-3 w-full lg:w-auto">
+            <div className="relative flex-1 lg:w-64">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder="Search..."
+                value={searchTerm ?? ''}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-9 bg-background border-border"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportToPDF}
+              className="bg-background border-border hover:bg-accent"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Export PDF
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportToExcel}
+              className="bg-background border-border hover:bg-accent"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Export Excel
+            </Button>
           </div>
+        </div>
       </div>
 
       {/* Loading/Error States */}
         {loading && (
           <div className="flex justify-center items-center py-24">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
-            <span className="ml-4 text-xl text-gray-500">Loading users...</span>
+            <Spinner size="lg" variant="primary" text="Loading users..." />
           </div>
         )}
         {error && <div className="text-center py-12 text-red-500 text-xl">{error}</div>}
 
         {/* Users Table View */}
       {!loading && !error && (
-          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-0 overflow-x-auto">
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold text-gray-900 px-6 pt-6 pb-2">Users</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gradient-to-r from-blue-50 to-purple-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">User</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Role</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Join Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white/60 divide-y divide-gray-100">
-              {filteredUsers.map((user) => {
-                    const showActions = canManageUsers && !isSuperAdmin(user)
-                    const canEdit = showActions && (isCurrentSuperAdmin || !isAdmin(user))
-                const canDelete = isCurrentSuperAdmin && user.id !== currentUser.id;
-                    const canChangeStatus = showActions && (isCurrentSuperAdmin || !isAdmin(user))
+          <div className="bg-card rounded-lg border border-border overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50 border-b border-border">
+                    <TableHead className="font-semibold text-foreground text-xs uppercase py-4 w-12">
+                      <Checkbox
+                        checked={filteredUsers.length > 0 && filteredUsers.every(u => selected.includes(u.id))}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelected(filteredUsers.map(u => u.id))
+                          } else {
+                            setSelected([])
+                          }
+                        }}
+                      />
+                    </TableHead>
+                    <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Name of User</TableHead>
+                    <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Role</TableHead>
+                    <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Date</TableHead>
+                    <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Email</TableHead>
+                    <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Phone Number</TableHead>
+                    <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Status</TableHead>
+                    <TableHead className="font-semibold text-foreground text-xs uppercase py-4 w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((user) => {
+                    // Super admin can manage all users (including other super admins)
+                    // Regular admin can manage non-super-admin users (including organizer_admin)
+                    const isOrganizerAdmin = user.role === 'organizer_admin'
+                    const showActions = canManageUsers && (isCurrentSuperAdmin || !isSuperAdmin(user))
+                    const canEdit = showActions && (isCurrentSuperAdmin || (!isAdmin(user) && !isSuperAdmin(user)))
+                    const canDelete = isCurrentSuperAdmin && user.id !== currentUser.id
+                    const canChangeStatus = showActions && (isCurrentSuperAdmin || (!isAdmin(user) && !isSuperAdmin(user)))
+                    const canResetPassword = showActions && (isCurrentSuperAdmin || (!isAdmin(user) && !isSuperAdmin(user)))
+                    const canView = canManageUsers // All admins can view user details
                     
-                return (
-                      <tr key={user.id} className="hover:bg-blue-50/40 transition">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                    const statusColors = {
+                      'active': 'bg-success/10 text-success border-success/30',
+                      'inactive': 'bg-muted text-muted-foreground border-border',
+                      'suspended': 'bg-destructive/10 text-destructive border-destructive/30',
+                    };
+                    
+                    return (
+                      <TableRow key={user.id} className="hover:bg-accent/50 transition-colors border-b border-border">
+                        <TableCell className="py-4">
+                          <Checkbox
+                            checked={selected.includes(user.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelected([...selected, user.id])
+                              } else {
+                                setSelected(selected.filter(id => id !== user.id))
+                              }
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center text-white text-lg font-bold shadow-md">
-                          {user.avatar ||
-                            user.name
-                              ?.split(' ')
-                              .map((n: string) => n[0])
-                              .join('')
-                                  .toUpperCase() || 'U'}
-                        </div>
-                        <div>
-                              <div className="font-semibold text-gray-900">{user.name}</div>
-                              <div className="text-sm text-gray-500">{user.email}</div>
-                              {user.phone && (
-                                <div className="text-xs text-gray-400 flex items-center gap-1">
-                                  <Phone className="w-3 h-3" />
-                                  {user.phone}
-                                </div>
-                              )}
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-semibold text-foreground text-sm">
+                              {user.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'U'}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-foreground">{user.name}</div>
+                              <div className="text-xs text-muted-foreground">{user.role}</div>
                             </div>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge className={getRoleColor(user.role) + ' text-xs px-2 py-1 rounded-full'}>
-                        {user.role}
-                      </Badge>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                      {canChangeStatus ? (
-                        <Select
-                              value={user.status || 'active'}
-                          onValueChange={(v) => handleStatusChange(user, v)}
-                          disabled={statusLoading === user.id}
-                        >
-                              <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="inactive">Inactive</SelectItem>
-                            <SelectItem value="suspended">Suspended</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                            <Badge className={getStatusColor(user.status || 'active') + ' text-xs px-2 py-1 rounded-full'}>
-                              {user.status || 'active'}
-                        </Badge>
-                      )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-gray-700">
-                          {user.created_at || user.createdAt || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex flex-wrap gap-2">
-                            {canEdit && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="outline" size="icon" onClick={() => openEdit(user)} className="shadow-sm">
-                                    <Edit className="w-5 h-5" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Edit User</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {isCurrentSuperAdmin && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                                    size="icon" 
-                                    onClick={() => setResetUserId(String(user.id))} 
-                                    className="shadow-sm"
-                                  >
-                                    <Key className="w-5 h-5" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Reset Password</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {canDelete && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="outline" size="icon" onClick={() => setDeleteUserId(user.id)} className="shadow-sm">
-                                    <Trash2 className="w-5 h-5 text-red-500" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Delete User</TooltipContent>
-                              </Tooltip>
-                            )}
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <Badge className={`${getRoleColor(user.role)} text-xs px-3 py-1 rounded-full border`}>
+                            {user.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="text-sm text-foreground">
+                            {user.created_at ? new Date(user.created_at).toLocaleDateString('en-GB') : 'N/A'}
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="text-sm text-foreground">{user.email}</div>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="text-sm text-foreground">{user.phone || '-'}</div>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          {canChangeStatus ? (
+                            <Select
+                              value={user.status || 'active'}
+                              onValueChange={(v) => handleStatusChange(user, v)}
+                              disabled={statusLoading === user.id}
+                            >
+                              <SelectTrigger className="w-32 h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="inactive">Inactive</SelectItem>
+                                <SelectItem value="suspended">Suspended</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Badge className={`${statusColors[user.status as keyof typeof statusColors] || 'bg-muted text-muted-foreground'} text-xs px-3 py-1 rounded-full border`}>
+                              {user.status || 'active'}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-4">
+                          {showActions ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-accent">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                {canView && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleViewUser(user.id)}
+                                    className="cursor-pointer"
+                                  >
+                                    <ViewIcon className="w-4 h-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                )}
+                                {canEdit && (
+                                  <>
+                                    {canView && <DropdownMenuSeparator />}
+                                    <DropdownMenuItem
+                                      onClick={() => openEdit(user)}
+                                      className="cursor-pointer"
+                                    >
+                                      <Edit className="w-4 h-4 mr-2" />
+                                      Edit User
+                                    </DropdownMenuItem>
+                                    {canResetPassword && (
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setResetUserId(user.id)
+                                          setResetPassword('')
+                                          setResetPasswordConfirm('')
+                                          setResetError(null)
+                                        }}
+                                        className="cursor-pointer"
+                                      >
+                                        <Key className="w-4 h-4 mr-2" />
+                                        Reset Password
+                                      </DropdownMenuItem>
+                                    )}
+                                  </>
+                                )}
+                                {canDelete && (
+                                  <>
+                                    {(canView || canEdit) && <DropdownMenuSeparator />}
+                                    <DropdownMenuItem
+                                      onClick={() => setDeleteUserId(user.id)}
+                                      className="cursor-pointer text-destructive focus:text-destructive"
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete User
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-accent" disabled>
+                              <MoreVertical className="w-4 h-4 opacity-50" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
                     )
                   })}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         )}
 
         {/* Pagination Component */}
@@ -751,11 +906,11 @@ export default function Users() {
 
         {filteredUsers.length === 0 && !loading && (
           <div className="text-center py-12">
-            <UsersIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <UsersIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-card-foreground mb-2">
               No users found
             </h3>
-            <p className="text-gray-600">
+            <p className="text-muted-foreground">
               Try adjusting your search or filter criteria
             </p>
           </div>
@@ -798,6 +953,7 @@ export default function Users() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="organizer_admin">Organizer Admin</SelectItem>
                       <SelectItem value="organizer">Organizer</SelectItem>
                       <SelectItem value="usher">Usher</SelectItem>
                     </SelectContent>
@@ -836,78 +992,209 @@ export default function Users() {
 
         {/* Reset Password Modal */}
         <Dialog open={resetUserId !== null} onOpenChange={(open) => {
-                            if (!open) {
-                              setResetUserId(null)
-                              setResetPassword('')
-                              setResetPasswordConfirm('')
-                              setResetError(null)
-                            }
-                          }}>
+          if (!open) {
+            setResetUserId(null)
+            setResetPassword('')
+            setResetPasswordConfirm('')
+            setResetError(null)
+            setShowResetPassword(false)
+            setShowResetPasswordConfirm(false)
+          }
+        }}>
           <DialogContent className="max-w-md">
-                              <DialogHeader>
+            <DialogHeader>
               <DialogTitle className="text-xl font-bold">Reset Password</DialogTitle>
-                              </DialogHeader>
-                              <form onSubmit={e => { e.preventDefault(); handleResetPassword(); }} className="space-y-4">
+            </DialogHeader>
+            <form onSubmit={e => { e.preventDefault(); handleResetPassword(); }} className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">New Password</label>
-                                <Input
-                                  type="password"
-                  placeholder="Enter new password"
-                                  value={resetPassword ?? ''}
-                                  onChange={e => setResetPassword(e.target.value)}
-                                  required
-                                />
+                <div className="relative">
+                  <Input
+                    type={showResetPassword ? 'text' : 'password'}
+                    placeholder="Enter new password (min. 6 characters)"
+                    value={resetPassword ?? ''}
+                    onChange={e => setResetPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowResetPassword((v) => !v)}
+                  >
+                    {showResetPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Confirm New Password</label>
-                                <Input
-                                  type="password"
-                  placeholder="Confirm new password"
-                                  value={resetPasswordConfirm ?? ''}
-                                  onChange={e => setResetPasswordConfirm(e.target.value)}
-                                  required
-                                />
+                <div className="relative">
+                  <Input
+                    type={showResetPasswordConfirm ? 'text' : 'password'}
+                    placeholder="Confirm new password"
+                    value={resetPasswordConfirm ?? ''}
+                    onChange={e => setResetPasswordConfirm(e.target.value)}
+                    required
+                    minLength={6}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowResetPasswordConfirm((v) => !v)}
+                  >
+                    {showResetPasswordConfirm ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               {resetError && (
                 <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{resetError}</div>
               )}
-                                <DialogFooter>
+              <DialogFooter>
                 <Button type="submit" disabled={resetLoading} className="w-full">
                   {resetLoading ? 'Resetting Password...' : 'Reset Password'}
-                                    </Button>
-                                </DialogFooter>
-                              </form>
-                            </DialogContent>
-                          </Dialog>
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Delete User Confirmation */}
         <AlertDialog open={deleteUserId !== null} onOpenChange={(open) => {
           if (!open) setDeleteUserId(null)
         }}>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete User</AlertDialogTitle>
-                              </AlertDialogHeader>
-                              <div>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete User</AlertDialogTitle>
+            </AlertDialogHeader>
+            <div>
               Are you sure you want to delete this user? This action cannot be undone.
-                              </div>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel asChild>
-                                  <Button variant="outline">Cancel</Button>
-                                </AlertDialogCancel>
-                                <AlertDialogAction asChild>
-                                  <Button
-                                    variant="destructive"
-                                    onClick={handleDelete}
-                                    disabled={deleteLoading}
-                                  >
-                                    {deleteLoading ? 'Deleting...' : 'Delete'}
-                                  </Button>
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                      </div>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel asChild>
+                <Button variant="outline">Cancel</Button>
+              </AlertDialogCancel>
+              <AlertDialogAction asChild>
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? 'Deleting...' : 'Delete'}
+                </Button>
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* View User Details Modal */}
+        <Dialog open={viewUserId !== null} onOpenChange={(open) => {
+          if (!open) {
+            setViewUserId(null)
+            setViewUser(null)
+          }
+        }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold">User Details</DialogTitle>
+            </DialogHeader>
+            {viewUser && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4 pb-4 border-b">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center font-semibold text-foreground text-xl">
+                    {viewUser.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'U'}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">{viewUser.name}</h3>
+                    <p className="text-sm text-muted-foreground">{viewUser.email}</p>
+                    <Badge className={`${getRoleColor(viewUser.role)} text-xs px-3 py-1 rounded-full border mt-2`}>
+                      {viewUser.role}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Phone Number</label>
+                    <p className="text-sm font-medium">{viewUser.phone || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Status</label>
+                    <div className="mt-1">
+                      <Badge className={`${getStatusColor(viewUser.status || 'active')} text-xs px-3 py-1 rounded-full border`}>
+                        {viewUser.status || 'active'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Joined Date</label>
+                    <p className="text-sm font-medium">
+                      {viewUser.created_at ? new Date(viewUser.created_at).toLocaleDateString('en-GB', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      }) : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Last Updated</label>
+                    <p className="text-sm font-medium">
+                      {viewUser.updated_at ? new Date(viewUser.updated_at).toLocaleDateString('en-GB', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      }) : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+                {viewUser.bio && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Bio</label>
+                    <p className="text-sm font-medium mt-1">{viewUser.bio}</p>
+                  </div>
+                )}
+                {canEdit && (
+                  <div className="flex gap-2 pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setViewUserId(null)
+                        openEdit(viewUser)
+                      }}
+                      className="flex-1"
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit User
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setViewUserId(null)
+                        setResetUserId(viewUser.id)
+                        setResetPassword('')
+                        setResetPasswordConfirm('')
+                        setResetError(null)
+                      }}
+                      className="flex-1"
+                    >
+                      <Key className="w-4 h-4 mr-2" />
+                      Reset Password
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
     </TooltipProvider>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import Breadcrumbs from '@/components/Breadcrumbs'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
@@ -392,9 +393,14 @@ export default function OrganizerProfile() {
 
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-8 w-full">
-      <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
-        <ArrowLeft className="w-4 h-4 mr-2" /> Back
-      </Button>
+      {/* Breadcrumbs */}
+      <Breadcrumbs 
+        items={[
+          { label: 'Organizers', href: '/dashboard/organizers' },
+          { label: organizer?.name || 'Organizer Profile' }
+        ]}
+        className="mb-4"
+      />
       <Card className="p-4 sm:p-6 mb-6">
         <div className="flex justify-between items-start">
           <h2 className="text-2xl font-bold mb-2">{organizer.name}</h2>
@@ -440,7 +446,7 @@ export default function OrganizerProfile() {
       <Card className="p-4 sm:p-6">
         <h3 className="text-xl font-semibold mb-4">Contacts</h3>
         {contacts.length === 0 ? (
-          <div className="text-gray-400">No contacts assigned.</div>
+          <div className="text-muted-foreground/70">No contacts assigned.</div>
         ) : (
           <div className="flex flex-col gap-2">
             {contacts.map((contact) => (
@@ -451,7 +457,7 @@ export default function OrganizerProfile() {
                 <span
                   className={
                     contact.is_primary_contact
-                      ? 'font-bold text-purple-700'
+                      ? 'font-bold text-info'
                       : ''
                   }
                 >
@@ -642,7 +648,7 @@ export default function OrganizerProfile() {
         </div>
         {user?.role === 'admin' &&
           (events.length === 0 ? (
-            <div className="text-gray-400">
+            <div className="text-muted-foreground/70">
               No events managed by this organizer.
             </div>
           ) : (
@@ -652,11 +658,11 @@ export default function OrganizerProfile() {
                   key={event.id}
                   className="flex flex-col sm:flex-row md:items-center md:gap-4 border-b last:border-b-0 py-2"
                 >
-                  <span className="font-semibold text-gray-800">
+                  <span className="font-semibold text-card-foreground">
                     {event.name}
                   </span>
-                  <span className="text-gray-600">{event.location}</span>
-                  <span className="text-gray-500">
+                  <span className="text-muted-foreground">{event.location}</span>
+                  <span className="text-muted-foreground/70">
                     {event.start_date} - {event.end_date}
                   </span>
                   <div className="flex gap-2 mt-2 sm:mt-0">
@@ -690,7 +696,7 @@ export default function OrganizerProfile() {
       <Card className="p-4 sm:p-6 mt-6">
         <h3 className="text-xl font-semibold mb-4">Audit Log</h3>
         {auditLogs.length === 0 ? (
-          <div className="text-gray-400">No audit log entries.</div>
+          <div className="text-muted-foreground/70">No audit log entries.</div>
         ) : (
           <div className="flex flex-col gap-2">
             {auditLogs.map((log) => (
@@ -698,13 +704,13 @@ export default function OrganizerProfile() {
                 key={log.id}
                 className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm"
               >
-                <span className="font-mono text-gray-500">
+                <span className="font-mono text-muted-foreground/70">
                   {format(new Date(log.created_at), 'yyyy-MM-dd HH:mm')}
                 </span>
-                <span className="font-semibold text-gray-800">
+                <span className="font-semibold text-card-foreground">
                   {log.action}
                 </span>
-                <span className="text-gray-600">
+                <span className="text-muted-foreground">
                   by {log.user?.name || 'System'}
                 </span>
               </div>

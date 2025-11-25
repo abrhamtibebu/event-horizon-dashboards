@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Camera, Mail, Phone, MapPin, Calendar, Briefcase, Save, Loader2 } from 'lucide-react'
+import { Camera, Mail, Phone, MapPin, Calendar, Briefcase, Save } from 'lucide-react'
+import Breadcrumbs from '@/components/Breadcrumbs'
+import { SpinnerInline } from '@/components/ui/spinner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -105,10 +107,18 @@ export default function Profile() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
+      {/* Breadcrumbs */}
+      <Breadcrumbs 
+        items={[
+          { label: 'Profile', href: '/dashboard/profile' }
+        ]}
+        className="mb-4"
+      />
+      
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Profile</h1>
-        <p className="text-gray-600">Manage your personal information and preferences</p>
+        <h1 className="text-3xl font-bold text-foreground mb-2">My Profile</h1>
+        <p className="text-muted-foreground">Manage your personal information and preferences</p>
       </div>
 
       {/* Profile Card */}
@@ -117,9 +127,9 @@ export default function Profile() {
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
             {/* Avatar with Upload */}
             <div className="relative group">
-              <Avatar className="w-32 h-32 border-4 border-white shadow-xl">
+              <Avatar className="w-32 h-32 border-4 border-card shadow-xl">
                 <AvatarImage src={user?.profile_image} />
-                <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-3xl font-bold">
+                <AvatarFallback className="bg-primary text-primary-foreground text-3xl font-bold">
                   {getInitials(user?.name)}
                 </AvatarFallback>
               </Avatar>
@@ -128,7 +138,7 @@ export default function Profile() {
                 className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
               >
                 {isUploadingImage ? (
-                  <Loader2 className="w-8 h-8 text-white animate-spin" />
+                  <SpinnerInline size="md" />
                 ) : (
                   <Camera className="w-8 h-8 text-white" />
                 )}
@@ -145,29 +155,29 @@ export default function Profile() {
 
             {/* User Info */}
             <div className="flex-1 text-center md:text-left">
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">{user?.name}</h2>
-              <p className="text-gray-600 mb-3">{user?.email}</p>
+              <h2 className="text-2xl font-bold text-card-foreground mb-1">{user?.name}</h2>
+              <p className="text-muted-foreground mb-3">{user?.email}</p>
               <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                 <Badge variant="secondary" className="capitalize">
                   {user?.role}
                 </Badge>
                 {user?.organizer_id && (
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                  <Badge variant="outline" className="bg-blue-500/10 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700/50">
                     Organizer
                   </Badge>
                 )}
               </div>
               <div className="mt-4">
                 {!isEditing ? (
-                  <Button onClick={() => setIsEditing(true)} className="bg-blue-600 hover:bg-blue-700">
+                  <Button onClick={() => setIsEditing(true)} className="bg-brand-gradient">
                     Edit Profile
                   </Button>
                 ) : (
                   <div className="flex gap-2">
-                    <Button onClick={handleSave} disabled={isSaving} className="bg-green-600 hover:bg-green-700">
+                    <Button onClick={handleSave} disabled={isSaving} className="bg-success text-foreground">
                       {isSaving ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <SpinnerInline className="mr-2" />
                           Saving...
                         </>
                       ) : (
@@ -199,7 +209,7 @@ export default function Profile() {
             <div>
               <Label htmlFor="name">Full Name</Label>
               <div className="relative">
-                <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   id="name"
                   name="name"
@@ -213,7 +223,7 @@ export default function Profile() {
             <div>
               <Label htmlFor="email">Email Address</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   id="email"
                   name="email"
@@ -228,7 +238,7 @@ export default function Profile() {
             <div>
               <Label htmlFor="phone">Phone Number</Label>
               <div className="relative">
-                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   id="phone"
                   name="phone"
@@ -243,7 +253,7 @@ export default function Profile() {
             <div>
               <Label htmlFor="location">Location</Label>
               <div className="relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   id="location"
                   name="location"
@@ -259,7 +269,7 @@ export default function Profile() {
           <div>
             <Label htmlFor="organization">Organization</Label>
             <div className="relative">
-              <Briefcase className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
+              <Briefcase className="absolute left-3 top-3 text-muted-foreground w-4 h-4" />
               <Input
                 id="organization"
                 name="organization"
@@ -294,30 +304,30 @@ export default function Profile() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border border-blue-100">
+            <div className="flex items-center gap-3 p-4 bg-blue-500/10 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700/50">
               <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Calendar className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Events Created</p>
-                <p className="text-2xl font-bold text-blue-600">-</p>
+                <p className="text-sm text-muted-foreground">Events Created</p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">-</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-100">
+            <div className="flex items-center gap-3 p-4 bg-green-500/10 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700/50">
               <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center">
                 <Briefcase className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Total Attendees</p>
-                <p className="text-2xl font-bold text-green-600">-</p>
+                <p className="text-sm text-muted-foreground">Total Attendees</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">-</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg border border-purple-100">
+            <div className="flex items-center gap-3 p-4 bg-purple-500/10 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700/50">
               <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center">
                 <Mail className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Member Since</p>
+                <p className="text-sm text-muted-foreground">Member Since</p>
                 <p className="text-sm font-bold text-purple-600">
                   {user?.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}
                 </p>

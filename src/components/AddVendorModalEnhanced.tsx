@@ -29,6 +29,7 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle,
+  Search,
 } from 'lucide-react';
 import vendorApi from '@/lib/vendorApi';
 
@@ -104,6 +105,7 @@ export default function AddVendorModalEnhanced({ open, onOpenChange, onVendorCre
   const [documents, setDocuments] = useState<File[]>([]);
   const [newService, setNewService] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLookingUpTin, setIsLookingUpTin] = useState(false);
 
   const createVendorMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -142,6 +144,11 @@ export default function AddVendorModalEnhanced({ open, onOpenChange, onVendorCre
 
       // Always set status to pending_approval for new vendors
       formDataToSend.append('status', 'pending_approval');
+      
+      // Enable auto-fill from TIN if tax_id is provided
+      if (data.tax_id && data.tax_id.trim()) {
+        formDataToSend.append('auto_fill_from_tin', 'true');
+      }
 
       // Add files
       if (logo) {
@@ -184,6 +191,80 @@ export default function AddVendorModalEnhanced({ open, onOpenChange, onVendorCre
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handleLookupByTin = async () => {
+    if (!formData.tax_id.trim()) {
+      toast.error('Please enter a TIN number first');
+      return;
+    }
+
+    // Validate TIN format (numeric only)
+    if (!/^\d+$/.test(formData.tax_id.trim())) {
+      toast.error('TIN number must contain only digits');
+      return;
+    }
+
+    setIsLookingUpTin(true);
+    try {
+      const businessInfo = await vendorApi.lookupByTin(formData.tax_id.trim());
+      
+      if (businessInfo) {
+        // Map business info to form fields (only fill if field is empty)
+        const updates: Partial<VendorFormData> = {};
+        
+        if (!formData.name && (businessInfo.businessName || businessInfo.name)) {
+          updates.name = businessInfo.businessName || businessInfo.name;
+        }
+        
+        if (!formData.address && (businessInfo.address || businessInfo.location)) {
+          updates.address = businessInfo.address || businessInfo.location;
+        }
+        
+        if (!formData.email && businessInfo.email) {
+          updates.email = businessInfo.email;
+        }
+        
+        if (!formData.phone && (businessInfo.phone || businessInfo.phoneNumber)) {
+          updates.phone = businessInfo.phone || businessInfo.phoneNumber;
+        }
+        
+        if (!formData.website && businessInfo.website) {
+          updates.website = businessInfo.website;
+        }
+        
+        if (!formData.business_license && (businessInfo.licenseNumber || businessInfo.businessLicense)) {
+          updates.business_license = businessInfo.licenseNumber || businessInfo.businessLicense;
+        }
+        
+        if (!formData.contact_person && (businessInfo.contactPerson || businessInfo.contactName)) {
+          updates.contact_person = businessInfo.contactPerson || businessInfo.contactName;
+        }
+        
+        if (!formData.contact_email && businessInfo.contactEmail) {
+          updates.contact_email = businessInfo.contactEmail;
+        }
+        
+        if (!formData.contact_phone && businessInfo.contactPhone) {
+          updates.contact_phone = businessInfo.contactPhone;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          setFormData(prev => ({ ...prev, ...updates }));
+          toast.success(`Fetched business information! Filled ${Object.keys(updates).length} field(s).`);
+        } else {
+          toast.info('Business information retrieved, but all fields are already filled.');
+        }
+      } else {
+        toast.warning('No business information found for this TIN number');
+      }
+    } catch (error: any) {
+      console.error('TIN lookup error:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to lookup business information';
+      toast.error(errorMessage);
+    } finally {
+      setIsLookingUpTin(false);
     }
   };
 
@@ -309,6 +390,51 @@ export default function AddVendorModalEnhanced({ open, onOpenChange, onVendorCre
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* TIN Lookup Section - Moved to Top */}
+          <div className="space-y-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Search className="h-5 w-5 text-blue-600" />
+              <h3 className="text-lg font-semibold text-blue-900">Business Registration Lookup</h3>
+            </div>
+            <p className="text-sm text-blue-700 mb-4">
+              Enter a TIN (Tax Identification Number) to automatically fetch business information from the Ethiopian Trade Registry.
+            </p>
+            <div className="flex gap-2">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="tax_id">Tax ID (TIN) Number</Label>
+                <Input
+                  id="tax_id"
+                  value={formData.tax_id}
+                  onChange={(e) => handleInputChange('tax_id', e.target.value)}
+                  placeholder="Enter TIN number (e.g., 1234567890)"
+                  className={errors.tax_id ? 'border-red-500' : ''}
+                />
+                {errors.tax_id && <p className="text-sm text-red-500">{errors.tax_id}</p>}
+              </div>
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  onClick={handleLookupByTin}
+                  disabled={!formData.tax_id.trim() || isLookingUpTin}
+                  variant="outline"
+                  className="min-w-[140px]"
+                >
+                  {isLookingUpTin ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Looking up...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Fetch Info
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+
           {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Basic Information</h3>

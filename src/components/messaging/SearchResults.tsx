@@ -54,27 +54,27 @@ const SearchResult: React.FC<SearchResultProps> = ({
     if (message.highlighted_content) {
       return (
         <div 
-          className="text-sm text-gray-700"
+          className="text-sm text-foreground"
           dangerouslySetInnerHTML={{ __html: message.highlighted_content }}
         />
       )
     }
-    return <div className="text-sm text-gray-700">{message.content}</div>
+    return <div className="text-sm text-foreground">{message.content}</div>
   }
 
   const renderAttachment = () => {
-    if (!message.file_path) return null
+    if (!(message.file_path || message.file_url)) return null
 
     const isImage = message.file_type?.startsWith('image/')
     
     return (
       <div className="flex items-center space-x-2 mt-2">
         {isImage ? (
-          <ImageIcon className="w-4 h-4 text-blue-500" />
+          <ImageIcon className="w-4 h-4 text-primary" />
         ) : (
-          <FileText className="w-4 h-4 text-gray-500" />
+          <FileText className="w-4 h-4 text-muted-foreground" />
         )}
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-muted-foreground">
           {message.highlighted_file_name ? (
             <span dangerouslySetInnerHTML={{ __html: message.highlighted_file_name }} />
           ) : (
@@ -91,14 +91,14 @@ const SearchResult: React.FC<SearchResultProps> = ({
 
   return (
     <div 
-      className="p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+      className="p-4 border-b border-border hover:bg-muted/50 cursor-pointer transition-colors"
       onClick={() => onMessageClick(message)}
     >
       <div className="flex items-start space-x-3">
         {/* Avatar */}
         <Avatar className="w-10 h-10 flex-shrink-0">
           <AvatarImage src={message.sender.profile_image} />
-          <AvatarFallback className="bg-gray-200 text-gray-600 text-sm">
+          <AvatarFallback className="bg-muted text-muted-foreground text-sm">
             {getInitials(message.sender.name)}
           </AvatarFallback>
         </Avatar>
@@ -108,7 +108,7 @@ const SearchResult: React.FC<SearchResultProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center space-x-2">
-              <span className="font-medium text-gray-900">{message.sender.name}</span>
+              <span className="font-medium text-foreground">{message.sender.name}</span>
               <Badge 
                 variant={conversationType === 'event' ? 'default' : 'secondary'}
                 className="text-xs"
@@ -126,7 +126,7 @@ const SearchResult: React.FC<SearchResultProps> = ({
                 )}
               </Badge>
             </div>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-muted-foreground">
               {formatMessageTime(message.created_at)}
             </span>
           </div>
@@ -185,8 +185,8 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   if (isLoading) {
     return (
       <div className="p-8 text-center">
-        <Search className="w-8 h-8 mx-auto text-gray-400 mb-4" />
-        <p className="text-gray-500">Searching messages...</p>
+        <Search className="w-8 h-8 mx-auto text-muted-foreground mb-4" />
+        <p className="text-muted-foreground">Searching messages...</p>
       </div>
     )
   }
@@ -194,9 +194,9 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   if (messages.length === 0) {
     return (
       <div className="p-8 text-center">
-        <Search className="w-8 h-8 mx-auto text-gray-400 mb-4" />
-        <p className="text-gray-500 mb-2">No messages found</p>
-        <p className="text-sm text-gray-400">
+        <Search className="w-8 h-8 mx-auto text-muted-foreground mb-4" />
+        <p className="text-foreground mb-2">No messages found</p>
+        <p className="text-sm text-muted-foreground">
           Try searching with different keywords or check your spelling
         </p>
       </div>
@@ -204,15 +204,15 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   }
 
   return (
-    <div className="bg-white">
+    <div className="bg-card">
       {/* Results header */}
-      <div className="p-4 border-b border-gray-200 bg-gray-50">
+      <div className="p-4 border-b border-border bg-muted/30">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-medium text-gray-900">
+            <h3 className="font-medium text-foreground">
               Search results for "{query}"
             </h3>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {total} message{total !== 1 ? 's' : ''} found
             </p>
           </div>
@@ -233,7 +233,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
       {/* Load more button */}
       {hasMore && onLoadMore && (
-        <div className="p-4 border-t border-gray-200 bg-gray-50">
+        <div className="p-4 border-t border-border bg-muted/30">
           <Button
             variant="outline"
             onClick={onLoadMore}

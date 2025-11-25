@@ -12,7 +12,7 @@ export default function RoleDashboard() {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-400 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
+          <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
     )
@@ -23,7 +23,7 @@ export default function RoleDashboard() {
       {(user.role === 'admin' || user.role === 'superadmin') && (
         <AdminDashboard />
       )}
-      {user.role === 'organizer' && <OrganizerDashboard />}
+      {(user.role === 'organizer' || user.role === 'organizer_admin') && <OrganizerDashboard />}
       {user.role === 'usher' && <UsherDashboard />}
       {user.role === 'attendee' && <AttendeeDashboard />}
     </div>

@@ -51,14 +51,14 @@ export const MessageReplies: React.FC<MessageRepliesProps> = ({
       {/* Slack-style Reply count with avatars */}
       <button
         onClick={() => setShowReplies(!showReplies)}
-        className="flex items-center space-x-2 text-xs font-medium text-[#1264A3] hover:underline transition-colors py-1"
+        className="flex items-center space-x-2 text-xs font-medium text-primary hover:underline transition-colors py-1"
       >
         {/* Show small avatars of people who replied */}
         <div className="flex -space-x-1">
           {replies.slice(0, 3).map((reply, index) => (
-            <Avatar key={reply.id} className="w-5 h-5 border-2 border-white">
+            <Avatar key={reply.id} className="w-5 h-5 border-2 border-background">
               <AvatarImage src={reply.sender.profile_image} />
-              <AvatarFallback className="bg-gray-300 text-gray-700 text-[10px]">
+              <AvatarFallback className="bg-muted text-muted-foreground text-[10px]">
                 {reply.sender.name.charAt(0)}
               </AvatarFallback>
             </Avatar>
@@ -72,19 +72,19 @@ export const MessageReplies: React.FC<MessageRepliesProps> = ({
 
       {/* Collapsible Replies list */}
       {showReplies && (
-        <div className="mt-3 space-y-3 pl-0 pb-4 border-l-2 border-gray-200 ml-4 pl-4">
+        <div className="mt-3 space-y-3 pl-0 pb-4 border-l-2 border-border ml-4 pl-4">
           {isLoading ? (
-            <div className="text-xs text-gray-500">Loading replies...</div>
+            <div className="text-xs text-muted-foreground">Loading replies...</div>
           ) : (
             replies.map((reply) => (
               <div key={reply.id} className="relative">
                 {/* Slack-style reply indicator */}
-                <div className="flex items-center space-x-1 mb-1 text-xs text-[#9CA3AF]">
+                <div className="flex items-center space-x-1 mb-1 text-xs text-muted-foreground">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                   </svg>
                   <span>
-                    <strong className="font-medium text-gray-700">
+                    <strong className="font-medium text-foreground">
                       {reply.sender_id === currentUserId ? 'You' : reply.sender.name}
                     </strong>
                     {' '}replied

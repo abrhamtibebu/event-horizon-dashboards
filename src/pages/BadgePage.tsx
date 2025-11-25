@@ -140,7 +140,7 @@ const BadgePage = () => {
   if (!attendee) return <div className="p-8 text-center">No attendee data.</div>;
 
   return (
-    <div className="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+    <div className="bg-background min-h-screen flex flex-col items-center justify-center p-4">
       <style type="text/css" media="print">
         {`
           @page { size: auto; margin: 0; }

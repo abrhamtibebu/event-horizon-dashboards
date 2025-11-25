@@ -1,7 +1,7 @@
-import { Bell, Search, User, LogOut, MessageCircle, Settings, Calendar, Users, BarChart, Loader2, X, ChevronDown, UserCircle, Shield } from 'lucide-react'
+import { Bell, Search, User, LogOut, MessageCircle, Settings, Calendar, Users, BarChart, X, ChevronDown, UserCircle, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { SidebarTrigger } from '@/components/ui/sidebar'
+import { SpinnerInline } from '@/components/ui/spinner'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,8 +12,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { useAuth } from '@/hooks/use-auth'
 import { useUnreadCount } from '@/hooks/use-messages'
+import { useSubscription } from '@/hooks/useSubscription'
+import { SubscriptionStatusBadge } from '@/components/subscription/SubscriptionStatusBadge'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '@/lib/api'
@@ -28,6 +31,7 @@ interface SearchResult {
 
 export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
   const { user, logout } = useAuth()
+  const { subscription } = useSubscription()
   const [searchValue, setSearchValue] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
@@ -144,16 +148,14 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
   }
 
   return (
-    <header className="h-16 border-b bg-white/80 backdrop-blur-sm flex items-center px-6 justify-between sticky top-0 z-50">
+    <header className="h-16 border-b bg-background/80 backdrop-blur-sm flex items-center px-6 justify-between sticky top-0 z-50 border-border">
       <div className="flex items-center gap-4">
-        <SidebarTrigger className="text-gray-600 hover:text-gray-900" />
-        
         {/* Enhanced Search with Dropdown */}
         <div className="relative" ref={searchRef}>
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             placeholder="Search events, users..."
-            className="pl-10 pr-10 w-80 bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-500 transition-all"
+            className="pl-10 pr-10 w-80 bg-muted/50 border-border focus:bg-background focus:border-primary transition-all"
             value={searchValue}
             onChange={handleSearchChange}
             onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
@@ -161,31 +163,33 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
           {searchValue && (
             <button
               onClick={clearSearch}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <X className="w-4 h-4" />
             </button>
           )}
           {isSearching && (
-            <Loader2 className="absolute right-10 top-1/2 transform -translate-y-1/2 text-blue-500 w-4 h-4 animate-spin" />
+            <div className="absolute right-10 top-1/2 transform -translate-y-1/2">
+              <SpinnerInline size="sm" />
+            </div>
           )}
 
           {/* Search Results Dropdown */}
           {showSearchResults && searchResults.length > 0 && (
-            <div className="absolute top-full mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+            <div className="absolute top-full mt-2 w-full bg-popover border border-border rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
               {searchResults.map((result, index) => (
                 <button
                   key={`${result.type}-${result.id}`}
                   onClick={() => handleSearchResultClick(result)}
-                  className="w-full px-4 py-3 hover:bg-gray-50 flex items-center gap-3 transition-colors border-b border-gray-100 last:border-0 text-left"
+                  className="w-full px-4 py-3 hover:bg-accent flex items-center gap-3 transition-colors border-b border-border last:border-0 text-left"
                 >
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                  <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary">
                     {result.icon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900 truncate">{result.title}</div>
+                    <div className="font-medium text-foreground truncate">{result.title}</div>
                     {result.subtitle && (
-                      <div className="text-sm text-gray-500 truncate">{result.subtitle}</div>
+                      <div className="text-sm text-muted-foreground truncate">{result.subtitle}</div>
                     )}
                   </div>
                   <Badge variant="secondary" className="text-xs capitalize">
@@ -198,14 +202,17 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
 
           {/* No Results */}
           {showSearchResults && searchResults.length === 0 && searchValue && !isSearching && (
-            <div className="absolute top-full mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg z-50 px-4 py-6 text-center">
-              <Search className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No results found for "{searchValue}"</p>
+            <div className="absolute top-full mt-2 w-full bg-popover border border-border rounded-lg shadow-lg z-50 px-4 py-6 text-center">
+              <Search className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No results found for "{searchValue}"</p>
             </div>
           )}
         </div>
       </div>
       <div className="flex items-center gap-4">
+        {/* Theme Toggle */}
+        <ThemeToggle />
+        
         {/* Notifications Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -252,10 +259,18 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        
+        {/* Subscription Status Badge (Organizers only) */}
+        {user?.role === 'organizer' && subscription && (
+          <div className="hidden md:block">
+            <SubscriptionStatusBadge subscription={subscription} />
+          </div>
+        )}
+        
         {/* Enhanced Profile Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="flex items-center gap-2 px-2 hover:bg-gray-100">
+            <Button variant="ghost" className="flex items-center gap-2 px-2">
               <Avatar className="w-8 h-8">
                 <AvatarImage src={user?.profile_image} />
                 <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold">
@@ -263,12 +278,12 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:flex flex-col items-start">
-                <span className="text-sm font-medium text-gray-900">
+                <span className="text-sm font-medium text-foreground">
                   {getShortName(user?.name || 'User')}
                 </span>
-                <span className="text-xs text-gray-500 capitalize">{user?.role}</span>
+                <span className="text-xs text-muted-foreground capitalize">{user?.role}</span>
               </div>
-              <ChevronDown className="w-4 h-4 text-gray-400" />
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
@@ -282,8 +297,8 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-gray-900 truncate">{user?.name}</div>
-                  <div className="text-xs text-gray-500 truncate">{user?.email}</div>
+                  <div className="font-semibold text-foreground truncate">{user?.name}</div>
+                  <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
                   <Badge variant="secondary" className="text-xs mt-1 capitalize">
                     {user?.role}
                   </Badge>
@@ -322,6 +337,16 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
               <BarChart className="mr-2 h-4 w-4 text-orange-600" />
               <span>Reports</span>
             </DropdownMenuItem>
+            
+            {user?.role === 'organizer' && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/dashboard/subscription')} className="cursor-pointer">
+                  <Shield className="mr-2 h-4 w-4 text-blue-600" />
+                  <span>Subscription</span>
+                </DropdownMenuItem>
+              </>
+            )}
             
             {(user?.role === 'admin' || user?.role === 'superadmin') && (
               <>

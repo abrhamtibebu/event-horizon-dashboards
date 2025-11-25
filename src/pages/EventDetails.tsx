@@ -23,6 +23,7 @@ import {
   MoreHorizontal,
   Send,
   FileText,
+  FileSpreadsheet,
   BarChart3,
   Upload,
   Star,
@@ -36,7 +37,6 @@ import {
   UserCog,
   UserCheck,
   Image,
-  Loader2,
   ExternalLink,
   Share2,
   Facebook,
@@ -51,10 +51,12 @@ import {
   Globe,
   Palette,
   RotateCcw,
+  MoreVertical,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Spinner, SpinnerInline } from '@/components/ui/spinner'
 import { DashboardCard } from '@/components/DashboardCard'
 import {
   Select,
@@ -103,6 +105,8 @@ import EventSessions from '@/components/EventSessions'
 import { InvitationsTab } from '@/components/event-invitations/InvitationsTab'
 import { BulkBadgesTab } from '@/components/BulkBadgesTab'
 import { useAuth } from '@/hooks/use-auth'
+import { usePermissionCheck } from '@/hooks/use-permission-check'
+import { ProtectedButton } from '@/components/ProtectedButton'
 import { Checkbox } from '@/components/ui/checkbox'
 import Papa from 'papaparse'
 import {
@@ -126,6 +130,7 @@ import { UsherAssignmentDialog } from '@/components/UsherAssignmentDialog'
 import React from 'react'
 import BadgePrint from '@/components/Badge'
 import BadgeTest from '@/components/BadgeTest'
+import { ResponseViewer } from '@/components/registration/ResponseViewer'
 import { getOfficialBadgeTemplate, getBadgeTemplates } from '@/lib/badgeTemplates'
 import { BadgeTemplate } from '@/types/badge'
 import { DateRange } from 'react-date-range'
@@ -136,6 +141,13 @@ import { useInterval } from '@/hooks/use-interval'
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import { getChartStyles, getChartColors, getChartColorPalette } from '@/utils/reportTransformers'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 // Add predefined guest types at the top, after imports
 const PREDEFINED_GUEST_TYPES = [
@@ -152,41 +164,41 @@ export default function EventDetails() {
     
     // Check-in related tasks
     if (taskLower.includes('check-in') || taskLower.includes('checkin') || taskLower.includes('registration')) {
-      return 'bg-blue-100 text-blue-800 border-blue-200'
+      return 'bg-info/10 dark:bg-info/20 text-info dark:text-info border-info/30'
     }
     
     // Security related tasks
     if (taskLower.includes('security') || taskLower.includes('guard') || taskLower.includes('safety')) {
-      return 'bg-red-100 text-red-800 border-red-200'
+      return 'bg-error/10 dark:bg-error/20 text-error dark:text-error border-error/30'
     }
     
     // Guest assistance tasks
     if (taskLower.includes('guest') || taskLower.includes('assistance') || taskLower.includes('help') || taskLower.includes('support')) {
-      return 'bg-green-100 text-green-800 border-green-200'
+      return 'bg-success/10 dark:bg-success/20 text-success dark:text-success border-success/30'
     }
     
     // Crowd control tasks
     if (taskLower.includes('crowd') || taskLower.includes('control') || taskLower.includes('manage')) {
-      return 'bg-purple-100 text-purple-800 border-purple-200'
+      return 'bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary border-primary/30'
     }
     
     // Communication tasks
     if (taskLower.includes('communication') || taskLower.includes('announcement') || taskLower.includes('coordination')) {
-      return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      return 'bg-warning/10 dark:bg-warning/20 text-warning dark:text-warning border-warning/30'
     }
     
     // Technical tasks
     if (taskLower.includes('technical') || taskLower.includes('equipment') || taskLower.includes('setup') || taskLower.includes('audio') || taskLower.includes('video')) {
-      return 'bg-indigo-100 text-indigo-800 border-indigo-200'
+      return 'bg-info/10 dark:bg-info/20 text-info dark:text-info border-info/30'
     }
     
     // Emergency tasks
     if (taskLower.includes('emergency') || taskLower.includes('first aid') || taskLower.includes('medical')) {
-      return 'bg-orange-100 text-orange-800 border-orange-200'
+      return 'bg-error/10 dark:bg-error/20 text-error dark:text-error border-error/30'
     }
     
     // Default color for other tasks
-    return 'bg-gray-100 text-gray-800 border-gray-200'
+    return 'bg-muted text-muted-foreground border-border'
   }
   const [searchTerm, setSearchTerm] = useState('')
   const [guestTypeFilter, setGuestTypeFilter] = useState('all')
@@ -265,10 +277,15 @@ export default function EventDetails() {
   // Legacy badge designer state removed - now using standalone app
 
   const { user } = useAuth()
+  const { checkPermission } = usePermissionCheck()
+  // Check if user is admin or organizer (not usher)
+  const isAdminOrOrganizer = user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin'
   const [isUsherAssigned, setIsUsherAssigned] = useState(false)
 
   const [addAttendeeDialogOpen, setAddAttendeeDialogOpen] = useState(false)
   const [createParticipantDialogOpen, setCreateParticipantDialogOpen] = useState(false)
+  const [responseViewerOpen, setResponseViewerOpen] = useState(false)
+  const [selectedAttendeeForResponses, setSelectedAttendeeForResponses] = useState<number | null>(null)
   const [participantCount, setParticipantCount] = useState(1)
   const [addAttendeeForm, setAddAttendeeForm] = useState<any>({
     first_name: '',
@@ -292,6 +309,8 @@ export default function EventDetails() {
   const [analytics, setAnalytics] = useState<any>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [analyticsError, setAnalyticsError] = useState<string | null>(null)
+  const [sessionCheckInData, setSessionCheckInData] = useState<any[]>([])
+  const [sessionCheckInLoading, setSessionCheckInLoading] = useState(false)
 
   // Share Analytics state
   const [shareAnalytics, setShareAnalytics] = useState<any>(null)
@@ -392,11 +411,14 @@ export default function EventDetails() {
     setAttendeesLoading(true)
     setAttendeesError(null)
     
-    // Build query parameters for pagination and filtering
-    const params = new URLSearchParams({
-      page: currentPage.toString(),
-      per_page: perPage.toString(),
-    });
+    // Build query parameters for filtering
+    const params = new URLSearchParams();
+    
+    // Only add pagination params for admin and organizer
+    if (isAdminOrOrganizer) {
+      params.append('page', currentPage.toString());
+      params.append('per_page', perPage.toString());
+    }
     
     if (searchTerm) {
       params.append('search', searchTerm);
@@ -415,16 +437,17 @@ export default function EventDetails() {
       .then((res) => {
         console.log('Attendees response:', res.data)
         
-        // Handle paginated response
-        if (res.data.data) {
+        // Handle paginated response (only for admin/organizer)
+        if (isAdminOrOrganizer && res.data.data) {
           setAttendees(res.data.data)
           setTotalPages(res.data.last_page || 1)
           setTotalRecords(res.data.total || 0)
         } else {
-          // Fallback for non-paginated response
-          setAttendees(res.data || [])
+          // For ushers or non-paginated response, get all data
+          const attendeesData = res.data.data || res.data || []
+          setAttendees(attendeesData)
           setTotalPages(1)
-          setTotalRecords(res.data?.length || 0)
+          setTotalRecords(attendeesData.length || 0)
         }
         
         // Log first attendee structure for debugging
@@ -447,7 +470,7 @@ export default function EventDetails() {
         setTotalRecords(0)
       })
       .finally(() => setAttendeesLoading(false))
-  }, [eventId, currentPage, perPage, searchTerm, guestTypeFilter, checkedInFilter])
+  }, [eventId, currentPage, perPage, searchTerm, guestTypeFilter, checkedInFilter, isAdminOrOrganizer])
 
   // Set guest types and ticket types from event data
   useEffect(() => {
@@ -507,6 +530,63 @@ export default function EventDetails() {
       })
       .catch((err) => setAnalyticsError('Failed to fetch analytics.'))
       .finally(() => setAnalyticsLoading(false))
+  }, [eventId, activeTab])
+
+  // Fetch session check-in analytics
+  useEffect(() => {
+    if (!eventId || activeTab !== 'analytics') return
+    setSessionCheckInLoading(true)
+    
+    // First fetch all sessions for the event
+    api.get(`/events/${Number(eventId)}/sessions`)
+      .then(async (sessionsRes) => {
+        const sessions = sessionsRes.data.data || []
+        
+        // Fetch attendance data for each session
+        const sessionCheckInPromises = sessions.map(async (session: any) => {
+          try {
+            const attendanceRes = await api.get(`/sessions/${session.session_id}/attendances`)
+            const attendances = attendanceRes.data.data || []
+            const checkedInCount = attendances.filter((att: any) => att.checked_in).length
+            const totalAttendances = attendances.length
+            
+            return {
+              session_id: session.session_id,
+              session_name: session.session_name,
+              session_type: session.session_type,
+              start_time: session.start_time,
+              end_time: session.end_time,
+              location: session.location,
+              max_capacity: session.max_capacity,
+              checked_in: checkedInCount,
+              total_attendances: totalAttendances,
+              check_in_rate: totalAttendances > 0 ? Math.round((checkedInCount / totalAttendances) * 100) : 0,
+            }
+          } catch (err) {
+            console.error(`Error fetching attendance for session ${session.session_id}:`, err)
+            return {
+              session_id: session.session_id,
+              session_name: session.session_name,
+              session_type: session.session_type,
+              start_time: session.start_time,
+              end_time: session.end_time,
+              location: session.location,
+              max_capacity: session.max_capacity,
+              checked_in: 0,
+              total_attendances: 0,
+              check_in_rate: 0,
+            }
+          }
+        })
+        
+        const sessionData = await Promise.all(sessionCheckInPromises)
+        setSessionCheckInData(sessionData)
+      })
+      .catch((err) => {
+        console.error('Error fetching session check-in data:', err)
+        setSessionCheckInData([])
+      })
+      .finally(() => setSessionCheckInLoading(false))
   }, [eventId, activeTab])
 
   // Fetch share analytics
@@ -1000,6 +1080,9 @@ export default function EventDetails() {
   }
 
   const openEditDialog = () => {
+    if (!checkPermission('events.edit', 'edit events')) {
+      return
+    }
     const eventDataForEdit = { ...eventData }
     // Set up date ranges for edit form
     const startDate = eventData.start_date ? new Date(eventData.start_date) : new Date()
@@ -1699,6 +1782,9 @@ export default function EventDetails() {
 
   // Soft delete (move to trash)
   const handleDeleteEvent = async () => {
+    if (!checkPermission('events.delete', 'delete events')) {
+      return
+    }
     setDeleteLoading(true)
     try {
       await api.delete(`/events/${Number(eventId)}`)
@@ -1741,6 +1827,15 @@ export default function EventDetails() {
 
   const handleStatusChange = async (newStatus: string) => {
     if (!eventId) return;
+    
+    // Check permission for status changes (especially publish)
+    if (newStatus === 'active' && !checkPermission('events.publish', 'publish events')) {
+      return
+    }
+    if (!checkPermission('events.edit', 'change event status')) {
+      return
+    }
+    
     setStatusLoading(true);
     setStatusError(null);
     try {
@@ -1978,14 +2073,13 @@ export default function EventDetails() {
       <div className="space-y-6">
         {eventLoading ? (
           <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            <p className="text-gray-600">Loading event details...</p>
+            <Spinner size="lg" variant="primary" text="Loading event details..." />
           </div>
         ) : eventError ? (
           <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-            <XCircle className="w-12 h-12 text-red-500" />
-            <h3 className="text-lg font-semibold text-gray-700">Failed to Load Event</h3>
-            <p className="text-gray-600 text-center">{eventError}</p>
+            <XCircle className="w-12 h-12 text-error" />
+            <h3 className="text-lg font-semibold text-foreground">Failed to Load Event</h3>
+            <p className="text-muted-foreground text-center">{eventError}</p>
             <Button
               onClick={() => window.location.reload()}
               variant="outline"
@@ -1997,9 +2091,9 @@ export default function EventDetails() {
           </div>
         ) : !eventData ? (
           <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-            <XCircle className="w-12 h-12 text-gray-400" />
-            <h3 className="text-lg font-semibold text-gray-700">Event Not Found</h3>
-            <p className="text-gray-600">The event you're looking for doesn't exist.</p>
+            <XCircle className="w-12 h-12 text-muted-foreground" />
+            <h3 className="text-lg font-semibold text-foreground">Event Not Found</h3>
+            <p className="text-muted-foreground">The event you're looking for doesn't exist.</p>
             <Button
               onClick={() => window.history.back()}
               variant="outline"
@@ -2020,13 +2114,13 @@ export default function EventDetails() {
           />
         )}
               {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-900/80 via-purple-800/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--color-rich-black))]/70 via-[hsl(var(--color-rich-black))]/40 to-transparent" />
               {/* Event Info */}
         <div className="absolute left-0 top-0 w-full h-full flex flex-col justify-end p-8">
           <div className="flex items-center gap-4 mb-2">
                   <Link
                     to="/dashboard/events"
-                    className="text-yellow-400 hover:text-yellow-300 text-base font-semibold flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm shadow"
+                    className="text-yellow-400 hover:text-yellow-300 text-base font-semibold flex items-center gap-1 bg-card/10 dark:bg-card/20 px-3 py-1 rounded-full backdrop-blur-sm shadow"
                   >
               <span className="text-lg">←</span> Back to Events
             </Link>
@@ -2073,7 +2167,7 @@ export default function EventDetails() {
 
             {/* Event Image */}
             {eventData.event_image && (
-              <div className="w-full h-64 rounded-lg overflow-hidden mb-4 bg-gradient-to-r from-blue-100 to-purple-100 flex items-center justify-center">
+              <div className="w-full h-64 rounded-lg overflow-hidden mb-4 bg-gradient-to-r from-[hsl(var(--primary))]/10 to-[hsl(var(--color-warning))]/10 flex items-center justify-center">
                 <img
                   src={getImageUrl(eventData.event_image)}
                   alt={eventData.name}
@@ -2093,10 +2187,10 @@ export default function EventDetails() {
               
                   </Link>
                 </div>
-                <h1 className="text-3xl font-bold text-gray-900">{eventData.name}</h1>
-                <p className="text-gray-600 mt-1">
+                <h1 className="text-3xl font-bold text-foreground">{eventData.name}</h1>
+                <p className="text-muted-foreground mt-1">
                   Organized by{' '}
-                  <span className="font-semibold text-blue-600">
+                  <span className="font-semibold text-info">
                     {user?.organizer?.name || eventData.organizer?.name}
                   </span>
                 </p>
@@ -2119,8 +2213,8 @@ export default function EventDetails() {
                         ))}
                       </SelectContent>
                     </Select>
-                    {statusLoading && <Loader2 className="animate-spin w-4 h-4 text-blue-500" />}
-                    {statusError && <span className="text-red-500 text-xs ml-2">{statusError}</span>}
+                    {statusLoading && <SpinnerInline size="sm" />}
+                    {statusError && <span className="text-error text-xs ml-2">{statusError}</span>}
                   </div>
                 )} */}
                 {user?.role !== 'usher' && (
@@ -2139,7 +2233,7 @@ export default function EventDetails() {
                   <DialogContent className="max-w-2xl">
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2">
-                        <QrCode className="w-5 h-5 text-blue-600" />
+                        <QrCode className="w-5 h-5 text-info" />
                         Public Registration Link
                       </DialogTitle>
                       <DialogDescription>
@@ -2149,8 +2243,8 @@ export default function EventDetails() {
                     {eventData?.status?.toLowerCase().trim() === 'active' && eventData?.uuid ? (
                       <div className="space-y-6">
                         {/* Registration Link Section */}
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
-                          <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                        <div className="bg-info/5 rounded-lg p-4 border border-info/30">
+                          <h3 className="text-sm font-semibold text-card-foreground mb-3 flex items-center gap-2">
                             <ExternalLink className="w-4 h-4" />
                             Registration Link
                           </h3>
@@ -2158,7 +2252,7 @@ export default function EventDetails() {
                             <Input
                               value={`${window.location.origin}/event/register/${eventData.uuid}`}
                               readOnly
-                              className="text-sm bg-white border-blue-300 focus:border-blue-500"
+                              className="text-sm bg-card border-info/40 focus:border-info"
                               onClick={e => (e.target as HTMLInputElement).select()}
                             />
                             <Button
@@ -2168,7 +2262,7 @@ export default function EventDetails() {
                                 toast.success('Registration link copied to clipboard!')
                               }}
                               variant="outline"
-                              className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700"
+                              className="bg-card hover:bg-accent border-info/40 text-info"
                             >
                               Copy
                             </Button>
@@ -2176,13 +2270,13 @@ export default function EventDetails() {
                         </div>
 
                         {/* QR Code Section */}
-                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
-                          <h3 className="text-sm font-semibold text-green-900 mb-3 flex items-center gap-2">
+                        <div className="bg-gradient-to-r from-success/10 to-success/20 rounded-lg p-4 border border-success/30">
+                          <h3 className="text-sm font-semibold text-success dark:text-success mb-3 flex items-center gap-2">
                             <QrCode className="w-4 h-4" />
                             QR Code
                           </h3>
                           <div className="flex items-center gap-4">
-                            <div className="bg-white p-3 rounded-lg border border-green-300">
+                            <div className="bg-background p-3 rounded-lg border border-success/30">
                               <img 
                                 id="public-registration-qr"
                                 src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`} 
@@ -2201,7 +2295,7 @@ export default function EventDetails() {
                                   link.click()
                                   toast.success('QR code downloaded!')
                                 }}
-                                className="bg-white hover:bg-green-50 border-green-300 text-green-700"
+                                className="bg-background hover:bg-success/10 border-success/50 text-success dark:text-success"
                               >
                                 Download QR
                               </Button>
@@ -2212,7 +2306,7 @@ export default function EventDetails() {
                                   navigator.clipboard.writeText(`${window.location.origin}/event/register/${eventData.uuid}`)
                                   toast.success('Link copied! Scan the QR code or share the link.')
                                 }}
-                                className="bg-white hover:bg-green-50 border-green-300 text-green-700"
+                                className="bg-background hover:bg-success/10 border-success/50 text-success dark:text-success"
                               >
                                 Copy Link
                               </Button>
@@ -2221,8 +2315,8 @@ export default function EventDetails() {
                         </div>
 
                         {/* Quick Share Section */}
-                        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-200">
-                          <h3 className="text-sm font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                        <div className="bg-info/5 rounded-lg p-4 border border-info/30">
+                          <h3 className="text-sm font-semibold text-card-foreground mb-3 flex items-center gap-2">
                             <Share2 className="w-4 h-4" />
                             Quick Share
                           </h3>
@@ -2230,7 +2324,7 @@ export default function EventDetails() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700"
+                              className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info"
                               onClick={async () => {
                                 await trackShareAction('facebook')
                                 window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&quote=${encodeURIComponent('Register for ' + eventData.name)}`, '_blank')
@@ -2242,7 +2336,7 @@ export default function EventDetails() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700"
+                              className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info"
                               onClick={async () => {
                                 await trackShareAction('twitter')
                                 window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&text=${encodeURIComponent('Register for ' + eventData.name)}&hashtags=event,registration`, '_blank')
@@ -2254,7 +2348,7 @@ export default function EventDetails() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="bg-white hover:bg-green-50 border-green-300 text-green-700"
+                              className="bg-background hover:bg-success/10 border-success/50 text-success dark:text-success"
                               onClick={async () => {
                                 await trackShareAction('whatsapp')
                                 window.open(`https://wa.me/?text=${encodeURIComponent('Register for ' + eventData.name + ': ' + window.location.origin + '/event/register/' + eventData.uuid)}`, '_blank')
@@ -2266,7 +2360,7 @@ export default function EventDetails() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="bg-white hover:bg-red-50 border-red-300 text-red-700"
+                              className="bg-background hover:bg-error/10 border-error/50 text-error dark:text-error"
                               onClick={async () => {
                                 await trackShareAction('email')
                                 const emailBody = `Hi,\n\nYou're invited to register for: ${eventData.name}\n\nRegistration Link: ${window.location.origin}/event/register/${eventData.uuid}\n\nBest regards`
@@ -2279,7 +2373,7 @@ export default function EventDetails() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700"
+                              className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info"
                               onClick={async () => {
                                 await trackShareAction('linkedin')
                                 window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}`, '_blank')
@@ -2291,7 +2385,7 @@ export default function EventDetails() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="bg-white hover:bg-pink-50 border-pink-300 text-pink-700"
+                              className="bg-background hover:bg-muted border-border text-muted-foreground"
                               onClick={async () => {
                                 await trackShareAction('copy_text')
                                 const text = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
@@ -2305,7 +2399,7 @@ export default function EventDetails() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700"
+                              className="bg-background hover:bg-warning/10 border-warning/50 text-warning dark:text-warning"
                               onClick={async () => {
                                 await trackShareAction('sms')
                                 const smsText = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
@@ -2318,7 +2412,7 @@ export default function EventDetails() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="bg-white hover:bg-teal-50 border-teal-300 text-teal-700"
+                              className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info"
                               onClick={async () => {
                                 await trackShareAction('telegram')
                                 const telegramText = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
@@ -2332,27 +2426,27 @@ export default function EventDetails() {
                         </div>
 
                         {/* Embeddable Section */}
-                        <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-4 border border-orange-200">
-                          <h3 className="text-sm font-semibold text-orange-900 mb-3 flex items-center gap-2">
+                        <div className="bg-gradient-to-r from-warning/10 to-primary/10 rounded-lg p-4 border border-warning/30">
+                          <h3 className="text-sm font-semibold text-warning dark:text-warning mb-3 flex items-center gap-2">
                             <Code className="w-4 h-4" />
                             Embed on Website
                           </h3>
                           <div className="space-y-3">
                             <div>
-                              <label className="text-xs font-medium text-orange-800 mb-1 block">HTML Embed Code:</label>
+                              <label className="text-xs font-medium text-foreground mb-1 block">HTML Embed Code:</label>
                               <Input
                                 value={`<iframe src='${window.location.origin}/event/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`}
                                 readOnly
-                                className="text-xs bg-white font-mono border-orange-300"
+                                className="text-xs bg-background font-mono border-warning/30"
                                 onClick={e => (e.target as HTMLInputElement).select()}
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-orange-800 mb-1 block">Direct Link:</label>
+                              <label className="text-xs font-medium text-foreground mb-1 block">Direct Link:</label>
                               <Input
                                 value={`${window.location.origin}/event/register/${eventData.uuid}`}
                                 readOnly
-                                className="text-xs bg-white font-mono border-orange-300"
+                                className="text-xs bg-background font-mono border-warning/30"
                                 onClick={e => (e.target as HTMLInputElement).select()}
                               />
                             </div>
@@ -2366,7 +2460,7 @@ export default function EventDetails() {
                                   navigator.clipboard.writeText(embedCode)
                                   toast.success('Embed code copied to clipboard!')
                                 }}
-                                className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700"
+                                className="bg-background hover:bg-warning/10 border-warning/50 text-warning dark:text-warning"
                               >
                                 Copy Embed Code
                               </Button>
@@ -2379,12 +2473,12 @@ export default function EventDetails() {
                                   navigator.clipboard.writeText(link)
                                   toast.success('Direct link copied to clipboard!')
                                 }}
-                                className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700"
+                                className="bg-background hover:bg-warning/10 border-warning/50 text-warning dark:text-warning"
                               >
                                 Copy Direct Link
                               </Button>
                             </div>
-                            <p className="text-xs text-orange-700">
+                            <p className="text-xs text-muted-foreground">
                               💡 <strong>Tip:</strong> Copy the HTML code and paste it into your website to embed the registration form directly.
                             </p>
                           </div>
@@ -2394,9 +2488,9 @@ export default function EventDetails() {
                       </div>
                     ) : (
                       <div className="text-center py-8">
-                        <XCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-700 mb-2">Event Not Active</h3>
-                        <p className="text-sm text-gray-500 mb-4">The event must be active to share the public registration link.</p>
+                        <XCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-foreground mb-2">Event Not Active</h3>
+                        <p className="text-sm text-muted-foreground mb-4">The event must be active to share the public registration link.</p>
                         <Button
                           variant="outline"
                           onClick={() => {
@@ -2427,7 +2521,7 @@ export default function EventDetails() {
                 </Button>
                 )}
                 {/* Event Delete/Trash Actions */}
-                {(user?.role === 'admin' || (user?.role === 'organizer' && eventData.organizer_id === user.organizer_id)) && (
+                {(user?.role === 'admin' || ((user?.role === 'organizer' || user?.role === 'organizer_admin') && eventData.organizer_id === user.organizer_id)) && (
                   <div className="flex gap-2 mt-2">
                     <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                       <AlertDialogTrigger asChild>
@@ -2442,7 +2536,7 @@ export default function EventDetails() {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleDeleteEvent} disabled={deleteLoading} className="bg-red-600 text-white">
+                          <AlertDialogAction onClick={handleDeleteEvent} disabled={deleteLoading} className="bg-error text-error-foreground">
                             {deleteLoading ? 'Deleting...' : 'Move to Trash'}
                           </AlertDialogAction>
                         </AlertDialogFooter>
@@ -2462,7 +2556,7 @@ export default function EventDetails() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleForceDeleteEvent} disabled={deleteLoading} className="bg-red-700 text-white">
+                            <AlertDialogAction onClick={handleForceDeleteEvent} disabled={deleteLoading} className="bg-error text-error-foreground hover:bg-error/90">
                               {deleteLoading ? 'Deleting...' : 'Delete Permanently'}
                             </AlertDialogAction>
                           </AlertDialogFooter>
@@ -2482,7 +2576,7 @@ export default function EventDetails() {
                   <TabsTrigger
                     value="attendees"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'attendees' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                      ${activeTab === 'attendees' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
                     `}
                   >
                     Attendees
@@ -2490,7 +2584,7 @@ export default function EventDetails() {
                   <TabsTrigger
                     value="badges"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'badges' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                      ${activeTab === 'badges' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
                     `}
                   >
                     Badges
@@ -2501,7 +2595,7 @@ export default function EventDetails() {
                   <TabsTrigger
                     value="details"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'details' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                      ${activeTab === 'details' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
                     `}
                   >
                     Details
@@ -2509,16 +2603,16 @@ export default function EventDetails() {
                   <TabsTrigger
                     value="badges"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'badges' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                      ${activeTab === 'badges' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
                     `}
                   >
                     Badges
                   </TabsTrigger>
-                  {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer') && (
+                  {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin') && (
                     <TabsTrigger
                       value="bulk-badges"
                       className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                        ${activeTab === 'bulk-badges' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                        ${activeTab === 'bulk-badges' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
                       `}
                     >
                       Bulk Badges
@@ -2528,7 +2622,7 @@ export default function EventDetails() {
                     <TabsTrigger
                       value="badge-designer"
                       className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                        ${activeTab === 'badge-designer' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                        ${activeTab === 'badge-designer' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
                       `}
                     >
                       Badge Designer
@@ -2537,7 +2631,7 @@ export default function EventDetails() {
                   <TabsTrigger
                     value="attendees"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'attendees' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                      ${activeTab === 'attendees' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
                     `}
                   >
                     Attendees
@@ -2545,7 +2639,7 @@ export default function EventDetails() {
                   <TabsTrigger
                     value="ushers"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'ushers' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                      ${activeTab === 'ushers' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
                     `}
                   >
                     Ushers & Tasks
@@ -2553,7 +2647,7 @@ export default function EventDetails() {
                   <TabsTrigger
                     value="team"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'team' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                      ${activeTab === 'team' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
                     `}
                   >
                     Team
@@ -2561,7 +2655,7 @@ export default function EventDetails() {
                   <TabsTrigger
                     value="analytics"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'analytics' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                      ${activeTab === 'analytics' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
                     `}
                   >
                     Analytics
@@ -2569,7 +2663,7 @@ export default function EventDetails() {
                   <TabsTrigger
                     value="sessions"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'sessions' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                      ${activeTab === 'sessions' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
                     `}
                   >
                     Sessions
@@ -2577,7 +2671,7 @@ export default function EventDetails() {
                   <TabsTrigger
                     value="invitations"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'invitations' ? 'border-blue-600 text-blue-700 font-semibold' : 'text-gray-600 hover:text-blue-600 hover:border-blue-200'}
+                      ${activeTab === 'invitations' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
                     `}
                   >
                     <Share2 className="w-4 h-4 mr-1 inline" />
@@ -2590,15 +2684,17 @@ export default function EventDetails() {
               <div className="space-y-8">
                 {/* Actions Row - moved to top right */}
                 <div className="flex flex-wrap gap-4 mb-8 justify-end">
-                  {(user?.role === 'admin' || user?.role === 'superadmin' || (user?.role?.startsWith('organizer') && (user?.organizer_id === (eventData as any)?.organizer_id || user?.organizer_id === (eventData as any)?.organizer?.id))) && (
+                  {(user?.role === 'admin' || user?.role === 'superadmin' || ((user?.role === 'organizer' || user?.role === 'organizer_admin') && (user?.organizer_id === (eventData as any)?.organizer_id || user?.organizer_id === (eventData as any)?.organizer?.id))) && (
                     <>
-                      <Button 
+                      <ProtectedButton
+                        permission="events.edit"
                         onClick={openEditDialog}
-                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                        className="bg-brand-gradient text-foreground dark:text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200"
+                        actionName="edit events"
                       >
                         <Edit className="w-4 h-4 mr-2" />
                         Edit Event
-                      </Button>
+                      </ProtectedButton>
                       <div className="flex items-center gap-2">
                         <Select
                           value={eventData.status}
@@ -2614,15 +2710,15 @@ export default function EventDetails() {
                             ))}
                           </SelectContent>
                         </Select>
-                        {statusLoading && <Loader2 className="animate-spin w-4 h-4 text-blue-500" />}
-                        {statusError && <span className="text-red-500 text-xs ml-2">{statusError}</span>}
+                        {statusLoading && <SpinnerInline size="sm" />}
+                        {statusError && <span className="text-error dark:text-error text-xs ml-2">{statusError}</span>}
                       </div>
                     </>
                   )}
                   {(user?.role === 'admin' || user?.role === 'superadmin') && (
                     <Button 
                       onClick={openEditDialog}
-                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                      className="bg-brand-gradient text-foreground dark:text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200"
                     >
                       <Edit className="w-4 h-4 mr-2" />
                       Edit Event
@@ -2644,7 +2740,7 @@ export default function EventDetails() {
                         <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
                           <DialogHeader>
                             <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                              <QrCode className="w-5 h-5 text-blue-600" />
+                              <QrCode className="w-5 h-5 text-primary" />
                               Public Registration Link
                             </DialogTitle>
                             <DialogDescription className="text-sm">
@@ -2654,8 +2750,8 @@ export default function EventDetails() {
                           {eventData?.status?.toLowerCase().trim() === 'active' && eventData?.uuid ? (
                             <div className="space-y-4 sm:space-y-6">
                               {/* Registration Link Section */}
-                              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 sm:p-4 border border-blue-200">
-                                <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                              <div className="bg-gradient-to-r from-info/10 to-primary/10 rounded-lg p-3 sm:p-4 border border-info/30">
+                                <h3 className="text-sm font-semibold text-info dark:text-info mb-3 flex items-center gap-2">
                                   <ExternalLink className="w-4 h-4" />
                                   Registration Link
                                 </h3>
@@ -2663,7 +2759,7 @@ export default function EventDetails() {
                                   <Input
                                     value={`${window.location.origin}/event/register/${eventData.uuid}`}
                                     readOnly
-                                    className="text-xs sm:text-sm bg-white border-blue-300 focus:border-blue-500 flex-1"
+                                    className="text-xs sm:text-sm bg-background border-info/50 focus:border-primary flex-1"
                                     onClick={e => (e.target as HTMLInputElement).select()}
                                   />
                                   <Button
@@ -2673,7 +2769,7 @@ export default function EventDetails() {
                                       toast.success('Registration link copied to clipboard!')
                                     }}
                                     variant="outline"
-                                    className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 whitespace-nowrap"
+                                    className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info whitespace-nowrap"
                                   >
                                     Copy
                                   </Button>
@@ -2681,13 +2777,13 @@ export default function EventDetails() {
                               </div>
 
                               {/* QR Code Section */}
-                              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 sm:p-4 border border-green-200">
-                                <h3 className="text-sm font-semibold text-green-900 mb-3 flex items-center gap-2">
+                              <div className="bg-gradient-to-r from-success/10 to-success/20 rounded-lg p-3 sm:p-4 border border-success/30">
+                                <h3 className="text-sm font-semibold text-success dark:text-success mb-3 flex items-center gap-2">
                                   <QrCode className="w-4 h-4" />
                                   QR Code
                                 </h3>
                                 <div className="flex flex-col sm:flex-row items-center gap-4">
-                                  <div className="bg-white p-2 sm:p-3 rounded-lg border border-green-300">
+                                  <div className="bg-background p-2 sm:p-3 rounded-lg border border-success/50">
                                     <img 
                                       id="public-registration-qr"
                                       src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`} 
@@ -2706,7 +2802,7 @@ export default function EventDetails() {
                                         link.click()
                                         toast.success('QR code downloaded!')
                                       }}
-                                      className="bg-white hover:bg-green-50 border-green-300 text-green-700 flex-1 sm:flex-none"
+                                      className="bg-background hover:bg-success/10 border-success/50 text-success dark:text-success flex-1 sm:flex-none"
                                     >
                                       Download QR
                                     </Button>
@@ -2717,7 +2813,7 @@ export default function EventDetails() {
                                         navigator.clipboard.writeText(`${window.location.origin}/event/register/${eventData.uuid}`)
                                         toast.success('Link copied! Scan the QR code or share the link.')
                                       }}
-                                      className="bg-white hover:bg-green-50 border-green-300 text-green-700 flex-1 sm:flex-none"
+                                      className="bg-background hover:bg-success/10 border-success/50 text-success dark:text-success flex-1 sm:flex-none"
                                     >
                                       Copy Link
                                     </Button>
@@ -2726,8 +2822,8 @@ export default function EventDetails() {
                               </div>
 
                               {/* Quick Share Section */}
-                              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 sm:p-4 border border-purple-200">
-                                <h3 className="text-sm font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                              <div className="bg-gradient-to-r from-primary/10 to-warning/10 rounded-lg p-3 sm:p-4 border border-primary/30">
+                                <h3 className="text-sm font-semibold text-primary dark:text-primary mb-3 flex items-center gap-2">
                                   <Share2 className="w-4 h-4" />
                                   Quick Share
                                 </h3>
@@ -2735,7 +2831,7 @@ export default function EventDetails() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 text-xs sm:text-sm"
+                                    className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info text-xs sm:text-sm"
                                     onClick={async () => {
                                       await trackShareAction('facebook')
                                       window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&quote=${encodeURIComponent('Register for ' + eventData.name)}`, '_blank')
@@ -2748,7 +2844,7 @@ export default function EventDetails() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 text-xs sm:text-sm"
+                                    className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info text-xs sm:text-sm"
                                     onClick={async () => {
                                       await trackShareAction('twitter')
                                       window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&text=${encodeURIComponent('Register for ' + eventData.name)}&hashtags=event,registration`, '_blank')
@@ -2761,7 +2857,7 @@ export default function EventDetails() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="bg-white hover:bg-green-50 border-green-300 text-green-700 text-xs sm:text-sm"
+                                    className="bg-background hover:bg-success/10 border-success/50 text-success dark:text-success text-xs sm:text-sm"
                                     onClick={async () => {
                                       await trackShareAction('whatsapp')
                                       window.open(`https://wa.me/?text=${encodeURIComponent('Register for ' + eventData.name + ': ' + window.location.origin + '/event/register/' + eventData.uuid)}`, '_blank')
@@ -2774,7 +2870,7 @@ export default function EventDetails() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="bg-white hover:bg-red-50 border-red-300 text-red-700 text-xs sm:text-sm"
+                                    className="bg-background hover:bg-error/10 border-error/50 text-error dark:text-error text-xs sm:text-sm"
                                     onClick={async () => {
                                       await trackShareAction('email')
                                       const emailBody = `Hi,\n\nYou're invited to register for: ${eventData.name}\n\nRegistration Link: ${window.location.origin}/event/register/${eventData.uuid}\n\nBest regards`
@@ -2788,7 +2884,7 @@ export default function EventDetails() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    className="bg-white hover:bg-blue-50 border-blue-300 text-blue-700 text-xs sm:text-sm"
+                                    className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info text-xs sm:text-sm"
                                     onClick={async () => {
                                       await trackShareAction('linkedin')
                                       window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}`, '_blank')
@@ -2951,25 +3047,25 @@ export default function EventDetails() {
                 {/* Event Overview Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {/* Event Type Card */}
-                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-2xl p-6">
+                  <div className="bg-gradient-to-br from-primary/10 to-warning/10 border border-primary/30 rounded-2xl p-6">
                     <div className="flex items-center gap-3 mb-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                         eventData?.event_type === 'ticketed' 
-                          ? 'bg-purple-100 text-purple-600' 
-                          : 'bg-green-100 text-green-600'
+                          ? 'bg-primary/20 text-primary dark:text-primary' 
+                          : 'bg-success/20 text-success dark:text-success'
                       }`}>
                         {eventData?.event_type === 'ticketed' ? '🎫' : '🎉'}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Event Type</p>
+                        <p className="text-sm font-medium text-muted-foreground">Event Type</p>
                         <p className={`font-bold ${
-                          eventData?.event_type === 'ticketed' ? 'text-purple-700' : 'text-green-700'
+                          eventData?.event_type === 'ticketed' ? 'text-primary dark:text-primary' : 'text-success dark:text-success'
                         }`}>
                           {eventData?.event_type === 'ticketed' ? 'Ticketed Event' : 'Free Event'}
                         </p>
                       </div>
                       </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-muted-foreground">
                       {eventData?.event_type === 'ticketed' 
                         ? `${ticketTypes.length} ticket types available`
                         : `${guestTypes.length} guest types available`
@@ -2978,24 +3074,24 @@ export default function EventDetails() {
                       </div>
 
                   {/* Status Card */}
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6">
+                  <div className="bg-gradient-to-br from-info/10 to-primary/10 border border-info/30 rounded-2xl p-6">
                     <div className="flex items-center gap-3 mb-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        eventData?.status === 'active' ? 'bg-green-100 text-green-600' :
-                        eventData?.status === 'draft' ? 'bg-yellow-100 text-yellow-600' :
-                        eventData?.status === 'cancelled' ? 'bg-red-100 text-red-600' :
-                        'bg-gray-100 text-gray-600'
+                        eventData?.status === 'active' ? 'bg-success/20 text-success dark:text-success' :
+                        eventData?.status === 'draft' ? 'bg-warning/20 text-warning dark:text-warning' :
+                        eventData?.status === 'cancelled' ? 'bg-error/20 text-error dark:text-error' :
+                        'bg-muted text-muted-foreground'
                       }`}>
                         {eventData?.status === 'active' ? '✓' : 
                          eventData?.status === 'draft' ? '📝' : 
                          eventData?.status === 'cancelled' ? '✗' : '?'}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Status</p>
-                        <p className="font-bold text-gray-800 capitalize">{eventData?.status || 'Unknown'}</p>
+                        <p className="text-sm font-medium text-muted-foreground">Status</p>
+                        <p className="font-bold text-foreground capitalize">{eventData?.status || 'Unknown'}</p>
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-muted-foreground">
                       {eventData?.status === 'active' ? 'Event is live and accepting registrations' :
                        eventData?.status === 'draft' ? 'Event is in preparation mode' :
                        eventData?.status === 'cancelled' ? 'Event has been cancelled' : 'Status unknown'}
@@ -3003,20 +3099,20 @@ export default function EventDetails() {
                   </div>
 
                   {/* Registration Card */}
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-6">
+                  <div className="bg-gradient-to-br from-success/10 to-success/20 border border-success/30 rounded-2xl p-6">
                     <div className="flex items-center gap-3 mb-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                         eventData?.registration_start_date && new Date(eventData.registration_start_date) <= new Date() && 
                         eventData?.registration_end_date && new Date(eventData.registration_end_date) >= new Date() 
-                          ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                          ? 'bg-success/20 text-success dark:text-success' : 'bg-error/20 text-error dark:text-error'
                       }`}>
                         {eventData?.registration_start_date && new Date(eventData.registration_start_date) <= new Date() && 
                          eventData?.registration_end_date && new Date(eventData.registration_end_date) >= new Date() 
                            ? '✓' : '✗'}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Registration</p>
-                        <p className="font-bold text-gray-800">
+                        <p className="text-sm font-medium text-muted-foreground">Registration</p>
+                        <p className="font-bold text-foreground">
                           {eventData?.registration_start_date && eventData?.registration_end_date 
                             ? (new Date(eventData.registration_start_date) <= new Date() && new Date(eventData.registration_end_date) >= new Date())
                               ? 'Open'
@@ -3027,25 +3123,25 @@ export default function EventDetails() {
                         </p>
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-muted-foreground">
                       {attendees.length} attendees registered
                     </div>
                   </div>
 
                   {/* Capacity Card */}
-                  <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-6">
+                  <div className="bg-gradient-to-br from-warning/10 to-primary/10 border border-warning/30 rounded-2xl p-6">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-full bg-warning/20 text-warning dark:text-warning flex items-center justify-center">
                         👥
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-600">Capacity</p>
-                        <p className="font-bold text-gray-800">
+                        <p className="text-sm font-medium text-muted-foreground">Capacity</p>
+                        <p className="font-bold text-foreground">
                           {eventData?.max_guests ? `${eventData.max_guests} guests` : 'Unlimited'}
                         </p>
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-muted-foreground">
                       {eventData?.max_guests 
                         ? `${attendees.length}/${eventData.max_guests} spots filled`
                         : 'No capacity limit'
@@ -3059,27 +3155,27 @@ export default function EventDetails() {
                   {/* Main Event Information */}
                   <div className="lg:col-span-2 space-y-6">
                     {/* Event Description */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                    <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-info/20 text-info dark:text-info flex items-center justify-center">
                           📝
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900">Event Description</h3>
+                        <h3 className="text-xl font-bold text-foreground">Event Description</h3>
                       </div>
                       <div className="prose prose-gray max-w-none">
-                        <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                        <p className="text-foreground leading-relaxed whitespace-pre-line">
                           {eventData?.description || 'No description provided for this event.'}
                         </p>
                       </div>
                     </div>
 
                     {/* Event Type Details */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                    <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-primary/20 text-primary dark:text-primary flex items-center justify-center">
                           {eventData?.event_type === 'ticketed' ? '🎫' : '🎉'}
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900">
+                        <h3 className="text-xl font-bold text-foreground">
                           {eventData?.event_type === 'ticketed' ? 'Ticket Information' : 'Guest Type Information'}
                         </h3>
                       </div>
@@ -3094,22 +3190,22 @@ export default function EventDetails() {
                               const ticketDescription = ticket?.description || '';
                               
                                 return (
-                                <div key={index} className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6">
+                                <div key={index} className="bg-gradient-to-r from-primary/10 to-warning/10 border border-primary/30 rounded-xl p-6">
                                   <div className="flex items-start justify-between mb-3">
                                     <div>
-                                      <h4 className="font-bold text-purple-900 text-lg">{ticketName}</h4>
+                                      <h4 className="font-bold text-primary dark:text-primary text-lg">{ticketName}</h4>
                                       {ticketDescription && (
-                                        <p className="text-purple-700 text-sm mt-1">{ticketDescription}</p>
+                                        <p className="text-primary/80 dark:text-primary/70 text-sm mt-1">{ticketDescription}</p>
                                       )}
                                     </div>
                                     <div className="text-right">
-                                      <div className="text-2xl font-bold text-purple-900">ETB {ticketPrice}</div>
-                                      <div className="text-sm text-purple-600">
+                                      <div className="text-2xl font-bold text-primary dark:text-primary">ETB {ticketPrice}</div>
+                                      <div className="text-sm text-primary/80 dark:text-primary/70">
                                         {ticketQuantity === 'Unlimited' ? 'Unlimited' : `${ticketQuantity} available`}
                                       </div>
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-2 text-xs text-purple-600">
+                                  <div className="flex items-center gap-2 text-xs text-primary/80 dark:text-primary/70">
                                     <span>🎫</span>
                                     <span>Ticket Type</span>
                                   </div>
@@ -3117,7 +3213,7 @@ export default function EventDetails() {
                                 );
                               })
                             ) : (
-                            <div className="text-center py-8 text-gray-500">
+                            <div className="text-center py-8 text-muted-foreground">
                               <div className="text-4xl mb-2">🎫</div>
                               <p>No ticket types defined for this event</p>
                             </div>
@@ -3141,22 +3237,22 @@ export default function EventDetails() {
                                 }
                               
                                 return (
-                                <div key={index} className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+                                <div key={index} className="bg-gradient-to-r from-success/10 to-success/20 border border-success/30 rounded-xl p-6">
                                   <div className="flex items-start justify-between mb-3">
                                     <div>
-                                      <h4 className="font-bold text-green-900 text-lg">{guestTypeName}</h4>
+                                      <h4 className="font-bold text-success dark:text-success text-lg">{guestTypeName}</h4>
                                       {guestTypeDescription && (
-                                        <p className="text-green-700 text-sm mt-1">{guestTypeDescription}</p>
+                                        <p className="text-success/80 dark:text-success/70 text-sm mt-1">{guestTypeDescription}</p>
                                       )}
                                     </div>
                                     <div className="text-right">
-                                      <div className="text-2xl font-bold text-green-900">
+                                      <div className="text-2xl font-bold text-success dark:text-success">
                                         {guestTypePrice === '0' ? 'Free' : `ETB ${guestTypePrice}`}
                                       </div>
-                                      <div className="text-sm text-green-600">Guest Type</div>
+                                      <div className="text-sm text-success/80 dark:text-success/70">Guest Type</div>
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-2 text-xs text-green-600">
+                                  <div className="flex items-center gap-2 text-xs text-success/80 dark:text-success/70">
                                     <span>👥</span>
                                     <span>Guest Type</span>
                                   </div>
@@ -3164,7 +3260,7 @@ export default function EventDetails() {
                                 );
                               })
                             ) : (
-                            <div className="text-center py-8 text-gray-500">
+                            <div className="text-center py-8 text-muted-foreground">
                               <div className="text-4xl mb-2">👥</div>
                               <p>No guest types defined for this event</p>
                             </div>
@@ -3177,74 +3273,74 @@ export default function EventDetails() {
                   {/* Sidebar Information */}
                   <div className="space-y-6">
                     {/* Event Details */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-info/20 text-info dark:text-info flex items-center justify-center">
                           📅
                       </div>
-                        <h3 className="text-lg font-bold text-gray-900">Event Details</h3>
+                        <h3 className="text-lg font-bold text-foreground">Event Details</h3>
                     </div>
                       
                       <div className="space-y-4">
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                          <Calendar className="w-5 h-5 text-blue-500" />
+                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                          <Calendar className="w-5 h-5 text-primary" />
                           <div>
-                            <p className="text-sm font-medium text-gray-600">Start Date</p>
-                            <p className="text-sm text-gray-900">
+                            <p className="text-sm font-medium text-muted-foreground">Start Date</p>
+                            <p className="text-sm text-foreground">
                               {eventData?.start_date && format(parseISO(eventData.start_date), 'MMM d, yyyy')}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-muted-foreground">
                               {eventData?.start_date && format(parseISO(eventData.start_date), 'h:mm a')}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                          <Calendar className="w-5 h-5 text-red-500" />
+                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                          <Calendar className="w-5 h-5 text-error" />
                           <div>
-                            <p className="text-sm font-medium text-gray-600">End Date</p>
-                            <p className="text-sm text-gray-900">
+                            <p className="text-sm font-medium text-muted-foreground">End Date</p>
+                            <p className="text-sm text-foreground">
                               {eventData?.end_date && format(parseISO(eventData.end_date), 'MMM d, yyyy')}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-muted-foreground">
                               {eventData?.end_date && format(parseISO(eventData.end_date), 'h:mm a')}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                          <MapPin className="w-5 h-5 text-pink-500" />
+                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                          <MapPin className="w-5 h-5 text-primary" />
                           <div>
-                            <p className="text-sm font-medium text-gray-600">Location</p>
-                            <p className="text-sm text-gray-900">{eventData?.location}</p>
+                            <p className="text-sm font-medium text-muted-foreground">Location</p>
+                            <p className="text-sm text-foreground">{eventData?.location}</p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                          <UserPlus className="w-5 h-5 text-blue-500" />
+                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                          <UserPlus className="w-5 h-5 text-info" />
                           <div>
-                            <p className="text-sm font-medium text-gray-600">Organizer</p>
-                            <p className="text-sm text-gray-900">
+                            <p className="text-sm font-medium text-muted-foreground">Organizer</p>
+                            <p className="text-sm text-foreground">
                               {user?.organizer?.name || eventData?.organizer?.name}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                          <Tag className="w-5 h-5 text-blue-500" />
+                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                          <Tag className="w-5 h-5 text-info" />
                           <div>
-                            <p className="text-sm font-medium text-gray-600">Category</p>
-                            <p className="text-sm text-gray-900 capitalize">
+                            <p className="text-sm font-medium text-muted-foreground">Category</p>
+                            <p className="text-sm text-foreground capitalize">
                               {eventData?.eventCategory?.name || 'Not specified'}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                          <Tag className="w-5 h-5 text-yellow-500" />
+                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                          <Tag className="w-5 h-5 text-primary" />
                           <div>
-                            <p className="text-sm font-medium text-gray-600">Type Category</p>
-                            <p className="text-sm text-gray-900 capitalize">
+                            <p className="text-sm font-medium text-muted-foreground">Type Category</p>
+                            <p className="text-sm text-foreground capitalize">
                               {eventData?.eventType?.name || 'Not specified'}
                             </p>
                           </div>
@@ -3253,36 +3349,36 @@ export default function EventDetails() {
                     </div>
 
                     {/* Registration Period */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-success/20 text-success dark:text-success flex items-center justify-center">
                           ⏰
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900">Registration Period</h3>
+                        <h3 className="text-lg font-bold text-foreground">Registration Period</h3>
                       </div>
                       
                       <div className="space-y-4">
-                        <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-                          <Clock className="w-5 h-5 text-green-500" />
+                        <div className="flex items-center gap-3 p-3 bg-success/10 rounded-lg">
+                          <Clock className="w-5 h-5 text-success dark:text-success" />
                           <div>
-                            <p className="text-sm font-medium text-gray-600">Opens</p>
-                            <p className="text-sm text-gray-900">
+                            <p className="text-sm font-medium text-muted-foreground">Opens</p>
+                            <p className="text-sm text-foreground">
                               {eventData?.registration_start_date && format(parseISO(eventData.registration_start_date), 'MMM d, yyyy')}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-muted-foreground">
                               {eventData?.registration_start_date && format(parseISO(eventData.registration_start_date), 'h:mm a')}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg">
-                          <Clock className="w-5 h-5 text-red-500" />
+                        <div className="flex items-center gap-3 p-3 bg-error/10 rounded-lg">
+                          <Clock className="w-5 h-5 text-error dark:text-error" />
                           <div>
-                            <p className="text-sm font-medium text-gray-600">Closes</p>
-                            <p className="text-sm text-gray-900">
+                            <p className="text-sm font-medium text-muted-foreground">Closes</p>
+                            <p className="text-sm text-foreground">
                               {eventData?.registration_end_date && format(parseISO(eventData.registration_end_date), 'MMM d, yyyy')}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-muted-foreground">
                               {eventData?.registration_end_date && format(parseISO(eventData.registration_end_date), 'h:mm a')}
                             </p>
                           </div>
@@ -3334,30 +3430,30 @@ export default function EventDetails() {
                   
                   {/* Additional Event Details Section */}
                   {(eventData?.requirements || eventData?.agenda) && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                    <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-info/20 text-info dark:text-info flex items-center justify-center">
                           📋
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900">Additional Information</h3>
+                        <h3 className="text-xl font-bold text-foreground">Additional Information</h3>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {eventData?.requirements && (
-                          <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6">
+                          <div className="bg-gradient-to-br from-warning/10 to-primary/10 border border-warning/30 rounded-xl p-6">
                             <div className="flex items-center gap-3 mb-4">
-                              <Shield className="w-5 h-5 text-orange-600" />
-                              <h4 className="font-bold text-orange-900">Requirements</h4>
+                              <Shield className="w-5 h-5 text-warning dark:text-warning" />
+                              <h4 className="font-bold text-foreground">Requirements</h4>
                             </div>
-                            <p className="text-orange-800 leading-relaxed whitespace-pre-line">{eventData.requirements}</p>
+                            <p className="text-foreground leading-relaxed whitespace-pre-line">{eventData.requirements}</p>
                           </div>
                         )}
                         {eventData?.agenda && (
-                          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
+                          <div className="bg-gradient-to-br from-info/10 to-primary/10 border border-info/30 rounded-xl p-6">
                             <div className="flex items-center gap-3 mb-4">
-                              <Clock className="w-5 h-5 text-blue-600" />
-                              <h4 className="font-bold text-blue-900">Agenda</h4>
+                              <Clock className="w-5 h-5 text-info dark:text-info" />
+                              <h4 className="font-bold text-foreground">Agenda</h4>
                             </div>
-                            <p className="text-blue-800 leading-relaxed whitespace-pre-line">{eventData.agenda}</p>
+                            <p className="text-foreground leading-relaxed whitespace-pre-line">{eventData.agenda}</p>
                           </div>
                         )}
                       </div>
@@ -3372,14 +3468,14 @@ export default function EventDetails() {
                     {/* Header Section */}
                     <div className="flex flex-wrap gap-4 justify-between items-start mb-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
-                          <Printer className="w-6 h-6 text-slate-700" />
+                        <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
+                          <Printer className="w-6 h-6 text-primary" />
                         </div>
                         <div>
-                          <h3 className="text-2xl font-bold text-slate-900">
+                          <h3 className="text-2xl font-bold text-foreground">
                             Badge Management
                           </h3>
-                          <p className="text-slate-600 text-sm">
+                          <p className="text-muted-foreground text-sm">
                             Design, preview, and print attendee badges
                           </p>
                         </div>
@@ -3388,7 +3484,7 @@ export default function EventDetails() {
                         <Button 
                           variant="outline" 
                           onClick={() => navigate(`/badge-designer/templates/${eventId}`)}
-                          className="border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                          className="border-border text-foreground hover:bg-muted flex items-center gap-2"
                         >
                           <Palette className="w-4 h-4" /> Design Badge
                         </Button>
@@ -3397,7 +3493,7 @@ export default function EventDetails() {
                           variant="default" 
                           onClick={handleBadgeBatchPrintBadges} 
                           disabled={badgeSelectedAttendees.size === 0}
-                          className="bg-slate-900 hover:bg-slate-800 shadow-sm flex items-center gap-2"
+                          className="bg-brand-gradient text-foreground dark:text-primary-foreground shadow-sm flex items-center gap-2"
                         >
                           <Printer className="w-4 h-4" /> 
                           Print Selected ({badgeSelectedAttendees.size})
@@ -3407,61 +3503,61 @@ export default function EventDetails() {
 
                     {/* Statistics Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                      <div className="bg-white rounded-lg p-4 border border-slate-200">
+                      <div className="bg-card rounded-lg p-4 border border-border">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm text-slate-600">Total Attendees</p>
-                            <p className="text-2xl font-bold text-slate-900">{filteredBadgesAttendees.length}</p>
+                            <p className="text-sm text-muted-foreground">Total Attendees</p>
+                            <p className="text-2xl font-bold text-foreground">{filteredBadgesAttendees.length}</p>
                           </div>
-                          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                            <Users className="w-5 h-5 text-blue-600" />
+                          <div className="w-10 h-10 bg-info/20 rounded-lg flex items-center justify-center">
+                            <Users className="w-5 h-5 text-info" />
                           </div>
                         </div>
                       </div>
-                      <div className="bg-white rounded-lg p-4 border border-slate-200">
+                      <div className="bg-card rounded-lg p-4 border border-border">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm text-slate-600">Checked In</p>
-                            <p className="text-2xl font-bold text-emerald-600">
+                            <p className="text-sm text-muted-foreground">Checked In</p>
+                            <p className="text-2xl font-bold text-success">
                               {filteredBadgesAttendees.filter(a => a.checked_in).length}
                             </p>
                           </div>
-                          <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
-                            <CheckCircle className="w-5 h-5 text-emerald-600" />
+                          <div className="w-10 h-10 bg-success/20 rounded-lg flex items-center justify-center">
+                            <CheckCircle className="w-5 h-5 text-success" />
                           </div>
                         </div>
                       </div>
-                      <div className="bg-white rounded-lg p-4 border border-slate-200">
+                      <div className="bg-card rounded-lg p-4 border border-border">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm text-slate-600">Pending Check-in</p>
-                            <p className="text-2xl font-bold text-amber-600">
+                            <p className="text-sm text-muted-foreground">Pending Check-in</p>
+                            <p className="text-2xl font-bold text-warning">
                               {filteredBadgesAttendees.filter(a => !a.checked_in).length}
                             </p>
                           </div>
-                          <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
-                            <Clock className="w-5 h-5 text-amber-600" />
+                          <div className="w-10 h-10 bg-warning/20 rounded-lg flex items-center justify-center">
+                            <Clock className="w-5 h-5 text-warning" />
                           </div>
                         </div>
                       </div>
-                      <div className="bg-white rounded-lg p-4 border border-slate-200">
+                      <div className="bg-card rounded-lg p-4 border border-border">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm text-slate-600">Selected for Print</p>
-                            <p className="text-2xl font-bold text-slate-900">{badgeSelectedAttendees.size}</p>
+                            <p className="text-sm text-muted-foreground">Selected for Print</p>
+                            <p className="text-2xl font-bold text-foreground">{badgeSelectedAttendees.size}</p>
                           </div>
-                          <div className="w-10 h-10 bg-slate-50 rounded-lg flex items-center justify-center">
-                            <FileText className="w-5 h-5 text-slate-600" />
+                          <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-muted-foreground" />
                           </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Search and Filters */}
-                    <div className="bg-white rounded-lg p-4 border border-slate-200">
+                    <div className="bg-card rounded-lg p-4 border border-border">
                       <div className="flex flex-wrap gap-4 items-center">
                         <div className="relative flex-1 max-w-md">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                       <Input
                             placeholder="Search attendees by name, email, or company..."
                         value={badgeSearchTerm}
@@ -3473,7 +3569,7 @@ export default function EventDetails() {
                               variant="ghost"
                               size="sm"
                               onClick={() => setBadgeSearchTerm('')}
-                              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-slate-100"
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-muted"
                             >
                               <X className="w-3 h-3" />
                             </Button>
@@ -3508,7 +3604,7 @@ export default function EventDetails() {
                             setBadgeGuestTypeFilter('all');
                             setBadgeCheckedInFilter('all');
                           }}
-                          className="text-slate-500 hover:text-slate-700"
+                          className="text-muted-foreground hover:text-foreground"
                         >
                           <RotateCcw className="w-4 h-4" />
                         </Button>
@@ -3516,15 +3612,15 @@ export default function EventDetails() {
                     </div>
 
                     {/* Badge List View */}
-                    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                      <div className="p-4 border-b border-slate-200">
+                    <div className="bg-card rounded-lg border border-border overflow-hidden">
+                      <div className="p-4 border-b border-border">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <Checkbox 
                               checked={badgeSelectedAttendees.size === filteredBadgesAttendees.length && filteredBadgesAttendees.length > 0} 
                               onCheckedChange={handleBadgeSelectAllAttendees} 
                             />
-                            <span className="text-sm text-slate-600">
+                            <span className="text-sm text-muted-foreground">
                               {badgeSelectedAttendees.size} of {filteredBadgesAttendees.length} selected
                             </span>
                           </div>
@@ -3534,7 +3630,7 @@ export default function EventDetails() {
                               size="sm"
                               onClick={() => setBadgeSelectedAttendees(new Set())}
                               disabled={badgeSelectedAttendees.size === 0}
-                              className="text-slate-600 hover:text-slate-800"
+                              className="text-muted-foreground hover:text-foreground"
                             >
                               Clear Selection
                       </Button>
@@ -3544,11 +3640,11 @@ export default function EventDetails() {
                       
                       {filteredBadgesAttendees.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12">
-                          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                            <FileText className="w-8 h-8 text-slate-400" />
+                          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                            <FileText className="w-8 h-8 text-muted-foreground" />
                           </div>
-                          <h3 className="text-lg font-medium text-slate-900 mb-2">No attendees found</h3>
-                          <p className="text-slate-600 text-center max-w-md">
+                          <h3 className="text-lg font-medium text-foreground mb-2">No attendees found</h3>
+                          <p className="text-muted-foreground text-center max-w-md">
                             {badgeSearchTerm || badgeGuestTypeFilter !== 'all' || badgeCheckedInFilter !== 'all' 
                               ? 'Try adjusting your search or filters to find attendees.'
                               : 'No attendees have been registered for this event yet.'
@@ -3556,13 +3652,13 @@ export default function EventDetails() {
                           </p>
                         </div>
                       ) : (
-                        <div className="divide-y divide-slate-200">
+                        <div className="divide-y divide-border">
                           {filteredBadgesAttendees.map(attendee => (
                             <div 
                               key={attendee.id} 
-                              className={`p-4 transition-all duration-200 hover:bg-slate-50 ${
+                              className={`p-4 transition-all duration-200 hover:bg-muted/50 ${
                                 badgeSelectedAttendees.has(attendee.id) 
-                                  ? 'bg-slate-50 border-l-4 border-slate-900' 
+                                  ? 'bg-muted/50 border-l-4 border-primary' 
                                   : 'border-l-4 border-transparent'
                               }`}
                             >
@@ -3577,7 +3673,7 @@ export default function EventDetails() {
 
                                 {/* Badge Preview */}
                                 <div className="flex-shrink-0">
-                                  <div className="w-20 h-28 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-center overflow-hidden">
+                                  <div className="w-20 h-28 bg-muted border border-border rounded-lg flex items-center justify-center overflow-hidden">
                                     <div style={{ transform: 'scale(0.12)', transformOrigin: 'top left', width: 400, height: 600 }}>
                                       <BadgePrint attendee={attendee} />
                                     </div>
@@ -3587,29 +3683,29 @@ export default function EventDetails() {
                                 {/* Attendee Info */}
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-3 mb-2">
-                                    <h4 className="font-semibold text-slate-900 truncate">
+                                    <h4 className="font-semibold text-foreground truncate">
                                       {attendee.guest?.name || 'Unknown'}
                                     </h4>
                                     <Badge className={`text-xs ${getGuestTypeBadgeClasses((attendee.guestType || attendee.guest_type)?.name)}`}>
                                   {(attendee.guestType || attendee.guest_type)?.name || 'General'}
                                 </Badge>
                                 {attendee.checked_in ? (
-                                      <Badge className="bg-emerald-50 text-emerald-700 text-xs border border-emerald-200">
+                                      <Badge className="bg-success/10 text-success dark:text-success text-xs border border-success/30">
                                         <CheckCircle className="w-3 h-3 mr-1" />
                                         Checked In
                                       </Badge>
                                 ) : (
-                                      <Badge className="bg-amber-50 text-amber-700 text-xs border border-amber-200">
+                                      <Badge className="bg-warning/10 text-warning dark:text-warning text-xs border border-warning/30">
                                         <Clock className="w-3 h-3 mr-1" />
                                         Pending
                                       </Badge>
                                 )}
                                   </div>
-                                  <p className="text-sm text-slate-600 truncate">
+                                  <p className="text-sm text-muted-foreground truncate">
                                     {attendee.guest?.email || 'No email'}
                                   </p>
                                   {attendee.guest?.company && (
-                                    <p className="text-sm text-slate-500 truncate">
+                                    <p className="text-sm text-muted-foreground truncate">
                                       {attendee.guest.company}
                                     </p>
                                   )}
@@ -3624,7 +3720,7 @@ export default function EventDetails() {
                                   setBadgeSelectedAttendees(new Set([attendee.id]));
                                   setPrinting(true);
                                     }}
-                                    className="border-slate-200 text-slate-700 hover:bg-slate-50"
+                                    className="border-border text-foreground hover:bg-muted"
                                   >
                                     <Printer className="w-4 h-4 mr-1" />
                                     Print
@@ -3695,121 +3791,150 @@ export default function EventDetails() {
             </TabsContent>
                 <TabsContent value="attendees">
                   <div className="flex flex-col gap-6">
-                    <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-emerald-600 rounded-xl flex items-center justify-center">
-                          <Users className="w-6 h-6 text-white" />
+                    {/* Page Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-card rounded-lg flex items-center justify-center border border-border">
+                          <Users className="w-7 h-7 text-foreground" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                            Attendee Management
+                          <h3 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                            Attendees List
+                            <Star className="w-5 h-5 text-muted-foreground" />
                           </h3>
-                          <p className="text-gray-600 text-sm">
-                            Search, filter, and manage event attendees
+                          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                            <RefreshCw className="w-3 h-3" />
+                            Auto-updates in 2 min
                           </p>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="default" 
-                          onClick={() => setAddAttendeeDialogOpen(true)} 
-                          className="bg-gradient-to-r from-green-600 to-emerald-600 shadow-lg hover:shadow-xl flex items-center gap-2"
-                        >
-                          <Plus className="w-4 h-4" /> Add Attendee
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => setCreateParticipantDialogOpen(true)}
-                          className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 flex items-center gap-2"
-                        >
-                          <UserPlus className="w-4 h-4" /> 
-                          Create Participant
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => setCsvUploadDialogOpen(true)} 
-                          className="border-gray-200 hover:bg-gray-50 flex items-center gap-2"
-                        >
-                          <Upload className="w-4 h-4" /> Upload CSV
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          onClick={exportAttendeesToCSV} 
-                          className="border-gray-200 hover:bg-gray-50 flex items-center gap-2"
-                        >
-                          <Download className="w-4 h-4" /> Export CSV
-                        </Button>
-                        <Button 
-                          variant="default" 
-                          onClick={handleBatchPrintBadges} 
-                          disabled={selectedAttendees.size === 0}
-                          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl flex items-center gap-2"
-                        >
-                          <Printer className="w-4 h-4" /> 
-                          Print Selected ({selectedAttendees.size})
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      <div className="relative flex-1 max-w-md">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <Input
-                          placeholder="Search by name, email, phone, company, job title, or country..."
-                        value={searchTerm}
-                        onChange={e => handleSearchChange(e.target.value)}
-                          className="pl-10 pr-4 py-2 w-full"
-                        />
-                        {searchTerm && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSearchChange('')}
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-gray-100"
+                      <div className="flex items-center gap-2">
+                        {selectedAttendees.size > 0 && (
+                          <Button 
+                            variant="outline"
+                            onClick={handleBatchPrintBadges}
+                            disabled={selectedAttendees.size === 0}
+                            className="bg-background border-border hover:bg-accent"
                           >
-                            <X className="w-3 h-3" />
+                            <Printer className="w-4 h-4 mr-2" />
+                            Print Selected ({selectedAttendees.size})
                           </Button>
                         )}
+                        <Button 
+                          variant="outline"
+                          onClick={handleImportClick}
+                          className="bg-background border-border hover:bg-accent"
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          Import CSV
+                        </Button>
+                        <Button 
+                          className="bg-success hover:bg-success/90 text-white"
+                          onClick={() => setAddAttendeeDialogOpen(true)}
+                        >
+                          <Plus className="w-4 h-4 mr-2" /> + Add New Attendee
+                        </Button>
                       </div>
-                      <Select value={guestTypeFilter} onValueChange={handleGuestTypeFilterChange}>
-                        <SelectTrigger className="w-40"><SelectValue placeholder="All Types" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Types</SelectItem>
-                          {guestTypes.map(type => (
-                            <SelectItem key={type.id} value={type.name.toLowerCase()}>{type.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select value={checkedInFilter} onValueChange={handleCheckedInFilterChange}>
-                        <SelectTrigger className="w-40"><SelectValue placeholder="All Status" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Status</SelectItem>
-                          <SelectItem value="checked-in">Checked In</SelectItem>
-                          <SelectItem value="not-checked-in">Not Checked In</SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                            <TableRow className="bg-gray-50">
-                              <TableHead className="font-semibold text-gray-700 text-sm py-4 w-12">
+
+                    {/* Filter and Search Bar */}
+                    <div className="bg-card rounded-lg border border-border p-4 mb-6">
+                      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+                        {/* Filters */}
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Select value={guestTypeFilter} onValueChange={handleGuestTypeFilterChange}>
+                            <SelectTrigger className="w-[140px] bg-background border-border">
+                              <SelectValue placeholder="All Types" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Types</SelectItem>
+                              {guestTypes.map(type => (
+                                <SelectItem key={type.id} value={type.name.toLowerCase()}>{type.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select value={checkedInFilter} onValueChange={handleCheckedInFilterChange}>
+                            <SelectTrigger className="w-[120px] bg-background border-border">
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Status</SelectItem>
+                              <SelectItem value="checked-in">Checked In</SelectItem>
+                              <SelectItem value="not-checked-in">Not Checked In</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select>
+                            <SelectTrigger className="w-[120px] bg-background border-border">
+                              <SelectValue placeholder="Monthly" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Time</SelectItem>
+                              <SelectItem value="this-month">This Month</SelectItem>
+                              <SelectItem value="last-month">Last Month</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button variant="ghost" size="icon" className="hover:bg-accent">
+                            <Filter className="w-4 h-4" />
+                          </Button>
+                        </div>
+
+                        {/* Search and Export */}
+                        <div className="flex items-center gap-3 w-full lg:w-auto">
+                          <div className="relative flex-1 lg:w-64">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                            <Input
+                              placeholder="Search..."
+                              value={searchTerm}
+                              onChange={e => handleSearchChange(e.target.value)}
+                              className="pl-9 bg-background border-border"
+                            />
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={exportAttendeesToCSV}
+                            className="bg-background border-border hover:bg-accent"
+                          >
+                            <FileText className="w-4 h-4 mr-2" />
+                            Export PDF
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={exportAttendeesToCSV}
+                            className="bg-background border-border hover:bg-accent"
+                          >
+                            <FileSpreadsheet className="w-4 h-4 mr-2" />
+                            Export Excel
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Attendees Table */}
+                    <div className="bg-card rounded-lg border border-border overflow-hidden shadow-sm">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50 border-b border-border">
+                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4 w-12">
                                 <Checkbox 
                                   checked={selectedAttendees.size === filteredAttendees.length && filteredAttendees.length > 0} 
                                   onCheckedChange={handleSelectAllAttendees} 
                                 />
                               </TableHead>
-                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Attendee</TableHead>
-                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Company & Title</TableHead>
-                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Contact</TableHead>
-                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Guest Type</TableHead>
-                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Status</TableHead>
-                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Name of Attendee</TableHead>
+                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Source</TableHead>
+                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Date</TableHead>
+                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Email</TableHead>
+                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Phone Number</TableHead>
+                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Check-in Status</TableHead>
+                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4 w-12"></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
                             {filteredAttendees.length > 0 ? filteredAttendees.map(attendee => (
-                              <TableRow key={attendee.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                              <TableRow key={attendee.id} className="hover:bg-accent/50 transition-colors border-b border-border">
                                 <TableCell className="py-4">
                                   <Checkbox 
                                     checked={selectedAttendees.has(attendee.id)} 
@@ -3818,96 +3943,100 @@ export default function EventDetails() {
                                 </TableCell>
                                 <TableCell className="py-4">
                                   <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm">
+                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-semibold text-foreground text-sm">
                                       {attendee.guest?.name?.charAt(0)?.toUpperCase() || 'A'}
                                     </div>
-                                <div>
-                                      <div className="font-semibold text-gray-900">{attendee.guest?.name}</div>
-                                  <div className="text-xs text-gray-500">{attendee.guest?.country}</div>
+                                    <div>
+                                      <div className="font-semibold text-foreground">{attendee.guest?.name}</div>
+                                      <div className="text-xs text-muted-foreground">{(attendee.guestType || attendee.guest_type)?.name || 'General'}</div>
                                     </div>
-                                </div>
-                              </TableCell>
-                                <TableCell className="py-4">
-                                  <div className="font-medium text-gray-900">{attendee.guest?.company}</div>
-                                <div className="text-xs text-gray-500">{attendee.guest?.jobtitle}</div>
-                              </TableCell>
-                                <TableCell className="py-4">
-                                  <div className="text-sm text-gray-900 flex items-center gap-1">
-                                    <Mail className="w-3 h-3 text-gray-400" /> 
-                                    {attendee.guest?.email}
                                   </div>
-                                  {attendee.guest?.phone && (
-                                    <div className="text-sm text-gray-900 flex items-center gap-1 mt-1">
-                                      <Phone className="w-3 h-3 text-gray-400" /> 
-                                      {attendee.guest?.phone}
-                                    </div>
-                                  )}
-                              </TableCell>
+                                </TableCell>
                                 <TableCell className="py-4">
-                                <Badge className={getGuestTypeBadgeClasses((attendee.guestType || attendee.guest_type)?.name)}>
-                                  {(attendee.guestType || attendee.guest_type)?.name || 'General'}
-                                </Badge>
-                              </TableCell>
+                                  <div className="text-sm text-foreground">
+                                    {eventData?.name || 'Event'}
+                                  </div>
+                                </TableCell>
                                 <TableCell className="py-4">
-                                {attendee.checked_in ? (
-                                    <Badge className="bg-green-100 text-green-800 border border-green-200">
-                                      <CheckCircle className="w-3 h-3 mr-1" />
+                                  <div className="text-sm text-foreground">
+                                    {attendee.created_at ? new Date(attendee.created_at).toLocaleDateString('en-GB') : '-'}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-4">
+                                  <div className="text-sm text-foreground">{attendee.guest?.email}</div>
+                                </TableCell>
+                                <TableCell className="py-4">
+                                  <div className="text-sm text-foreground">{attendee.guest?.phone || '-'}</div>
+                                </TableCell>
+                                <TableCell className="py-4">
+                                  {attendee.checked_in ? (
+                                    <Badge className="bg-success/10 text-success border-success/30 text-xs px-3 py-1 rounded-full border">
                                       Checked In
                                     </Badge>
-                                ) : (
-                                    <Badge className="bg-gray-100 text-gray-800 border border-gray-200">
-                                      <Clock className="w-3 h-3 mr-1" />
+                                  ) : (
+                                    <Badge className="bg-muted/50 text-muted-foreground border-border text-xs px-3 py-1 rounded-full border">
                                       Not Checked In
                                     </Badge>
-                                )}
-                              </TableCell>
+                                  )}
+                                </TableCell>
                                 <TableCell className="py-4">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1">
                                     <Button 
-                                      size="sm" 
-                                      variant="outline" 
+                                      variant="ghost" 
+                                      size="sm"
                                       onClick={() => {
-                                  setSelectedAttendees(new Set([attendee.id]));
-                                  setPrinting(true);
+                                        setSelectedAttendees(new Set([attendee.id]));
+                                        setPrinting(true);
                                       }}
-                                      className="bg-white border-gray-200 hover:bg-gray-50"
+                                      className="h-8 w-8 p-0 hover:bg-accent"
+                                      title="Print Badge"
                                     >
-                                      <Printer className="w-3 h-3" />
+                                      <Printer className="w-4 h-4" />
                                     </Button>
-
                                     <Button 
-                                      size="sm" 
-                                      variant="outline" 
-                                      onClick={() => openEditAttendeeDialog(attendee)}
-                                      className="bg-white border-gray-200 hover:bg-gray-50"
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedAttendeeForResponses(attendee.id)
+                                        setResponseViewerOpen(true)
+                                      }}
+                                      className="h-8 w-8 p-0 hover:bg-accent"
+                                      title="View Custom Fields"
                                     >
-                                      <Edit className="w-3 h-3" />
+                                      <FileText className="w-4 h-4" />
                                     </Button>
-                                {(user?.role === 'admin' || user?.role === 'superadmin' || 
-                                  (['organizer', 'organizer_admin'].includes(user?.role) && eventData?.organizer_id === user?.organizer_id)) && (
-                                      <Button 
-                                        size="sm" 
-                                        variant="outline"
-                                        onClick={() => handleRemoveAttendee(attendee)}
-                                        className="bg-white border-red-200 text-red-600 hover:bg-red-50"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
-                                    )}
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={() => openEditAttendeeDialog(attendee)}
+                                      className="h-8 w-8 p-0 hover:bg-accent"
+                                      title="Edit Guest"
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={() => handleRemoveAttendee(attendee)}
+                                      className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                                      title="Delete Guest"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
                                   </div>
-                              </TableCell>
-                            </TableRow>
+                                </TableCell>
+                              </TableRow>
                             )) : (
                               <TableRow>
-                                <TableCell colSpan={7} className="text-center py-12">
+                                <TableCell colSpan={8} className="text-center py-12">
                                   <div className="flex flex-col items-center space-y-3">
-                                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-                                      <Search className="w-8 h-8 text-gray-400" />
+                                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+                                      <Search className="w-8 h-8 text-muted-foreground" />
                                     </div>
-                                    <div className="text-lg font-medium text-gray-900">
+                                    <div className="text-lg font-medium text-foreground">
                                       {searchTerm ? 'No attendees found' : 'No attendees'}
                                     </div>
-                                    <div className="text-sm text-gray-600 max-w-md text-center">
+                                    <div className="text-sm text-muted-foreground max-w-md text-center">
                                       {searchTerm 
                                         ? `No attendees match your search for "${searchTerm}". Try adjusting your search terms or filters.`
                                         : 'No attendees have been registered for this event yet.'
@@ -3916,7 +4045,7 @@ export default function EventDetails() {
                                     {searchTerm && (
                                       <Button
                                         variant="outline"
-                                        onClick={() => setSearchTerm('')}
+                                        onClick={() => handleSearchChange('')}
                                         className="mt-2"
                                       >
                                         Clear search
@@ -3926,13 +4055,13 @@ export default function EventDetails() {
                                 </TableCell>
                               </TableRow>
                             )}
-                        </TableBody>
-                      </Table>
-                    </div>
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
                     
-                    {/* Pagination Component */}
-                    {!attendeesLoading && !attendeesError && filteredAttendees.length > 0 && (
+                    {/* Pagination Component - Only for admin and organizer */}
+                    {!attendeesLoading && !attendeesError && isAdminOrOrganizer && totalRecords > 0 && (
                       <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}
@@ -3948,14 +4077,14 @@ export default function EventDetails() {
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+                        <div className="w-10 h-10 bg-brand-gradient rounded-xl flex items-center justify-center">
                           <Users className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                          <h3 className="text-xl font-bold text-foreground">
                             Ushers & Tasks
                           </h3>
-                          <p className="text-gray-600 text-sm">
+                          <p className="text-muted-foreground text-sm">
                             Manage usher assignments and task distribution
                           </p>
                         </div>
@@ -3963,22 +4092,22 @@ export default function EventDetails() {
                       <Button 
                         variant="default" 
                         onClick={() => setIsAssignUsherDialogOpen(true)} 
-                        className="bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg hover:shadow-xl flex items-center gap-2"
+                        className="bg-brand-gradient text-foreground dark:text-primary-foreground shadow-lg hover:shadow-xl flex items-center gap-2"
                       >
                         <Plus className="w-4 h-4" /> Assign Ushers
                       </Button>
                     </div>
 
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
-                            <TableRow className="bg-gray-50">
-                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Usher</TableHead>
-                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Contact</TableHead>
-                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Status</TableHead>
-                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Assigned Tasks</TableHead>
-                              <TableHead className="font-semibold text-gray-700 text-sm py-4">Actions</TableHead>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="font-semibold text-foreground text-sm py-4">Usher</TableHead>
+                              <TableHead className="font-semibold text-foreground text-sm py-4">Contact</TableHead>
+                              <TableHead className="font-semibold text-foreground text-sm py-4">Status</TableHead>
+                              <TableHead className="font-semibold text-foreground text-sm py-4">Assigned Tasks</TableHead>
+                              <TableHead className="font-semibold text-foreground text-sm py-4">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -3989,28 +4118,28 @@ export default function EventDetails() {
                                   ? JSON.parse(usher.pivot.tasks) 
                                   : [])
                               return (
-                                <TableRow key={usher.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                                <TableRow key={usher.id} className="hover:bg-muted/50 transition-colors border-b border-border">
                                   <TableCell className="py-4">
                                     <div className="flex items-center gap-3">
-                                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm">
+                                      <div className="w-10 h-10 bg-brand-gradient rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm">
                                         {usher.name.charAt(0).toUpperCase()}
                                       </div>
                                 <div>
-                                        <div className="font-semibold text-gray-900">{usher.name}</div>
-                                        <div className="text-xs text-gray-500">
+                                        <div className="font-semibold text-foreground">{usher.name}</div>
+                                        <div className="text-xs text-muted-foreground">
                                           ID: {usher.id}
                                         </div>
                                       </div>
                                 </div>
                               </TableCell>
                                   <TableCell className="py-4">
-                                    <div className="text-sm text-gray-900">{usher.email}</div>
+                                    <div className="text-sm text-foreground">{usher.email}</div>
                                     {usher.phone && (
-                                <div className="text-xs text-gray-500">{usher.phone}</div>
+                                <div className="text-xs text-muted-foreground">{usher.phone}</div>
                                     )}
                               </TableCell>
                                   <TableCell className="py-4">
-                                    <Badge className="bg-blue-100 text-blue-800 border border-blue-200">
+                                    <Badge className="bg-info/10 text-info dark:text-info border border-info/30">
                                       <UserCheck className="w-3 h-3 mr-1" />
                                       Assigned
                                 </Badge>
@@ -4033,7 +4162,7 @@ export default function EventDetails() {
                                               await updateUsherTasks(Number(eventId), usher.id, editTasks.split(',').map(t => t.trim()).filter(Boolean)); 
                                               setEditingUsherId(null); 
                                             }}
-                                            className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                                            className="bg-success/10 border-success/50 text-success dark:text-success hover:bg-success/20"
                                           >
                                             Save
                                           </Button>
@@ -4041,7 +4170,7 @@ export default function EventDetails() {
                                             size="sm" 
                                             variant="ghost" 
                                             onClick={() => setEditingUsherId(null)}
-                                            className="text-gray-600"
+                                            className="text-muted-foreground"
                                           >
                                             Cancel
                                           </Button>
@@ -4062,7 +4191,7 @@ export default function EventDetails() {
                                             ))}
                                           </div>
                                         ) : (
-                                          <span className="text-gray-500 text-sm">
+                                          <span className="text-muted-foreground text-sm">
                                             No tasks assigned
                                           </span>
                                         )}
@@ -4073,7 +4202,7 @@ export default function EventDetails() {
                                             setEditingUsherId(usher.id); 
                                             setEditTasks(tasks.join(', ')); 
                                           }}
-                                          className="bg-white border-gray-200 hover:bg-gray-50 text-xs"
+                                          className="bg-background border-border hover:bg-muted text-xs"
                                         >
                                           <Edit className="w-3 h-3 mr-1" />
                                           Edit Tasks
@@ -4086,7 +4215,7 @@ export default function EventDetails() {
                                       <Button
                                         variant="outline"
                                         size="sm"
-                                        className="bg-white border-gray-200 hover:bg-gray-50"
+                                        className="bg-background border-border hover:bg-muted"
                                         onClick={async () => {
                                   try {
                                     await api.delete(`/events/${Number(eventId)}/ushers/${usher.id}`);
@@ -4109,11 +4238,11 @@ export default function EventDetails() {
                             <TableRow>
                                 <TableCell colSpan={5} className="text-center py-12">
                                   <div className="flex flex-col items-center space-y-3">
-                                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-                                      <Users className="w-8 h-8 text-gray-400" />
+                                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+                                      <Users className="w-8 h-8 text-muted-foreground" />
                                     </div>
-                                    <div className="text-lg font-medium text-gray-900">No ushers assigned</div>
-                                    <div className="text-sm text-gray-600 max-w-md text-center">
+                                    <div className="text-lg font-medium text-foreground">No ushers assigned</div>
+                                    <div className="text-sm text-muted-foreground max-w-md text-center">
                                       No ushers have been assigned to this event yet. Click "Assign Ushers" to get started.
                                     </div>
                                   </div>
@@ -4130,43 +4259,43 @@ export default function EventDetails() {
             <TabsContent value="team">
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
-                      <h3 className="text-xl font-bold">Organizing Team</h3>
-                      <Button variant="default" onClick={() => setAddUsherDialogOpen(true)} className="flex items-center gap-2">
+                      <h3 className="text-xl font-bold text-foreground">Organizing Team</h3>
+                      <Button variant="default" onClick={() => setAddUsherDialogOpen(true)} className="flex items-center gap-2 bg-brand-gradient text-foreground dark:text-primary-foreground">
                         <Plus className="w-4 h-4" /> Add Team Member
                       </Button>
                     </div>
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Role</TableHead>
-                            <TableHead>Contact</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Actions</TableHead>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="text-foreground">Name</TableHead>
+                            <TableHead className="text-foreground">Role</TableHead>
+                            <TableHead className="text-foreground">Contact</TableHead>
+                            <TableHead className="text-foreground">Status</TableHead>
+                            <TableHead className="text-foreground">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {teamMembers && teamMembers.length > 0 ? teamMembers.map(member => (
-                            <TableRow key={member.id}>
+                            <TableRow key={member.id} className="hover:bg-muted/50">
                               <TableCell className="flex items-center gap-2">
                                 <img src={member.profile_picture || '/placeholder-avatar.png'} alt={member.name} className="w-8 h-8 rounded-full object-cover" />
                                 <div>
-                                  <div className="font-semibold">{member.name}</div>
-                                  <div className="text-xs text-gray-500">{member.email}</div>
+                                  <div className="font-semibold text-foreground">{member.name}</div>
+                                  <div className="text-xs text-muted-foreground">{member.email}</div>
                                 </div>
                               </TableCell>
-                              <TableCell>{member.role || 'Member'}</TableCell>
+                              <TableCell className="text-foreground">{member.role || 'Member'}</TableCell>
                               <TableCell>
-                                <div className="text-xs text-gray-500">{member.phone}</div>
+                                <div className="text-xs text-muted-foreground">{member.phone}</div>
                               </TableCell>
                               <TableCell>
-                                <Badge className={member.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}>
+                                <Badge className={member.status === 'active' ? 'bg-success/10 text-success dark:text-success border border-success/30' : 'bg-warning/10 text-warning dark:text-warning border border-warning/30'}>
                                   {member.status || 'active'}
                                 </Badge>
                               </TableCell>
                               <TableCell className="flex flex-wrap gap-1">
-                                <Button size="sm" variant="outline" onClick={() => handleEditMember(member)}>Edit</Button>
+                                <Button size="sm" variant="outline" onClick={() => handleEditMember(member)} className="border-border hover:bg-muted">Edit</Button>
                                 <Button size="sm" variant="destructive" onClick={() => handleRemoveMember(member)}>Remove</Button>
                                 {!member.is_primary && (
                                   <Button size="sm" variant="secondary" onClick={() => handleSetPrimary(member)}>Set Primary</Button>
@@ -4175,7 +4304,7 @@ export default function EventDetails() {
                             </TableRow>
                           )) : (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center text-gray-500">No team members assigned to this event.</TableCell>
+                              <TableCell colSpan={5} className="text-center text-muted-foreground">No team members assigned to this event.</TableCell>
                             </TableRow>
                           )}
                         </TableBody>
@@ -4185,35 +4314,34 @@ export default function EventDetails() {
                   </div>
             </TabsContent>
             <TabsContent value="analytics">
-              <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+              <div className="min-h-screen bg-background p-6">
                 {/* Header Section */}
                 <div className="mb-8">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+                    <div className="w-10 h-10 bg-brand-gradient rounded-xl flex items-center justify-center">
                       <BarChart3 className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                      <h1 className="text-3xl font-bold text-foreground">
                         Event Analytics
                       </h1>
-                      <p className="text-gray-600">Comprehensive insights and performance metrics</p>
+                      <p className="text-muted-foreground">Comprehensive insights and performance metrics</p>
                     </div>
                   </div>
                 </div>
 
                 {analyticsLoading ? (
                   <div className="flex flex-col items-center justify-center py-20">
-                    <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-                    <div className="text-lg font-medium text-gray-600">Loading analytics dashboard...</div>
-                    <div className="text-sm text-gray-500 mt-2">Gathering comprehensive event data</div>
+                    <Spinner size="xl" variant="primary" text="Loading analytics dashboard..." />
+                    <div className="text-sm text-muted-foreground mt-2">Gathering comprehensive event data</div>
                   </div>
                 ) : analyticsError ? (
                   <div className="flex flex-col items-center justify-center py-20">
-                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                      <XCircle className="w-8 h-8 text-red-600" />
+                    <div className="w-16 h-16 bg-error/10 rounded-full flex items-center justify-center mb-4">
+                      <XCircle className="w-8 h-8 text-error" />
                     </div>
-                    <div className="text-lg font-medium text-gray-900 mb-2">Failed to load analytics</div>
-                    <div className="text-gray-600 mb-6">{analyticsError}</div>
+                    <div className="text-lg font-medium text-foreground mb-2">Failed to load analytics</div>
+                    <div className="text-muted-foreground mb-6">{analyticsError}</div>
                     <Button 
                       variant="outline" 
                       onClick={() => window.location.reload()}
@@ -4227,187 +4355,207 @@ export default function EventDetails() {
                   <div className="space-y-8">
                     {/* Key Metrics Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <div className="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-all duration-300">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
+                      <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-info/10 rounded-full -translate-y-10 translate-x-10"></div>
                         <div className="relative">
                           <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                              <Users className="w-5 h-5 text-white" />
+                            <div className="w-10 h-10 bg-info/20 rounded-xl flex items-center justify-center">
+                              <Users className="w-5 h-5 text-info" />
                             </div>
-                            <div className="text-sm font-medium text-gray-600">Total Registered</div>
+                            <div className="text-sm font-medium text-muted-foreground">Total Registered</div>
                           </div>
-                          <div className="text-3xl font-bold text-gray-900 mb-1">{analytics.total_registered}</div>
-                          <div className="text-xs text-gray-500">Event attendees</div>
+                          <div className="text-3xl font-bold text-foreground mb-1">{analytics.total_registered}</div>
+                          <div className="text-xs text-muted-foreground">Event attendees</div>
                         </div>
                       </div>
 
-                      <div className="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-all duration-300">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
+                      <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-success/10 rounded-full -translate-y-10 translate-x-10"></div>
                         <div className="relative">
                           <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
-                              <CheckCircle className="w-5 h-5 text-white" />
+                            <div className="w-10 h-10 bg-success/20 rounded-xl flex items-center justify-center">
+                              <CheckCircle className="w-5 h-5 text-success" />
                             </div>
-                            <div className="text-sm font-medium text-gray-600">Checked In</div>
+                            <div className="text-sm font-medium text-muted-foreground">Checked In</div>
                           </div>
-                          <div className="text-3xl font-bold text-gray-900 mb-1">{analytics.total_checked_in}</div>
-                          <div className="text-xs text-gray-500">Present attendees</div>
+                          <div className="text-3xl font-bold text-foreground mb-1">{analytics.total_checked_in}</div>
+                          <div className="text-xs text-muted-foreground">Present attendees</div>
                         </div>
                       </div>
 
-                      <div className="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-all duration-300">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-indigo-500 to-indigo-600 opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
+                      <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full -translate-y-10 translate-x-10"></div>
                         <div className="relative">
                           <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                              <TrendingUp className="w-5 h-5 text-white" />
+                            <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
+                              <TrendingUp className="w-5 h-5 text-primary" />
                             </div>
-                            <div className="text-sm font-medium text-gray-600">Check-in Rate</div>
+                            <div className="text-sm font-medium text-muted-foreground">Check-in Rate</div>
                           </div>
-                          <div className="text-3xl font-bold text-gray-900 mb-1">
+                          <div className="text-3xl font-bold text-foreground mb-1">
                             {analytics.total_registered ? Math.round((analytics.total_checked_in / analytics.total_registered) * 100) : 0}%
                           </div>
-                          <div className="text-xs text-gray-500">Attendance rate</div>
+                          <div className="text-xs text-muted-foreground">Attendance rate</div>
                         </div>
                       </div>
 
-                      <div className="group relative overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-lg transition-all duration-300">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-gray-500 to-gray-600 opacity-10 rounded-full -translate-y-10 translate-x-10"></div>
+                      <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-muted/50 rounded-full -translate-y-10 translate-x-10"></div>
                         <div className="relative">
                           <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center">
-                              <Clock className="w-5 h-5 text-white" />
+                            <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center">
+                              <Clock className="w-5 h-5 text-muted-foreground" />
                             </div>
-                            <div className="text-sm font-medium text-gray-600">Not Checked In</div>
+                            <div className="text-sm font-medium text-muted-foreground">Not Checked In</div>
                           </div>
-                          <div className="text-3xl font-bold text-gray-900 mb-1">{analytics.total_registered - analytics.total_checked_in}</div>
-                          <div className="text-xs text-gray-500">Absent attendees</div>
+                          <div className="text-3xl font-bold text-foreground mb-1">{analytics.total_registered - analytics.total_checked_in}</div>
+                          <div className="text-xs text-muted-foreground">Absent attendees</div>
                         </div>
                       </div>
                     </div>
                     {/* Charts Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Hourly Check-in Trend</h3>
-                            <p className="text-sm text-gray-600">Real-time attendance patterns</p>
+                            <h3 className="text-lg font-semibold text-foreground">Hourly Check-in Trend</h3>
+                            <p className="text-sm text-muted-foreground">Real-time attendance patterns</p>
                           </div>
-                          <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                            <TrendingUp className="w-4 h-4 text-white" />
+                          <div className="w-8 h-8 bg-success/20 rounded-lg flex items-center justify-center">
+                            <TrendingUp className="w-4 h-4 text-success" />
                           </div>
                         </div>
                         <ResponsiveContainer width="100%" height={280}>
                           <LineChart data={analytics.hourly_checkin_trend || analytics.checkin_trend || []}>
-                            <defs>
-                              <linearGradient id="checkinGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis 
-                              dataKey="hour" 
-                              stroke="#64748b"
-                              fontSize={12}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <YAxis 
-                              allowDecimals={false}
-                              stroke="#64748b"
-                              fontSize={12}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <RechartsTooltip 
-                              contentStyle={{
-                                backgroundColor: 'white',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                              }}
-                            />
-                            <Area 
-                              type="monotone" 
-                              dataKey="checked_in" 
-                              stroke="#22c55e" 
-                              strokeWidth={3}
-                              fill="url(#checkinGradient)"
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="checked_in" 
-                              stroke="#22c55e" 
-                              strokeWidth={3}
-                              dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
-                              activeDot={{ r: 6, stroke: '#22c55e', strokeWidth: 2 }}
-                            />
+                            {(() => {
+                              const styles = getChartStyles();
+                              const chartColors = getChartColors();
+                              
+                              return (
+                                <>
+                                  <defs>
+                                    <linearGradient id="checkinGradient" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor={chartColors.line} stopOpacity={0.3}/>
+                                      <stop offset="95%" stopColor={chartColors.line} stopOpacity={0}/>
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                                  <XAxis 
+                                    dataKey="hour" 
+                                    stroke={styles.axisStroke}
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                  />
+                                  <YAxis 
+                                    allowDecimals={false}
+                                    stroke={styles.axisStroke}
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                  />
+                                  <RechartsTooltip 
+                                    contentStyle={{
+                                      backgroundColor: styles.tooltipBg,
+                                      border: `1px solid ${styles.tooltipBorder}`,
+                                      borderRadius: '8px',
+                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                      color: styles.tooltipText,
+                                    }}
+                                  />
+                                  <Area 
+                                    type="monotone" 
+                                    dataKey="checked_in" 
+                                    stroke={chartColors.line} 
+                                    strokeWidth={3}
+                                    fill="url(#checkinGradient)"
+                                  />
+                                  <Line 
+                                    type="monotone" 
+                                    dataKey="checked_in" 
+                                    stroke={chartColors.line} 
+                                    strokeWidth={3}
+                                    dot={{ fill: chartColors.line, strokeWidth: 2, r: 4 }}
+                                    activeDot={{ r: 6, stroke: chartColors.line, strokeWidth: 2 }}
+                                  />
+                                </>
+                              );
+                            })()}
                           </LineChart>
                         </ResponsiveContainer>
                       </div>
 
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Registration Timeline</h3>
-                            <p className="text-sm text-gray-600">Registration growth over time</p>
+                            <h3 className="text-lg font-semibold text-foreground">Registration Timeline</h3>
+                            <p className="text-sm text-muted-foreground">Registration growth over time</p>
                           </div>
-                          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                            <BarChart3 className="w-4 h-4 text-white" />
+                          <div className="w-8 h-8 bg-info/20 rounded-lg flex items-center justify-center">
+                            <BarChart3 className="w-4 h-4 text-info" />
                           </div>
                         </div>
 {analytics.registration_timeline && analytics.registration_timeline.length > 0 ? (
                         <ResponsiveContainer width="100%" height={280}>
                           <LineChart data={analytics.registration_timeline}>
-                            <defs>
-                              <linearGradient id="registrationGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis 
-                              dataKey="date" 
-                              stroke="#64748b"
-                              fontSize={12}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <YAxis 
-                              allowDecimals={false}
-                              stroke="#64748b"
-                              fontSize={12}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <RechartsTooltip 
-                              contentStyle={{
-                                backgroundColor: 'white',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                              }}
-                            />
-                            <Area 
-                              type="monotone" 
-                              dataKey="registered" 
-                              stroke="#6366f1" 
-                              strokeWidth={3}
-                              fill="url(#registrationGradient)"
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="registered" 
-                              stroke="#6366f1" 
-                              strokeWidth={3}
-                              dot={{ fill: '#6366f1', strokeWidth: 2, r: 4 }}
-                              activeDot={{ r: 6, stroke: '#6366f1', strokeWidth: 2 }}
-                            />
+                            {(() => {
+                              const styles = getChartStyles();
+                              const chartColors = getChartColors();
+                              
+                              return (
+                                <>
+                                  <defs>
+                                    <linearGradient id="registrationGradient" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor={chartColors.line} stopOpacity={0.3}/>
+                                      <stop offset="95%" stopColor={chartColors.line} stopOpacity={0}/>
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                                  <XAxis 
+                                    dataKey="date" 
+                                    stroke={styles.axisStroke}
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                  />
+                                  <YAxis 
+                                    allowDecimals={false}
+                                    stroke={styles.axisStroke}
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                  />
+                                  <RechartsTooltip 
+                                    contentStyle={{
+                                      backgroundColor: styles.tooltipBg,
+                                      border: `1px solid ${styles.tooltipBorder}`,
+                                      borderRadius: '8px',
+                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                      color: styles.tooltipText,
+                                    }}
+                                  />
+                                  <Area 
+                                    type="monotone" 
+                                    dataKey="registered" 
+                                    stroke={chartColors.line} 
+                                    strokeWidth={3}
+                                    fill="url(#registrationGradient)"
+                                  />
+                                  <Line 
+                                    type="monotone" 
+                                    dataKey="registered" 
+                                    stroke={chartColors.line} 
+                                    strokeWidth={3}
+                                    dot={{ fill: chartColors.line, strokeWidth: 2, r: 4 }}
+                                    activeDot={{ r: 6, stroke: chartColors.line, strokeWidth: 2 }}
+                                  />
+                                </>
+                              );
+                            })()}
                           </LineChart>
                         </ResponsiveContainer>
                         ) : (
-                          <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                             <BarChart3 className="w-12 h-12 mb-4 opacity-50" />
                             <p className="text-lg font-medium">No Registration Data</p>
                             <p className="text-sm">Registration timeline will appear when attendees register for this event</p>
@@ -4417,734 +4565,440 @@ export default function EventDetails() {
                     </div>
                     {/* Distribution Charts */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Top Companies</h3>
-                            <p className="text-sm text-gray-600">Most represented organizations</p>
+                            <h3 className="text-lg font-semibold text-foreground">Top Companies</h3>
+                            <p className="text-sm text-muted-foreground">Most represented organizations</p>
                           </div>
-                          <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-                            <Building className="w-4 h-4 text-white" />
+                          <div className="w-8 h-8 bg-warning/20 rounded-lg flex items-center justify-center">
+                            <Building className="w-4 h-4 text-warning" />
                           </div>
                         </div>
                         <ResponsiveContainer width="100%" height={280}>
                           <BarChart data={analytics.top_companies || []}>
-                            <defs>
-                              <linearGradient id="companyGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8}/>
-                                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.3}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis 
-                              dataKey="company" 
-                              stroke="#64748b"
-                              fontSize={12}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <YAxis 
-                              allowDecimals={false}
-                              stroke="#64748b"
-                              fontSize={12}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <RechartsTooltip 
-                              contentStyle={{
-                                backgroundColor: 'white',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                              }}
-                            />
-                            <Bar 
-                              dataKey="count" 
-                              fill="url(#companyGradient)"
-                              radius={[4, 4, 0, 0]}
-                            />
+                            {(() => {
+                              const styles = getChartStyles();
+                              const chartColors = getChartColors();
+                              
+                              return (
+                                <>
+                                  <defs>
+                                    <linearGradient id="companyGradient" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor={chartColors.warning} stopOpacity={0.8}/>
+                                      <stop offset="95%" stopColor={chartColors.warning} stopOpacity={0.3}/>
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                                  <XAxis 
+                                    dataKey="company" 
+                                    stroke={styles.axisStroke}
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                  />
+                                  <YAxis 
+                                    allowDecimals={false}
+                                    stroke={styles.axisStroke}
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                  />
+                                  <RechartsTooltip 
+                                    contentStyle={{
+                                      backgroundColor: styles.tooltipBg,
+                                      border: `1px solid ${styles.tooltipBorder}`,
+                                      borderRadius: '8px',
+                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                      color: styles.tooltipText,
+                                    }}
+                                  />
+                                  <Bar 
+                                    dataKey="count" 
+                                    fill="url(#companyGradient)"
+                                    radius={[4, 4, 0, 0]}
+                                  />
+                                </>
+                              );
+                            })()}
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
 
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Guest Type Distribution</h3>
-                            <p className="text-sm text-gray-600">Attendee category breakdown</p>
+                            <h3 className="text-lg font-semibold text-foreground">Guest Type Distribution</h3>
+                            <p className="text-sm text-muted-foreground">Attendee category breakdown</p>
                           </div>
-                          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
-                            <Users className="w-4 h-4 text-white" />
+                          <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                            <Users className="w-4 h-4 text-primary" />
                           </div>
                         </div>
                         <ResponsiveContainer width="100%" height={280}>
                           <BarChart data={analytics.top_guest_types || analytics.guest_type_distribution || []}>
-                            <defs>
-                              <linearGradient id="guestTypeGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#a21caf" stopOpacity={0.8}/>
-                                <stop offset="95%" stopColor="#a21caf" stopOpacity={0.3}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis 
-                              dataKey="type" 
-                              stroke="#64748b"
-                              fontSize={12}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <YAxis 
-                              allowDecimals={false}
-                              stroke="#64748b"
-                              fontSize={12}
-                              tickLine={false}
-                              axisLine={false}
-                            />
-                            <RechartsTooltip 
-                              contentStyle={{
-                                backgroundColor: 'white',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                              }}
-                            />
-                            <Bar 
-                              dataKey="count" 
-                              fill="url(#guestTypeGradient)"
-                              radius={[4, 4, 0, 0]}
-                            />
+                            {(() => {
+                              const styles = getChartStyles();
+                              const chartColors = getChartColors();
+                              const gradientColor = chartColors.accent;
+                              
+                              return (
+                                <>
+                                  <defs>
+                                    <linearGradient id="guestTypeGradient" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="5%" stopColor={gradientColor} stopOpacity={0.8}/>
+                                      <stop offset="95%" stopColor={gradientColor} stopOpacity={0.3}/>
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                                  <XAxis 
+                                    dataKey="type" 
+                                    stroke={styles.axisStroke}
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                  />
+                                  <YAxis 
+                                    allowDecimals={false}
+                                    stroke={styles.axisStroke}
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                  />
+                                  <RechartsTooltip 
+                                    contentStyle={{
+                                      backgroundColor: styles.tooltipBg,
+                                      border: `1px solid ${styles.tooltipBorder}`,
+                                      borderRadius: '8px',
+                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                      color: styles.tooltipText,
+                                    }}
+                                  />
+                                  <Bar 
+                                    dataKey="count" 
+                                    fill="url(#guestTypeGradient)"
+                                    radius={[4, 4, 0, 0]}
+                                  />
+                                </>
+                              );
+                            })()}
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
                     </div>
                     {/* Pie Charts Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Gender Distribution</h3>
-                            <p className="text-sm text-gray-600">Attendee gender breakdown</p>
+                            <h3 className="text-lg font-semibold text-foreground">Gender Distribution</h3>
+                            <p className="text-sm text-muted-foreground">Attendee gender breakdown</p>
                           </div>
-                          <div className="w-8 h-8 bg-gradient-to-br from-pink-500 to-pink-600 rounded-lg flex items-center justify-center">
-                            <User className="w-4 h-4 text-white" />
+                          <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                            <User className="w-4 h-4 text-primary dark:text-primary" />
                           </div>
                         </div>
                         <ResponsiveContainer width="100%" height={280}>
                           <PieChart>
-                            <Pie
-                              data={analytics.gender_distribution || []}
-                              dataKey="count"
-                              nameKey="gender"
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={80}
-                              innerRadius={40}
-                              fill="#6366f1"
-                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                              labelLine={false}
-                            >
-                              {(analytics.gender_distribution || []).map((entry, idx) => (
-                                <Cell key={`gender-cell-${idx}`} fill={["#6366f1", "#f59e42", "#22c55e", "#f43f5e", "#a21caf"][idx % 5]} />
-                              ))}
-                            </Pie>
-                            <RechartsTooltip 
-                              contentStyle={{
-                                backgroundColor: 'white',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                              }}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                        <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Country Distribution</h3>
-                            <p className="text-sm text-gray-600">Geographic representation</p>
-                          </div>
-                          <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                            <Globe className="w-4 h-4 text-white" />
-                          </div>
-                        </div>
-                        <ResponsiveContainer width="100%" height={280}>
-                          <PieChart>
-                            <Pie
-                              data={analytics.country_distribution || []}
-                              dataKey="count"
-                              nameKey="country"
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={80}
-                              innerRadius={40}
-                              fill="#22c55e"
-                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                              labelLine={false}
-                            >
-                              {(analytics.country_distribution || []).map((entry, idx) => (
-                                <Cell key={`country-cell-${idx}`} fill={["#22c55e", "#6366f1", "#f59e42", "#f43f5e", "#a21caf"][idx % 5]} />
-                              ))}
-                            </Pie>
-                            <RechartsTooltip 
-                              contentStyle={{
-                                backgroundColor: 'white',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                              }}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                    {/* Attendee Summary Section */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                      <div className="flex items-center justify-between mb-6">
-                        <div>
-                          <h3 className="text-lg font-semibold text-gray-900">Attendee Summary</h3>
-                          <p className="text-sm text-gray-600">Recent attendee registrations and status</p>
-                        </div>
-                        <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                          <FileText className="w-4 h-4 text-white" />
-                        </div>
-                      </div>
-                    
-                    {/* Search Results Counter */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="text-sm text-gray-600">
-                        {searchTerm || guestTypeFilter !== 'all' || checkedInFilter !== 'all' ? (
-                          <>
-                            Showing <span className="font-semibold text-gray-900">{filteredAttendees.length}</span> of{' '}
-                            <span className="font-semibold text-gray-900">{attendees.length}</span> attendees
-                            {searchTerm && (
-                              <span className="ml-2 text-gray-500">
-                                matching "{searchTerm}"
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <span className="font-semibold text-gray-900">{attendees.length} attendees</span>
-                        )}
-                      </div>
-                      {searchTerm && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSearchTerm('')}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          Clear search
-                        </Button>
-                      )}
-                    </div>
-                    
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="border-gray-200">
-                              <TableHead className="font-semibold text-gray-700">Name</TableHead>
-                              <TableHead className="font-semibold text-gray-700">Email</TableHead>
-                              <TableHead className="font-semibold text-gray-700">Company</TableHead>
-                              <TableHead className="font-semibold text-gray-700">Guest Type</TableHead>
-                              <TableHead className="font-semibold text-gray-700">Status</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {attendees.slice(0, 10).map(attendee => (
-                              <TableRow key={attendee.id} className="hover:bg-gray-50 transition-colors">
-                                <TableCell className="font-medium text-gray-900">{attendee.guest?.name}</TableCell>
-                                <TableCell className="text-gray-600">{attendee.guest?.email}</TableCell>
-                                <TableCell className="text-gray-600">{attendee.guest?.company}</TableCell>
-                                <TableCell>
-                                  <Badge className={getGuestTypeBadgeClasses((attendee.guestType || attendee.guest_type)?.name)}>
-                                    {(attendee.guestType || attendee.guest_type)?.name || 'General'}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  {attendee.checked_in ? (
-                                    <Badge className="bg-green-100 text-green-700 border-green-200">
-                                      <CheckCircle className="w-3 h-3 mr-1" />
-                                      Checked In
-                                    </Badge>
-                                  ) : (
-                                    <Badge className="bg-gray-100 text-gray-700 border-gray-200">
-                                      <Clock className="w-3 h-3 mr-1" />
-                                      Not Checked In
-                                    </Badge>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                        {attendees.length > 10 && (
-                          <div className="text-sm text-gray-500 mt-4 text-center">
-                            Showing first 10 attendees of {attendees.length} total
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Session Analytics Section */}
-                    {analytics?.session_analytics && analytics.session_analytics.length > 0 && (
-                      <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-                        {/* Header */}
-                        <div className="bg-gray-50 border-b border-gray-200 p-6">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                                <Calendar className="w-6 h-6 text-gray-600" />
-                              </div>
-                              <div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-1">Session Analytics</h3>
-                                <p className="text-gray-600 text-sm">Click on any session to view checked-in guests</p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-2xl font-bold text-gray-900">{analytics.session_analytics.length}</div>
-                              <div className="text-gray-600 text-sm">Total Sessions</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="p-6">
-                          {/* Summary Cards */}
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                            <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                              <div className="flex items-center gap-3 mb-2">
-                                <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                                  <Users className="w-4 h-4 text-white" />
-                                </div>
-                                <div className="text-sm font-medium text-blue-700">Total Session Attendees</div>
-                              </div>
-                              <div className="text-xl font-bold text-blue-900">
-                                {analytics.session_analytics.reduce((sum: number, session: any) => sum + session.total_attendees, 0)}
-                              </div>
-                            </div>
-
-                            <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-                              <div className="flex items-center gap-3 mb-2">
-                                <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
-                                  <CheckCircle className="w-4 h-4 text-white" />
-                                </div>
-                                <div className="text-sm font-medium text-green-700">Total Checked In</div>
-                              </div>
-                              <div className="text-xl font-bold text-green-900">
-                                {analytics.session_analytics.reduce((sum: number, session: any) => sum + session.checked_in_attendees, 0)}
-                              </div>
-                            </div>
-
-                            <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
-                              <div className="flex items-center gap-3 mb-2">
-                                <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
-                                  <TrendingUp className="w-4 h-4 text-white" />
-                                </div>
-                                <div className="text-sm font-medium text-purple-700">Average Check-in Rate</div>
-                              </div>
-                              <div className="text-xl font-bold text-purple-900">
-                                {Math.round(analytics.session_analytics.reduce((sum: number, session: any) => sum + session.check_in_rate, 0) / analytics.session_analytics.length)}%
-                              </div>
-                            </div>
-
-                            <div className="bg-orange-50 rounded-xl p-4 border border-orange-200">
-                              <div className="flex items-center gap-3 mb-2">
-                                <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
-                                  <BarChart3 className="w-4 h-4 text-white" />
-                                </div>
-                                <div className="text-sm font-medium text-orange-700">Capacity Utilization</div>
-                              </div>
-                              <div className="text-xl font-bold text-orange-900">
-                                {Math.round(analytics.session_analytics.reduce((sum: number, session: any) => {
-                                  if (session.max_capacity && session.max_capacity > 0) {
-                                    return sum + (session.total_attendees / session.max_capacity * 100);
-                                  }
-                                  return sum;
-                                }, 0) / analytics.session_analytics.filter((s: any) => s.max_capacity > 0).length)}%
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Session Cards */}
-                          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {analytics.session_analytics.map((session: any, index: number) => {
-                              const capacityPercentage = session.max_capacity ? (session.total_attendees / session.max_capacity) * 100 : 0;
-                              const checkInPercentage = session.total_attendees > 0 ? (session.checked_in_attendees / session.total_attendees) * 100 : 0;
+                            {(() => {
+                              const styles = getChartStyles();
+                              const colors = getChartColorPalette('primary');
                               
                               return (
-                                <div 
-                                  key={session.session_id} 
-                                  className="group relative bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer"
-                                  onClick={() => handleSessionClick(session)}
-                                >
-                                  {/* Status indicator */}
-                                  <div className={`absolute top-0 left-0 right-0 h-1 ${
-                                    session.status === 'completed' ? 'bg-green-500' :
-                                    session.status === 'cancelled' ? 'bg-red-500' :
-                                    session.status === 'scheduled' ? 'bg-blue-500' :
-                                    'bg-gray-500'
-                                  }`}></div>
-
-                                  {/* Card Header */}
-                                  <div className="p-5 pb-3">
-                                    <div className="flex items-start justify-between mb-3">
-                                      <div className="flex-1">
-                                        <h4 className="font-semibold text-gray-900 text-base mb-1 overflow-hidden text-ellipsis whitespace-nowrap">{session.session_name}</h4>
-                                        <div className="flex items-center gap-2 mb-2">
-                                          <Badge 
-                                            className={`text-xs font-medium ${
-                                              session.status === 'completed' ? 'bg-green-100 text-green-700 border-green-200' :
-                                              session.status === 'cancelled' ? 'bg-red-100 text-red-700 border-red-200' :
-                                              session.status === 'scheduled' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                              'bg-gray-100 text-gray-700 border-gray-200'
-                                            }`}
-                                          >
-                                            {session.status}
-                                          </Badge>
-                                          <Badge variant="outline" className="text-xs font-medium">
-                                            {session.session_type}
-                                          </Badge>
-                                        </div>
-                                      </div>
-                                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-gray-600 font-semibold text-sm">
-                                        {index + 1}
-                                      </div>
-                                    </div>
-
-                                    {/* Progress Bars */}
-                                    <div className="space-y-2">
-                                      {/* Check-in Progress */}
-                                      <div>
-                                        <div className="flex items-center justify-between text-sm mb-1">
-                                          <span className="text-gray-600 font-medium">Check-in Rate</span>
-                                          <span className="font-semibold text-gray-900">{session.check_in_rate}%</span>
-                                        </div>
-                                        <div className="w-full bg-gray-200 rounded-full h-2">
-                                          <div 
-                                            className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                                            style={{ width: `${checkInPercentage}%` }}
-                                          ></div>
-                                        </div>
-                                      </div>
-
-                                      {/* Capacity Progress */}
-                                      {session.max_capacity && (
-                                        <div>
-                                          <div className="flex items-center justify-between text-sm mb-1">
-                                            <span className="text-gray-600 font-medium">Capacity</span>
-                                            <span className="font-semibold text-gray-900">{session.total_attendees}/{session.max_capacity}</span>
-                                          </div>
-                                          <div className="w-full bg-gray-200 rounded-full h-2">
-                                            <div 
-                                              className={`h-2 rounded-full transition-all duration-300 ${
-                                                capacityPercentage > 90 ? 'bg-red-500' :
-                                                capacityPercentage > 70 ? 'bg-yellow-500' :
-                                                'bg-blue-500'
-                                              }`}
-                                              style={{ width: `${Math.min(capacityPercentage, 100)}%` }}
-                                            ></div>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Metrics Grid */}
-                                  <div className="px-5 pb-5">
-                                    <div className="grid grid-cols-2 gap-3">
-                                      <div className="bg-blue-50 rounded-lg p-3 text-center border border-blue-200">
-                                        <div className="text-lg font-bold text-blue-900 mb-1">{session.total_attendees}</div>
-                                        <div className="text-xs font-medium text-blue-700">Total Attendees</div>
-                                      </div>
-                                      <div className="bg-green-50 rounded-lg p-3 text-center border border-green-200">
-                                        <div className="text-lg font-bold text-green-900 mb-1">{session.checked_in_attendees}</div>
-                                        <div className="text-xs font-medium text-green-700">Checked In</div>
-                                      </div>
-                                    </div>
-
-                                    {/* Session Details */}
-                                    <div className="mt-3 pt-3 border-t border-gray-100">
-                                      {session.location && (
-                                        <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
-                                          <MapPin className="w-4 h-4 text-gray-400" />
-                                          <span className="truncate">{session.location}</span>
-                                        </div>
-                                      )}
-                                      {session.start_time && (
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                          <Clock className="w-4 h-4 text-gray-400" />
-                                          <span>{new Date(session.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Click indicator */}
-                                  <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                    <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center">
-                                      <ExternalLink className="w-3 h-3 text-gray-500" />
-                                    </div>
-                                  </div>
-                                </div>
+                                <>
+                                  <Pie
+                                    data={analytics.gender_distribution || []}
+                                    dataKey="count"
+                                    nameKey="gender"
+                                    cx="50%"
+                                    cy="50%"
+                                    outerRadius={80}
+                                    innerRadius={40}
+                                    fill={colors[0]}
+                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                    labelLine={false}
+                                    labelStyle={{ fill: styles.labelColor }}
+                                  >
+                                    {(analytics.gender_distribution || []).map((entry, idx) => (
+                                      <Cell key={`gender-cell-${idx}`} fill={colors[idx % colors.length]} />
+                                    ))}
+                                  </Pie>
+                                  <RechartsTooltip 
+                                    contentStyle={{
+                                      backgroundColor: styles.tooltipBg,
+                                      border: `1px solid ${styles.tooltipBorder}`,
+                                      borderRadius: '8px',
+                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                      color: styles.tooltipText,
+                                    }}
+                                  />
+                                </>
                               );
-                            })}
-                          </div>
-
-                          {/* Empty State */}
-                          {analytics.session_analytics.length === 0 && (
-                            <div className="text-center py-12">
-                              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Calendar className="w-8 h-8 text-gray-400" />
-                              </div>
-                              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Sessions Found</h3>
-                              <p className="text-gray-600 max-w-md mx-auto">
-                                This event doesn't have any sessions configured yet. Create sessions to track detailed attendance analytics.
-                              </p>
-                            </div>
-                          )}
-                        </div>
+                            })()}
+                          </PieChart>
+                        </ResponsiveContainer>
                       </div>
-                    )}
 
-                        {/* Share Analytics Section */}
-                        <div className="bg-white rounded-xl shadow p-6">
-                          <div className="flex items-center gap-2 mb-4">
-                            <Share2 className="w-5 h-5 text-purple-600" />
-                            <div className="font-semibold text-lg">Share Analytics</div>
-                            <Badge variant="outline" className="text-xs">Real-time</Badge>
+                      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h3 className="text-lg font-semibold text-foreground">Country Distribution</h3>
+                            <p className="text-sm text-muted-foreground">Geographic representation</p>
                           </div>
-                          
-                          {shareAnalyticsLoading ? (
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                              {[...Array(4)].map((_, i) => (
-                                <div key={i} className="bg-gray-50 rounded-lg p-4 animate-pulse">
-                                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                                  <div className="h-8 bg-gray-200 rounded"></div>
+                          <div className="w-8 h-8 bg-success/20 rounded-lg flex items-center justify-center">
+                            <Globe className="w-4 h-4 text-success dark:text-success" />
+                          </div>
+                        </div>
+                        <ResponsiveContainer width="100%" height={280}>
+                          <PieChart>
+                            {(() => {
+                              const styles = getChartStyles();
+                              const colors = getChartColorPalette('primary');
+                              
+                              return (
+                                <>
+                                  <Pie
+                                    data={analytics.country_distribution || []}
+                                    dataKey="count"
+                                    nameKey="country"
+                                    cx="50%"
+                                    cy="50%"
+                                    outerRadius={80}
+                                    innerRadius={40}
+                                    fill={colors[0]}
+                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                    labelLine={false}
+                                    labelStyle={{ fill: styles.labelColor }}
+                                  >
+                                    {(analytics.country_distribution || []).map((entry, idx) => (
+                                      <Cell key={`country-cell-${idx}`} fill={colors[idx % colors.length]} />
+                                    ))}
+                                  </Pie>
+                                  <RechartsTooltip 
+                                    contentStyle={{
+                                      backgroundColor: styles.tooltipBg,
+                                      border: `1px solid ${styles.tooltipBorder}`,
+                                      borderRadius: '8px',
+                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                      color: styles.tooltipText,
+                                    }}
+                                  />
+                                </>
+                              );
+                            })()}
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Session Check-in Analytics Section */}
+                    {sessionCheckInData.length > 0 && (
+                      <div className="space-y-8 mt-8">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="w-10 h-10 bg-info/20 rounded-xl flex items-center justify-center">
+                            <Calendar className="w-6 h-6 text-info" />
+                          </div>
+                          <div>
+                            <h2 className="text-2xl font-bold text-foreground">Session Check-in Analytics</h2>
+                            <p className="text-sm text-muted-foreground">Check-in statistics and attendance by session</p>
+                          </div>
+                        </div>
+
+                        {/* Session Check-in Metrics */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-info/10 rounded-full -translate-y-10 translate-x-10"></div>
+                            <div className="relative">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 bg-info/20 rounded-xl flex items-center justify-center">
+                                  <Calendar className="w-5 h-5 text-info" />
                                 </div>
-                              ))}
+                                <div className="text-sm font-medium text-muted-foreground">Total Sessions</div>
+                              </div>
+                              <div className="text-3xl font-bold text-foreground mb-1">{sessionCheckInData.length}</div>
+                              <div className="text-xs text-muted-foreground">Active sessions</div>
                             </div>
-                          ) : shareAnalyticsError ? (
-                            <div className="text-center py-8">
-                              <div className="text-red-600 mb-4">Failed to load share analytics</div>
-                              <Button
-                                variant="outline"
-                                onClick={() => {
-                                  setShareAnalyticsLoading(true)
-                                  getRealTimeShareAnalytics(eventId!)
-                                    .then((res) => {
-                                      console.log('Share Analytics Retry Response:', res.data)
-                                      setShareAnalytics(res.data)
-                                    })
-                                    .catch((err) => {
-                                      console.error('Share Analytics Retry Error:', err)
-                                      setShareAnalyticsError('Failed to fetch share analytics.')
-                                    })
-                                    .finally(() => setShareAnalyticsLoading(false))
-                                }}
-                              >
-                                Retry
-                              </Button>
+                          </div>
+
+                          <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-success/10 rounded-full -translate-y-10 translate-x-10"></div>
+                            <div className="relative">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 bg-success/20 rounded-xl flex items-center justify-center">
+                                  <CheckCircle className="w-5 h-5 text-success" />
+                                </div>
+                                <div className="text-sm font-medium text-muted-foreground">Total Check-ins</div>
+                              </div>
+                              <div className="text-3xl font-bold text-foreground mb-1">
+                                {sessionCheckInData.reduce((sum, session) => sum + session.checked_in, 0)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">Across all sessions</div>
+                            </div>
+                          </div>
+
+                          <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
+                            <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full -translate-y-10 translate-x-10"></div>
+                            <div className="relative">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
+                                  <TrendingUp className="w-5 h-5 text-primary" />
+                                </div>
+                                <div className="text-sm font-medium text-muted-foreground">Avg. Check-in Rate</div>
+                              </div>
+                              <div className="text-3xl font-bold text-foreground mb-1">
+                                {sessionCheckInData.length > 0
+                                  ? Math.round(
+                                      sessionCheckInData.reduce((sum, session) => sum + session.check_in_rate, 0) /
+                                        sessionCheckInData.length
+                                    )
+                                  : 0}%
+                              </div>
+                              <div className="text-xs text-muted-foreground">Average attendance rate</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Session Check-in Chart */}
+                        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+                          <div className="flex items-center justify-between mb-6">
+                            <div>
+                              <h3 className="text-lg font-semibold text-foreground">Check-ins by Session</h3>
+                              <p className="text-sm text-muted-foreground">Attendance breakdown per session</p>
+                            </div>
+                            <div className="w-8 h-8 bg-info/20 rounded-lg flex items-center justify-center">
+                              <BarChart3 className="w-4 h-4 text-info" />
+                            </div>
+                          </div>
+                          {sessionCheckInLoading ? (
+                            <div className="flex items-center justify-center h-64">
+                              <Spinner size="lg" variant="primary" text="Loading session data..." />
                             </div>
                           ) : (
-                            <>
-                              {/* Key Metrics */}
-                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
-                                  <div className="text-xs text-blue-600 mb-1">Total Clicks (24h)</div>
-                                  <div className="text-2xl font-bold text-blue-700">
-                                    {shareAnalytics?.last_24_hours?.clicks || 0}
-                                  </div>
-                                  <div className="text-xs text-blue-600 mt-1">
-                                    {shareAnalytics?.last_24_hours?.clicks > 0 ? 'Active sharing' : 'No activity'}
-                                  </div>
-                                </div>
-                                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
-                                  <div className="text-xs text-green-600 mb-1">Registrations (24h)</div>
-                                  <div className="text-2xl font-bold text-green-700">
-                                    {shareAnalytics?.last_24_hours?.registrations || 0}
-                                  </div>
-                                  <div className="text-xs text-green-600 mt-1">
-                                    {shareAnalytics?.last_24_hours?.registrations > 0 ? 'Successful conversions' : 'No registrations'}
-                                  </div>
-                                </div>
-                                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
-                                  <div className="text-xs text-purple-600 mb-1">Conversion Rate</div>
-                                  <div className="text-2xl font-bold text-purple-700">
-                                    {shareAnalytics?.last_24_hours?.conversion_rate || 0}%
-                                  </div>
-                                  <div className="text-xs text-purple-600 mt-1">
-                                    {shareAnalytics?.last_24_hours?.conversion_rate > 0 ? 'Effective sharing' : 'Needs improvement'}
-                                  </div>
-                                </div>
-                                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
-                                  <div className="text-xs text-orange-600 mb-1">Top Platform</div>
-                                  <div className="text-lg font-bold text-orange-700">
-                                    {shareAnalytics?.top_platforms?.[0]?.platform ? 
-                                      shareAnalytics.top_platforms[0].platform.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 
-                                      'N/A'}
-                                  </div>
-                                  <div className="text-xs text-orange-600 mt-1">
-                                    {shareAnalytics?.top_platforms?.[0]?.count || 0} shares
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Additional Metrics Row */}
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-4 border border-indigo-200">
-                                  <div className="text-xs text-indigo-600 mb-1">Active Platforms</div>
-                                  <div className="text-xl font-bold text-indigo-700">
-                                    {shareAnalytics?.top_platforms?.length || 0}
-                                  </div>
-                                  <div className="text-xs text-indigo-600 mt-1">
-                                    Different sharing channels
-                                  </div>
-                                </div>
-                                <div className="bg-gradient-to-br from-teal-50 to-teal-100 rounded-lg p-4 border border-teal-200">
-                                  <div className="text-xs text-teal-600 mb-1">Peak Hour</div>
-                                  <div className="text-xl font-bold text-teal-700">
-                                    {shareAnalytics?.hourly_breakdown?.reduce((max: any, hour: any) => 
-                                      hour.clicks > max.clicks ? hour : max, { clicks: 0, hour: 'N/A' })?.hour || 'N/A'}
-                                  </div>
-                                  <div className="text-xs text-teal-600 mt-1">
-                                    Highest activity time
-                                  </div>
-                                </div>
-                                <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg p-4 border border-pink-200">
-                                  <div className="text-xs text-pink-600 mb-1">Total Activity</div>
-                                  <div className="text-xl font-bold text-pink-700">
-                                    {(shareAnalytics?.last_24_hours?.clicks || 0) + (shareAnalytics?.last_24_hours?.registrations || 0)}
-                                  </div>
-                                  <div className="text-xs text-pink-600 mt-1">
-                                    Clicks + Registrations
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Platform Breakdown */}
-                              {shareAnalytics?.top_platforms && shareAnalytics.top_platforms.length > 0 && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                  <div>
-                                    <div className="font-semibold mb-3">Platform Performance</div>
-                                    <ResponsiveContainer width="100%" height={200}>
-                                      <BarChart data={shareAnalytics.top_platforms.map(platform => ({
-                                        ...platform,
-                                        platform: platform.platform.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-                                      }))}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="platform" />
-                                        <YAxis allowDecimals={false} />
-                                        <RechartsTooltip />
-                                        <Bar dataKey="count" fill="#8b5cf6" />
-                                      </BarChart>
-                                    </ResponsiveContainer>
-                                  </div>
-                                  <div>
-                                    <div className="font-semibold mb-3">Platform Distribution</div>
-                                    <ResponsiveContainer width="100%" height={200}>
-                                      <PieChart>
-                                        <Pie
-                                          data={shareAnalytics.top_platforms.map(platform => ({
-                                            ...platform,
-                                            platform: platform.platform.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-                                          }))}
-                                          dataKey="count"
-                                          nameKey="platform"
-                                          cx="50%"
-                                          cy="50%"
-                                          outerRadius={60}
-                                          fill="#8b5cf6"
-                                          label
-                                        >
-                                          {shareAnalytics.top_platforms.map((entry, idx) => (
-                                            <Cell key={`platform-cell-${idx}`} fill={["#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#84cc16", "#f97316"][idx % 8]} />
-                                          ))}
-                                        </Pie>
-                                        <RechartsTooltip />
-                                      </PieChart>
-                                    </ResponsiveContainer>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Hourly Breakdown */}
-                              {shareAnalytics?.hourly_breakdown && shareAnalytics.hourly_breakdown.length > 0 && (
-                                <div className="mb-6">
-                                  <div className="font-semibold mb-3">Hourly Activity (Last 24 Hours)</div>
-                                  <ResponsiveContainer width="100%" height={200}>
-                                    <LineChart data={shareAnalytics.hourly_breakdown}>
-                                      <CartesianGrid strokeDasharray="3 3" />
-                                      <XAxis dataKey="hour" />
-                                      <YAxis allowDecimals={false} />
-                                      <RechartsTooltip />
-                                      <Line type="monotone" dataKey="clicks" stroke="#3b82f6" strokeWidth={2} name="Clicks" />
-                                      <Line type="monotone" dataKey="registrations" stroke="#10b981" strokeWidth={2} name="Registrations" />
-                                    </LineChart>
-                                  </ResponsiveContainer>
-                                </div>
-                              )}
-
-                              {/* Platform Details */}
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                  <div className="font-semibold mb-3">Top Sharing Platforms</div>
-                                  <div className="space-y-2">
-                                    {shareAnalytics?.top_platforms?.slice(0, 5).map((platform: any, index: number) => (
-                                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                        <div className="flex items-center gap-2">
-                                          <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                                          <span className="font-medium capitalize">
-                                            {platform.platform.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                          </span>
-                                        </div>
-                                        <div className="text-sm text-gray-600">{platform.count} shares</div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="font-semibold mb-3">Performance Insights</div>
-                                  <div className="space-y-3">
-                                    <div className="p-3 bg-blue-50 rounded-lg">
-                                      <div className="text-sm font-medium text-blue-800">Conversion Rate</div>
-                                      <div className="text-lg font-bold text-blue-900">
-                                        {shareAnalytics?.last_24_hours?.conversion_rate || 0}%
-                                      </div>
-                                      <div className="text-xs text-blue-600">
-                                        {shareAnalytics?.last_24_hours?.clicks || 0} clicks → {shareAnalytics?.last_24_hours?.registrations || 0} registrations
-                                      </div>
-                                    </div>
-                                    <div className="p-3 bg-green-50 rounded-lg">
-                                      <div className="text-sm font-medium text-green-800">Most Active Hour</div>
-                                      <div className="text-lg font-bold text-green-900">
-                                        {shareAnalytics?.hourly_breakdown?.reduce((max: any, hour: any) => 
-                                          hour.clicks > max.clicks ? hour : max, { clicks: 0, hour: 'N/A' })?.hour || 'N/A'}
-                                      </div>
-                                      <div className="text-xs text-green-600">
-                                        Peak sharing activity
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </>
+                            <ResponsiveContainer width="100%" height={350}>
+                              <BarChart data={sessionCheckInData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                                {(() => {
+                                  const styles = getChartStyles();
+                                  const chartColors = getChartColors();
+                                  
+                                  return (
+                                    <>
+                                      <defs>
+                                        <linearGradient id="sessionCheckInGradient" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="5%" stopColor={chartColors.info} stopOpacity={0.8}/>
+                                          <stop offset="95%" stopColor={chartColors.info} stopOpacity={0.3}/>
+                                        </linearGradient>
+                                      </defs>
+                                      <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                                      <XAxis 
+                                        dataKey="session_name" 
+                                        stroke={styles.axisStroke}
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        angle={-45}
+                                        textAnchor="end"
+                                        height={100}
+                                      />
+                                      <YAxis 
+                                        allowDecimals={false}
+                                        stroke={styles.axisStroke}
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                      />
+                                      <RechartsTooltip 
+                                        contentStyle={{
+                                          backgroundColor: styles.tooltipBg,
+                                          border: `1px solid ${styles.tooltipBorder}`,
+                                          borderRadius: '8px',
+                                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                          color: styles.tooltipText,
+                                        }}
+                                        formatter={(value: number, name: string) => {
+                                          if (name === 'checked_in') return [value, 'Checked In'];
+                                          if (name === 'total_attendances') return [value, 'Total Attendances'];
+                                          return [value, name];
+                                        }}
+                                      />
+                                      <Bar 
+                                        dataKey="checked_in" 
+                                        fill="url(#sessionCheckInGradient)"
+                                        radius={[4, 4, 0, 0]}
+                                        name="Checked In"
+                                      />
+                                    </>
+                                  );
+                                })()}
+                              </BarChart>
+                            </ResponsiveContainer>
                           )}
                         </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-20">
-                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                          <BarChart3 className="w-8 h-8 text-gray-400" />
-                        </div>
-                        <div className="text-lg font-medium text-gray-900 mb-2">No Analytics Data</div>
-                        <div className="text-gray-600 text-center max-w-md">
-                          Analytics data will appear here once the event has attendees and activity.
+
+                        {/* Session Check-in Table */}
+                        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+                          <div className="flex items-center justify-between mb-6">
+                            <div>
+                              <h3 className="text-lg font-semibold text-foreground">Session Details</h3>
+                              <p className="text-sm text-muted-foreground">Detailed check-in statistics per session</p>
+                            </div>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-muted/50">
+                                  <TableHead className="text-foreground">Session Name</TableHead>
+                                  <TableHead className="text-foreground">Type</TableHead>
+                                  <TableHead className="text-foreground">Location</TableHead>
+                                  <TableHead className="text-foreground">Start Time</TableHead>
+                                  <TableHead className="text-foreground">Checked In</TableHead>
+                                  <TableHead className="text-foreground">Total</TableHead>
+                                  <TableHead className="text-foreground">Check-in Rate</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {sessionCheckInData.map((session) => (
+                                  <TableRow key={session.session_id} className="hover:bg-muted/50">
+                                    <TableCell className="font-medium text-foreground">{session.session_name}</TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline" className="text-xs">
+                                        {session.session_type || 'N/A'}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground">{session.location || 'N/A'}</TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                      {session.start_time 
+                                        ? new Date(session.start_time).toLocaleString('en-US', {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          })
+                                        : 'N/A'}
+                                    </TableCell>
+                                    <TableCell className="font-semibold text-success">{session.checked_in}</TableCell>
+                                    <TableCell className="text-muted-foreground">{session.total_attendances}</TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                                          <div
+                                            className="h-full bg-success transition-all duration-300"
+                                            style={{ width: `${session.check_in_rate}%` }}
+                                          />
+                                        </div>
+                                        <span className="text-sm font-medium text-foreground">{session.check_in_rate}%</span>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
                         </div>
                       </div>
                     )}
                   </div>
+                ) : null}
+              </div>
             </TabsContent>
             <TabsContent value="sessions">
               <div className="min-h-[200px]">
@@ -5157,10 +5011,10 @@ export default function EventDetails() {
                 eventUuid={eventData?.uuid || ''}
                 eventName={eventData?.name || ''}
                 eventType={eventData?.event_type as 'free' | 'ticketed' || 'free'}
-                isOrganizer={user?.role === 'organizer' || user?.role === 'admin' || user?.role === 'superadmin'}
+                isOrganizer={user?.role === 'organizer' || user?.role === 'organizer_admin' || user?.role === 'admin' || user?.role === 'superadmin'}
               />
             </TabsContent>
-            {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer') && (
+            {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin') && (
             <TabsContent value="bulk-badges">
               <BulkBadgesTab 
                 eventId={Number(eventId)}
@@ -5169,20 +5023,20 @@ export default function EventDetails() {
               />
             </TabsContent>
             )}
-                {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer') && (
+            {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin') && (
             <TabsContent value="badge-designer">
                     <div className="flex flex-col items-center justify-center py-16 px-4">
                       <div className="max-w-2xl text-center">
-                        <Palette className="w-16 h-16 mx-auto mb-6 text-blue-600" />
-                        <h2 className="text-2xl font-bold mb-4">Badge Designer</h2>
-                        <p className="text-gray-600 mb-8">
+                        <Palette className="w-16 h-16 mx-auto mb-6 text-primary" />
+                        <h2 className="text-2xl font-bold mb-4 text-foreground">Badge Designer</h2>
+                        <p className="text-muted-foreground mb-8">
                           The Badge Designer is now a standalone application with enhanced features including 
                           Fabric.js canvas editing, dynamic fields, QR codes, and more.
                         </p>
                         <Button 
                           size="lg"
                           onClick={() => navigate(`/badge-designer/templates/${eventId}`)}
-                          className="bg-blue-600 hover:bg-blue-700"
+                          className="bg-brand-gradient text-foreground dark:text-primary-foreground"
                         >
                           <Palette className="w-5 h-5 mr-2" />
                           Open Badge Designer
@@ -5190,7 +5044,7 @@ export default function EventDetails() {
                       </div>
                     </div>
             </TabsContent>
-                )}
+            )}
         </Tabs>
 
           {/* Edit Event Dialog */}
@@ -5279,7 +5133,7 @@ export default function EventDetails() {
                           disabled={editLoadingStates.eventTypes}
                           required
                         >
-                          <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 rounded-xl" id="edit_event_type_id">
+                          <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl" id="edit_event_type_id">
                             <SelectValue placeholder="Select event type" />
                           </SelectTrigger>
                           <SelectContent>
@@ -5291,12 +5145,12 @@ export default function EventDetails() {
                           </SelectContent>
                         </Select>
                         {editErrors.eventTypes && (
-                          <div className="text-xs text-red-500 mt-2">
+                          <div className="text-xs text-error mt-2">
                             {editErrors.eventTypes}
                           </div>
                         )}
                       </div>
-                                            <div>
+                      <div>
                         <Label htmlFor="edit_event_category_id" className="flex items-center gap-2 text-gray-700 font-medium">
                           <Tag className="w-4 h-4 text-indigo-500" /> Event Category
                         </Label>
@@ -5306,7 +5160,7 @@ export default function EventDetails() {
                           disabled={editLoadingStates.eventCategories}
                           required
                         >
-                          <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-xl" id="edit_event_category_id">
+                          <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl" id="edit_event_category_id">
                             <SelectValue placeholder="Select event category" />
                           </SelectTrigger>
                           <SelectContent>
@@ -5318,7 +5172,7 @@ export default function EventDetails() {
                           </SelectContent>
                         </Select>
                         {editErrors.eventCategories && (
-                          <div className="text-xs text-red-500 mt-2">
+                          <div className="text-xs text-error mt-2">
                             {editErrors.eventCategories}
                           </div>
                         )}
@@ -5694,7 +5548,7 @@ export default function EventDetails() {
                       >
                         {editLoading ? (
                           <div className="flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <SpinnerInline size="sm" />
                             Updating Event...
                           </div>
                         ) : (
@@ -6374,35 +6228,35 @@ export default function EventDetails() {
             {/* CSV Upload Dialog */}
             <Dialog open={csvUploadDialogOpen} onOpenChange={setCsvUploadDialogOpen}>
               <DialogContent
-                className="w-full max-w-5xl min-w-[900px] p-0 overflow-visible rounded-2xl shadow-2xl border-0 bg-gradient-to-br from-white via-gray-50 to-gray-100"
+                className="w-full max-w-5xl min-w-[900px] p-0 overflow-visible rounded-2xl shadow-2xl border border-border bg-card"
                 style={{ width: '1100px', maxWidth: '99vw' }}
               >
-                <div className="px-12 pt-10 pb-6 border-b bg-gradient-to-r from-white to-gray-50">
+                <div className="px-12 pt-10 pb-6 border-b border-border bg-card">
                   <DialogHeader>
-                    <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600">
+                    <DialogTitle className="text-2xl font-bold flex items-center gap-2 text-foreground">
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary">
                         <Download className="w-5 h-5" />
                       </span>
                       Import Attendees from CSV
                     </DialogTitle>
-                    <DialogDescription className="text-base text-gray-500 mt-2">
-                      Upload a CSV file with columns: <span className="font-medium text-gray-700">name</span>, <span className="font-medium text-gray-700">email</span>, <span className="font-medium text-gray-700">guest_type_name</span> (or <span className="font-medium text-gray-700">guest_type_id</span>). Extra columns are accepted.
+                    <DialogDescription className="text-base text-muted-foreground mt-2">
+                      Upload a CSV file with columns: <span className="font-medium text-foreground">name</span>, <span className="font-medium text-foreground">email</span>, <span className="font-medium text-foreground">guest_type_name</span> (or <span className="font-medium text-foreground">guest_type_id</span>). Extra columns are accepted.
                     </DialogDescription>
                   </DialogHeader>
                 </div>
 
                 {/* Step: Upload */}
                 {csvUploadStep === 'upload' && (
-                  <div className="p-12 space-y-10 bg-gradient-to-br from-white via-gray-50 to-gray-100">
+                  <div className="p-12 space-y-10 bg-card">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
                       <div className="md:col-span-2 flex flex-col justify-center">
                         <label className="block">
-                          <div className="w-full border-2 border-dashed border-blue-200 rounded-2xl p-12 text-center bg-white hover:bg-blue-50 transition cursor-pointer flex flex-col items-center gap-2 shadow-sm">
-                            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mb-2">
-                              <Download className="w-6 h-6 text-blue-500" />
+                          <div className="w-full border-2 border-dashed border-primary/30 rounded-2xl p-12 text-center bg-background hover:bg-primary/5 transition cursor-pointer flex flex-col items-center gap-2 shadow-sm">
+                            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-2">
+                              <Download className="w-6 h-6 text-primary" />
                             </div>
-                            <div className="font-semibold text-lg text-blue-700 mb-1">Select CSV file</div>
-                            <div className="text-sm text-gray-500">Drag &amp; drop or click to choose</div>
+                            <div className="font-semibold text-lg text-foreground mb-1">Select CSV file</div>
+                            <div className="text-sm text-muted-foreground">Drag &amp; drop or click to choose</div>
                           </div>
                           <input
                             type="file"
@@ -6459,9 +6313,9 @@ export default function EventDetails() {
                         </label>
                       </div>
                       <div className="md:col-span-1">
-                        <div className="h-full bg-gray-50 rounded-xl border p-4">
-                          <div className="text-sm font-medium mb-2">Tips</div>
-                          <ul className="text-xs text-gray-600 space-y-1 list-disc pl-4">
+                        <div className="h-full bg-muted/50 rounded-xl border border-border p-4">
+                          <div className="text-sm font-medium mb-2 text-foreground">Tips</div>
+                          <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4">
                             <li>Required: name, email, guest_type_name or guest_type_id</li>
                             <li>Guest types are case-insensitive</li>
                             <li>Extra columns are ignored</li>
@@ -6474,7 +6328,7 @@ export default function EventDetails() {
                     </div>
 
                     {csvUploadErrors.length > 0 && (
-                      <div className="rounded-md border border-red-200 bg-red-50 text-red-700 text-sm p-3">
+                      <div className="rounded-md border border-destructive/30 bg-destructive/10 text-destructive text-sm p-3">
                         {csvUploadErrors.map((err, i) => (
                           <div key={i}>{err}</div>
                         ))}
@@ -6484,38 +6338,38 @@ export default function EventDetails() {
                 )}
 
                 {csvUploadStep === 'review' && (
-                  <div className="p-6 space-y-5">
+                  <div className="p-6 space-y-5 bg-card">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="rounded-lg border p-3">
-                        <div className="text-xs text-gray-500">Rows</div>
-                        <div className="text-lg font-semibold">{csvUploadData.length}</div>
+                      <div className="rounded-lg border border-border p-3 bg-card">
+                        <div className="text-xs text-muted-foreground">Rows</div>
+                        <div className="text-lg font-semibold text-foreground">{csvUploadData.length}</div>
                       </div>
-                      <div className="rounded-lg border p-3">
-                        <div className="text-xs text-gray-500">Guest Types</div>
-                        <div className="text-xs text-gray-700 truncate">
+                      <div className="rounded-lg border border-border p-3 bg-card">
+                        <div className="text-xs text-muted-foreground">Guest Types</div>
+                        <div className="text-xs text-foreground truncate">
                           {guestTypes.map((gt: any) => gt.name).join(', ') || '—'}
                         </div>
                       </div>
-                      <div className="rounded-lg border p-3">
-                        <div className="text-xs text-gray-500">Issues</div>
-                        <div className="text-lg font-semibold">{csvUploadErrors.length}</div>
+                      <div className="rounded-lg border border-border p-3 bg-card">
+                        <div className="text-xs text-muted-foreground">Issues</div>
+                        <div className="text-lg font-semibold text-foreground">{csvUploadErrors.length}</div>
                       </div>
                     </div>
 
-                    <div className="overflow-x-auto max-h-72 border rounded">
+                    <div className="overflow-x-auto max-h-72 border border-border rounded">
                       <table className="min-w-full text-xs">
-                        <thead className="bg-gray-50 sticky top-0">
+                        <thead className="bg-muted/50 sticky top-0">
                           <tr>
                             {Object.keys(csvUploadData[0] || {}).map((h) => (
-                              <th key={h} className="border px-2 py-1 text-left">{h}</th>
+                              <th key={h} className="border border-border px-2 py-1 text-left text-foreground">{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
                           {csvUploadData.slice(0, 15).map((row, idx) => (
-                            <tr key={idx}>
+                            <tr key={idx} className={idx % 2 === 0 ? 'bg-card' : 'bg-muted/30'}>
                               {Object.keys(csvUploadData[0] || {}).map((h) => (
-                                <td key={h} className="border px-2 py-1">{row[h]}</td>
+                                <td key={h} className="border border-border px-2 py-1 text-foreground">{row[h]}</td>
                               ))}
                             </tr>
                           ))}
@@ -6524,7 +6378,7 @@ export default function EventDetails() {
                     </div>
 
                     {csvUploadErrors.length > 0 && (
-                      <div className="rounded-md border border-red-200 bg-red-50 text-red-700 text-xs p-3">
+                      <div className="rounded-md border border-destructive/30 bg-destructive/10 text-destructive text-xs p-3">
                         {csvUploadErrors.map((err, i) => (
                           <div key={i}>{String(err)}</div>
                         ))}
@@ -6615,26 +6469,25 @@ export default function EventDetails() {
 
                 {csvUploadStep === 'importing' && (
                   <div className="p-8 text-center">
-                    <div className="mx-auto mb-3 w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
-                    <div className="text-sm text-gray-600">Importing attendees...</div>
+                    <Spinner size="md" variant="primary" text="Importing attendees..." />
                   </div>
                 )}
 
                 {csvUploadStep === 'complete' && (
-                  <div className="p-10 space-y-6 bg-gradient-to-br from-white via-gray-50 to-gray-100">
+                  <div className="p-10 space-y-6 bg-card">
                     {csvUploadSuccess.length > 0 && (
-                      <div className="rounded-xl border border-green-200 bg-green-50 text-green-800 p-4">
-                        <div className="font-semibold mb-1">
+                      <div className="rounded-xl border border-success/30 bg-success/10 text-success p-4">
+                        <div className="font-semibold mb-1 text-foreground">
                           {csvUploadSuccess.length} attendees imported successfully
                         </div>
-                        <div className="text-xs text-green-700">Your attendee list has been updated.</div>
+                        <div className="text-xs text-muted-foreground">Your attendee list has been updated.</div>
                       </div>
                     )}
 
                     {csvUploadWarnings.length > 0 && (
-                      <div className="rounded-xl border border-amber-200 bg-amber-50 text-amber-900 p-5">
+                      <div className="rounded-xl border border-warning/30 bg-warning/10 text-foreground p-5">
                         <div className="flex items-center justify-between mb-3">
-                          <div className="font-semibold text-amber-900">
+                          <div className="font-semibold text-foreground">
                             {csvUploadWarnings.length} attendees failed to import
                           </div>
                           <div className="flex gap-2">
@@ -6665,25 +6518,25 @@ export default function EventDetails() {
                             </Button>
                           </div>
                         </div>
-                        <div className="max-h-64 overflow-auto rounded border bg-white">
+                        <div className="max-h-64 overflow-auto rounded border border-border bg-background">
                           <table className="min-w-full text-xs">
-                            <thead className="bg-gray-50 sticky top-0">
+                            <thead className="bg-muted/50 sticky top-0">
                               <tr>
-                                <th className="border px-2 py-1 text-left">Email</th>
-                                <th className="border px-2 py-1 text-left">Reason</th>
+                                <th className="border border-border px-2 py-1 text-left text-foreground">Email</th>
+                                <th className="border border-border px-2 py-1 text-left text-foreground">Reason</th>
                               </tr>
                             </thead>
                             <tbody>
                               {csvUploadWarnings.map((w: any, i: number) => (
-                                <tr key={i} className="odd:bg-white even:bg-gray-50">
-                                  <td className="border px-2 py-1 font-medium text-gray-800">{w.email}</td>
-                                  <td className="border px-2 py-1 text-gray-700">{w.error}</td>
+                                <tr key={i} className={i % 2 === 0 ? 'bg-card' : 'bg-muted/30'}>
+                                  <td className="border border-border px-2 py-1 font-medium text-foreground">{w.email}</td>
+                                  <td className="border border-border px-2 py-1 text-foreground">{w.error}</td>
                                 </tr>
                               ))}
                             </tbody>
                           </table>
                         </div>
-                        <div className="text-xs text-amber-800 mt-2">
+                        <div className="text-xs text-muted-foreground mt-2">
                           Tip: Ensure guest_type_name matches an event guest type or include guest_type_id.
                         </div>
                       </div>
@@ -6735,7 +6588,7 @@ export default function EventDetails() {
                   <AlertDialogAction 
                     onClick={handleRemoveConfirm} 
                     disabled={removeLoading} 
-                    className="bg-red-600 text-white hover:bg-red-700"
+                    className="bg-error text-error-foreground hover:bg-error/90"
                   >
                     {removeLoading ? 'Removing...' : (removeMember?.guest ? 'Remove Attendee' : 'Remove Member')}
                   </AlertDialogAction>
@@ -6828,8 +6681,7 @@ export default function EventDetails() {
               {sessionGuestsLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-                    <div className="text-gray-600">Loading session guests...</div>
+                    <Spinner size="lg" variant="primary" text="Loading session guests..." />
                   </div>
                 </div>
               ) : sessionGuests.length > 0 ? (
@@ -6904,6 +6756,16 @@ export default function EventDetails() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Custom Field Responses Viewer */}
+        {selectedAttendeeForResponses && eventId && (
+          <ResponseViewer
+            attendeeId={selectedAttendeeForResponses}
+            eventId={Number(eventId)}
+            open={responseViewerOpen}
+            onOpenChange={setResponseViewerOpen}
+          />
+        )}
       </div>
     </>
   )

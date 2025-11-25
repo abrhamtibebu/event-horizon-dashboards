@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { SpinnerInline } from '@/components/ui/spinner'
 import { useParams, useNavigate } from 'react-router-dom'
 import { resolveShortLink } from '@/lib/api'
 import { toast } from 'sonner'
@@ -73,7 +74,7 @@ export default function ShortLinkResolver() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <SpinnerInline className="mx-auto mb-4" />
           <p className="text-gray-600">Resolving short link...</p>
         </div>
       </div>

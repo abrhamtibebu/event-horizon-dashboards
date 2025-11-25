@@ -58,9 +58,34 @@ export const Pagination: React.FC<PaginationProps> = ({
   };
 
   const handlePageChange = (page: number) => {
-    if (page !== currentPage) {
-      onPageChange(page);
+    // Validate page number
+    const targetPage = Math.max(1, Math.min(page, totalPages));
+    
+    // Only change if it's different from current page and valid
+    if (targetPage !== currentPage && targetPage >= 1 && targetPage <= totalPages && totalPages > 0) {
+      onPageChange(targetPage);
+      // Scroll to top of the page when changing pages
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  };
+
+  const handlePrevious = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (currentPage > 1) {
+      handlePageChange(currentPage - 1);
+    }
+  };
+
+  const handleNext = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (currentPage < totalPages) {
+      handlePageChange(currentPage + 1);
+    }
+  };
+
+  const handlePageClick = (page: number) => (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    handlePageChange(page);
   };
 
   const handleGoToPage = () => {
@@ -78,43 +103,47 @@ export const Pagination: React.FC<PaginationProps> = ({
   };
 
   return (
-    <div className={`flex items-center justify-center ${className}`}>
+    <div className={`flex items-center justify-center mt-6 ${className}`}>
       {/* Main Pagination Container */}
-      <div className="flex items-center space-x-3 bg-white rounded-full px-6 py-3 shadow-lg border border-blue-200">
-        
+      <div className="flex items-center gap-2">
         {/* Previous Page Button */}
         <button
-          onClick={() => handlePageChange(currentPage - 1)}
+          type="button"
+          onClick={handlePrevious}
           disabled={currentPage === 1 || totalPages <= 1}
-          className="flex items-center justify-center w-10 h-10 rounded-full border border-blue-200 bg-white hover:bg-blue-50 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 rounded-lg bg-card border border-border text-foreground hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium active:scale-95"
           title="Previous page"
+          aria-label="Go to previous page"
         >
-          <svg className="w-4 h-4 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
+          ← Previous
         </button>
 
         {/* Page Numbers */}
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center gap-1">
           {getPageNumbers().map((page, index) => {
             if (page === '...') {
               return (
-                <span key={`ellipsis-${index}`} className="px-2 py-1 text-gray-500 font-medium">
+                <span key={`ellipsis-${index}`} className="px-2 py-1 text-muted-foreground font-medium">
                   ...
                 </span>
               );
             }
 
             const isCurrentPage = page === currentPage;
+            const pageNumber = page as number;
             return (
               <button
                 key={page}
-                onClick={() => handlePageChange(page as number)}
-                className={`flex items-center justify-center w-10 h-10 rounded-full font-medium ${
+                type="button"
+                onClick={handlePageClick(pageNumber)}
+                disabled={isCurrentPage || totalPages === 0}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
                   isCurrentPage
-                    ? 'bg-blue-500 text-white border border-blue-600'
-                    : 'text-gray-800 hover:text-blue-600 hover:bg-blue-50'
+                    ? 'bg-success text-white cursor-default scale-105'
+                    : 'bg-card border border-border text-foreground hover:bg-accent cursor-pointer active:scale-95'
                 }`}
+                aria-label={`Go to page ${page}`}
+                aria-current={isCurrentPage ? 'page' : undefined}
               >
                 {page}
               </button>
@@ -124,46 +153,15 @@ export const Pagination: React.FC<PaginationProps> = ({
 
         {/* Next Page Button */}
         <button
-          onClick={() => handlePageChange(currentPage + 1)}
+          type="button"
+          onClick={handleNext}
           disabled={currentPage === totalPages || totalPages <= 1}
-          className="flex items-center justify-center w-10 h-10 rounded-full border border-blue-200 bg-white hover:bg-blue-50 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 rounded-lg bg-card border border-border text-foreground hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium active:scale-95"
           title="Next page"
+          aria-label="Go to next page"
         >
-          <svg className="w-4 h-4 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
+          Next →
         </button>
-
-        {/* Records Per Page Selector */}
-        <div className="flex items-center space-x-2 ml-4 pl-4 border-l border-blue-200">
-          <select
-            value={perPage}
-            onChange={(e) => onPerPageChange(Number(e.target.value))}
-            className="px-3 py-2 text-sm border border-blue-200 rounded-full bg-white hover:border-blue-300 hover:bg-blue-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer text-gray-800"
-          >
-            <option value={10}>10 / page</option>
-            <option value={15}>15 / page</option>
-            <option value={25}>25 / page</option>
-            <option value={50}>50 / page</option>
-            <option value={100}>100 / page</option>
-          </select>
-        </div>
-
-        {/* Go To Page Input */}
-        <div className="flex items-center space-x-2 ml-4 pl-4 border-l border-blue-200">
-          <span className="text-sm text-gray-800 font-medium">Go to</span>
-          <input
-            type="number"
-            value={goToPage}
-            onChange={(e) => setGoToPage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder=""
-            min="1"
-            max={totalPages}
-            className="w-16 px-3 py-2 text-sm border border-blue-200 rounded-full bg-white hover:border-blue-300 hover:bg-blue-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 text-center"
-          />
-          <span className="text-sm text-gray-800 font-medium">Page</span>
-        </div>
       </div>
     </div>
   );

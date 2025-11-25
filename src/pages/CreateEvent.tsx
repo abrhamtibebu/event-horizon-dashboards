@@ -409,24 +409,24 @@ export default function CreateEvent() {
       <style>{customRangeStyles}</style>
       <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-2xl shadow-2xl w-full max-w-6xl mx-auto p-0 animate-fade-in relative h-[95vh] flex flex-col">
         {/* Header */}
-        <div className="flex-shrink-0 bg-white rounded-t-xl p-6 border-b border-gray-200">
+        <div className="flex-shrink-0 bg-card rounded-t-xl p-6 border-b border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
                 <Tag className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                <h2 className="text-3xl font-bold text-foreground">
                   Create New Event
                 </h2>
-                <p className="text-gray-600 mt-1">
+                <p className="text-muted-foreground mt-1">
                   Set up a new event in the system
                 </p>
               </div>
             </div>
             <button
               onClick={() => navigate(-1)}
-              className="text-gray-400 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100 transition-colors"
+              className="text-muted-foreground hover:text-foreground p-2 rounded-full hover:bg-accent transition-colors"
             >
               <X className="w-6 h-6" />
             </button>
@@ -439,16 +439,16 @@ export default function CreateEvent() {
         >
           <div className="max-w-5xl mx-auto space-y-8">
           {/* Event Type Selection */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
                 <Ticket className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">
+                <h3 className="text-xl font-bold text-card-foreground">
                   Event Type
                 </h3>
-                <p className="text-gray-500 text-sm">
+                <p className="text-muted-foreground text-sm">
                   Choose between free or ticketed event
                 </p>
               </div>
@@ -459,7 +459,7 @@ export default function CreateEvent() {
                 className={`p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${
                   formData.event_type === 'free' 
                     ? 'border-purple-500 bg-purple-50' 
-                    : 'border-gray-200 hover:border-purple-300'
+                    : 'border-border hover:border-purple-300'
                 }`}
                 onClick={() => handleInputChange('event_type', 'free')}
               >
@@ -468,11 +468,11 @@ export default function CreateEvent() {
                     <Gift className="w-6 h-6 text-green-600" />
                   </div>
                   <div>
-                    <h4 className="text-lg font-bold text-gray-900">Free Event</h4>
-                    <p className="text-gray-600">No cost to attendees</p>
+                    <h4 className="text-lg font-bold text-card-foreground">Free Event</h4>
+                    <p className="text-muted-foreground">No cost to attendees</p>
                   </div>
                 </div>
-                <ul className="space-y-2 text-sm text-gray-600">
+                <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-center">
                     <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                     Guest type management
@@ -493,7 +493,7 @@ export default function CreateEvent() {
                 className={`p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${
                   formData.event_type === 'ticketed' 
                     ? 'border-purple-500 bg-purple-50' 
-                    : 'border-gray-200 hover:border-purple-300'
+                    : 'border-border hover:border-purple-300'
                 }`}
                 onClick={() => handleInputChange('event_type', 'ticketed')}
               >
@@ -502,11 +502,11 @@ export default function CreateEvent() {
                     <Ticket className="w-6 h-6 text-purple-600" />
                   </div>
                   <div>
-                    <h4 className="text-lg font-bold text-gray-900">Ticketed Event</h4>
-                    <p className="text-gray-600">Paid tickets with multiple tiers</p>
+                    <h4 className="text-lg font-bold text-card-foreground">Ticketed Event</h4>
+                    <p className="text-muted-foreground">Paid tickets with multiple tiers</p>
                   </div>
                 </div>
-                <ul className="space-y-2 text-sm text-gray-600">
+                <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-center">
                     <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
                     Multiple ticket types
@@ -525,23 +525,23 @@ export default function CreateEvent() {
           </div>
 
           {/* Event Information */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                 <Tag className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">
+                <h3 className="text-xl font-bold text-card-foreground">
                   Event Information
                 </h3>
-                <p className="text-gray-500 text-sm">
+                <p className="text-muted-foreground text-sm">
                   Basic event details and logistics
                 </p>
               </div>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
-                <Label htmlFor="name" className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label htmlFor="name" className="flex items-center gap-2 text-foreground font-medium">
                   <Tag className="w-4 h-4 text-blue-500" /> Event Name
                 </Label>
                 <Input
@@ -550,18 +550,18 @@ export default function CreateEvent() {
                   onChange={(e) => handleInputChange('name', e.target.value)}
                   placeholder="Enter event name"
                   required
-                  className="mt-2 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                  className="mt-2 h-12 border-border focus:border-blue-500 focus:ring-blue-500 rounded-xl"
                 />
               </div>
               <div>
-                <Label htmlFor="organizer_id" className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label htmlFor="organizer_id" className="flex items-center gap-2 text-foreground font-medium">
                   <Tag className="w-4 h-4 text-green-500" /> Organizer
                 </Label>
-                {user?.role === 'organizer' ? (
+                {(user?.role === 'organizer' || user?.role === 'organizer_admin') ? (
                   <Input
                     value={user.organizer?.name || ''}
                     disabled
-                    className="mt-2 h-12 border-gray-300 bg-gray-50 rounded-xl"
+                    className="mt-2 h-12 border-border bg-muted rounded-xl"
                   />
                 ) : (
                   <Select
@@ -572,7 +572,7 @@ export default function CreateEvent() {
                     disabled={loading.organizers}
                     required
                   >
-                    <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl" id="organizer_id">
+                    <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl" id="organizer_id">
                       <SelectValue placeholder="Select an organizer" />
                     </SelectTrigger>
                     <SelectContent>
@@ -598,7 +598,7 @@ export default function CreateEvent() {
                 )}
               </div>
               <div className="lg:col-span-2">
-                <Label htmlFor="description" className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label htmlFor="description" className="flex items-center gap-2 text-foreground font-medium">
                   <FileText className="w-4 h-4 text-purple-500" /> Description
                 </Label>
                 <Textarea
@@ -609,11 +609,11 @@ export default function CreateEvent() {
                   }
                   placeholder="Describe your event..."
                   rows={4}
-                  className="mt-2 border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-xl resize-none"
+                  className="mt-2 border-border focus:border-purple-500 focus:ring-purple-500 rounded-xl resize-none"
                 />
               </div>
               <div>
-                <Label htmlFor="event_type_id" className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label htmlFor="event_type_id" className="flex items-center gap-2 text-foreground font-medium">
                   <Tag className="w-4 h-4 text-orange-500" /> Event Type
                 </Label>
                 <Select
@@ -624,7 +624,7 @@ export default function CreateEvent() {
                   disabled={loading.eventTypes}
                   required
                 >
-                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 rounded-xl" id="event_type_id">
+                  <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl" id="event_type_id">
                     <SelectValue placeholder="Select event type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -642,7 +642,7 @@ export default function CreateEvent() {
                 )}
               </div>
               <div>
-                <Label htmlFor="event_category_id" className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label htmlFor="event_category_id" className="flex items-center gap-2 text-foreground font-medium">
                   <Tag className="w-4 h-4 text-indigo-500" /> Event Category
                 </Label>
                 <Select
@@ -653,7 +653,7 @@ export default function CreateEvent() {
                   disabled={loading.eventCategories}
                   required
                 >
-                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-xl" id="event_category_id">
+                  <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl" id="event_category_id">
                     <SelectValue placeholder="Select event category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -671,14 +671,14 @@ export default function CreateEvent() {
                 )}
               </div>
               <div>
-                <Label className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label className="flex items-center gap-2 text-foreground font-medium">
                   <MapPin className="w-4 h-4 text-green-500" /> City
                 </Label>
                 <Select
                   value={formData.city}
                   onValueChange={(value) => handleInputChange('city', value)}
                 >
-                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl">
+                  <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
                     <SelectValue placeholder="Select a city" />
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
@@ -807,16 +807,16 @@ export default function CreateEvent() {
           </div>
 
           {/* Event & Registration Dates Section */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-violet-600 rounded-xl flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 bg-brand-gradient rounded-xl flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-primary-foreground" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">
+                <h3 className="text-xl font-bold text-foreground">
                   Event & Registration Dates
                 </h3>
-                <p className="text-gray-500 text-sm">
+                <p className="text-muted-foreground text-sm">
                   Set event and registration periods
                 </p>
               </div>
@@ -824,7 +824,7 @@ export default function CreateEvent() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Event Date Range Picker */}
               <div>
-                <Label className="flex items-center gap-2 text-gray-700">
+                <Label className="flex items-center gap-2 text-foreground">
                   <Calendar className="w-4 h-4" /> Event Date Range
                 </Label>
                 <Popover>
@@ -832,18 +832,18 @@ export default function CreateEvent() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full mt-1 mb-2 bg-white/80 text-purple-700 border-purple-200 hover:bg-purple-50 rounded-xl shadow"
+                      className="w-full mt-1 mb-2 rounded-xl shadow"
                     >
                       {formData.start_date && formData.end_date
                         ? `${eventRange[0].startDate.toLocaleDateString()} - ${eventRange[0].endDate.toLocaleDateString()}`
                         : 'Select event date range'}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="p-4 bg-white/90 rounded-2xl shadow-xl border border-purple-200 w-auto">
+                  <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
                     <div className="flex flex-col gap-4">
                       <div className="flex gap-4">
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">Start Date</div>
+                          <div className="text-xs text-muted-foreground mb-1">Start Date</div>
                           <ShadCalendar
                             mode="single"
                             selected={eventRange[0].startDate}
@@ -855,7 +855,7 @@ export default function CreateEvent() {
                           />
                         </div>
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">End Date</div>
+                          <div className="text-xs text-muted-foreground mb-1">End Date</div>
                           <ShadCalendar
                             mode="single"
                             selected={eventRange[0].endDate}
@@ -873,7 +873,7 @@ export default function CreateEvent() {
               </div>
               {/* Registration Date Range Picker */}
               <div>
-                <Label className="flex items-center gap-2 text-gray-700">
+                <Label className="flex items-center gap-2 text-foreground">
                   <Calendar className="w-4 h-4" /> Registration Date Range
                 </Label>
                 <Popover>
@@ -881,18 +881,18 @@ export default function CreateEvent() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full mt-1 mb-2 bg-white/80 text-purple-700 border-purple-200 hover:bg-purple-50 rounded-xl shadow"
+                      className="w-full mt-1 mb-2 rounded-xl shadow"
                     >
                       {formData.registration_start_date && formData.registration_end_date
                         ? `${regRange[0].startDate.toLocaleDateString()} - ${regRange[0].endDate.toLocaleDateString()}`
                         : 'Select registration date range'}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="p-4 bg-white/90 rounded-2xl shadow-xl border border-purple-200 w-auto">
+                  <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
                     <div className="flex flex-col gap-4">
                       <div className="flex gap-4">
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">Start Date</div>
+                          <div className="text-xs text-muted-foreground mb-1">Start Date</div>
                           <ShadCalendar
                             mode="single"
                             selected={regRange[0].startDate}
@@ -904,7 +904,7 @@ export default function CreateEvent() {
                           />
                         </div>
                         <div>
-                          <div className="text-xs text-gray-500 mb-1">End Date</div>
+                          <div className="text-xs text-muted-foreground mb-1">End Date</div>
                           <ShadCalendar
                             mode="single"
                             selected={regRange[0].endDate}
@@ -925,17 +925,17 @@ export default function CreateEvent() {
 
           {/* Ticket Types Section - Only show for ticketed events */}
           {formData.event_type === 'ticketed' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                    <Ticket className="w-5 h-5 text-white" />
+                  <div className="w-10 h-10 bg-brand-gradient rounded-xl flex items-center justify-center">
+                    <Ticket className="w-5 h-5 text-primary-foreground" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-gray-900">
-                      Ticket Types <span className="text-sm font-normal text-gray-500">(Optional)</span>
+                    <h3 className="text-xl font-bold text-foreground">
+                      Ticket Types <span className="text-sm font-normal text-muted-foreground">(Optional)</span>
                     </h3>
-                    <p className="text-gray-500 text-sm">
+                    <p className="text-muted-foreground text-sm">
                       You can add ticket types now or later in Ticket Management
                     </p>
                   </div>
@@ -943,12 +943,12 @@ export default function CreateEvent() {
               </div>
 
               {/* Info Alert */}
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="mb-6 p-4 bg-info/10 border border-info/30 rounded-lg">
                 <div className="flex items-start gap-3">
-                  <div className="text-blue-600 mt-0.5">ℹ️</div>
+                  <div className="text-info dark:text-info mt-0.5">ℹ️</div>
                   <div>
-                    <p className="text-sm text-blue-900 font-medium">Ticket types are optional during event creation</p>
-                    <p className="text-sm text-blue-700 mt-1">
+                    <p className="text-sm text-info dark:text-info font-medium">Ticket types are optional during event creation</p>
+                    <p className="text-sm text-info/90 dark:text-info/80 mt-1">
                       You can skip this section and add ticket types later through the <strong>Ticket Management</strong> dashboard. 
                       This allows you to configure pricing and availability after your event is created.
                     </p>
@@ -958,7 +958,7 @@ export default function CreateEvent() {
 
               {/* Available Ticket Types */}
               <div className="mb-6">
-                <h4 className="text-lg font-semibold text-gray-900 mb-4">Available Ticket Types</h4>
+                <h4 className="text-lg font-semibold text-foreground mb-4">Available Ticket Types</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {ticketTypeOptions.map((option) => {
                     const isSelected = ticketTypes.some(t => t.name === option.name)
@@ -967,17 +967,17 @@ export default function CreateEvent() {
                         key={option.name}
                         className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
                           isSelected 
-                            ? 'border-purple-500 bg-purple-50' 
-                            : 'border-gray-200 hover:border-purple-300'
+                            ? 'border-primary bg-primary/10' 
+                            : 'border-border hover:border-primary/50'
                         }`}
                         onClick={() => !isSelected && addTicketType(option)}
                       >
                         <div className="flex items-center mb-2">
-                          <option.icon className="w-5 h-5 text-purple-600 mr-2" />
-                          <span className="font-semibold text-gray-900">{option.name}</span>
+                          <option.icon className="w-5 h-5 text-primary dark:text-primary mr-2" />
+                          <span className="font-semibold text-foreground">{option.name}</span>
                         </div>
-                        <p className="text-sm text-gray-600">{option.description}</p>
-                                                    <p className="text-sm font-medium text-purple-600 mt-2">
+                        <p className="text-sm text-muted-foreground">{option.description}</p>
+                                                    <p className="text-sm font-medium text-primary dark:text-primary mt-2">
                               Starting at ETB {option.defaultPrice.toLocaleString()}
                             </p>
                       </div>
@@ -989,16 +989,16 @@ export default function CreateEvent() {
               {/* Selected Ticket Types */}
               {ticketTypes.length > 0 && (
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Configure Ticket Types</h4>
+                  <h4 className="text-lg font-semibold text-foreground mb-4">Configure Ticket Types</h4>
                   <div className="space-y-4">
                     {ticketTypes.map((ticketType, index) => (
-                      <div key={index} className="p-6 border border-gray-200 rounded-xl">
+                      <div key={index} className="p-6 border border-border rounded-xl bg-card">
                         <div className="flex items-center justify-between mb-4">
-                          <h5 className="text-lg font-semibold text-gray-900">{ticketType.name}</h5>
+                          <h5 className="text-lg font-semibold text-foreground">{ticketType.name}</h5>
                           <button
                             type="button"
                             onClick={() => removeTicketType(index)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                            className="p-2 text-error hover:bg-error/10 rounded-lg"
                           >
                             <Trash2 className="w-5 h-5" />
                           </button>
@@ -1006,14 +1006,14 @@ export default function CreateEvent() {
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                            <Label className="block text-sm font-medium text-foreground mb-2">
                               Price (ETB) *
                             </Label>
                             <Input
                               type="number"
                               value={ticketType.price}
                               onChange={(e) => updateTicketType(index, 'price', parseFloat(e.target.value))}
-                              className="w-full h-12 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              className="w-full h-12 border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
                               placeholder="0"
                               min="0"
                               step="1"
@@ -1021,21 +1021,21 @@ export default function CreateEvent() {
                           </div>
                           
                           <div>
-                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                            <Label className="block text-sm font-medium text-foreground mb-2">
                               Quantity (leave empty for unlimited)
                             </Label>
                             <Input
                               type="number"
                               value={ticketType.quantity || ''}
                               onChange={(e) => updateTicketType(index, 'quantity', e.target.value ? parseInt(e.target.value) : null)}
-                              className="w-full h-12 border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              className="w-full h-12 border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
                               placeholder="Unlimited"
                               min="1"
                             />
                           </div>
                           
                           <div>
-                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                            <Label className="block text-sm font-medium text-foreground mb-2">
                               Sales End Date
                             </Label>
                             <Popover>
@@ -1043,14 +1043,14 @@ export default function CreateEvent() {
                                 <Button
                                   type="button"
                                   variant="outline"
-                                  className="w-full h-12 bg-white/80 text-purple-700 border-purple-200 hover:bg-purple-50 rounded-xl shadow focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                  className="w-full h-12 rounded-xl shadow focus:ring-2 focus:ring-primary focus:border-primary"
                                 >
                                   {ticketType.sales_end_date
                                     ? new Date(ticketType.sales_end_date).toLocaleDateString()
                                     : 'Select sales end date'}
                                 </Button>
                               </PopoverTrigger>
-                              <PopoverContent className="p-4 bg-white/90 rounded-2xl shadow-xl border border-purple-200 w-auto">
+                              <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
                                 <ShadCalendar
                                   mode="single"
                                   selected={ticketType.sales_end_date ? new Date(ticketType.sales_end_date) : undefined}
@@ -1066,14 +1066,14 @@ export default function CreateEvent() {
                           </div>
                           
                           <div>
-                            <Label className="block text-sm font-medium text-gray-700 mb-2">
+                            <Label className="block text-sm font-medium text-foreground mb-2">
                               Description
                             </Label>
                             <Textarea
                               value={ticketType.description}
                               onChange={(e) => updateTicketType(index, 'description', e.target.value)}
                               rows={2}
-                              className="w-full border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                              className="w-full border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary resize-none"
                               placeholder="Describe this ticket type..."
                             />
                           </div>
@@ -1089,24 +1089,24 @@ export default function CreateEvent() {
 
 
           {/* Additional Information Section */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
-                <FileText className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 bg-brand-gradient rounded-xl flex items-center justify-center">
+                <FileText className="w-5 h-5 text-primary-foreground" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">
+                <h3 className="text-xl font-bold text-foreground">
                   Additional Information
                 </h3>
-                <p className="text-gray-500 text-sm">
+                <p className="text-muted-foreground text-sm">
                   Requirements, agenda, and additional details
                 </p>
               </div>
             </div>
             <div className="grid grid-cols-1 gap-6">
               <div>
-                <Label htmlFor="requirements" className="flex items-center gap-2 text-gray-700 font-medium">
-                  <FileText className="w-4 h-4 text-amber-500" /> Requirements & Prerequisites
+                <Label htmlFor="requirements" className="flex items-center gap-2 text-foreground font-medium">
+                  <FileText className="w-4 h-4 text-warning" /> Requirements & Prerequisites
                 </Label>
                 <Textarea
                   id="requirements"
@@ -1116,12 +1116,12 @@ export default function CreateEvent() {
                   }
                   placeholder="Any requirements or prerequisites for attendees..."
                   rows={3}
-                  className="mt-2 border-gray-300 focus:border-amber-500 focus:ring-amber-500 rounded-xl resize-none"
+                  className="mt-2 border-border focus:border-primary focus:ring-primary/20 rounded-xl resize-none"
                 />
               </div>
               <div>
-                <Label htmlFor="agenda" className="flex items-center gap-2 text-gray-700 font-medium">
-                  <FileText className="w-4 h-4 text-amber-500" /> Event Agenda
+                <Label htmlFor="agenda" className="flex items-center gap-2 text-foreground font-medium">
+                  <FileText className="w-4 h-4 text-warning" /> Event Agenda
                 </Label>
                 <Textarea
                   id="agenda"
@@ -1129,7 +1129,7 @@ export default function CreateEvent() {
                   onChange={(e) => handleInputChange('agenda', e.target.value)}
                   placeholder="Detailed event schedule and agenda..."
                   rows={4}
-                  className="mt-2 border-gray-300 focus:border-amber-500 focus:ring-amber-500 rounded-xl resize-none"
+                  className="mt-2 border-border focus:border-primary focus:ring-primary/20 rounded-xl resize-none"
                 />
               </div>
             </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import Breadcrumbs from '@/components/Breadcrumbs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,8 +45,7 @@ import evellaAnalytics, {
   EventViewData,
   EventRegistrationData
 } from '@/lib/evellaAnalytics'
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D']
+import { getChartStyles, getChartColors, getChartColorPalette } from '@/utils/reportTransformers'
 
 export default function EvellaAnalytics() {
   const [loading, setLoading] = useState(true)
@@ -208,6 +208,14 @@ export default function EvellaAnalytics() {
   if (apiStatus === 'error') {
     return (
       <div className="space-y-6">
+        {/* Breadcrumbs */}
+        <Breadcrumbs 
+          items={[
+            { label: 'Evella Analytics', href: '/dashboard/evella-analytics' }
+          ]}
+          className="mb-4"
+        />
+        
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Evella Analytics</h1>
@@ -340,7 +348,7 @@ export default function EvellaAnalytics() {
       {/* Real-time Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-2 h-full bg-gradient-to-b from-green-400 to-green-600"></div>
+          <div className="absolute top-0 right-0 w-2 h-full bg-success"></div>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Users</CardTitle>
             <div className="flex items-center gap-1">
@@ -349,18 +357,18 @@ export default function EvellaAnalytics() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{realTimeData?.activeUsers || 0}</div>
+            <div className="text-2xl font-bold text-success">{realTimeData?.activeUsers || 0}</div>
             <p className="text-xs text-muted-foreground">
               Currently online
             </p>
-            <div className="mt-2 text-xs text-green-600">
+            <div className="mt-2 text-xs text-success">
               +{Math.floor(Math.random() * 5) + 1} in last minute
             </div>
           </CardContent>
         </Card>
 
         <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-2 h-full bg-gradient-to-b from-blue-400 to-blue-600"></div>
+          <div className="absolute top-0 right-0 w-2 h-full bg-info"></div>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Page Views</CardTitle>
             <div className="flex items-center gap-1">
@@ -369,40 +377,38 @@ export default function EvellaAnalytics() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{realTimeData?.currentPageViews || 0}</div>
+            <div className="text-2xl font-bold text-info">{realTimeData?.currentPageViews || 0}</div>
             <p className="text-xs text-muted-foreground">
               Last 5 minutes
             </p>
-            <div className="mt-2 text-xs text-blue-600">
+            <div className="mt-2 text-xs text-info">
               {Math.floor(Math.random() * 10) + 5} per minute
             </div>
           </CardContent>
         </Card>
 
         <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-2 h-full bg-gradient-to-b from-purple-400 to-purple-600"></div>
+          <div className="absolute top-0 right-0 w-2 h-full bg-info"></div>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Interactions</CardTitle>
             <div className="flex items-center gap-1">
               <MousePointer className="h-4 w-4 text-muted-foreground" />
-              <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-info rounded-full animate-pulse"></div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">
+            <div className="text-2xl font-bold text-info">
               {realTimeData?.recentInteractions?.length || 0}
             </div>
             <p className="text-xs text-muted-foreground">
               Last 5 minutes
             </p>
-            <div className="mt-2 text-xs text-purple-600">
-              {Math.floor(Math.random() * 20) + 10} per minute
-            </div>
+            <div className="mt-2 text-xs text-info">Recent interactions</div>
           </CardContent>
         </Card>
 
         <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-2 h-full bg-gradient-to-b from-orange-400 to-orange-600"></div>
+          <div className="absolute top-0 right-0 w-2 h-full bg-error"></div>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Errors</CardTitle>
             <div className="flex items-center gap-1">
@@ -411,7 +417,7 @@ export default function EvellaAnalytics() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+            <div className="text-2xl font-bold text-error">
               {realTimeData?.recentErrors?.length || 0}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -442,7 +448,7 @@ export default function EvellaAnalytics() {
           <div className="space-y-3 max-h-64 overflow-y-auto">
             {realTimeData?.recentInteractions?.slice(0, 10).map((interaction, index) => (
               <div key={index} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-info rounded-full animate-pulse"></div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium capitalize">{interaction.type}</span>
@@ -506,7 +512,7 @@ export default function EvellaAnalytics() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Connections</span>
-                <span className="text-xs font-medium text-blue-600">{Math.floor(Math.random() * 20) + 10}</span>
+                <span className="text-xs font-medium text-info">{Math.floor(Math.random() * 20) + 10}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Query Time</span>
@@ -533,7 +539,7 @@ export default function EvellaAnalytics() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Events/sec</span>
-                <span className="text-xs font-medium text-purple-600">{Math.floor(Math.random() * 100) + 50}</span>
+                <span className="text-xs font-medium text-info">{Math.floor(Math.random() * 100) + 50}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Processing</span>
@@ -569,7 +575,7 @@ export default function EvellaAnalytics() {
                     notification.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' :
                     notification.type === 'warning' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
                     notification.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' :
-                    'bg-blue-50 text-blue-700 border border-blue-200'
+                    'bg-info/10 text-info border border-info/30'
                   }`}
                 >
                   <div className={`w-2 h-2 rounded-full ${
@@ -615,11 +621,20 @@ export default function EvellaAnalytics() {
                     date: new Date(pv.timestamp).toLocaleDateString(),
                     views: 1
                   })) || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="views" stroke="#8884d8" />
+                    {(() => {
+                      const styles = getChartStyles();
+                      const chartColors = getChartColors();
+                      
+                      return (
+                        <>
+                          <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                          <XAxis dataKey="date" stroke={styles.axisStroke} />
+                          <YAxis stroke={styles.axisStroke} />
+                          <Tooltip contentStyle={{ backgroundColor: styles.tooltipBg, border: `1px solid ${styles.tooltipBorder}`, borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', color: styles.tooltipText }} />
+                          <Line type="monotone" dataKey="views" stroke={chartColors.line} />
+                        </>
+                      );
+                    })()}
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -634,25 +649,36 @@ export default function EvellaAnalytics() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
-                    <Pie
-                      data={[
+                    {(() => {
+                      const styles = getChartStyles();
+                      const colors = getChartColorPalette('primary');
+                      const deviceData = [
                         { name: 'Desktop', value: analyticsData?.pageViews?.filter(pv => pv.deviceType === 'desktop').length || 0 },
                         { name: 'Mobile', value: analyticsData?.pageViews?.filter(pv => pv.deviceType === 'mobile').length || 0 },
                         { name: 'Tablet', value: analyticsData?.pageViews?.filter(pv => pv.deviceType === 'tablet').length || 0 }
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {COLORS.map((color, index) => (
-                        <Cell key={`cell-${index}`} fill={color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
+                      ];
+                      
+                      return (
+                        <>
+                          <Pie
+                            data={deviceData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                            outerRadius={80}
+                            fill={colors[0]}
+                            dataKey="value"
+                            labelStyle={{ fill: styles.labelColor }}
+                          >
+                            {deviceData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={{ backgroundColor: styles.tooltipBg, border: `1px solid ${styles.tooltipBorder}`, borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', color: styles.tooltipText }} />
+                        </>
+                      );
+                    })()}
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -707,11 +733,20 @@ export default function EvellaAnalytics() {
                     duration: Math.round(session.duration / 60), // Convert to minutes
                     count: 1
                   })) || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="duration" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#8884d8" />
+                    {(() => {
+                      const styles = getChartStyles();
+                      const chartColors = getChartColors();
+                      
+                      return (
+                        <>
+                          <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                          <XAxis dataKey="duration" stroke={styles.axisStroke} />
+                          <YAxis stroke={styles.axisStroke} />
+                          <Tooltip contentStyle={{ backgroundColor: styles.tooltipBg, border: `1px solid ${styles.tooltipBorder}`, borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', color: styles.tooltipText }} />
+                          <Bar dataKey="count" fill={chartColors.info} />
+                        </>
+                      );
+                    })()}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -726,31 +761,41 @@ export default function EvellaAnalytics() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
-                    <Pie
-                      data={analyticsData?.userInteractions?.reduce((acc, interaction) => {
+                    {(() => {
+                      const styles = getChartStyles();
+                      const colors = getChartColorPalette('primary');
+                      const interactionData = analyticsData?.userInteractions?.reduce((acc, interaction) => {
                         acc[interaction.type] = (acc[interaction.type] || 0) + 1
                         return acc
                       }, {} as Record<string, number>)
-                      ? Object.entries(analyticsData.userInteractions.reduce((acc, interaction) => {
-                          acc[interaction.type] = (acc[interaction.type] || 0) + 1
-                          return acc
-                        }, {} as Record<string, number>))
-                        .map(([type, count]) => ({ name: type, value: count }))
-                      : []
-                      }
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {COLORS.map((color, index) => (
-                        <Cell key={`cell-${index}`} fill={color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
+                        ? Object.entries(analyticsData.userInteractions.reduce((acc, interaction) => {
+                            acc[interaction.type] = (acc[interaction.type] || 0) + 1
+                            return acc
+                          }, {} as Record<string, number>))
+                          .map(([type, count]) => ({ name: type, value: count }))
+                        : [];
+                      
+                      return (
+                        <>
+                          <Pie
+                            data={interactionData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                            outerRadius={80}
+                            fill={colors[0]}
+                            dataKey="value"
+                            labelStyle={{ fill: styles.labelColor }}
+                          >
+                            {interactionData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={{ backgroundColor: styles.tooltipBg, border: `1px solid ${styles.tooltipBorder}`, borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', color: styles.tooltipText }} />
+                        </>
+                      );
+                    })()}
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -803,11 +848,20 @@ export default function EvellaAnalytics() {
                     event: reg.eventTitle.substring(0, 20) + '...',
                     registrations: 1
                   })) || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="event" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="registrations" fill="#00C49F" />
+                    {(() => {
+                      const styles = getChartStyles();
+                      const chartColors = getChartColors();
+                      
+                      return (
+                        <>
+                          <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                          <XAxis dataKey="event" stroke={styles.axisStroke} />
+                          <YAxis stroke={styles.axisStroke} />
+                          <Tooltip contentStyle={{ backgroundColor: styles.tooltipBg, border: `1px solid ${styles.tooltipBorder}`, borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', color: styles.tooltipText }} />
+                          <Bar dataKey="registrations" fill={chartColors.success} />
+                        </>
+                      );
+                    })()}
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -830,10 +884,18 @@ export default function EvellaAnalytics() {
                     metric: 'Page Load',
                     value: pm.pageLoadTime
                   })) || []}>
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="metric" />
-                    <PolarRadiusAxis />
-                    <Radar name="Performance" dataKey="value" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                    {(() => {
+                      const chartColors = getChartColors();
+                      
+                      return (
+                        <>
+                          <PolarGrid />
+                          <PolarAngleAxis dataKey="metric" />
+                          <PolarRadiusAxis />
+                          <Radar name="Performance" dataKey="value" stroke={chartColors.info} fill={chartColors.info} fillOpacity={0.6} />
+                        </>
+                      );
+                    })()}
                   </RadarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -851,11 +913,20 @@ export default function EvellaAnalytics() {
                     time: new Date(pm.timestamp).toLocaleDateString(),
                     loadTime: pm.pageLoadTime
                   })) || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="time" />
-                    <YAxis />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="loadTime" stroke="#8884d8" fill="#8884d8" />
+                    {(() => {
+                      const styles = getChartStyles();
+                      const chartColors = getChartColors();
+                      
+                      return (
+                        <>
+                          <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                          <XAxis dataKey="time" stroke={styles.axisStroke} />
+                          <YAxis stroke={styles.axisStroke} />
+                          <Tooltip contentStyle={{ backgroundColor: styles.tooltipBg, border: `1px solid ${styles.tooltipBorder}`, borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', color: styles.tooltipText }} />
+                          <Area type="monotone" dataKey="loadTime" stroke={chartColors.success} fill={chartColors.success} />
+                        </>
+                      );
+                    })()}
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -878,11 +949,20 @@ export default function EvellaAnalytics() {
                     time: new Date(sa.timestamp).toLocaleDateString(),
                     searches: 1
                   })) || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="time" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="searches" stroke="#00C49F" />
+                    {(() => {
+                      const styles = getChartStyles();
+                      const chartColors = getChartColors();
+                      
+                      return (
+                        <>
+                          <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                          <XAxis dataKey="time" stroke={styles.axisStroke} />
+                          <YAxis stroke={styles.axisStroke} />
+                          <Tooltip contentStyle={{ backgroundColor: styles.tooltipBg, border: `1px solid ${styles.tooltipBorder}`, borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', color: styles.tooltipText }} />
+                          <Line type="monotone" dataKey="searches" stroke={chartColors.line} />
+                        </>
+                      );
+                    })()}
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -935,11 +1015,20 @@ export default function EvellaAnalytics() {
                     time: new Date(el.timestamp).toLocaleDateString(),
                     errors: 1
                   })) || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="time" />
-                    <YAxis />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="errors" stroke="#FF8042" fill="#FF8042" />
+                    {(() => {
+                      const styles = getChartStyles();
+                      const chartColors = getChartColors();
+                      
+                      return (
+                        <>
+                          <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                          <XAxis dataKey="time" stroke={styles.axisStroke} />
+                          <YAxis stroke={styles.axisStroke} />
+                          <Tooltip contentStyle={{ backgroundColor: styles.tooltipBg, border: `1px solid ${styles.tooltipBorder}`, borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', color: styles.tooltipText }} />
+                          <Area type="monotone" dataKey="errors" stroke={chartColors.error} fill={chartColors.error} />
+                        </>
+                      );
+                    })()}
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -954,31 +1043,41 @@ export default function EvellaAnalytics() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
-                    <Pie
-                      data={analyticsData?.errorLogs?.reduce((acc, el) => {
+                    {(() => {
+                      const styles = getChartStyles();
+                      const colors = getChartColorPalette('primary');
+                      const errorData = analyticsData?.errorLogs?.reduce((acc, el) => {
                         acc[el.severity] = (acc[el.severity] || 0) + 1
                         return acc
                       }, {} as Record<string, number>)
-                      ? Object.entries(analyticsData.errorLogs.reduce((acc, el) => {
-                          acc[el.severity] = (acc[el.severity] || 0) + 1
-                          return acc
-                        }, {} as Record<string, number>))
-                        .map(([severity, count]) => ({ name: severity, value: count }))
-                      : []
-                      }
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#FF8042"
-                      dataKey="value"
-                    >
-                      {COLORS.map((color, index) => (
-                        <Cell key={`cell-${index}`} fill={color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
+                        ? Object.entries(analyticsData.errorLogs.reduce((acc, el) => {
+                            acc[el.severity] = (acc[el.severity] || 0) + 1
+                            return acc
+                          }, {} as Record<string, number>))
+                          .map(([severity, count]) => ({ name: severity, value: count }))
+                        : [];
+                      
+                      return (
+                        <>
+                          <Pie
+                            data={errorData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                            outerRadius={80}
+                            fill={colors[0]}
+                            dataKey="value"
+                            labelStyle={{ fill: styles.labelColor }}
+                          >
+                            {errorData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={{ backgroundColor: styles.tooltipBg, border: `1px solid ${styles.tooltipBorder}`, borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', color: styles.tooltipText }} />
+                        </>
+                      );
+                    })()}
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>

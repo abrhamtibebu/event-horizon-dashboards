@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense, lazy } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,12 +17,18 @@ import {
   Save, 
   Eye,
   Download,
+  Settings,
+  Layers,
+  Palette,
+  Undo,
+  Redo,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
 } from 'lucide-react'
-import { BadgeCanvas } from '@/components/badge-designer/BadgeCanvas'
-import { Toolbar } from '@/components/badge-designer/Toolbar'
-import { Sidebar } from '@/components/badge-designer/Sidebar'
-import { PropertiesPanel } from '@/components/badge-designer/PropertiesPanel'
-import { PreviewModal } from '@/components/badge-designer/PreviewModal'
+import { Spinner } from '@/components/ui/spinner'
+import { Separator } from '@/components/ui/separator'
+import { Badge } from '@/components/ui/badge'
 import { useBadgeStore, startAutoSave, stopAutoSave } from '@/lib/badge-designer/store/useBadgeStore'
 import { 
   useSaveBadgeTemplate, 
@@ -33,6 +39,22 @@ import {
 } from '@/hooks/badge-designer/useBadgeTemplates'
 import { loadGoogleFonts } from '@/lib/badge-designer/utils/fontLoader'
 import { toast } from 'sonner'
+import { usePermissionCheck } from '@/hooks/use-permission-check'
+import { cn } from '@/lib/utils'
+
+// Lazy load heavy components
+const BadgeCanvas = lazy(() => import('@/components/badge-designer/BadgeCanvas').then(m => ({ default: m.BadgeCanvas })))
+const Toolbar = lazy(() => import('@/components/badge-designer/Toolbar').then(m => ({ default: m.Toolbar })))
+const Sidebar = lazy(() => import('@/components/badge-designer/Sidebar').then(m => ({ default: m.Sidebar })))
+const PropertiesPanel = lazy(() => import('@/components/badge-designer/PropertiesPanel').then(m => ({ default: m.PropertiesPanel })))
+const PreviewModal = lazy(() => import('@/components/badge-designer/PreviewModal').then(m => ({ default: m.PreviewModal })))
+
+// Loading fallback component
+const ComponentLoader = () => (
+  <div className="flex items-center justify-center h-full">
+    <Spinner size="md" text="Loading designer..." />
+  </div>
+)
 
 export function DesignerPage() {
   const { eventId, templateId } = useParams()
@@ -41,10 +63,14 @@ export function DesignerPage() {
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [templateName, setTemplateName] = useState('My Badge Template')
   const [isDefault, setIsDefault] = useState(true)
+  const [fontsLoaded, setFontsLoaded] = useState(false)
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true)
+  const [rightPanelOpen, setRightPanelOpen] = useState(true)
   
-  const { exportTemplate, importTemplate } = useBadgeStore()
+  const { exportTemplate, loadTemplate, undo, redo, canUndo, canRedo, elements } = useBadgeStore()
   const saveMutation = useSaveBadgeTemplate(Number(eventId))
   const updateMutation = useUpdateBadgeTemplate(Number(eventId))
+  const { checkPermission } = usePermissionCheck()
   
   // Load existing template if editing
   const { data: templateData } = useBadgeTemplate(
@@ -71,22 +97,38 @@ export function DesignerPage() {
       
       // Import template JSON into store
       if (templateData.template_json) {
-        importTemplate(templateData.template_json)
+        loadTemplate(templateData.template_json)
         toast.success(`Loaded template: ${templateData.name}`)
       }
     }
-  }, [templateData, templateId])
+  }, [templateData, templateId, loadTemplate])
   
   // Load Google Fonts on mount
   useEffect(() => {
-    loadGoogleFonts().then(() => {
-      console.log('Badge designer fonts loaded')
-    })
+    let mounted = true
+    
+    const loadFonts = async () => {
+      try {
+        await loadGoogleFonts()
+        if (mounted) {
+          setFontsLoaded(true)
+          console.log('Badge designer fonts loaded')
+        }
+      } catch (error) {
+        console.error('Failed to load fonts:', error)
+        if (mounted) {
+          setFontsLoaded(true) // Continue even if fonts fail
+        }
+      }
+    }
+    
+    loadFonts()
     
     // Start autosave
     startAutoSave()
     
     return () => {
+      mounted = false
       stopAutoSave()
     }
   }, [])
@@ -95,12 +137,12 @@ export function DesignerPage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'z') {
+        if (e.key === 'z' && !e.shiftKey) {
           e.preventDefault()
-          useBadgeStore.getState().undo()
+          undo()
         } else if (e.key === 'y' || (e.shiftKey && e.key === 'z')) {
           e.preventDefault()
-          useBadgeStore.getState().redo()
+          redo()
         } else if (e.key === 's') {
           e.preventDefault()
           setShowSaveDialog(true)
@@ -110,9 +152,13 @@ export function DesignerPage() {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [undo, redo])
   
   const handleSave = async () => {
+    if (!checkPermission('badges.design', 'save badge templates')) {
+      return
+    }
+    
     const templateData = exportTemplate()
     
     try {
@@ -166,75 +212,205 @@ export function DesignerPage() {
     },
   }
   
+  // Show loading until fonts are loaded
+  if (!fontsLoaded) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
+        <div className="text-center space-y-4">
+          <Spinner size="md" text="Loading badge designer..." />
+          <p className="text-sm text-muted-foreground">Preparing your workspace...</p>
+        </div>
+      </div>
+    )
+  }
+  
   return (
-    <div className="h-screen flex flex-col bg-white">
-      {/* Top Bar */}
-      <div className="h-16 border-b flex items-center justify-between px-4 bg-white z-10">
-        <div className="flex items-center gap-3">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 to-gray-100 overflow-hidden">
+      {/* Modern Top Bar */}
+      <div className="h-16 border-b border-gray-200 bg-white/80 backdrop-blur-sm flex items-center justify-between px-6 z-20 shadow-sm">
+        <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate(`/badge-designer/templates/${eventId}`)}
+            className="hover:bg-gray-100"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-xl font-bold">Badge Designer</h1>
-            <p className="text-xs text-muted-foreground">
-              {eventData?.name || 'Loading event...'}
-            </p>
+          <Separator orientation="vertical" className="h-6" />
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg">
+              <Palette className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900">Badge Designer</h1>
+              <p className="text-xs text-gray-500">
+                {eventData?.name || 'Loading event...'}
+                {templateId && templateId !== 'new' && (
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    Editing
+                  </Badge>
+                )}
+              </p>
+            </div>
           </div>
         </div>
         
-        <div className="flex gap-2">
+        {/* Top Bar Actions */}
+        <div className="flex items-center gap-2">
+          {/* Undo/Redo */}
+          <div className="flex items-center gap-1 border-r pr-2 mr-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={undo}
+              disabled={!canUndo()}
+              className="h-8 w-8"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={redo}
+              disabled={!canRedo()}
+              className="h-8 w-8"
+              title="Redo (Ctrl+Y)"
+            >
+              <Redo className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* Panel Toggles */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setLeftPanelOpen(!leftPanelOpen)}
+            className="h-8 w-8"
+            title={leftPanelOpen ? "Hide Layers" : "Show Layers"}
+          >
+            <Layers className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setRightPanelOpen(!rightPanelOpen)}
+            className="h-8 w-8"
+            title={rightPanelOpen ? "Hide Properties" : "Show Properties"}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+          
+          <Separator orientation="vertical" className="h-6" />
+          
+          {/* Main Actions */}
           <Button 
             onClick={() => setShowPreview(true)} 
             variant="outline"
-            className="hidden sm:flex"
+            size="sm"
+            className="gap-2"
           >
             <Eye className="h-4 w-4" />
-            <span className="hidden md:inline ml-2">Preview</span>
+            <span className="hidden sm:inline">Preview</span>
           </Button>
-          <Button onClick={() => setShowSaveDialog(true)}>
+          <Button 
+            onClick={() => setShowSaveDialog(true)}
+            size="sm"
+            className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+          >
             <Save className="h-4 w-4" />
-            <span className="hidden md:inline ml-2">Save Template</span>
+            <span className="hidden sm:inline">Save</span>
           </Button>
         </div>
       </div>
       
-      {/* Main Layout: Sidebar | Canvas | Toolbar+Properties */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Sidebar - collapsible on mobile */}
-        <div className="lg:border-r bg-white">
-          <Sidebar />
-        </div>
+      {/* Main Layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar - Layers & Configuration */}
+        {leftPanelOpen && (
+          <div className={cn(
+            "w-80 border-r border-gray-200 bg-white/80 backdrop-blur-sm transition-all duration-300",
+            "flex flex-col overflow-hidden"
+          )}>
+            <Suspense fallback={<ComponentLoader />}>
+              <Sidebar />
+            </Suspense>
+          </div>
+        )}
         
-        {/* Canvas - full width on mobile */}
-        <div className="flex-1 flex items-center justify-center bg-gray-100 p-4 lg:p-8 overflow-auto">
-          <BadgeCanvas />
-        </div>
-        
-        {/* Toolbar + Properties - stack below on mobile */}
-        <div className="lg:w-80 border-t lg:border-t-0 lg:border-l flex flex-col bg-white overflow-hidden">
-          <Toolbar />
-          <div className="flex-1 border-t overflow-auto">
-            <PropertiesPanel />
+        {/* Canvas Area - Center */}
+        <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+          {/* Canvas Toolbar */}
+          <div className="h-12 border-b border-gray-200 bg-white/60 backdrop-blur-sm flex items-center justify-between px-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">
+                {elements.length} element{elements.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" className="h-7 gap-1">
+                <ZoomOut className="h-3 w-3" />
+              </Button>
+              <span className="text-xs text-gray-500">100%</span>
+              <Button variant="ghost" size="sm" className="h-7 gap-1">
+                <ZoomIn className="h-3 w-3" />
+              </Button>
+              <Separator orientation="vertical" className="h-4" />
+              <Button variant="ghost" size="sm" className="h-7 gap-1">
+                <Maximize2 className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+          
+          {/* Canvas */}
+          <div className="flex-1 flex items-center justify-center p-6 overflow-auto">
+            <Suspense fallback={<ComponentLoader />}>
+              <BadgeCanvas />
+            </Suspense>
           </div>
         </div>
+        
+        {/* Right Sidebar - Tools & Properties */}
+        {rightPanelOpen && (
+          <div className={cn(
+            "w-96 border-l border-gray-200 bg-white/80 backdrop-blur-sm transition-all duration-300",
+            "flex flex-col overflow-hidden"
+          )}>
+            {/* Tools Section */}
+            <div className="border-b border-gray-200">
+              <Suspense fallback={<ComponentLoader />}>
+                <Toolbar />
+              </Suspense>
+            </div>
+            
+            {/* Properties Section */}
+            <div className="flex-1 overflow-auto">
+              <Suspense fallback={<ComponentLoader />}>
+                <PropertiesPanel />
+              </Suspense>
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Preview Modal */}
-      <PreviewModal
-        open={showPreview}
-        onClose={() => setShowPreview(false)}
-        sampleData={sampleData}
-      />
+      <Suspense fallback={null}>
+        <PreviewModal
+          open={showPreview}
+          onClose={() => setShowPreview(false)}
+          sampleData={sampleData}
+        />
+      </Suspense>
       
       {/* Save Dialog */}
       <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Save Badge Template</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Save className="h-5 w-5" />
+              Save Badge Template
+            </DialogTitle>
             <DialogDescription>
               Save this badge design as a template for the event
             </DialogDescription>
@@ -248,27 +424,31 @@ export function DesignerPage() {
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
                 placeholder="Enter template name..."
+                className="w-full"
               />
             </div>
             
-            <div className="flex items-center space-x-2">
+            <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
               <Checkbox 
                 id="is-default"
                 checked={isDefault}
                 onCheckedChange={(checked) => setIsDefault(checked as boolean)}
+                className="mt-0.5"
               />
-              <Label 
-                htmlFor="is-default"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                Set as default badge template for this event
-              </Label>
+              <div className="flex-1 space-y-1">
+                <Label 
+                  htmlFor="is-default"
+                  className="text-sm font-medium leading-none cursor-pointer"
+                >
+                  Set as default badge template
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {isDefault 
+                    ? '✓ This template will be used when generating badges for this event' 
+                    : 'This template will be saved but not used by default'}
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {isDefault 
-                ? '✓ This template will be used when generating badges for this event' 
-                : 'This template will be saved but not used by default'}
-            </p>
           </div>
           
           <DialogFooter>
@@ -278,11 +458,10 @@ export function DesignerPage() {
             <Button 
               onClick={handleSave}
               disabled={saveMutation.isPending || updateMutation.isPending}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
             >
-              <Save className="h-4 w-4" />
-              <span className="ml-2">
-                {templateId && templateId !== 'new' ? 'Update' : 'Save'} Template
-              </span>
+              <Save className="h-4 w-4 mr-2" />
+              {templateId && templateId !== 'new' ? 'Update' : 'Save'} Template
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -290,5 +469,3 @@ export function DesignerPage() {
     </div>
   )
 }
-
-

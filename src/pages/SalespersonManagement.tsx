@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/use-auth';
 import api from '../lib/api';
 import { useSearchParams } from 'react-router-dom';
+import Breadcrumbs from '@/components/Breadcrumbs';
 import { 
   Plus, 
   Users, 
@@ -31,7 +32,8 @@ import {
   Phone,
   Shield,
   Upload,
-  Check
+  Check,
+  AlertCircle
 } from 'lucide-react';
 
 interface SalespersonJob {
@@ -89,7 +91,7 @@ interface SalespersonRegistration {
 const SalespersonManagement: React.FC = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'overview' | 'jobs' | 'invitations' | 'registrations'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'jobs' | 'invitations' | 'registrations' | 'salespersons'>('overview');
   const [jobs, setJobs] = useState<SalespersonJob[]>([]);
   const [invitations, setInvitations] = useState<SalespersonInvitation[]>([]);
   const [registrations, setRegistrations] = useState<SalespersonRegistration[]>([]);
@@ -121,6 +123,20 @@ const SalespersonManagement: React.FC = () => {
   const [editingInvitationData, setEditingInvitationData] = useState<SalespersonInvitation | null>(null);
   const [showRegistrationDetails, setShowRegistrationDetails] = useState(false);
   const [selectedRegistration, setSelectedRegistration] = useState<SalespersonRegistration | null>(null);
+  
+  // Salespersons management state
+  const [salespersons, setSalespersons] = useState<any[]>([]);
+  const [showCreateSalespersonForm, setShowCreateSalespersonForm] = useState(false);
+  const [editingSalesperson, setEditingSalesperson] = useState<any | null>(null);
+  const [showEditSalespersonForm, setShowEditSalespersonForm] = useState(false);
+  const [salespersonForm, setSalespersonForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    password_confirmation: '',
+    phone: '',
+    bio: ''
+  });
 
   // Job form state
   const [jobForm, setJobForm] = useState({
@@ -157,7 +173,7 @@ const SalespersonManagement: React.FC = () => {
 
   // Initialize state from URL parameters
   useEffect(() => {
-    const tab = searchParams.get('tab') as 'overview' | 'jobs' | 'invitations' | 'registrations' || 'overview';
+    const tab = searchParams.get('tab') as 'overview' | 'jobs' | 'invitations' | 'registrations' | 'salespersons' || 'overview';
     const page = parseInt(searchParams.get('page') || '1');
     const perPageParam = parseInt(searchParams.get('per_page') || '10');
     const search = searchParams.get('search') || '';
@@ -236,6 +252,22 @@ const SalespersonManagement: React.FC = () => {
         const data = response.data;
         
         setRegistrations(data.data || []);
+        setTotalPages(data.last_page || 1);
+        setTotalRecords(data.total || 0);
+      } else if (activeTab === 'salespersons') {
+        const params = new URLSearchParams({
+          role: 'sales',
+          per_page: '100',
+        });
+        
+        if (searchTerm) {
+          params.append('search', searchTerm);
+        }
+        
+        const response = await api.get(`/users?${params.toString()}`);
+        const data = response.data;
+        
+        setSalespersons(data.data || []);
         setTotalPages(data.last_page || 1);
         setTotalRecords(data.total || 0);
       }
@@ -368,7 +400,7 @@ const SalespersonManagement: React.FC = () => {
 
     try {
       await api.delete(`/salesperson/invitations/${invitationId}`);
-      await fetchInvitations();
+      await fetchData();
       setSuccess('Invitation deleted successfully');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to delete invitation');
@@ -606,6 +638,93 @@ const SalespersonManagement: React.FC = () => {
     setCurrentPage(1); // Reset to first page when filtering
   };
 
+  // Salesperson management handlers
+  const handleCreateSalesperson = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/users', {
+        ...salespersonForm,
+        role: 'sales'
+      });
+      setShowCreateSalespersonForm(false);
+      setSalespersonForm({
+        name: '',
+        email: '',
+        password: '',
+        password_confirmation: '',
+        phone: '',
+        bio: ''
+      });
+      setSuccess('Salesperson created successfully!');
+      fetchData();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to create salesperson');
+    }
+  };
+
+  const handleEditSalesperson = (salesperson: any) => {
+    setEditingSalesperson(salesperson);
+    setSalespersonForm({
+      name: salesperson.name,
+      email: salesperson.email,
+      password: '',
+      password_confirmation: '',
+      phone: salesperson.phone || '',
+      bio: salesperson.bio || ''
+    });
+    setShowEditSalespersonForm(true);
+  };
+
+  const handleUpdateSalesperson = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSalesperson) return;
+    
+    try {
+      const updateData: any = {
+        name: salespersonForm.name,
+        email: salespersonForm.email,
+        phone: salespersonForm.phone,
+        bio: salespersonForm.bio
+      };
+      
+      // Only include password if it's provided
+      if (salespersonForm.password) {
+        updateData.password = salespersonForm.password;
+        updateData.password_confirmation = salespersonForm.password_confirmation;
+      }
+      
+      await api.put(`/users/${editingSalesperson.id}`, updateData);
+      setShowEditSalespersonForm(false);
+      setEditingSalesperson(null);
+      setSalespersonForm({
+        name: '',
+        email: '',
+        password: '',
+        password_confirmation: '',
+        phone: '',
+        bio: ''
+      });
+      setSuccess('Salesperson updated successfully!');
+      fetchData();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update salesperson');
+    }
+  };
+
+  const handleDeleteSalesperson = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this salesperson? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await api.delete(`/users/${id}`);
+      setSuccess('Salesperson deleted successfully');
+      fetchData();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete salesperson');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-800';
@@ -824,6 +943,18 @@ const SalespersonManagement: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Breadcrumbs */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="px-6 py-4">
+          <Breadcrumbs 
+            items={[
+              { label: 'Salesperson Management', href: '/dashboard/salesperson-management' }
+            ]}
+            className="mb-4"
+          />
+        </div>
+      </div>
+      
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="px-6 py-4">
@@ -929,6 +1060,13 @@ const SalespersonManagement: React.FC = () => {
               icon={Users}
               isActive={activeTab === 'registrations'}
               onClick={() => setActiveTab('registrations')}
+            />
+            <TabButton
+              id="salespersons"
+              label="Salespersons"
+              icon={UserPlus}
+              isActive={activeTab === 'salespersons'}
+              onClick={() => setActiveTab('salespersons')}
             />
           </div>
         </div>
@@ -1332,6 +1470,109 @@ const SalespersonManagement: React.FC = () => {
             
             {/* Pagination Component */}
             <PaginationComponent />
+          </div>
+        )}
+
+        {/* Salespersons tab */}
+        {activeTab === 'salespersons' && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">Salesperson Accounts</h3>
+                <div className="flex items-center space-x-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search salespersons..."
+                      value={searchTerm}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setShowCreateSalespersonForm(true)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Create Salesperson</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="h-6 w-6 animate-spin text-blue-600" />
+                  <span className="ml-2 text-gray-600">Loading salespersons...</span>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {salespersons.length > 0 ? (
+                    salespersons.map((salesperson) => (
+                      <div key={salesperson.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-3">
+                              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                <span className="text-blue-600 font-semibold text-lg">
+                                  {salesperson.name.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                              <div>
+                                <h4 className="text-lg font-semibold text-gray-900">{salesperson.name}</h4>
+                                <p className="text-sm text-gray-600">{salesperson.email}</p>
+                                {salesperson.phone && (
+                                  <p className="text-sm text-gray-500">{salesperson.phone}</p>
+                                )}
+                              </div>
+                            </div>
+
+                            {salesperson.bio && (
+                              <div className="mt-3">
+                                <p className="text-sm text-gray-700">{salesperson.bio}</p>
+                              </div>
+                            )}
+
+                            <div className="mt-3 flex items-center space-x-4 text-xs text-gray-500">
+                              <span>Joined {new Date(salesperson.created_at).toLocaleDateString()}</span>
+                              <span>•</span>
+                              <span>Role: {salesperson.role}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleEditSalesperson(salesperson)}
+                              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Edit Salesperson"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSalesperson(salesperson.id)}
+                              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete Salesperson"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-12">
+                      <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600 font-medium">No salespersons found</p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        {searchTerm ? 'Try adjusting your search' : 'Create your first salesperson to get started'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -1894,6 +2135,254 @@ const SalespersonManagement: React.FC = () => {
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Create Job
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Salesperson Form Modal */}
+      {showCreateSalespersonForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Create New Salesperson</h3>
+              <button
+                onClick={() => {
+                  setShowCreateSalespersonForm(false);
+                  setSalespersonForm({
+                    name: '',
+                    email: '',
+                    password: '',
+                    password_confirmation: '',
+                    phone: '',
+                    bio: ''
+                  });
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSalesperson} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                  <input
+                    type="text"
+                    value={salespersonForm.name}
+                    onChange={(e) => setSalespersonForm({ ...salespersonForm, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                  <input
+                    type="email"
+                    value={salespersonForm.email}
+                    onChange={(e) => setSalespersonForm({ ...salespersonForm, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
+                  <input
+                    type="password"
+                    value={salespersonForm.password}
+                    onChange={(e) => setSalespersonForm({ ...salespersonForm, password: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password *</label>
+                  <input
+                    type="password"
+                    value={salespersonForm.password_confirmation}
+                    onChange={(e) => setSalespersonForm({ ...salespersonForm, password_confirmation: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                    minLength={6}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                <input
+                  type="tel"
+                  value={salespersonForm.phone}
+                  onChange={(e) => setSalespersonForm({ ...salespersonForm, phone: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Bio</label>
+                <textarea
+                  value={salespersonForm.bio}
+                  onChange={(e) => setSalespersonForm({ ...salespersonForm, bio: e.target.value })}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Brief description or notes about this salesperson..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateSalespersonForm(false);
+                    setSalespersonForm({
+                      name: '',
+                      email: '',
+                      password: '',
+                      password_confirmation: '',
+                      phone: '',
+                      bio: ''
+                    });
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Create Salesperson
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Salesperson Form Modal */}
+      {showEditSalespersonForm && editingSalesperson && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Edit Salesperson</h3>
+              <button
+                onClick={() => {
+                  setShowEditSalespersonForm(false);
+                  setEditingSalesperson(null);
+                  setSalespersonForm({
+                    name: '',
+                    email: '',
+                    password: '',
+                    password_confirmation: '',
+                    phone: '',
+                    bio: ''
+                  });
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateSalesperson} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                  <input
+                    type="text"
+                    value={salespersonForm.name}
+                    onChange={(e) => setSalespersonForm({ ...salespersonForm, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                  <input
+                    type="email"
+                    value={salespersonForm.email}
+                    onChange={(e) => setSalespersonForm({ ...salespersonForm, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">New Password (leave blank to keep current)</label>
+                  <input
+                    type="password"
+                    value={salespersonForm.password}
+                    onChange={(e) => setSalespersonForm({ ...salespersonForm, password: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    minLength={6}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+                  <input
+                    type="password"
+                    value={salespersonForm.password_confirmation}
+                    onChange={(e) => setSalespersonForm({ ...salespersonForm, password_confirmation: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    minLength={6}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                <input
+                  type="tel"
+                  value={salespersonForm.phone}
+                  onChange={(e) => setSalespersonForm({ ...salespersonForm, phone: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Bio</label>
+                <textarea
+                  value={salespersonForm.bio}
+                  onChange={(e) => setSalespersonForm({ ...salespersonForm, bio: e.target.value })}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Brief description or notes about this salesperson..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditSalespersonForm(false);
+                    setEditingSalesperson(null);
+                    setSalespersonForm({
+                      name: '',
+                      email: '',
+                      password: '',
+                      password_confirmation: '',
+                      phone: '',
+                      bio: ''
+                    });
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Update Salesperson
                 </button>
               </div>
             </form>

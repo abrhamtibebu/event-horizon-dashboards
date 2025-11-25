@@ -1,5 +1,6 @@
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Card } from '@/components/ui/card';
+import { getChartStyles, getChartColors } from '@/utils/reportTransformers';
 
 interface GeographicChartProps {
   data: Array<{
@@ -11,6 +12,9 @@ interface GeographicChartProps {
 }
 
 export function GeographicChart({ data }: GeographicChartProps) {
+  const styles = getChartStyles();
+  const chartColors = getChartColors();
+  
   // Group by country and aggregate
   const countryData = data.reduce((acc, item) => {
     const existing = acc.find(d => d.country === item.country);
@@ -38,23 +42,39 @@ export function GeographicChart({ data }: GeographicChartProps) {
       {topCountries.length > 0 ? (
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={topCountries}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
             <XAxis 
               dataKey="country" 
               style={{ fontSize: '12px' }}
+              stroke={styles.axisStroke}
+              tickLine={false}
+              axisLine={false}
               angle={-45}
               textAnchor="end"
               height={100}
             />
-            <YAxis style={{ fontSize: '12px' }} />
-            <Tooltip />
+            <YAxis 
+              style={{ fontSize: '12px' }}
+              stroke={styles.axisStroke}
+              tickLine={false}
+              axisLine={false}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: styles.tooltipBg,
+                border: `1px solid ${styles.tooltipBorder}`,
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                color: styles.tooltipText,
+              }}
+            />
             <Legend />
-            <Bar dataKey="clicks" fill="#3B82F6" name="Clicks" />
-            <Bar dataKey="registrations" fill="#10B981" name="Registrations" />
+            <Bar dataKey="clicks" fill={chartColors.info} name="Clicks" />
+            <Bar dataKey="registrations" fill={chartColors.success} name="Registrations" />
           </BarChart>
         </ResponsiveContainer>
       ) : (
-        <div className="flex items-center justify-center h-64 text-gray-500">
+        <div className="flex items-center justify-center h-64 text-muted-foreground">
           No geographic data available yet
         </div>
       )}

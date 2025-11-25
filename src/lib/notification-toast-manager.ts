@@ -1,5 +1,5 @@
-// Global notification toast manager
-import { NotificationToast } from '../components/messaging/NotificationToast'
+// Global notification toast manager - Updated to use ModernToast
+import { showMessageToast } from '../components/ui/ModernToast'
 
 interface ToastNotification {
   id: string
@@ -21,10 +21,22 @@ class NotificationToastManager {
     this.toasts.push(newToast)
     this.notifyListeners()
     
-    // Auto-remove after 5 seconds
+    // Show modern toast notification
+    showMessageToast(
+      toast.senderName,
+      toast.message.length > 100 ? toast.message.substring(0, 100) + '...' : toast.message,
+      toast.senderAvatar,
+      toast.conversationId,
+      toast.onView ? {
+        label: 'View',
+        onClick: toast.onView
+      } : undefined
+    )
+    
+    // Auto-remove after 6 seconds (matches ModernToast duration)
     setTimeout(() => {
       this.removeToast(id)
-    }, 5000)
+    }, 6000)
   }
 
   removeToast(id: string) {
@@ -55,7 +67,7 @@ class NotificationToastManager {
 
 export const notificationToastManager = new NotificationToastManager()
 
-// Convenience functions
+// Convenience functions - Now uses ModernToast
 export const showNotificationToast = (
   senderName: string,
   message: string,

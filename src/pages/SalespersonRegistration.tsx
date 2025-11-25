@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { 
   CheckCircle, 
   XCircle, 
@@ -22,7 +23,6 @@ import {
   Upload,
   Link as LinkIcon,
   AlertCircle,
-  Loader2,
   FileText,
   ExternalLink,
   Check,
@@ -214,7 +214,7 @@ const SalespersonRegistration: React.FC = () => {
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl blur opacity-20"></div>
             <div className="relative bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/30 p-8">
               <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <Loader2 className="h-8 w-8 animate-spin text-white" />
+                <Spinner size="lg" variant="primary" className="[&>div>div]:bg-white" />
               </div>
               <h2 className="text-2xl font-bold text-gray-900 mb-3">Loading Invitation</h2>
               <p className="text-gray-600 leading-relaxed">Please wait while we verify your invitation...</p>
@@ -476,7 +476,7 @@ const SalespersonRegistration: React.FC = () => {
                           value={formData.gender} 
                           onValueChange={(value) => setFormData({ ...formData, gender: value })}
                         >
-                          <SelectTrigger className="h-11 sm:h-12 lg:h-13 border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 rounded-xl text-sm sm:text-base">
+                          <SelectTrigger className="h-11 sm:h-12 lg:h-13 rounded-xl text-sm sm:text-base">
                             <SelectValue placeholder="Select gender" />
                           </SelectTrigger>
                           <SelectContent>
@@ -603,7 +603,7 @@ const SalespersonRegistration: React.FC = () => {
                           value={formData.experience} 
                           onValueChange={(value) => setFormData({ ...formData, experience: value })}
                         >
-                          <SelectTrigger className="h-11 sm:h-12 lg:h-13 border-gray-200 focus:border-purple-500 focus:ring-purple-500/20 rounded-xl text-sm sm:text-base">
+                          <SelectTrigger className="h-11 sm:h-12 lg:h-13 rounded-xl text-sm sm:text-base">
                             <SelectValue placeholder="Select experience" />
                           </SelectTrigger>
                           <SelectContent>

@@ -7,6 +7,7 @@ import { showMessageNotification, requestNotificationPermission } from '../lib/n
 import { playMessageReceived, playMessageSent } from '../lib/sounds'
 import { showMessageToast } from '../components/ui/ModernToast'
 import { showNotificationToast } from '../lib/notification-toast-manager'
+import { shouldUseWebsocket } from '@/config/messaging'
 
 // Global callback for notification clicks
 let notificationClickCallback: ((conversationId: string) => void) | null = null
@@ -22,7 +23,7 @@ export const useRealtimeMessages = () => {
   const isConnected = useRef(false)
 
   useEffect(() => {
-    if (!user?.id || isConnected.current) return
+    if (!shouldUseWebsocket || !user?.id || isConnected.current) return
 
     isConnected.current = true
     console.log(`Connecting to real-time messaging for user ${user.id}`)
@@ -124,17 +125,6 @@ export const useRealtimeMessages = () => {
       }
     })
 
-    // Listen for typing indicators
-    channel.listen('.typing.started', (data: any) => {
-      console.log('User started typing:', data)
-      // TODO: Implement typing indicator UI
-    })
-
-    channel.listen('.typing.stopped', (data: any) => {
-      console.log('User stopped typing:', data)
-      // TODO: Implement typing indicator UI
-    })
-
     // Listen for reaction updates
     channel.listen('.message.reaction.updated', (data: any) => {
       console.log('Received reaction update:', data)
@@ -154,29 +144,21 @@ export const useRealtimeMessages = () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     })
 
+    channel.listen('.message.read', (data: any) => {
+      console.log('Received read receipt:', data)
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      queryClient.invalidateQueries({ queryKey: ['unreadCount'] })
+      queryClient.invalidateQueries({ queryKey: ['messages'] })
+    })
+
     return () => {
+      if (!shouldUseWebsocket) return
       isConnected.current = false
       console.log('Disconnecting from real-time messaging')
       channel.stopListening('.message.sent')
-      channel.stopListening('.typing.started')
-      channel.stopListening('.typing.stopped')
       channel.stopListening('.message.reaction.updated')
+      channel.stopListening('.message.read')
     }
   }, [user?.id, queryClient, addNotification])
-
-  // Function to broadcast typing indicator
-  const broadcastTyping = (conversationId: string, isTyping: boolean) => {
-    if (!user?.id) return
-    
-    const event = isTyping ? 'typing.started' : 'typing.stopped'
-    const channel = echo.private(`user.${user.id}`)
-    
-    channel.whisper(event, {
-      user_id: user.id,
-      conversation_id: conversationId,
-      timestamp: new Date().toISOString()
-    })
-  }
-
-  return { broadcastTyping }
+ 
 }

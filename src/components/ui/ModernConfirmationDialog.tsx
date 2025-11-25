@@ -53,66 +53,66 @@ export function ModernConfirmationDialog({
         return {
           icon: (
             <div className="relative">
-              <Trash2 className="h-8 w-8 text-red-600 animate-pulse" />
-              <Zap className="h-4 w-4 text-red-500 absolute -top-1 -right-1 animate-bounce" />
+              <Trash2 className="h-8 w-8 text-destructive animate-pulse" />
+              <Zap className="h-4 w-4 text-destructive/80 absolute -top-1 -right-1 animate-bounce" />
             </div>
           ),
-          confirmButton: 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-200/50',
-          iconBg: 'bg-gradient-to-br from-red-50 to-rose-50',
-          borderColor: 'border-red-200',
-          glowColor: 'shadow-red-200/30',
+          confirmButton: 'bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-lg shadow-destructive/20',
+          iconBg: 'bg-destructive/10 dark:bg-destructive/20',
+          borderColor: 'border-destructive/30',
+          glowColor: 'shadow-destructive/20',
         };
       case 'warning':
         return {
           icon: (
             <div className="relative">
-              <AlertTriangle className="h-8 w-8 text-yellow-600 animate-pulse" />
-              <Shield className="h-4 w-4 text-yellow-500 absolute -top-1 -right-1 animate-bounce" />
+              <AlertTriangle className="h-8 w-8 text-[hsl(var(--color-warning))] animate-pulse" />
+              <Shield className="h-4 w-4 text-[hsl(var(--color-warning))]/80 absolute -top-1 -right-1 animate-bounce" />
             </div>
           ),
-          confirmButton: 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white shadow-lg shadow-yellow-200/50',
-          iconBg: 'bg-gradient-to-br from-yellow-50 to-amber-50',
-          borderColor: 'border-yellow-200',
-          glowColor: 'shadow-yellow-200/30',
+          confirmButton: 'bg-[hsl(var(--color-warning))] hover:bg-[hsl(var(--color-warning))]/90 text-[hsl(var(--color-rich-black))] shadow-lg shadow-[hsl(var(--color-warning))]/20',
+          iconBg: 'bg-[hsl(var(--color-warning))]/10 dark:bg-[hsl(var(--color-warning))]/20',
+          borderColor: 'border-[hsl(var(--color-warning))]/30',
+          glowColor: 'shadow-[hsl(var(--color-warning))]/20',
         };
       case 'info':
         return {
           icon: (
             <div className="relative">
-              <Info className="h-8 w-8 text-blue-600 animate-pulse" />
-              <Sparkles className="h-4 w-4 text-blue-500 absolute -top-1 -right-1 animate-bounce" />
+              <Info className="h-8 w-8 text-[hsl(var(--color-info))] animate-pulse" />
+              <Sparkles className="h-4 w-4 text-[hsl(var(--color-info))]/80 absolute -top-1 -right-1 animate-bounce" />
             </div>
           ),
-          confirmButton: 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-200/50',
-          iconBg: 'bg-gradient-to-br from-blue-50 to-indigo-50',
-          borderColor: 'border-blue-200',
-          glowColor: 'shadow-blue-200/30',
+          confirmButton: 'bg-[hsl(var(--color-info))] hover:bg-[hsl(var(--color-info))]/90 text-white shadow-lg shadow-[hsl(var(--color-info))]/20',
+          iconBg: 'bg-[hsl(var(--color-info))]/10 dark:bg-[hsl(var(--color-info))]/20',
+          borderColor: 'border-[hsl(var(--color-info))]/30',
+          glowColor: 'shadow-[hsl(var(--color-info))]/20',
         };
       case 'success':
         return {
           icon: (
             <div className="relative">
-              <CheckCircle className="h-8 w-8 text-green-600 animate-pulse" />
-              <Heart className="h-4 w-4 text-green-500 absolute -top-1 -right-1 animate-bounce" />
+              <CheckCircle className="h-8 w-8 text-[hsl(var(--color-success))] animate-pulse" />
+              <Heart className="h-4 w-4 text-[hsl(var(--color-success))]/80 absolute -top-1 -right-1 animate-bounce" />
             </div>
           ),
-          confirmButton: 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg shadow-green-200/50',
-          iconBg: 'bg-gradient-to-br from-green-50 to-emerald-50',
-          borderColor: 'border-green-200',
-          glowColor: 'shadow-green-200/30',
+          confirmButton: 'bg-[hsl(var(--color-success))] hover:bg-[hsl(var(--color-success))]/90 text-[hsl(var(--color-rich-black))] shadow-lg shadow-[hsl(var(--color-success))]/20',
+          iconBg: 'bg-[hsl(var(--color-success))]/10 dark:bg-[hsl(var(--color-success))]/20',
+          borderColor: 'border-[hsl(var(--color-success))]/30',
+          glowColor: 'shadow-[hsl(var(--color-success))]/20',
         };
       default:
         return {
           icon: (
             <div className="relative">
-              <AlertCircle className="h-8 w-8 text-gray-600 animate-pulse" />
-              <Sparkles className="h-4 w-4 text-gray-500 absolute -top-1 -right-1 animate-bounce" />
+              <AlertCircle className="h-8 w-8 text-muted-foreground animate-pulse" />
+              <Sparkles className="h-4 w-4 text-muted-foreground/80 absolute -top-1 -right-1 animate-bounce" />
             </div>
           ),
-          confirmButton: 'bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white shadow-lg shadow-gray-200/50',
-          iconBg: 'bg-gradient-to-br from-gray-50 to-slate-50',
-          borderColor: 'border-gray-200',
-          glowColor: 'shadow-gray-200/30',
+          confirmButton: 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20',
+          iconBg: 'bg-muted',
+          borderColor: 'border-border',
+          glowColor: 'shadow-border/30',
         };
     }
   };
@@ -122,19 +122,19 @@ export function ModernConfirmationDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md relative overflow-hidden">
+      <DialogContent className="sm:max-w-md relative overflow-hidden max-h-[90vh] overflow-y-auto !fixed !left-[50%] !top-[50%] !translate-x-[-50%] !translate-y-[-50%] !z-[100]">
         {/* Animated background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white via-gray-50/50 to-gray-100/30 opacity-50"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-background via-card/50 to-muted/30 opacity-50"></div>
         
         <DialogHeader className="text-center relative z-10">
           <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${styles.iconBg} ${styles.borderColor} border-2 mb-6 shadow-lg ${styles.glowColor} transform transition-transform duration-300 hover:scale-110`}>
             {displayIcon}
           </div>
-          <DialogTitle className="text-xl font-bold text-gray-900 mb-2">
+          <DialogTitle className="text-xl font-bold text-foreground mb-2">
             {title}
           </DialogTitle>
           {description && (
-            <DialogDescription className="text-gray-600 mt-2 leading-relaxed">
+            <DialogDescription className="text-muted-foreground mt-2 leading-relaxed">
               {description}
             </DialogDescription>
           )}
@@ -145,7 +145,7 @@ export function ModernConfirmationDialog({
             variant="outline"
             onClick={onClose}
             disabled={isLoading}
-            className="w-full sm:w-auto order-2 sm:order-1 hover:bg-gray-50 transition-all duration-200 hover:scale-105"
+            className="w-full sm:w-auto order-2 sm:order-1 hover:bg-accent transition-all duration-200 hover:scale-105"
           >
             <X className="h-4 w-4 mr-2" />
             {cancelText}
@@ -248,5 +248,4 @@ export function ModernStatusChangeConfirmationDialog({
   );
 }
 
-export { ModernConfirmationDialog };
 export default ModernConfirmationDialog;

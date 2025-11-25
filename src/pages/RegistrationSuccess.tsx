@@ -121,15 +121,15 @@ export default function RegistrationSuccess() {
   if (!showConfirmation) {
     // Initial success message (matching first screenshot)
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-background to-muted/50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full bg-card rounded-2xl shadow-xl p-8 text-center">
           {/* Success Icon */}
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-12 h-12 text-green-600" />
           </div>
 
           {/* Success Message */}
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl font-bold text-card-foreground mb-2">
             You have successfully registered for <span className="text-yellow-600">{eventName || 'the event'}</span>
           </h1>
 
@@ -154,7 +154,7 @@ export default function RegistrationSuccess() {
           {/* Footer Link */}
           <button
             onClick={() => navigate('/')}
-            className="mt-6 text-gray-600 hover:text-gray-900 text-sm flex items-center justify-center gap-2 mx-auto"
+            className="mt-6 text-muted-foreground hover:text-foreground text-sm flex items-center justify-center gap-2 mx-auto"
           >
             <ArrowLeft className="w-4 h-4" />
             Go to Evella Home
@@ -166,11 +166,11 @@ export default function RegistrationSuccess() {
 
   // Confirmation page with badge (matching second screenshot)
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/50 py-8 px-4">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-foreground mb-2">
             Your Event Confirmation {eventName || 'the event'}
           </h1>
         </div>
@@ -178,7 +178,7 @@ export default function RegistrationSuccess() {
         {/* Badge Card */}
         <Card 
           ref={badgeCardRef}
-          className="bg-gradient-to-br from-white via-gray-50 to-yellow-50 rounded-3xl shadow-2xl p-0 mb-8 border-0 overflow-hidden"
+          className="bg-gradient-to-br from-card via-muted/50 to-yellow-500/10 dark:to-yellow-900/20 rounded-3xl shadow-2xl p-0 mb-8 border-0 overflow-hidden"
         >
           <div className="flex flex-col md:flex-row gap-0 md:gap-10 items-stretch">
             {/* Modern Badge Preview */}
@@ -200,13 +200,13 @@ export default function RegistrationSuccess() {
               </div>
                {/* Event Title */}
                <div className="w-full text-center mt-4 mb-3 px-6">
-                 <h3 className="text-2xl font-extrabold text-gray-900 tracking-tight uppercase">
+                 <h3 className="text-2xl font-extrabold text-foreground tracking-tight uppercase">
                    {eventName?.toUpperCase() || 'EVENT'}
                  </h3>
                </div>
                {/* Guest Name */}
                <div className="w-full text-center mb-4 px-6">
-                 <p className="text-3xl font-extrabold text-gray-800 tracking-tight">
+                 <p className="text-3xl font-extrabold text-card-foreground tracking-tight">
                    {guestName || 'Guest'}
                  </p>
                </div>
@@ -217,7 +217,7 @@ export default function RegistrationSuccess() {
                     <Calendar className="w-4 h-4" />
                     <span className="text-xs font-medium">Date</span>
                   </div>
-                  <p className="text-base font-semibold text-gray-900">
+                  <p className="text-base font-semibold text-card-foreground">
                     {formatDate(eventDate)}
                   </p>
                 </div> */}
@@ -226,14 +226,14 @@ export default function RegistrationSuccess() {
                     <Clock className="w-4 h-4" />
                     <span className="text-xs font-medium">Time</span>
                   </div>
-                  <p className="text-base font-semibold text-gray-900">
+                  <p className="text-base font-semibold text-card-foreground">
                     {formatTime(eventTime)}
                   </p>
                 </div> */}
               </div>
                {/* QR Code Modern */}
                <div className="flex justify-center w-full mb-4">
-                 <div className="bg-white/90 p-3 rounded-xl shadow-lg border border-yellow-100">
+                 <div className="bg-card/90 dark:bg-card/80 p-3 rounded-xl shadow-lg border border-yellow-200 dark:border-yellow-700/50">
                    <QRCodeSVG
                      value={guestUuid || attendeeId || 'NO-DATA'}
                      size={100}
@@ -244,53 +244,53 @@ export default function RegistrationSuccess() {
                </div>
               {/* Attendee ID Footer */}
               <div className="w-full text-center pb-4 px-6">
-                <span className="text-xs text-gray-400 tracking-widest font-mono">
+                <span className="text-xs text-muted-foreground tracking-widest font-mono">
                   #{attendeeId}
                 </span>
               </div>
             </div>
 
             {/* Modern Event Info */}
-            <div className="flex-grow flex flex-col justify-center bg-white/80 rounded-r-3xl p-8">
+            <div className="flex-grow flex flex-col justify-center bg-card/80 dark:bg-card/70 rounded-r-3xl p-8">
               <div className="space-y-6">
                 <div>
                   <h3 className="text-xs font-semibold text-yellow-600 uppercase tracking-wider mb-1">Event</h3>
-                  <p className="text-xl font-bold text-gray-900">{eventName}</p>
+                  <p className="text-xl font-bold text-card-foreground">{eventName}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
                       Date
                     </h3>
-                    <p className="text-base font-semibold text-gray-900">
+                    <p className="text-base font-semibold text-card-foreground">
                       {formatDate(eventDate)}
                     </p>
                   </div>
                   <div>
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
                       <Clock className="w-4 h-4" />
                       Time
                     </h3>
-                    <p className="text-base font-semibold text-gray-900">
+                    <p className="text-base font-semibold text-card-foreground">
                       {formatTime(eventTime)}
                     </p>
                   </div>
                 </div>
                 {eventLocation && (
                   <div>
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
                       <MapPin className="w-4 h-4" />
                       Location
                     </h3>
-                    <p className="text-base font-semibold text-gray-900">{eventLocation}</p>
+                    <p className="text-base font-semibold text-card-foreground">{eventLocation}</p>
                   </div>
                 )}
-                <div className="pt-4 border-t border-gray-100">
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold text-gray-900">Guest:</span> {guestName}
+                <div className="pt-4 border-t border-border">
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-card-foreground">Guest:</span> {guestName}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-muted-foreground/70 mt-1">
                     Attendee ID: <span className="font-mono">{attendeeId}</span>
                   </p>
                 </div>
@@ -300,67 +300,67 @@ export default function RegistrationSuccess() {
         </Card>
 
         {/* Registration Details Section */}
-        <Card className="bg-white rounded-2xl shadow-xl p-8 mb-8">
+        <Card className="bg-card rounded-2xl shadow-xl p-8 mb-8">
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Registration Details</h2>
-            <p className="text-gray-600">Complete information about your registration</p>
+            <h2 className="text-2xl font-bold text-card-foreground mb-2">Registration Details</h2>
+            <p className="text-muted-foreground">Complete information about your registration</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Personal Information */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">Personal Information</h3>
+              <h3 className="text-lg font-semibold text-card-foreground border-b border-border pb-2">Personal Information</h3>
               <div className="space-y-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wider">Full Name</label>
-                  <p className="text-base font-semibold text-gray-900">{guestName || 'N/A'}</p>
+                  <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Full Name</label>
+                  <p className="text-base font-semibold text-card-foreground">{guestName || 'N/A'}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wider">Email Address</label>
-                  <p className="text-base font-semibold text-gray-900">{guestEmail || 'N/A'}</p>
+                  <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Email Address</label>
+                  <p className="text-base font-semibold text-card-foreground">{guestEmail || 'N/A'}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wider">Phone Number</label>
-                  <p className="text-base font-semibold text-gray-900">{guestPhone || 'N/A'}</p>
+                  <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Phone Number</label>
+                  <p className="text-base font-semibold text-card-foreground">{guestPhone || 'N/A'}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wider">Gender</label>
-                  <p className="text-base font-semibold text-gray-900">{guestGender || 'N/A'}</p>
+                  <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Gender</label>
+                  <p className="text-base font-semibold text-card-foreground">{guestGender || 'N/A'}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wider">Country</label>
-                  <p className="text-base font-semibold text-gray-900">{guestCountry || 'N/A'}</p>
+                  <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Country</label>
+                  <p className="text-base font-semibold text-card-foreground">{guestCountry || 'N/A'}</p>
                 </div>
               </div>
             </div>
 
             {/* Professional Information */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-2">Professional Information</h3>
+              <h3 className="text-lg font-semibold text-card-foreground border-b border-border pb-2">Professional Information</h3>
               <div className="space-y-3">
                 <div>
-                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wider">Company</label>
-                  <p className="text-base font-semibold text-gray-900">{guestCompany || 'N/A'}</p>
+                  <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Company</label>
+                  <p className="text-base font-semibold text-card-foreground">{guestCompany || 'N/A'}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wider">Job Title</label>
-                  <p className="text-base font-semibold text-gray-900">{guestJobTitle || 'N/A'}</p>
+                  <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Job Title</label>
+                  <p className="text-base font-semibold text-card-foreground">{guestJobTitle || 'N/A'}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wider">Guest Type</label>
-                  <p className="text-base font-semibold text-gray-900">{guestTypeName || 'N/A'}</p>
+                  <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Guest Type</label>
+                  <p className="text-base font-semibold text-card-foreground">{guestTypeName || 'N/A'}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wider">Registration Fee</label>
-                  <p className="text-base font-semibold text-gray-900">
+                  <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Registration Fee</label>
+                  <p className="text-base font-semibold text-card-foreground">
                     {guestTypePrice && parseFloat(guestTypePrice) > 0 
                       ? `$${parseFloat(guestTypePrice).toFixed(2)}` 
                       : 'Free'}
                   </p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-500 uppercase tracking-wider">Registration ID</label>
-                  <p className="text-base font-semibold text-gray-900 font-mono">{attendeeId || 'N/A'}</p>
+                  <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Registration ID</label>
+                  <p className="text-base font-semibold text-card-foreground font-mono">{attendeeId || 'N/A'}</p>
                 </div>
               </div>
             </div>
@@ -389,8 +389,8 @@ export default function RegistrationSuccess() {
         </div>
 
         {/* Info Box */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-          <p className="text-blue-800 text-sm">
+        <div className="mt-8 bg-blue-500/10 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg p-4 text-center">
+          <p className="text-blue-800 dark:text-blue-300 text-sm">
             <strong>E-Badge Sent!</strong> Your digital visitor badge has been sent to your email. 
             You can also download it above for easy access during the event.
           </p>
@@ -400,7 +400,7 @@ export default function RegistrationSuccess() {
         <div className="text-center mt-6">
           <button
             onClick={() => navigate('/')}
-            className="text-gray-600 hover:text-gray-900 text-sm inline-flex items-center gap-2"
+            className="text-muted-foreground hover:text-foreground text-sm inline-flex items-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
             Return to Home

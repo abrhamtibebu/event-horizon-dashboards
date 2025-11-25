@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import Breadcrumbs from '@/components/Breadcrumbs'
 import {
   Calendar,
   Users,
@@ -48,7 +49,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useToast } from '@/hooks/use-toast'
+import { useModernAlerts } from '@/hooks/useModernAlerts'
 import { useAuth } from '@/hooks/use-auth'
 import api from '@/lib/api'
 import { getGuestTypeBadgeClasses, getCheckInBadgeClasses } from '@/lib/utils'
@@ -65,17 +66,14 @@ import Papa from 'papaparse';
 import { postAttendeesBatch } from '@/lib/api';
 import { generateSingleBadgePDF, generateBatchBadgePDF, printPDFBlob, waitForElement } from '@/lib/badgeUtils';
 import { BadgeAssignmentDialog } from '@/components/BadgeAssignmentDialog';
+import { QRScanner } from '@/components/checkin/QRScanner';
+import { checkInByQR } from '@/lib/api';
 
-const QrReader = React.lazy(() =>
-  import('@blackbox-vision/react-qr-reader').then((mod) => ({
-    default: mod.QrReader,
-  }))
-)
 
 export default function UsherEventManagement() {
   const { eventId } = useParams()
   const navigate = useNavigate()
-  const { toast } = useToast()
+  const { showSuccess, showError, showWarning, showInfo } = useModernAlerts()
   const { user } = useAuth()
 
   // Event data
@@ -133,10 +131,6 @@ export default function UsherEventManagement() {
   const [showTestBadge, setShowTestBadge] = useState(false)
   const [testAttendee, setTestAttendee] = useState<any>(null)
 
-  // QR Check-In state
-  const [qrScanResult, setQrScanResult] = useState<string | null>(null)
-  const [qrScanStatus, setQrScanStatus] = useState<string | null>(null)
-  const [qrScannerOpen, setQrScannerOpen] = useState(false)
 
   // CSV Upload State
   const [csvRows, setCsvRows] = useState<any[]>([]);
@@ -154,6 +148,10 @@ export default function UsherEventManagement() {
   const [removeAttendeeDialogOpen, setRemoveAttendeeDialogOpen] = useState(false);
   const [attendeeToRemove, setAttendeeToRemove] = useState<any>(null);
   const [removeAttendeeLoading, setRemoveAttendeeLoading] = useState(false);
+
+  // QR Scanner state
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  const [qrScanning, setQrScanning] = useState(false);
 
   const requiredHeaders = [
     'name',
@@ -199,19 +197,11 @@ export default function UsherEventManagement() {
       if (exists) {
         if (already_registered) {
           setValidationStatus(prev => ({ ...prev, email: 'duplicate', phone: 'duplicate' }));
-          toast({
-            title: 'Already Registered',
-            description: 'This guest is already registered for this event.',
-            variant: 'destructive',
-          });
+          showError('Already Registered', 'This guest is already registered for this event.');
         } else {
           setValidationStatus(prev => ({ ...prev, email: 'duplicate', phone: 'duplicate' }));
           setExistingGuestInfo(guest_info);
-          toast({
-            title: 'Existing Guest Found',
-            description: 'We found an existing guest with this email/phone. We will update their information.',
-            variant: 'default',
-          });
+          showInfo('Existing Guest Found', 'We found an existing guest with this email/phone. We will update their information.');
         }
       } else {
         setValidationStatus(prev => ({ ...prev, email: 'valid', phone: 'valid' }));
@@ -385,11 +375,7 @@ export default function UsherEventManagement() {
     },
     onPrintError: (error) => {
       console.error('Single print error:', error)
-      toast({
-        title: 'Print Error',
-        description: 'Failed to print badge. Please try again.',
-        variant: 'destructive',
-      })
+      showError('Print Error', 'Failed to print badge. Please try again.')
       setSinglePrintAttendee(null)
       if (singlePrintRef.current) {
         singlePrintRef.current.style.visibility = 'hidden'
@@ -409,11 +395,7 @@ export default function UsherEventManagement() {
     },
     onPrintError: (error) => {
       console.error('Batch print error:', error)
-      toast({
-        title: 'Print Error',
-        description: 'Failed to print badges. Please try again.',
-        variant: 'destructive',
-      })
+      showError('Print Error', 'Failed to print badges. Please try again.')
       setPrinting(false)
       if (printRef.current) {
         printRef.current.style.visibility = 'hidden'
@@ -637,18 +619,11 @@ export default function UsherEventManagement() {
           })
           setAttendees(indexed)
           
-          toast({
-            title: 'Success',
-            description: 'Attendee registered with pre-generated badge!',
-          })
+          showSuccess('Success', 'Attendee registered with pre-generated badge!')
         } catch (badgeErr: any) {
           // If badge assignment fails, try regular attendee creation
           console.warn('Badge assignment failed:', badgeErr)
-          toast({
-            title: 'Warning',
-            description: badgeErr.response?.data?.error || 'Could not assign badge, creating attendee without badge',
-            variant: 'default',
-          })
+          showWarning('Warning', badgeErr.response?.data?.error || 'Could not assign badge, creating attendee without badge')
           
           // Fall through to regular attendee creation
           const payload = {
@@ -661,10 +636,7 @@ export default function UsherEventManagement() {
           
           setAttendees((prevAttendees) => [...prevAttendees, newAttendee])
           
-          toast({
-            title: 'Success',
-            description: 'Attendee added successfully (without badge)!',
-          })
+          showSuccess('Success', 'Attendee added successfully (without badge)!')
         }
       } else {
         // No badge code - create attendee normally
@@ -678,10 +650,7 @@ export default function UsherEventManagement() {
 
         setAttendees((prevAttendees) => [...prevAttendees, newAttendee])
 
-        toast({
-          title: 'Success',
-          description: 'Attendee added successfully!',
-        })
+        showSuccess('Success', 'Attendee added successfully!')
       }
 
       setAddAttendeeDialogOpen(false)
@@ -700,17 +669,9 @@ export default function UsherEventManagement() {
       })
     } catch (err: any) {
       if (err.response?.status === 409 && err.response?.data?.error) {
-        toast({
-          title: 'Error',
-          description: err.response.data.error,
-          variant: 'destructive',
-        })
+        showError('Error', err.response.data.error)
       } else {
-        toast({
-          title: 'Error',
-          description: err.response?.data?.error || 'Failed to add attendee',
-          variant: 'destructive',
-        })
+        showError('Error', err.response?.data?.error || 'Failed to add attendee')
       }
     } finally {
       setAddAttendeeLoading(false)
@@ -755,21 +716,46 @@ export default function UsherEventManagement() {
       // Remove from local state
       setAttendees(prev => prev.filter(a => a.id !== attendeeToRemove.id));
       
-      toast({
-        title: 'Success',
-        description: 'Attendee removed from event successfully!',
-      });
+      showSuccess('Success', 'Attendee removed from event successfully!');
       
       setRemoveAttendeeDialogOpen(false);
       setAttendeeToRemove(null);
     } catch (err: any) {
-      toast({
-        title: 'Error',
-        description: err.response?.data?.error || 'Failed to remove attendee',
-        variant: 'destructive',
-      });
+      showError('Error', err.response?.data?.error || 'Failed to remove attendee');
     } finally {
       setRemoveAttendeeLoading(false);
+    }
+  };
+
+  // Handle QR code scan for check-in
+  const handleQRScan = async (uuid: string) => {
+    if (!eventId || !uuid) {
+      showError('Error', 'Event ID or QR code is missing');
+      return;
+    }
+
+    setQrScanning(true);
+    try {
+      // Call the check-in API with the UUID from QR code
+      const response = await checkInByQR(Number(eventId), uuid.trim());
+      
+      if (response.data) {
+        const attendee = response.data.attendee;
+        showSuccess('Check-in Successful', `${attendee?.guest?.name || 'Attendee'} has been checked in successfully!`);
+        
+        // Refresh attendees list to show updated check-in status
+        await fetchAttendeesWithFilters();
+        
+        // Close scanner after successful check-in
+        setQrScannerOpen(false);
+      }
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error || 
+                          err.response?.data?.message || 
+                          'Failed to check in attendee. Please try again.';
+      showError('Check-in Failed', errorMessage);
+    } finally {
+      setQrScanning(false);
     }
   };
 
@@ -781,32 +767,18 @@ export default function UsherEventManagement() {
   // Validate badge template
   const validateBadgeTemplate = (template: BadgeTemplate | null): boolean => {
     if (!template) {
-      toast({
-        title: 'Error',
-        description:
-          'No badge template available. Please create a badge template first.',
-        variant: 'destructive',
-      })
+      showError('Error', 'No badge template available. Please create a badge template first.')
       return false
     }
 
     if (!template.template_json) {
-      toast({
-        title: 'Error',
-        description: 'Badge template is invalid. Please recreate the template.',
-        variant: 'destructive',
-      })
+      showError('Error', 'Badge template is invalid. Please recreate the template.')
       return false
     }
 
     const templateData = template.template_json
     if (!templateData.front && !templateData.back) {
-      toast({
-        title: 'Error',
-        description:
-          'Badge template is missing design elements. Please recreate the template.',
-        variant: 'destructive',
-      })
+      showError('Error', 'Badge template is missing design elements. Please recreate the template.')
       return false
     }
 
@@ -820,11 +792,7 @@ export default function UsherEventManagement() {
     }
 
     if (!attendee || !attendee.guest) {
-      toast({
-        title: 'Error',
-        description: 'Invalid attendee data. Please try again.',
-        variant: 'destructive',
-      })
+      showError('Error', 'Invalid attendee data. Please try again.')
       return
     }
 
@@ -834,11 +802,7 @@ export default function UsherEventManagement() {
       if (singlePrintRef.current) {
         const badgeElement = await waitForElement('.printable-badge-batch', singlePrintRef.current);
         if (!badgeElement) {
-          toast({
-            title: 'Error',
-            description: 'No badge found to print.',
-            variant: 'destructive',
-          });
+          showError('Error', 'No badge found to print.');
           setSinglePrintAttendee(null);
           return;
         }
@@ -848,11 +812,7 @@ export default function UsherEventManagement() {
           printPDFBlob(blob);
           setSinglePrintAttendee(null);
         } catch (error) {
-          toast({
-            title: 'Error',
-            description: 'Failed to generate badge PDF.',
-            variant: 'destructive',
-          });
+          showError('Error', 'Failed to generate badge PDF.');
           setSinglePrintAttendee(null);
         }
       }
@@ -871,11 +831,7 @@ export default function UsherEventManagement() {
       return
     }
     if (selectedAttendees.size === 0) {
-      toast({
-        title: 'Error',
-        description: 'Please select at least one attendee to print badges for.',
-        variant: 'destructive',
-      })
+      showError('Error', 'Please select at least one attendee to print badges for.')
       return
     }
 
@@ -887,11 +843,7 @@ export default function UsherEventManagement() {
     )
 
     if (invalidAttendees.length > 0) {
-      toast({
-        title: 'Error',
-        description: `${invalidAttendees.length} attendees have invalid data. Please check and try again.`,
-        variant: 'destructive',
-      })
+      showError('Error', `${invalidAttendees.length} attendees have invalid data. Please check and try again.`)
       return
     }
 
@@ -901,11 +853,7 @@ export default function UsherEventManagement() {
       if (printRef.current) {
         const badgeElements = Array.from(printRef.current.querySelectorAll('.printable-badge-batch')) as HTMLElement[];
         if (badgeElements.length === 0) {
-          toast({
-            title: 'Error',
-            description: 'No badges found to print.',
-            variant: 'destructive',
-          });
+          showError('Error', 'No badges found to print.');
           setPrinting(false);
           return;
         }
@@ -915,56 +863,17 @@ export default function UsherEventManagement() {
           printPDFBlob(blob);
           setPrinting(false);
         } catch (error) {
-          toast({
-            title: 'Error',
-            description: 'Failed to generate batch badge PDF.',
-            variant: 'destructive',
-          });
+          showError('Error', 'Failed to generate batch badge PDF.');
           setPrinting(false);
         }
       }
     }, 100); // Further reduced timeout for faster response
   }
 
-  // Handler for QR scan
-  const handleQrScan = async (data: string | null) => {
-    if (data) {
-      setQrScanResult(data)
-      // Try to match QR data to an attendee (assume QR contains attendee ID or email)
-      let attendee = attendees.find(
-        (a) => a.qr_code === data || a.guest?.email === data
-      )
-      if (!attendee) {
-        setQrScanStatus('No matching attendee found for this QR code.')
-        return
-      }
-      // Mark as checked in
-      try {
-        await api.post(`/events/${eventId}/attendees/${attendee.id}/check-in`, {
-          checked_in: true,
-        })
-        setQrScanStatus(`Checked in: ${attendee.guest?.name || attendee.id}`)
-        // Update local state
-        setAttendees((prev) =>
-          prev.map((a) =>
-            a.id === attendee.id ? { ...a, checked_in: true } : a
-          )
-        )
-      } catch (err) {
-        setQrScanStatus('Failed to check in attendee. Please try again.')
-      }
-    }
-  }
-  const handleQrError = (err: any) => {
-    setQrScanStatus('QR scanner error. Please try again.')
-  }
 
   const exportAttendeesToCSV = () => {
     if (filteredAttendees.length === 0) {
-      toast({
-        title: 'Info',
-        description: 'No attendees to export.',
-      })
+      showInfo('Info', 'No attendees to export.')
       return
     }
 
@@ -1012,10 +921,7 @@ export default function UsherEventManagement() {
     link.click()
     document.body.removeChild(link)
 
-    toast({
-      title: 'Success',
-      description: 'Attendee data exported successfully.',
-    })
+    showSuccess('Success', 'Attendee data exported successfully.')
   }
 
   if (eventLoading)
@@ -1026,6 +932,15 @@ export default function UsherEventManagement() {
 
   return (
     <div className="space-y-6 px-3 md:px-6 max-w-[1400px] mx-auto w-full">
+      {/* Breadcrumbs */}
+      <Breadcrumbs 
+        items={[
+          { label: 'Events', href: '/dashboard/events' },
+          { label: eventData?.name || 'Event Management' }
+        ]}
+        className="mb-4"
+      />
+      
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -1114,6 +1029,14 @@ export default function UsherEventManagement() {
                   Attendees ({attendees.length})
                 </span>
                 <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setQrScannerOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    Scan QR Code
+                  </Button>
                   <Button
                     variant="outline"
                     onClick={exportAttendeesToCSV}
@@ -1495,30 +1418,10 @@ export default function UsherEventManagement() {
         <TabsContent value="onsite-checkin">
           <DashboardCard title="Onsite Check-In & Walk-In Handling">
             <div className="mb-6">
-              <h4 className="font-semibold mb-2">QR Code Check-In</h4>
-              <Button
-                onClick={() => setQrScannerOpen((v) => !v)}
-                variant="outline"
-              >
-                {qrScannerOpen ? 'Close Scanner' : 'Open QR Scanner'}
-              </Button>
-              {qrScannerOpen && (
-                <div className="my-4">
-                  <Suspense fallback={<div>Loading QR scanner...</div>}>
-                    <QrReader
-                      delay={300}
-                      onError={handleQrError}
-                      onScan={handleQrScan}
-                      style={{ width: '100%' }}
-                    />
-                  </Suspense>
-                  {qrScanStatus && (
-                    <div className="mt-2 text-sm text-blue-700">
-                      {qrScanStatus}
-                    </div>
-                  )}
-                </div>
-              )}
+              <h4 className="font-semibold mb-2">Manual Check-In</h4>
+              <p className="text-sm text-muted-foreground mb-4">
+                Use the search functionality above to find and check in attendees manually.
+              </p>
             </div>
 
             {/* Manual Check-In */}
@@ -2422,6 +2325,33 @@ export default function UsherEventManagement() {
       </Dialog>
 
       {/* Badge Assignment Dialog */}
+      {/* QR Scanner Dialog */}
+      <Dialog open={qrScannerOpen} onOpenChange={setQrScannerOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Scan QR Code for Check-in</DialogTitle>
+            <DialogDescription>
+              Scan the attendee's QR code to check them in for this event. The QR code contains the guest UUID which will be used to identify and check in the attendee.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <QRScanner
+              onScan={handleQRScan}
+              isEnabled={!qrScanning}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setQrScannerOpen(false)}
+              disabled={qrScanning}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <BadgeAssignmentDialog
         open={assignBadgeDialogOpen}
         onOpenChange={setAssignBadgeDialogOpen}

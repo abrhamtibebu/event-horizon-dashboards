@@ -1,4 +1,5 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { getChartStyles, getChartColorPalette } from '@/utils/reportTransformers';
 
 interface TicketTypeBreakdownChartProps {
   data: Array<{
@@ -9,9 +10,10 @@ interface TicketTypeBreakdownChartProps {
   }>;
 }
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
-
 export function TicketTypeBreakdownChart({ data }: TicketTypeBreakdownChartProps) {
+  const styles = getChartStyles();
+  const colors = getChartColorPalette('tickets');
+  
   const chartData = data.map((item) => ({
     name: item.ticket_type_name,
     value: item.tickets_sold,
@@ -33,15 +35,22 @@ export function TicketTypeBreakdownChart({ data }: TicketTypeBreakdownChartProps
           labelLine={false}
           label={renderLabel}
           outerRadius={120}
-          fill="#8884d8"
+          fill={colors[0]}
           dataKey="value"
+          labelStyle={{ fill: styles.labelColor }}
         >
           {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
           ))}
         </Pie>
         <Tooltip
-          contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '4px' }}
+          contentStyle={{
+            backgroundColor: styles.tooltipBg,
+            border: `1px solid ${styles.tooltipBorder}`,
+            borderRadius: '8px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+            color: styles.tooltipText,
+          }}
           formatter={(value: number, name: string, props: any) => [
             `${value} tickets (ETB ${props.payload.revenue.toLocaleString()})`,
             name,

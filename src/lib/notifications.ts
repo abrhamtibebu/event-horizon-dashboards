@@ -1,4 +1,4 @@
-import { toast } from 'sonner'
+import { showInfoToast } from '@/components/ui/ModernToast'
 
 export interface NotificationOptions {
   title: string
@@ -85,14 +85,14 @@ class NotificationManager {
   }
 
   private showToastFallback(options: NotificationOptions) {
-    toast.info(options.title, {
-      description: options.body,
-      duration: 5000,
-      action: options.onClick ? {
+    showInfoToast(
+      options.title,
+      options.body,
+      options.onClick ? {
         label: 'View',
         onClick: options.onClick,
-      } : undefined,
-    })
+      } : undefined
+    )
   }
 
   async showMessageNotification(

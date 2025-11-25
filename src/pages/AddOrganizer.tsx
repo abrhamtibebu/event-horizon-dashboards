@@ -13,6 +13,7 @@ import {
   Users,
   Globe,
 } from 'lucide-react'
+import Breadcrumbs from '@/components/Breadcrumbs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -86,8 +87,18 @@ export default function AddOrganizer() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto p-0 animate-fade-in relative">
+        {/* Breadcrumbs */}
+        <div className="px-8 pt-6 pb-2">
+          <Breadcrumbs 
+            items={[
+              { label: 'Organizers', href: '/dashboard/organizers' },
+              { label: 'Add Organizer' }
+            ]}
+          />
+        </div>
+        
         {/* Header */}
-        <div className="flex items-center justify-between px-8 pt-8 pb-2 border-b">
+        <div className="flex items-center justify-between px-8 pt-2 pb-2 border-b">
           <div className="flex items-center gap-3">
             <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-2 rounded-xl">
               <Building2 className="w-6 h-6 text-white" />

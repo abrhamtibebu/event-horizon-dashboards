@@ -51,18 +51,18 @@ export const PinnedMessagesBanner: React.FC<PinnedMessagesBannerProps> = ({
   }
 
   return (
-    <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border-b border-amber-200 shadow-sm">
+    <div className="bg-warning/10 border-b border-warning/30 shadow-sm">
       {/* Header */}
       <div className="px-6 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
-            <Pin className="w-4 h-4 text-amber-600" />
+          <div className="w-8 h-8 bg-warning/20 rounded-full flex items-center justify-center">
+            <Pin className="w-4 h-4 text-warning" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">
+            <h3 className="text-sm font-semibold text-foreground">
               Pinned Messages
             </h3>
-            <p className="text-xs text-slate-600">
+            <p className="text-xs text-muted-foreground">
               {pinnedMessages.length} message{pinnedMessages.length !== 1 ? 's' : ''} pinned
             </p>
           </div>
@@ -71,7 +71,7 @@ export const PinnedMessagesBanner: React.FC<PinnedMessagesBannerProps> = ({
           variant="ghost"
           size="sm"
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-slate-600 hover:text-slate-900 hover:bg-amber-100 rounded-lg"
+          className="text-muted-foreground hover:text-foreground hover:bg-warning/20 rounded-lg"
         >
           {isExpanded ? (
             <ChevronUp className="w-4 h-4" />
@@ -83,19 +83,19 @@ export const PinnedMessagesBanner: React.FC<PinnedMessagesBannerProps> = ({
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="border-t border-amber-200 bg-white/50">
+        <div className="border-t border-warning/30 bg-card/50">
           <ScrollArea className="max-h-80">
-            <div className="divide-y divide-amber-100">
+            <div className="divide-y divide-warning/20">
               {pinnedMessages.map((message) => (
                 <div
                   key={message.id}
-                  className="px-6 py-4 hover:bg-amber-50/50 transition-colors group"
+                  className="px-6 py-4 hover:bg-warning/10 transition-colors group"
                 >
                   <div className="flex items-start space-x-3">
                     {/* Avatar */}
                     <Avatar className="w-10 h-10 flex-shrink-0">
                       <AvatarImage src={message.sender.profile_image} />
-                      <AvatarFallback className="bg-blue-100 text-blue-700 text-sm font-semibold">
+                      <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
                         {getInitials(message.sender.name)}
                       </AvatarFallback>
                     </Avatar>
@@ -104,26 +104,26 @@ export const PinnedMessagesBanner: React.FC<PinnedMessagesBannerProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center space-x-2">
-                          <span className="text-sm font-semibold text-slate-900">
+                          <span className="text-sm font-semibold text-foreground">
                             {message.sender.name}
                           </span>
-                          <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300">
+                          <Badge variant="outline" className="text-xs bg-warning/20 text-warning border-warning/30">
                             <Pin className="w-3 h-3 mr-1" />
                             Pinned
                           </Badge>
                         </div>
-                        <span className="text-xs text-slate-500 font-medium">
+                        <span className="text-xs text-muted-foreground font-medium">
                           {formatTimestamp(message.created_at)}
                         </span>
                       </div>
 
-                      <p className="text-sm text-slate-700 mb-2">
+                      <p className="text-sm text-foreground mb-2">
                         {truncateContent(message.content)}
                       </p>
 
                       {/* File attachment indicator */}
-                      {message.file_path && (
-                        <div className="text-xs text-blue-600 mb-2">
+                      {(message.file_path || message.file_url) && (
+                        <div className="text-xs text-primary mb-2">
                           📎 {message.file_name || 'Attachment'}
                         </div>
                       )}
@@ -135,7 +135,7 @@ export const PinnedMessagesBanner: React.FC<PinnedMessagesBannerProps> = ({
                             variant="ghost"
                             size="sm"
                             onClick={() => onJumpToMessage(message.id)}
-                            className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-7 px-2"
+                            className="text-xs text-primary hover:text-primary/80 hover:bg-primary/10 h-7 px-2"
                           >
                             Jump to message
                           </Button>
@@ -144,7 +144,7 @@ export const PinnedMessagesBanner: React.FC<PinnedMessagesBannerProps> = ({
                           variant="ghost"
                           size="sm"
                           onClick={() => onUnpin(message.id)}
-                          className="text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 h-7 px-2"
+                          className="text-xs text-warning hover:text-warning/80 hover:bg-warning/20 h-7 px-2"
                         >
                           <X className="w-3 h-3 mr-1" />
                           Unpin
@@ -162,11 +162,11 @@ export const PinnedMessagesBanner: React.FC<PinnedMessagesBannerProps> = ({
       {/* Compact View (when collapsed) */}
       {!isExpanded && pinnedMessages.length > 0 && (
         <div className="px-6 pb-3">
-          <div className="text-sm text-slate-700 bg-white/70 rounded-lg p-3 shadow-sm">
+          <div className="text-sm text-foreground bg-card/70 rounded-lg p-3 shadow-sm">
             <div className="flex items-center space-x-2">
               <Avatar className="w-6 h-6 flex-shrink-0">
                 <AvatarImage src={pinnedMessages[0].sender.profile_image} />
-                <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
+                <AvatarFallback className="bg-primary/10 text-primary text-xs">
                   {getInitials(pinnedMessages[0].sender.name)}
                 </AvatarFallback>
               </Avatar>

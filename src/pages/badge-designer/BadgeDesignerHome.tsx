@@ -53,7 +53,7 @@ export function BadgeDesignerHome() {
   console.log('Total events:', allEvents.length, 'Filtered events:', events.length)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto p-8">
         {/* Header */}
         <div className="mb-8">
@@ -62,8 +62,8 @@ export function BadgeDesignerHome() {
               <Palette className="w-8 h-8 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Badge Designer</h1>
-              <p className="text-gray-600 mt-1">
+              <h1 className="text-3xl font-bold text-foreground">Badge Designer</h1>
+              <p className="text-muted-foreground mt-1">
                 Create and manage beautiful badge designs for your events
               </p>
             </div>
@@ -79,8 +79,8 @@ export function BadgeDesignerHome() {
                   <Palette className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Visual Designer</h3>
-                  <p className="text-sm text-gray-600">
+                  <h3 className="font-semibold text-card-foreground mb-1">Visual Designer</h3>
+                  <p className="text-sm text-muted-foreground">
                     Drag, resize, and rotate elements with Fabric.js canvas
                   </p>
                 </div>
@@ -97,8 +97,8 @@ export function BadgeDesignerHome() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Dynamic Fields</h3>
-                  <p className="text-sm text-gray-600">
+                  <h3 className="font-semibold text-card-foreground mb-1">Dynamic Fields</h3>
+                  <p className="text-sm text-muted-foreground">
                     Insert attendee names, companies, and QR codes automatically
                   </p>
                 </div>
@@ -115,8 +115,8 @@ export function BadgeDesignerHome() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Export</h3>
-                  <p className="text-sm text-gray-600">
+                  <h3 className="font-semibold text-card-foreground mb-1">Export</h3>
+                  <p className="text-sm text-muted-foreground">
                     Export badges as high-resolution PNG or PDF files
                   </p>
                 </div>
@@ -128,8 +128,8 @@ export function BadgeDesignerHome() {
         {/* Events List */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Select an Event</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-xl font-semibold text-card-foreground">Select an Event</h2>
+            <p className="text-sm text-muted-foreground">
               {events.length} {events.length === 1 ? 'event' : 'events'} available
             </p>
           </div>
@@ -137,7 +137,7 @@ export function BadgeDesignerHome() {
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-3 text-gray-600">Loading events...</span>
+              <span className="ml-3 text-muted-foreground">Loading events...</span>
             </div>
           ) : events.length === 0 ? (
             <Card>
@@ -168,7 +168,7 @@ export function BadgeDesignerHome() {
                           event.status === 'draft' ? 'bg-yellow-100 text-yellow-700' :
                           event.status === 'upcoming' ? 'bg-blue-100 text-blue-700' :
                           event.status === 'ongoing' ? 'bg-green-100 text-green-700' :
-                          'bg-gray-100 text-gray-700'
+                          'bg-muted text-muted-foreground'
                         }`}>
                           {event.status === 'active' ? '✓ Active' :
                            event.status === 'draft' ? '📝 Draft' :
@@ -180,7 +180,7 @@ export function BadgeDesignerHome() {
                   <CardContent>
                     <div className="space-y-2 mb-4">
                       {event.start_date && (
-                        <p className="text-sm text-gray-600 flex items-center gap-2">
+                        <p className="text-sm text-muted-foreground flex items-center gap-2">
                           <Calendar className="w-4 h-4" />
                           {format(new Date(event.start_date), 'MMM dd, yyyy')}
                         </p>

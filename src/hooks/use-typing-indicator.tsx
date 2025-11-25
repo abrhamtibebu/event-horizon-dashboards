@@ -1,4 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { api } from '../lib/api'
+import { echo } from '../lib/echo'
+
+interface TypingIndicatorOptions {
+  conversationId: string | null
+  currentUserId: number | null | undefined
+}
 
 interface TypingUser {
   id: number
@@ -13,68 +20,132 @@ interface TypingIndicatorHook {
   stopTyping: () => void
 }
 
-export const useTypingIndicator = (
-  conversationId: string | null,
-  currentUserId: number
-): TypingIndicatorHook => {
+export const useTypingIndicator = ({
+  conversationId,
+  currentUserId,
+}: TypingIndicatorOptions): TypingIndicatorHook => {
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const [isTyping, setIsTyping] = useState(false)
-  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null)
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const typingTimersRef = useRef<Record<number, NodeJS.Timeout>>({})
+  const lastStateRef = useRef<'idle' | 'typing'>('idle')
 
-  // Listen for typing events
-  useEffect(() => {
+  const removeTypingUser = useCallback((userId: number) => {
+    setTypingUsers(prev => prev.filter(user => user.id !== userId))
+    if (typingTimersRef.current[userId]) {
+      clearTimeout(typingTimersRef.current[userId])
+      delete typingTimersRef.current[userId]
+    }
+  }, [])
+
+  const sendTypingStatus = useCallback(async (isTypingStatus: boolean) => {
     if (!conversationId) return
 
-    // For now, we'll implement a simple mock version
-    // In production, this would use Laravel Echo
-    console.log('Typing indicator initialized for conversation:', conversationId)
-  }, [conversationId, currentUserId])
-
-  // Auto-cleanup typing users after 3 seconds
-  useEffect(() => {
-    if (typingUsers.length > 0) {
-      const timeout = setTimeout(() => {
-        setTypingUsers([])
-      }, 3000)
-
-      return () => clearTimeout(timeout)
+    try {
+      await api.post('/messages/typing', {
+        conversation_id: conversationId,
+        is_typing: isTypingStatus,
+      })
+    } catch (error) {
+      console.warn('Failed to broadcast typing status', error)
     }
-  }, [typingUsers])
-
-  const startTyping = useCallback(() => {
-    if (!conversationId || isTyping) return
-
-    setIsTyping(true)
-    
-    // Clear existing timeout
-    if (typingTimeout) {
-      clearTimeout(typingTimeout)
-    }
-
-    // Set new timeout to stop typing
-    const timeout = setTimeout(() => {
-      stopTyping()
-    }, 2000)
-
-    setTypingTimeout(timeout)
-  }, [conversationId, currentUserId, isTyping, typingTimeout])
+  }, [conversationId])
 
   const stopTyping = useCallback(() => {
-    if (!conversationId || !isTyping) return
+    if (!conversationId || !currentUserId) return
 
     setIsTyping(false)
 
-    // Clear timeout
-    if (typingTimeout) {
-      clearTimeout(typingTimeout)
-      setTypingTimeout(null)
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+      typingTimeoutRef.current = null
     }
-  }, [conversationId, currentUserId, isTyping, typingTimeout])
+
+    if (lastStateRef.current === 'typing') {
+      sendTypingStatus(false)
+      lastStateRef.current = 'idle'
+    }
+  }, [conversationId, currentUserId, sendTypingStatus])
+
+  const startTyping = useCallback(() => {
+    if (!conversationId || !currentUserId) return
+
+    setIsTyping(true)
+
+    if (lastStateRef.current !== 'typing') {
+      sendTypingStatus(true)
+      lastStateRef.current = 'typing'
+    }
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      stopTyping()
+    }, 2000)
+  }, [conversationId, currentUserId, sendTypingStatus, stopTyping])
+
+  useEffect(() => {
+    if (!currentUserId) return
+
+    const channel = echo.private(`user.${currentUserId}`)
+
+    const handler = (data: any) => {
+      if (!conversationId || data.conversation_id !== conversationId) return
+      if (data.user_id === currentUserId) return
+
+      if (data.is_typing) {
+        setTypingUsers(prev => {
+          if (prev.some(user => user.id === data.user_id)) {
+            return prev
+          }
+          return [
+            ...prev,
+            {
+              id: data.user_id,
+              name: data.user_name || 'Typing...',
+              avatar: data.user_avatar || undefined,
+            },
+          ]
+        })
+
+        if (typingTimersRef.current[data.user_id]) {
+          clearTimeout(typingTimersRef.current[data.user_id])
+        }
+
+        typingTimersRef.current[data.user_id] = setTimeout(() => {
+          removeTypingUser(data.user_id)
+        }, 4000)
+      } else {
+        removeTypingUser(data.user_id)
+      }
+    }
+
+    channel.listen('.typing.updated', handler)
+
+    return () => {
+      channel.stopListening('.typing.updated', handler)
+      Object.values(typingTimersRef.current).forEach(timeout => clearTimeout(timeout))
+      typingTimersRef.current = {}
+      setTypingUsers([])
+    }
+  }, [conversationId, currentUserId, removeTypingUser])
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+      lastStateRef.current = 'idle'
+    }
+  }, [])
 
   return {
     typingUsers,
     isTyping,
     startTyping,
-    stopTyping
+    stopTyping,
   }
 }
+

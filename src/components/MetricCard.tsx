@@ -23,17 +23,17 @@ export function MetricCard({
   const cardContent = (
     <Card
       className={cn(
-        'bg-white/80 backdrop-blur-md border border-gray-200 shadow-xl rounded-2xl hover:shadow-2xl transition-all duration-200',
+        'bg-card/80 backdrop-blur-md border border-border shadow-xl rounded-2xl hover:shadow-2xl transition-all duration-200',
         className
       )}
     >
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
               {title}
             </p>
-            <p className="text-4xl font-extrabold text-gray-900 mb-1 leading-tight">
+            <p className="text-4xl font-extrabold text-card-foreground mb-1 leading-tight">
               {value}
             </p>
             {/* Show trend as string if provided, else fallback to old logic */}
@@ -53,7 +53,7 @@ export function MetricCard({
               </p>
             )}
           </div>
-          <div className="p-3 bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl shadow flex items-center justify-center">
+          <div className="p-3 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-xl shadow flex items-center justify-center">
             {icon}
           </div>
         </div>

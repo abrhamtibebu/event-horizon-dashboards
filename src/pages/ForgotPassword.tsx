@@ -39,14 +39,14 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="relative w-full max-w-md animate-fade-in">
-        <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm">
+        <Card className="shadow-2xl border-0 bg-card/80 backdrop-blur-sm">
           <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl font-semibold text-gray-900">
+            <CardTitle className="text-2xl font-semibold text-card-foreground">
               Forgot Password
             </CardTitle>
-            <CardDescription className="text-gray-600">
+            <CardDescription className="text-muted-foreground">
               Enter your email to receive a password reset link.
             </CardDescription>
           </CardHeader>
@@ -56,12 +56,12 @@ export default function ForgotPassword() {
               <div className="space-y-2">
                 <Label
                   htmlFor="email"
-                  className="text-sm font-medium text-gray-700"
+                  className="text-sm font-medium text-foreground"
                 >
                   Email Address
                 </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
@@ -76,17 +76,17 @@ export default function ForgotPassword() {
               </div>
 
               {error && (
-                <p className="text-red-500 text-sm text-center">{error}</p>
+                <p className="text-error text-sm text-center">{error}</p>
               )}
               {message && (
-                <p className="text-green-600 text-sm text-center">{message}</p>
+                <p className="text-success text-sm text-center">{message}</p>
               )}
             </CardContent>
 
             <CardContent className="flex flex-col space-y-4">
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                className="w-full bg-brand-gradient text-white"
                 disabled={isLoading}
               >
                 {isLoading ? 'Sending...' : 'Send Reset Link'}

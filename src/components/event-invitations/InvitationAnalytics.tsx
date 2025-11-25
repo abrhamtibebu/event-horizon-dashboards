@@ -36,7 +36,7 @@ export function InvitationAnalytics({ eventId, userId, isOrganizer }: Invitation
     return (
       <Card className="p-6">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       </Card>
     );
@@ -45,7 +45,7 @@ export function InvitationAnalytics({ eventId, userId, isOrganizer }: Invitation
   if (!analytics) {
     return (
       <Card className="p-6">
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12 text-muted-foreground">
           <p>No analytics data available yet.</p>
           <p className="text-sm mt-2">Start sharing invitations to see analytics!</p>
         </div>
@@ -92,63 +92,63 @@ export function InvitationAnalytics({ eventId, userId, isOrganizer }: Invitation
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="p-4">
+        <Card className="p-4 border border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Invitations</p>
-              <p className="text-2xl font-bold text-blue-600">
+              <p className="text-sm text-muted-foreground font-medium">Total Invitations</p>
+              <p className="text-2xl font-bold text-info">
                 {formatNumber(analytics.summary.total_invitations)}
               </p>
             </div>
-            <Users className="w-8 h-8 text-blue-600 opacity-50" />
+            <Users className="w-8 h-8 text-info opacity-50" />
           </div>
         </Card>
 
-        <Card className="p-4">
+        <Card className="p-4 border border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Clicks</p>
-              <p className="text-2xl font-bold text-purple-600">
+              <p className="text-sm text-muted-foreground font-medium">Total Clicks</p>
+              <p className="text-2xl font-bold text-primary">
                 {formatNumber(analytics.summary.total_clicks)}
               </p>
             </div>
-            <MousePointerClick className="w-8 h-8 text-purple-600 opacity-50" />
+            <MousePointerClick className="w-8 h-8 text-primary opacity-50" />
           </div>
         </Card>
 
-        <Card className="p-4">
+        <Card className="p-4 border border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Shares</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-sm text-muted-foreground font-medium">Total Shares</p>
+              <p className="text-2xl font-bold text-success">
                 {formatNumber(analytics.summary.total_shares)}
               </p>
             </div>
-            <Share2 className="w-8 h-8 text-green-600 opacity-50" />
+            <Share2 className="w-8 h-8 text-success opacity-50" />
           </div>
         </Card>
 
-        <Card className="p-4">
+        <Card className="p-4 border border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Registrations</p>
-              <p className="text-2xl font-bold text-orange-600">
+              <p className="text-sm text-muted-foreground font-medium">Registrations</p>
+              <p className="text-2xl font-bold text-warning">
                 {formatNumber(analytics.summary.total_registrations)}
               </p>
             </div>
-            <UserCheck className="w-8 h-8 text-orange-600 opacity-50" />
+            <UserCheck className="w-8 h-8 text-warning opacity-50" />
           </div>
         </Card>
 
-        <Card className="p-4">
+        <Card className="p-4 border border-border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Conversion Rate</p>
-              <p className="text-2xl font-bold text-pink-600">
+              <p className="text-sm text-muted-foreground font-medium">Conversion Rate</p>
+              <p className="text-2xl font-bold text-primary">
                 {formatConversionRate(analytics.summary.total_registrations, analytics.summary.total_clicks)}
               </p>
             </div>
-            <TrendingUp className="w-8 h-8 text-pink-600 opacity-50" />
+            <TrendingUp className="w-8 h-8 text-primary opacity-50" />
           </div>
         </Card>
       </div>
@@ -177,19 +177,19 @@ export function InvitationAnalytics({ eventId, userId, isOrganizer }: Invitation
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">#</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-center">Invitations</TableHead>
-                  <TableHead className="text-center">Clicks</TableHead>
-                  <TableHead className="text-center">Registrations</TableHead>
-                  <TableHead className="text-center">Conversion</TableHead>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-12 text-foreground">#</TableHead>
+                  <TableHead className="text-foreground">Name</TableHead>
+                  <TableHead className="text-center text-foreground">Invitations</TableHead>
+                  <TableHead className="text-center text-foreground">Clicks</TableHead>
+                  <TableHead className="text-center text-foreground">Registrations</TableHead>
+                  <TableHead className="text-center text-foreground">Conversion</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {analytics.top_inviters.map((inviter, index) => (
-                  <TableRow key={inviter.user_id}>
-                    <TableCell className="font-bold">
+                  <TableRow key={inviter.user_id} className="hover:bg-muted/50">
+                    <TableCell className="font-bold text-foreground">
                       {index + 1}
                       {index < 3 && (
                         <span className="ml-1">
@@ -197,13 +197,13 @@ export function InvitationAnalytics({ eventId, userId, isOrganizer }: Invitation
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="font-medium">{inviter.user_name}</TableCell>
-                    <TableCell className="text-center">{inviter.invitations_sent}</TableCell>
-                    <TableCell className="text-center">{inviter.total_clicks}</TableCell>
-                    <TableCell className="text-center text-green-600 font-semibold">
+                    <TableCell className="font-medium text-foreground">{inviter.user_name}</TableCell>
+                    <TableCell className="text-center text-foreground">{inviter.invitations_sent}</TableCell>
+                    <TableCell className="text-center text-foreground">{inviter.total_clicks}</TableCell>
+                    <TableCell className="text-center text-success font-semibold">
                       {inviter.total_registrations}
                     </TableCell>
-                    <TableCell className="text-center font-medium">
+                    <TableCell className="text-center font-medium text-foreground">
                       {formatConversionRate(inviter.total_registrations, inviter.total_clicks)}
                     </TableCell>
                   </TableRow>

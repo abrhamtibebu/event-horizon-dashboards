@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import Breadcrumbs from '@/components/Breadcrumbs'
 import {
   Calendar,
   MapPin,
@@ -11,17 +12,22 @@ import {
   Image,
   Ticket,
 } from 'lucide-react'
+import { CustomFieldsManager } from '@/components/event-creation/CustomFieldsManager'
+import type { CustomField } from '@/types/customFields'
+import { createCustomField } from '@/lib/customFieldsApi'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { toast } from 'sonner'
+import { showSuccessToast, showErrorToast } from '@/components/ui/ModernToast'
 import api from '@/lib/api'
 import { DateRange } from 'react-date-range'
 import 'react-date-range/dist/styles.css'
 import 'react-date-range/dist/theme/default.css'
 import { useAuth } from '@/hooks/use-auth'
+import { useFeatureAccess } from '@/hooks/useFeatureAccess'
+import { UpgradePrompt } from '@/components/subscription/UpgradePrompt'
 import {
   Select,
   SelectTrigger,
@@ -39,7 +45,11 @@ const ETHIOPIAN_CITIES = [
 export default function CreateTicketedEvent() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { canUseTicketing, canCreateEvent } = useFeatureAccess()
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
+  const [upgradeMessage, setUpgradeMessage] = useState('')
+  const [upgradeTitle, setUpgradeTitle] = useState('')
   
   const [formData, setFormData] = useState({
     name: '',
@@ -74,6 +84,7 @@ export default function CreateTicketedEvent() {
   const [eventTypes, setEventTypes] = useState([])
   const [eventCategories, setEventCategories] = useState([])
   const [organizers, setOrganizers] = useState([])
+  const [customFields, setCustomFields] = useState<CustomField[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
@@ -107,7 +118,7 @@ export default function CreateTicketedEvent() {
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        toast.error('Image size must be less than 2MB')
+        showErrorToast('Image size must be less than 2MB')
         return
       }
       setFormData(prev => ({ ...prev, event_image: file }))
@@ -119,7 +130,28 @@ export default function CreateTicketedEvent() {
 
     // Validate location data
     if (!formData.city || !formData.venue) {
-      toast.error('Please fill in both city and venue.')
+      showErrorToast('Please fill in both city and venue.')
+      return
+    }
+
+    // Check subscription access for ticketing
+    if (!canUseTicketing()) {
+      setUpgradeTitle('Ticketing Not Available')
+      setUpgradeMessage('Ticketing is available in Pro and Enterprise plans. Please upgrade to create ticketed events.')
+      setShowUpgradePrompt(true)
+      return
+    }
+
+    // Check event creation limit
+    const eventAccess = canCreateEvent()
+    if (!eventAccess.allowed) {
+      setUpgradeTitle('Event Limit Reached')
+      setUpgradeMessage(
+        eventAccess.limit !== null
+          ? `You have reached your monthly event limit of ${eventAccess.limit}. Please upgrade to create more events.`
+          : 'You have reached your event creation limit. Please upgrade to create more events.'
+      )
+      setShowUpgradePrompt(true)
       return
     }
 
@@ -159,24 +191,51 @@ export default function CreateTicketedEvent() {
         }
       }
 
-      await api.post('/events/ticketed/add', payload, { headers })
-      toast.success('Ticketed event created successfully!')
+      const response = await api.post('/events/ticketed/add', payload, { headers })
+      const eventId = response.data?.id || response.data?.data?.id
+      
+      // Save custom fields if any
+      if (eventId && customFields.length > 0) {
+        try {
+          for (const field of customFields) {
+            await createCustomField(eventId, {
+              ...field,
+              event_id: eventId,
+            })
+          }
+        } catch (error: any) {
+          console.error('Error saving custom fields:', error)
+          // Don't fail the entire creation if custom fields fail
+          showErrorToast('Event created but some custom fields could not be saved.')
+        }
+      }
+      
+      showSuccessToast('Ticketed event created successfully!')
       navigate('/dashboard/events')
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to create ticketed event.')
+      showErrorToast(error.response?.data?.message || 'Failed to create ticketed event.')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Breadcrumbs */}
+        <Breadcrumbs 
+          items={[
+            { label: 'Events', href: '/dashboard/events' },
+            { label: 'Create Ticketed Event' }
+          ]}
+          className="mb-4"
+        />
+        
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Create Ticketed Event</h1>
-              <p className="text-gray-600 mt-2">
+              <h1 className="text-3xl font-bold text-foreground">Create Ticketed Event</h1>
+              <p className="text-muted-foreground mt-2">
                 Set up a paid event with multiple ticket tiers and revenue tracking
               </p>
             </div>
@@ -193,20 +252,20 @@ export default function CreateTicketedEvent() {
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Event Information */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
                 <Ticket className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Ticketed Event</h3>
-                <p className="text-gray-500 text-sm">Paid tickets with multiple tiers</p>
+                <h3 className="text-xl font-bold text-card-foreground">Ticketed Event</h3>
+                <p className="text-muted-foreground text-sm">Paid tickets with multiple tiers</p>
               </div>
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
-                <Label htmlFor="name" className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label htmlFor="name" className="flex items-center gap-2 text-foreground font-medium">
                   <Tag className="w-4 h-4 text-blue-500" /> Event Name
                 </Label>
                 <Input
@@ -215,19 +274,19 @@ export default function CreateTicketedEvent() {
                   onChange={(e) => handleInputChange('name', e.target.value)}
                   placeholder="Enter event name"
                   required
-                  className="mt-2 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                  className="mt-2 h-12 border-border focus:border-blue-500 focus:ring-blue-500 rounded-xl"
                 />
               </div>
               
               <div>
-                <Label htmlFor="organizer_id" className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label htmlFor="organizer_id" className="flex items-center gap-2 text-foreground font-medium">
                   <Tag className="w-4 h-4 text-green-500" /> Organizer
                 </Label>
                 {user?.role === 'organizer' ? (
                   <Input
                     value={user.organizer?.name || ''}
                     disabled
-                    className="mt-2 h-12 border-gray-300 bg-gray-50 rounded-xl"
+                    className="mt-2 h-12 border-border bg-muted rounded-xl"
                   />
                 ) : (
                   <Select
@@ -236,7 +295,7 @@ export default function CreateTicketedEvent() {
                     disabled={loading.organizers}
                     required
                   >
-                    <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl">
+                    <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
                       <SelectValue placeholder="Select an organizer" />
                     </SelectTrigger>
                     <SelectContent>
@@ -251,7 +310,7 @@ export default function CreateTicketedEvent() {
               </div>
               
               <div className="lg:col-span-2">
-                <Label htmlFor="description" className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label htmlFor="description" className="flex items-center gap-2 text-foreground font-medium">
                   <FileText className="w-4 h-4 text-purple-500" /> Description
                 </Label>
                 <Textarea
@@ -260,12 +319,12 @@ export default function CreateTicketedEvent() {
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   placeholder="Describe your ticketed event..."
                   rows={4}
-                  className="mt-2 border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-xl resize-none"
+                  className="mt-2 border-border focus:border-purple-500 focus:ring-purple-500 rounded-xl resize-none"
                 />
               </div>
               
               <div>
-                <Label htmlFor="event_type_id" className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label htmlFor="event_type_id" className="flex items-center gap-2 text-foreground font-medium">
                   <Tag className="w-4 h-4 text-orange-500" /> Event Type
                 </Label>
                 <Select
@@ -274,7 +333,7 @@ export default function CreateTicketedEvent() {
                   disabled={loading.eventTypes}
                   required
                 >
-                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 rounded-xl">
+                  <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
                     <SelectValue placeholder="Select event type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -288,7 +347,7 @@ export default function CreateTicketedEvent() {
               </div>
               
               <div>
-                <Label htmlFor="event_category_id" className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label htmlFor="event_category_id" className="flex items-center gap-2 text-foreground font-medium">
                   <Tag className="w-4 h-4 text-indigo-500" /> Event Category
                 </Label>
                 <Select
@@ -297,7 +356,7 @@ export default function CreateTicketedEvent() {
                   disabled={loading.eventCategories}
                   required
                 >
-                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-xl">
+                  <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
                     <SelectValue placeholder="Select event category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -311,7 +370,7 @@ export default function CreateTicketedEvent() {
               </div>
               
               <div>
-                <Label htmlFor="city" className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label htmlFor="city" className="flex items-center gap-2 text-foreground font-medium">
                   <MapPin className="w-4 h-4 text-blue-500" /> City
                 </Label>
                 <Select
@@ -319,7 +378,7 @@ export default function CreateTicketedEvent() {
                   onValueChange={(value) => handleInputChange('city', value)}
                   required
                 >
-                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl">
+                  <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
                     <SelectValue placeholder="Select a city" />
                   </SelectTrigger>
                   <SelectContent>
@@ -333,7 +392,7 @@ export default function CreateTicketedEvent() {
               </div>
               
               <div>
-                <Label htmlFor="venue" className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label htmlFor="venue" className="flex items-center gap-2 text-foreground font-medium">
                   <MapPin className="w-4 h-4 text-green-500" /> Venue
                 </Label>
                 <Input
@@ -342,12 +401,12 @@ export default function CreateTicketedEvent() {
                   onChange={(e) => handleInputChange('venue', e.target.value)}
                   placeholder="Enter venue name"
                   required
-                  className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl"
+                  className="mt-2 h-12 border-border focus:border-green-500 focus:ring-green-500 rounded-xl"
                 />
               </div>
               
               <div>
-                <Label htmlFor="max_guests" className="flex items-center gap-2 text-gray-700 font-medium">
+                <Label htmlFor="max_guests" className="flex items-center gap-2 text-foreground font-medium">
                   <Users className="w-4 h-4 text-teal-500" /> Max Guests
                 </Label>
                 <Input
@@ -363,21 +422,21 @@ export default function CreateTicketedEvent() {
           </div>
 
           {/* Event Image Upload */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
                 <Image className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Event Image</h3>
-                <p className="text-gray-500 text-sm">Upload an image for your event (optional)</p>
+                <h3 className="text-xl font-bold text-card-foreground">Event Image</h3>
+                <p className="text-muted-foreground text-sm">Upload an image for your event (optional)</p>
               </div>
             </div>
             
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <div className="flex-1">
-                  <Label htmlFor="event_image" className="flex items-center gap-2 text-gray-700 font-medium">
+                  <Label htmlFor="event_image" className="flex items-center gap-2 text-foreground font-medium">
                     <Upload className="w-4 h-4 text-purple-500" /> Event Image
                   </Label>
                   <div className="mt-2">
@@ -394,7 +453,7 @@ export default function CreateTicketedEvent() {
                         type="button"
                         variant="outline"
                         onClick={() => imageInputRef.current?.click()}
-                        className="flex items-center gap-2 border-2 border-dashed border-gray-300 hover:border-purple-500 hover:bg-purple-50 transition-all duration-200"
+                        className="flex items-center gap-2 border-2 border-dashed border-border hover:border-purple-500 hover:bg-purple-500/10 dark:hover:bg-purple-900/20 transition-all duration-200"
                       >
                         <Upload className="w-4 h-4" />
                         Choose Image
@@ -416,7 +475,7 @@ export default function CreateTicketedEvent() {
                         </Button>
                       )}
                     </div>
-                    <p className="text-sm text-gray-500 mt-2">
+                    <p className="text-sm text-muted-foreground mt-2">
                       Maximum file size: 2MB. Supported formats: JPG, PNG, GIF
                     </p>
                   </div>
@@ -458,61 +517,70 @@ export default function CreateTicketedEvent() {
           </div>
 
           {/* Date & Time */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 bg-brand-gradient rounded-xl flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-primary-foreground" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Date & Time</h3>
-                <p className="text-gray-500 text-sm">Event schedule and registration period</p>
+                <h3 className="text-xl font-bold text-foreground">Date & Time</h3>
+                <p className="text-muted-foreground text-sm">Event schedule and registration period</p>
               </div>
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
-                <Label className="flex items-center gap-2 text-gray-700 font-medium mb-4">
-                  <Calendar className="w-4 h-4 text-orange-500" /> Event Date Range
+                <Label className="flex items-center gap-2 text-foreground font-medium mb-4">
+                  <Calendar className="w-4 h-4 text-warning" /> Event Date Range
                 </Label>
                 <DateRange
                   ranges={eventRange}
                   onChange={(item) => setEventRange([item.selection])}
                   minDate={new Date()}
-                  className="rounded-xl border border-gray-300"
+                  className="rounded-xl border border-border"
                 />
               </div>
               
               <div>
-                <Label className="flex items-center gap-2 text-gray-700 font-medium mb-4">
-                  <Calendar className="w-4 h-4 text-green-500" /> Registration Period
+                <Label className="flex items-center gap-2 text-foreground font-medium mb-4">
+                  <Calendar className="w-4 h-4 text-success" /> Registration Period
                 </Label>
                 <DateRange
                   ranges={regRange}
                   onChange={(item) => setRegRange([item.selection])}
                   minDate={new Date()}
-                  className="rounded-xl border border-gray-300"
+                  className="rounded-xl border border-border"
                 />
               </div>
             </div>
           </div>
 
           {/* Info Message */}
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+          <div className="bg-info/10 border border-info/30 rounded-2xl p-6">
             <div className="flex items-start gap-3">
-              <div className="text-blue-600 text-2xl">ℹ️</div>
+              <div className="text-info text-2xl dark:text-info">ℹ️</div>
               <div>
-                <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                <h3 className="text-lg font-semibold text-info dark:text-info mb-2">
                   Ticket Types Configuration
                 </h3>
-                <p className="text-blue-800">
+                <p className="text-info/90 dark:text-info/80">
                   After creating your event, you can add ticket types through the <strong>Ticket Management</strong> dashboard. 
                   This allows you to configure pricing, quantities, and benefits for each ticket tier.
                 </p>
-                <p className="text-blue-700 text-sm mt-2">
+                <p className="text-info/80 dark:text-info/70 text-sm mt-2">
                   Navigate to: Dashboard → Ticket Management → Select Your Event → Create Ticket Type
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Custom Fields Section */}
+          <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+            <CustomFieldsManager
+              fields={customFields}
+              onChange={setCustomFields}
+              guestTypes={[]} // Ticketed events don't use guest types, but custom fields can still be added
+            />
           </div>
 
           {/* Action Buttons */}
@@ -541,6 +609,13 @@ export default function CreateTicketedEvent() {
             </Button>
           </div>
         </form>
+
+        <UpgradePrompt
+          open={showUpgradePrompt}
+          onOpenChange={setShowUpgradePrompt}
+          title={upgradeTitle}
+          message={upgradeMessage}
+        />
       </div>
     </div>
   )

@@ -3,34 +3,98 @@ import axios from 'axios'
   const api = axios.create({
     // baseURL: import.meta.env.VITE_API_URL || 'https://api.validity.et/api',
     baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
-
-  headers: {
-    'Content-Type': 'application/json',
-  },
+    timeout: 60000, // 60 seconds timeout for long-running operations like campaign sending
+    headers: {
+      'Content-Type': 'application/json',
+    },
 })
 
 // Flag to prevent multiple refresh attempts
 let isRefreshing = false
-let failedQueue: any[] = []
+let failedQueue: Array<{
+  resolve: (value?: any) => void
+  reject: (error?: any) => void
+  config: any
+}> = []
 
 const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach(({ resolve, reject }) => {
+  failedQueue.forEach(({ resolve, reject, config }) => {
     if (error) {
       reject(error)
     } else {
-      resolve(token)
+      if (token && config) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
+      resolve()
     }
   })
   
   failedQueue = []
 }
 
+/**
+ * Refresh token function
+ */
+const refreshToken = async (): Promise<string | null> => {
+  const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
+  if (!token) {
+    throw new Error('No token available')
+  }
+
+  try {
+    const response = await axios.post(
+      '/refresh',
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
+
+    const { token: newToken, user, expires_in } = response.data
+
+    // Store new token
+    if (localStorage.getItem('jwt')) {
+      localStorage.setItem('jwt', newToken)
+    } else {
+      sessionStorage.setItem('jwt', newToken)
+    }
+
+    // Store token expiration timestamp
+    if (expires_in) {
+      const expiresAt = Date.now() + expires_in * 1000
+      const storage = localStorage.getItem('jwt') ? localStorage : sessionStorage
+      storage.setItem('token_expires_at', expiresAt.toString())
+    }
+
+    // Store token creation time for refresh period check
+    const storage = localStorage.getItem('jwt') ? localStorage : sessionStorage
+    if (!storage.getItem('token_created_at')) {
+      storage.setItem('token_created_at', Date.now().toString())
+    }
+
+    return newToken
+  } catch (error: any) {
+    // If refresh fails, clear all tokens and logout
+    localStorage.removeItem('jwt')
+    sessionStorage.removeItem('jwt')
+    localStorage.removeItem('token_expires_at')
+    sessionStorage.removeItem('token_expires_at')
+    localStorage.removeItem('token_created_at')
+    sessionStorage.removeItem('token_created_at')
+    localStorage.removeItem('user_role')
+    localStorage.removeItem('user_id')
+    localStorage.removeItem('organizer_id')
+    
+    throw error
+  }
+}
+
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
-    const isMockAuth = localStorage.getItem('mock_auth') === 'true'
     
-    // Allow public endpoints even in mock mode  
     // Check if URL matches public event patterns: /events/{id} or /events/{id}/ticket-types/available
     const isPublicEventEndpoint = config.url?.match(/^\/events\/\d+$/) || 
                                    config.url?.includes('/ticket-types/available') ||
@@ -51,15 +115,9 @@ api.interceptors.request.use(
                             config.url?.startsWith('/analytics/') ||
                             isPublicEventEndpoint
     
-    // DISABLED: Allow API calls even in mock mode for development
-    // if (isMockAuth && !isPublicEndpoint) {
-    //   // In mock mode, reject non-public API calls to prevent 401 errors
-    //   console.log('[API] Mock authentication mode - rejecting API call to prevent 401 errors')
-    //   return Promise.reject(new Error('Mock authentication mode - API calls disabled'))
-    // } else 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
-    } else if (!isPublicEndpoint && !isMockAuth) {
+    } else if (!isPublicEndpoint) {
       // Only warn for non-public endpoints
       console.warn('[API] No JWT token found in localStorage or sessionStorage. Requests may fail with 401 Unauthorized.')
     }
@@ -70,15 +128,102 @@ api.interceptors.request.use(
   }
 )
 
-// Add response interceptor to handle token expiration
+// Add response interceptor to handle token expiration and auto-refresh
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Store token expiration if provided in response (e.g., from login)
+    if (response.data?.expires_in) {
+      const expiresAt = Date.now() + response.data.expires_in * 1000
+      const storage = localStorage.getItem('jwt') ? localStorage : sessionStorage
+      storage.setItem('token_expires_at', expiresAt.toString())
+      
+      // Store token creation time if this is a new token
+      if (!storage.getItem('token_created_at')) {
+        storage.setItem('token_created_at', Date.now().toString())
+      }
+    }
+    return response
+  },
   async (error) => {
     const originalRequest = error.config
 
-    // Do not attempt automatic token refresh; surface 401 to the UI
-    if (error.response?.status === 401) {
+    // Skip refresh for refresh endpoint itself to avoid infinite loops
+    if (originalRequest?.url === '/refresh') {
+      // Clear tokens and logout on refresh failure
+      localStorage.removeItem('jwt')
+      sessionStorage.removeItem('jwt')
+      localStorage.removeItem('token_expires_at')
+      sessionStorage.removeItem('token_expires_at')
+      localStorage.removeItem('token_created_at')
+      sessionStorage.removeItem('token_created_at')
+      localStorage.removeItem('user_role')
+      localStorage.removeItem('user_id')
+      localStorage.removeItem('organizer_id')
+      localStorage.removeItem('mock_auth')
+      
+      if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
+        window.location.href = '/'
+      }
+      
       return Promise.reject(error)
+    }
+
+    // Handle 401 unauthorized - attempt token refresh
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      // Check if we're already refreshing
+      if (isRefreshing) {
+        // Queue this request to retry after refresh completes
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject, config: originalRequest })
+        })
+          .then(() => {
+            const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
+            if (token) {
+              originalRequest.headers.Authorization = `Bearer ${token}`
+            }
+            return api(originalRequest)
+          })
+          .catch((err) => Promise.reject(err))
+      }
+
+      originalRequest._retry = true
+      isRefreshing = true
+
+      try {
+        const newToken = await refreshToken()
+        
+        if (newToken) {
+          // Update the original request with new token
+          originalRequest.headers.Authorization = `Bearer ${newToken}`
+          
+          // Process queued requests
+          processQueue(null, newToken)
+          
+          // Retry the original request
+          return api(originalRequest)
+        }
+      } catch (refreshError) {
+        // Refresh failed - clear tokens and logout
+        processQueue(refreshError, null)
+        
+        localStorage.removeItem('jwt')
+        sessionStorage.removeItem('jwt')
+        localStorage.removeItem('token_expires_at')
+        sessionStorage.removeItem('token_expires_at')
+        localStorage.removeItem('token_created_at')
+        sessionStorage.removeItem('token_created_at')
+        localStorage.removeItem('user_role')
+        localStorage.removeItem('user_id')
+        localStorage.removeItem('organizer_id')
+        localStorage.removeItem('mock_auth')
+        
+        // Redirect to login if not already there
+        if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
+          window.location.href = '/'
+        }
+      } finally {
+        isRefreshing = false
+      }
     }
 
     return Promise.reject(error)
@@ -258,8 +403,13 @@ export const removeUsherFromEvent = (eventId: number, usherId: number) =>
   api.delete(`/events/${eventId}/ushers/${usherId}`)
 
 export const getEventById = (eventId: string) => api.get(`/events/${eventId}`)
+// Alias for getEventById for backward compatibility
+export const getEvent = (eventId: string) => getEventById(eventId)
 
 export const getAllGuests = () => api.get('/guests')
+
+// Get attendees for an event
+export const getAttendees = (eventId: string) => api.get(`/events/${eventId}/attendees`)
 
 // Fetch all organizers (admin)
 export const getAllOrganizers = () => api.get('/organizers')
@@ -298,6 +448,8 @@ export const exportUsherRegistrations = (eventId: number) =>
   api.get(`/events/${eventId}/usher-registrations/export`, { responseType: 'blob' })
 export const updateUsherRegistrationStatus = (eventId: number, registrationId: number, status: string) =>
   api.patch(`/events/${eventId}/usher-registrations/${registrationId}`, { status })
+export const deleteUsherRegistration = (eventId: number, registrationId: number) =>
+  api.delete(`/events/${eventId}/usher-registrations/${registrationId}`)
 
 // --- Short Links ---
 export const createShortLink = (eventId: number, registrationData: any, expiresAt?: string) =>
@@ -343,6 +495,7 @@ export const createVendorQuotation = (data: any) => api.post('/vendors/quotation
 export const updateVendorQuotation = (id: number, data: any) => api.put(`/vendors/quotations/${id}`, data)
 export const deleteVendorQuotation = (id: number) => api.delete(`/vendors/quotations/${id}`)
 export const approveVendorQuotation = (id: number) => api.post(`/vendors/quotations/${id}/approve`)
+export const bulkApproveVendorQuotations = (quotationIds: number[]) => api.post('/vendors/quotations/bulk-approve', { quotation_ids: quotationIds })
 export const rejectVendorQuotation = (id: number, reason: string) => api.post(`/vendors/quotations/${id}/reject`, { rejection_reason: reason })
 
 // Vendor Payments
@@ -406,6 +559,33 @@ export const uploadQuotationAttachment = (quotationId: number, file: File) => {
     },
   })
 }
+
+// Upload proforma invoice
+export const uploadProforma = (quotationId: number, file: File) => {
+  const formData = new FormData()
+  formData.append('proforma', file)
+  return api.post(`/vendors/quotations/${quotationId}/upload-proforma`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+}
+
+// Line Items
+export const getQuotationLineItems = (quotationId: number) => api.get(`/vendors/quotations/${quotationId}/line-items`)
+export const createQuotationLineItem = (quotationId: number, data: {
+  item_name: string;
+  description?: string;
+  quantity: number;
+  unit_price: number;
+}) => api.post(`/vendors/quotations/${quotationId}/line-items`, data)
+export const updateQuotationLineItem = (quotationId: number, itemId: number, data: {
+  item_name?: string;
+  description?: string;
+  quantity?: number;
+  unit_price?: number;
+}) => api.put(`/vendors/quotations/${quotationId}/line-items/${itemId}`, data)
+export const deleteQuotationLineItem = (quotationId: number, itemId: number) => api.delete(`/vendors/quotations/${quotationId}/line-items/${itemId}`)
 
 export const uploadPaymentReceipt = (paymentId: number, file: File) => {
   const formData = new FormData()
@@ -524,5 +704,13 @@ export const generatePrintableBadges = (eventId: number, badgeIds: number[]) =>
     { badge_ids: badgeIds },
     { responseType: 'blob' }
   )
+
+// QR Code Check-in
+export const checkInByQR = (eventId: number, uuid: string) =>
+  api.post(`/events/${eventId}/check-in/qr`, { uuid })
+
+// Auto-detect event check-in by QR (for ushers)
+export const checkInByQRAuto = (uuid: string) =>
+  api.post('/check-in/qr', { uuid })
 
 export { api }

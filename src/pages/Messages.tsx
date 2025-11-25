@@ -1,11 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { MessageCircle, Search, Settings, Bell, Menu, MoreVertical, Archive, Star, Info, ChevronRight } from 'lucide-react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { MessageCircle, Search, Settings, Bell, Menu, MoreVertical, Info, Users, Calendar, Pin } from 'lucide-react'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
-import { Badge } from '../components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu'
-import { ConversationList } from '../components/messaging/ConversationList'
 import { MessageThread } from '../components/messaging/MessageThread'
 import { MessageInput } from '../components/messaging/MessageInput'
 import { ConversationInfoPanel } from '../components/messaging/ConversationInfoPanel'
@@ -19,9 +16,14 @@ import { notificationToastManager } from '../lib/notification-toast-manager'
 import { useConversations, useUnreadCount, useMarkConversationRead } from '../hooks/use-messages'
 import { useMessageReplies, useSendReply } from '../hooks/use-message-threads'
 import { useAuth } from '../hooks/use-auth'
+import { usePermissionCheck } from '../hooks/use-permission-check'
+import { ProtectedButton } from '../components/ProtectedButton'
 import { useRealtimeMessages, setNotificationClickCallback } from '../hooks/use-realtime-messages'
-import { useSingleUserOnlineStatus } from '../hooks/use-online-status'
+import { useSingleUserOnlineStatus, useRealtimeOnlineStatus } from '../hooks/use-online-status'
 import { useLocation, useSearchParams } from 'react-router-dom'
+import { MessagingHeader } from '../components/messaging/MessagingHeader'
+import { ConversationFilters, ConversationFilter } from '../components/messaging/ConversationFilters'
+import { cn } from '@/lib/utils'
 import type { Conversation, Message, User, Event } from '../types/message'
 
 export default function Messages() {
@@ -32,22 +34,22 @@ export default function Messages() {
   const [isNewMessageDialogOpen, setIsNewMessageDialogOpen] = useState(false)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [threadMessage, setThreadMessage] = useState<Message | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [showSearchResults, setShowSearchResults] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showSidebar, setShowSidebar] = useState(true)
-  const [optimisticMessages, setOptimisticMessages] = useState<any[]>([])
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false)
   const [isConversationSearchOpen, setIsConversationSearchOpen] = useState(false)
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false)
   const [notificationToasts, setNotificationToasts] = useState<any[]>([])
-  const [showInfoPanel, setShowInfoPanel] = useState(false)
+  const [activeFilter, setActiveFilter] = useState<'all' | 'direct' | 'event' | 'unread' | 'pinned'>('all')
+  const [conversationSearch, setConversationSearch] = useState('')
+  const [isInspectorOpen, setIsInspectorOpen] = useState(true)
   const hasMarkedAsRead = useRef<string | null>(null)
 
   const { data: conversationsData = [] } = useConversations()
   const { data: unreadData } = useUnreadCount()
   const markConversationReadMutation = useMarkConversationRead()
   const { user } = useAuth()
+  const { checkPermission } = usePermissionCheck()
   const location = useLocation()
   const [searchParams] = useSearchParams()
   
@@ -55,8 +57,8 @@ export default function Messages() {
   const otherUserId = selectedUser?.id || null
   const { data: onlineStatus } = useSingleUserOnlineStatus(otherUserId)
   
-  // Initialize real-time messaging for notifications (disabled for now, using polling instead)
-  // useRealtimeMessages()
+  // Initialize real-time messaging for notifications
+  useRealtimeMessages()
 
   // Subscribe to notification toasts
   useEffect(() => {
@@ -72,6 +74,68 @@ export default function Messages() {
       : []
 
   const unreadCount = unreadData?.unread_count || 0
+
+  const selectedConversation = useMemo(
+    () => conversations.find((c: Conversation) => c.id === selectedConversationId) || null,
+    [conversations, selectedConversationId]
+  )
+
+  const participantIds = useMemo(() => {
+    const ids = new Set<number>()
+    conversations.forEach((conversation: Conversation) => {
+      if (conversation.type === 'direct' && Array.isArray(conversation.participants)) {
+        conversation.participants.forEach(participant => ids.add(participant.id))
+      }
+    })
+    return Array.from(ids)
+  }, [conversations])
+
+  const { isUserOnline, getLastSeenText } = useRealtimeOnlineStatus(participantIds)
+
+  const filterStats = useMemo(
+    () => ({
+      all: conversations.length,
+      direct: conversations.filter((c: Conversation) => c.type === 'direct').length,
+      event: conversations.filter((c: Conversation) => c.type === 'event').length,
+      unread: conversations.filter((c: Conversation) => (c.unreadCount || 0) > 0).length,
+      pinned: conversations.filter((c: Conversation) => c.is_pinned).length,
+    }),
+    [conversations]
+  )
+
+  const conversationFilterOptions = useMemo(() => {
+    const options: ConversationFilter[] = [
+      { id: 'all', label: 'All', count: filterStats.all },
+      { id: 'direct', label: '1:1', count: filterStats.direct, icon: <Users className="h-3.5 w-3.5" /> },
+      { id: 'event', label: 'Events', count: filterStats.event, icon: <Calendar className="h-3.5 w-3.5" /> },
+      { id: 'unread', label: 'Unread', count: filterStats.unread, icon: <Bell className="h-3.5 w-3.5" /> },
+      { id: 'pinned', label: 'Pinned', count: filterStats.pinned, icon: <Pin className="h-3.5 w-3.5" /> },
+    ]
+    return options
+  }, [filterStats])
+
+  const filteredConversations = useMemo(() => {
+    let data = [...conversations]
+
+    if (activeFilter === 'direct') {
+      data = data.filter((c: Conversation) => c.type === 'direct')
+    } else if (activeFilter === 'event') {
+      data = data.filter((c: Conversation) => c.type === 'event')
+    } else if (activeFilter === 'unread') {
+      data = data.filter((c: Conversation) => (c.unreadCount || 0) > 0)
+    } else if (activeFilter === 'pinned') {
+      data = data.filter((c: Conversation) => !!c.is_pinned)
+    }
+
+    if (conversationSearch.trim()) {
+      const search = conversationSearch.toLowerCase()
+      data = data.filter((conversation: Conversation) =>
+        conversation.name?.toLowerCase().includes(search)
+      )
+    }
+
+    return data
+  }, [conversations, activeFilter, conversationSearch])
 
   // Set up notification click handler
   useEffect(() => {
@@ -216,7 +280,7 @@ export default function Messages() {
   // Handle opening a message thread
   const handleOpenThread = useCallback((message: Message) => {
     setThreadMessage(message)
-    setShowInfoPanel(false) // Close info panel when opening thread
+    setIsInspectorOpen(true)
   }, [])
 
   // Handle sending a reply to a thread
@@ -237,6 +301,9 @@ export default function Messages() {
   }, [conversations, selectedConversationId, user, sendReplyMutation])
 
   const handleStartNewConversation = () => {
+    if (!checkPermission('messages.send', 'send messages')) {
+      return
+    }
     setIsNewMessageDialogOpen(true)
   }
 
@@ -253,12 +320,6 @@ export default function Messages() {
   }
 
   const handleMessageSent = (message: Message) => {
-    // Clear optimistic messages for this conversation
-    setOptimisticMessages(prev => 
-      prev.filter(msg => 
-        !(msg.conversationId === selectedConversationId && msg.isOptimistic)
-      )
-    )
     console.log('Message sent:', message)
   }
 
@@ -319,11 +380,6 @@ export default function Messages() {
     setReplyingTo(null)
   }
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query)
-    setShowSearchResults(query.length > 0)
-  }
-
   const getConversationTitle = () => {
     if (selectedUser) {
       return selectedUser.name
@@ -363,6 +419,149 @@ export default function Messages() {
       .slice(0, 2)
   }
 
+  const formatLastActivity = (timestamp?: string) => {
+    if (!timestamp) return '—'
+    const date = new Date(timestamp)
+    const now = new Date()
+    const diffInMinutes = (now.getTime() - date.getTime()) / (1000 * 60)
+
+    if (diffInMinutes < 1) return 'Just now'
+    if (diffInMinutes < 60) return `${Math.floor(diffInMinutes)}m ago`
+    if (diffInMinutes < 60 * 24) return `${Math.floor(diffInMinutes / 60)}h ago`
+    return date.toLocaleDateString()
+  }
+
+  const insightCards = useMemo(
+    () => [
+      { label: 'Avg response', value: '2m 15s' },
+      { label: 'SLA', value: 'On track' },
+      { label: 'Sentiment', value: 'Positive' },
+      { label: 'Priority', value: selectedConversation?.is_pinned ? 'High' : 'Normal' },
+    ],
+    [selectedConversation?.is_pinned]
+  )
+
+  const renderConversationCard = (conversation: Conversation) => {
+    const isActive = conversation.id === selectedConversationId
+    const participant = conversation.participants?.[0]
+    const isDirectOnline = conversation.type === 'direct' && participant ? isUserOnline(participant.id) : false
+    const presenceText =
+      conversation.type === 'direct' && participant
+        ? getLastSeenText(participant.id)
+        : conversation.event?.title || 'Event space'
+
+    return (
+      <button
+        key={conversation.id}
+        onClick={() => handleSelectConversation(conversation.id)}
+        className={cn(
+          'w-full rounded-2xl border px-4 py-3 text-left transition-all focus:outline-none',
+          isActive
+            ? 'border-primary/60 bg-primary/10 text-white shadow-lg'
+            : 'border-white/5 bg-white/5 text-white/80 hover:border-white/20 hover:bg-white/10'
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Avatar className="h-11 w-11 border border-white/20">
+              <AvatarImage src={conversation.avatar} />
+              <AvatarFallback className="bg-white/10 text-sm font-semibold text-white">
+                {getInitials(conversation.name || 'C')}
+              </AvatarFallback>
+            </Avatar>
+            {conversation.type === 'direct' && participant && (
+              <span
+                className={cn(
+                  'absolute -right-0 -bottom-0 h-3 w-3 rounded-full border-2 border-slate-900',
+                  isDirectOnline ? 'bg-emerald-400' : 'bg-slate-500'
+                )}
+              />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <p className="truncate text-sm font-semibold">{conversation.name}</p>
+              {conversation.lastMessage?.created_at && (
+                <span className="text-xs text-white/60">
+                  {formatLastActivity(conversation.lastMessage.created_at)}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 line-clamp-1 text-sm text-white/70">
+              {conversation.lastMessage?.content || 'No messages yet'}
+            </p>
+            <div className="mt-2 flex items-center justify-between text-xs text-white/50">
+              <span className="truncate">{presenceText}</span>
+              {conversation.unreadCount > 0 && (
+                <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[11px] font-semibold text-primary-foreground">
+                  {conversation.unreadCount}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </button>
+    )
+  }
+
+  const renderSidebarContent = () => (
+    <>
+      <div className="border-b border-white/10 px-5 py-4">
+        <div className="flex items-center justify-between text-xs uppercase tracking-widest text-white/60">
+          <span>Inbox overview</span>
+          <span>{filteredConversations.length} active</span>
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+            <Input
+              value={conversationSearch}
+              onChange={(event) => setConversationSearch(event.target.value)}
+              placeholder="Search or start a chat"
+              className="border-white/10 bg-white/5 pl-9 text-white placeholder:text-white/50 focus:border-white/30 focus:ring-white/30"
+            />
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsGlobalSearchOpen(true)}
+            className="rounded-2xl border border-white/10 bg-white/10 text-white hover:bg-white/20"
+            title="Advanced search"
+          >
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="mt-3">
+          <ConversationFilters
+            filters={conversationFilterOptions}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+          />
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 pb-6">
+        {filteredConversations.length > 0 ? (
+          <div className="space-y-3">{filteredConversations.map(renderConversationCard)}</div>
+        ) : (
+          <div className="mt-8 rounded-3xl border border-dashed border-white/20 px-4 py-8 text-center text-sm text-white/60">
+            <p className="font-semibold text-white">No conversations</p>
+            <p className="mt-2 text-xs text-white/50">
+              Try adjusting your filters or start a new conversation.
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-4"
+              onClick={handleStartNewConversation}
+            >
+              Start New Message
+            </Button>
+          </div>
+        )}
+      </div>
+    </>
+  )
+
   const handleBackToConversations = () => {
     setSelectedConversationId(null)
     setSelectedUser(null)
@@ -372,226 +571,220 @@ export default function Messages() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Corporate Header */}
-      <div className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            {/* Breadcrumb and Title */}
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center text-sm text-slate-500">
-                <span className="hover:text-slate-700 cursor-pointer transition-colors">Dashboard</span>
-                <ChevronRight className="w-4 h-4 mx-1" />
-                <span className="text-slate-900 font-semibold">Messages</span>
-              </div>
-            </div>
+    <div className="flex h-screen flex-col bg-slate-950 text-white">
+      <MessagingHeader
+        user={user}
+        unreadCount={unreadCount}
+        isSidebarOpen={showSidebar}
+        isInspectorOpen={isInspectorOpen}
+        onToggleSidebar={() => setShowSidebar(prev => !prev)}
+        onToggleInspector={() => setIsInspectorOpen(prev => !prev)}
+        onOpenSearch={() => setIsGlobalSearchOpen(true)}
+        onOpenNotifications={() => setIsNotificationSettingsOpen(true)}
+        newMessageButton={
+          <ProtectedButton
+            permission="messages.send"
+            onClick={handleStartNewConversation}
+            className="bg-white text-slate-900 hover:bg-white/90"
+            size="sm"
+            actionName="send new messages"
+          >
+            <MessageCircle className="mr-2 h-4 w-4" />
+            Compose
+          </ProtectedButton>
+        }
+      />
 
-            {/* Header Actions */}
-            <div className="flex items-center space-x-2">
-              {unreadCount > 0 && (
-                <Badge className="bg-blue-500 text-white px-2.5 py-1 text-xs font-semibold">
-                  {unreadCount} Unread
-                </Badge>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsGlobalSearchOpen(true)}
-                className="text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                title="Search all messages (Ctrl+K)"
-              >
-                <Search className="w-5 h-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsNotificationSettingsOpen(true)}
-                className="text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                title="Notification settings"
-              >
-                <Settings className="w-5 h-5" />
-              </Button>
-              <Button
-                onClick={handleStartNewConversation}
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm"
-                size="sm"
-              >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                New Message
-              </Button>
-            </div>
-          </div>
+      <div className="relative flex flex-1 overflow-hidden bg-slate-900/40">
+        {showSidebar && (
+          <div
+            className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm md:hidden"
+            onClick={() => setShowSidebar(false)}
+          />
+        )}
+
+        <aside
+          className={cn(
+            'fixed inset-y-0 left-0 z-40 w-80 transform border-r border-white/10 bg-slate-900/95 shadow-2xl transition-transform md:hidden',
+            showSidebar ? 'translate-x-0' : '-translate-x-full'
+          )}
+        >
+          {renderSidebarContent()}
+        </aside>
+
+        <div className="hidden h-full w-[320px] flex-col border-r border-white/10 bg-slate-900/80 backdrop-blur md:flex">
+          {renderSidebarContent()}
         </div>
-      </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-      {/* Left Column - Conversations Sidebar */}
-        <div className={`${showSidebar ? 'flex' : 'hidden'} md:flex flex-col w-80 lg:w-96 bg-white border-r border-slate-200 shadow-sm`}>
-        <ConversationList
-          selectedConversationId={selectedConversationId}
-          onSelectConversation={handleSelectConversation}
-          onStartNewConversation={handleStartNewConversation}
-          onOpenSettings={() => setIsNotificationSettingsOpen(true)}
-        />
-      </div>
-
-        {/* Middle Column - Chat Area */}
-        <div className="flex-1 flex flex-col bg-white relative">
-        {selectedConversationId ? (
-          <>
-            {/* Slack-style Clean Header */}
-            <div className="bg-white border-b border-gray-200">
-              <div className="px-6 py-3 flex items-center justify-between">
-                {/* Left: Avatar and Title */}
-                <div className="flex items-center space-x-3">
-                  {/* Mobile back button */}
+        <main className="flex flex-1 flex-col bg-background/80 text-foreground shadow-inner">
+          {selectedConversationId ? (
+            <>
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-4 lg:px-8">
+                <div className="flex flex-1 items-center gap-4">
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     onClick={handleBackToConversations}
-                    className="md:hidden p-2 hover:bg-gray-100"
+                    className="rounded-full border border-white/10 bg-white/10 text-white hover:bg-white/20 md:hidden"
                   >
-                    <Menu className="w-5 h-5 text-gray-600" />
+                    <Menu className="h-5 w-5" />
                   </Button>
-                  
-                  {/* Avatar */}
-                  <div className="relative">
-                    <Avatar className="w-9 h-9">
-                      <AvatarImage src={getConversationAvatar()} />
-                      <AvatarFallback className="bg-gray-200 text-gray-700 text-sm font-medium">
-                        {getInitials(getConversationTitle())}
-                      </AvatarFallback>
-                    </Avatar>
+                  <Avatar className="h-11 w-11 border border-white/20">
+                    <AvatarImage src={getConversationAvatar() || undefined} />
+                    <AvatarFallback className="bg-white/10 text-sm font-semibold text-white">
+                      {getInitials(getConversationTitle())}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-base font-semibold">{getConversationTitle()}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedConversation?.type === 'direct'
+                        ? onlineStatus?.is_online
+                          ? 'Online'
+                          : onlineStatus?.last_seen_text || 'Offline'
+                        : selectedEvent?.title
+                        ? `Event · ${selectedEvent.title}`
+                        : getConversationSubtitle()}
+                    </p>
                   </div>
-                  
-                  {/* Title */}
-                  <h1 className="text-base font-bold text-gray-900 truncate">
-                    {getConversationTitle()}
-                  </h1>
                 </div>
-                
-                {/* Right: Action Icons */}
-                <div className="flex items-center space-x-1">
-                  {/* Search icon */}
+                <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
-                    size="sm"
-                    onClick={() => setIsConversationSearchOpen(!isConversationSearchOpen)}
-                    className="p-2 hover:bg-gray-100 rounded-full"
+                    size="icon"
+                    onClick={() => setIsConversationSearchOpen(prev => !prev)}
+                    className="rounded-full border border-white/10 bg-white/5 text-white hover:bg-white/15"
                     title="Search in conversation"
                   >
-                    <Search className="w-5 h-5 text-gray-600" />
+                    <Search className="h-5 w-5" />
                   </Button>
-
-                  {/* Info icon */}
                   <Button
                     variant="ghost"
-                    size="sm"
-                    onClick={() => setShowInfoPanel(!showInfoPanel)}
-                    className={`p-2 hover:bg-gray-100 rounded-full ${showInfoPanel ? 'bg-gray-100' : ''}`}
-                    title="Conversation info"
+                    size="icon"
+                    onClick={() => setIsInspectorOpen(prev => !prev)}
+                    className={cn(
+                      'rounded-full border border-white/10 bg-white/5 text-white hover:bg-white/15',
+                      isInspectorOpen && 'bg-white/20'
+                    )}
+                    title="Toggle command drawer"
                   >
-                    <Info className="w-5 h-5 text-gray-600" />
+                    <Info className="h-5 w-5" />
                   </Button>
                 </div>
               </div>
-            </div>
 
-            {/* Message Thread Container - Scrollable area above fixed input */}
-            <div className="flex-1 overflow-hidden bg-[#FAFAFA] relative min-h-0">
-              {/* Conversation Search */}
               {isConversationSearchOpen && selectedConversationId && (
-                <ConversationSearch
-                  conversationId={selectedConversationId}
-                  conversationName={getConversationTitle()}
-                  onMessageClick={handleConversationSearchMessageClick}
-                  onClose={() => setIsConversationSearchOpen(false)}
-                />
+                <div className="border-b border-white/10 bg-card/40 px-4 py-4 lg:px-8">
+                  <ConversationSearch
+                    conversationId={selectedConversationId}
+                    conversationName={getConversationTitle()}
+                    onMessageClick={handleConversationSearchMessageClick}
+                    onClose={() => setIsConversationSearchOpen(false)}
+                  />
+                </div>
               )}
 
-              <MessageThread
-                conversationId={selectedConversationId}
-                currentUserId={user?.id || 1}
-                onReply={handleReply}
-                onOptimisticMessage={handleOptimisticMessage}
-                onOpenThread={handleOpenThread}
-              />
-            </div>
-            
-            {/* Fixed Message Input at Bottom - Slack Style */}
-            <div className="flex-shrink-0 bg-white border-t border-gray-200 px-6 py-4">
-              <MessageInput
-                conversationId={selectedConversationId}
-                recipientId={selectedUser?.id}
-                onMessageSent={handleMessageSent}
-                onOptimisticMessage={handleOptimisticMessage}
-                replyingTo={replyingTo}
-                onCancelReply={handleCancelReply}
-                isGroup={selectedConversationId?.startsWith('event_')}
-              />
-            </div>
-          </>
-        ) : (
-          /* Enhanced Empty State */
-          <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-            <div className="text-center max-w-md px-6">
-              <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <MessageCircle className="w-16 h-16 text-blue-600" />
+              <div className="flex-1 min-h-0">
+                <MessageThread
+                  conversationId={selectedConversationId}
+                  currentUserId={user?.id || 1}
+                  onReply={handleReply}
+                  onOptimisticMessage={handleOptimisticMessage}
+                  onOpenThread={handleOpenThread}
+                />
               </div>
-              <h2 className="text-3xl font-bold text-slate-900 mb-3">
-                Welcome to Messages
-              </h2>
-              <p className="text-slate-600 mb-8 text-lg">
-                Select a conversation from the sidebar to start messaging, or start a new conversation with your team.
+
+              <div className="border-t border-white/10 bg-card/40 px-4 py-4 lg:px-8">
+                <MessageInput
+                  conversationId={selectedConversationId}
+                  recipientId={selectedUser?.id}
+                  onMessageSent={handleMessageSent}
+                  onOptimisticMessage={handleOptimisticMessage}
+                  replyingTo={replyingTo}
+                  onCancelReply={handleCancelReply}
+                  isGroup={selectedConversationId?.startsWith('event_')}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+              <div className="mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10">
+                <MessageCircle className="h-12 w-12 text-primary" />
+              </div>
+              <h2 className="text-3xl font-semibold text-white">Welcome to Messaging</h2>
+              <p className="mt-3 max-w-md text-base text-white/70">
+                Select a conversation from the rail or start a new thread to collaborate with your
+                team.
               </p>
-              <Button 
-                onClick={handleStartNewConversation} 
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md px-6 py-3 text-base"
+              <Button
+                onClick={handleStartNewConversation}
+                className="mt-6 bg-brand-gradient px-6 py-3 font-semibold text-white shadow-lg"
               >
-                <MessageCircle className="w-5 h-5 mr-2" />
+                <MessageCircle className="mr-2 h-5 w-5" />
                 Start New Conversation
               </Button>
             </div>
-          </div>
-        )}
-        </div>
+          )}
+        </main>
 
-        {/* Right Column - Info Panel or Thread Panel (collapsible) */}
-        {threadMessage && (
-          <div className="hidden lg:block">
-            <MessageThreadPanel
-              parentMessage={threadMessage}
-              replies={threadReplies}
-              isLoading={isLoadingThreadReplies}
-              onClose={() => setThreadMessage(null)}
-              onReply={handleSendReply}
-              conversationId={selectedConversationId || ''}
-            />
-          </div>
-        )}
-        
-        {!threadMessage && showInfoPanel && selectedConversationId && (
-          <div className="hidden lg:block">
-            <ConversationInfoPanel
-              conversation={conversations.find((c: Conversation) => c.id === selectedConversationId) || null}
-              onClose={() => setShowInfoPanel(false)}
-              messages={[]} // TODO: Pass actual messages
-            />
-          </div>
+        {isInspectorOpen && selectedConversationId && (
+          <aside className="hidden w-[360px] flex-col border-l border-white/10 bg-card/80 text-foreground backdrop-blur xl:flex">
+            {threadMessage ? (
+              <MessageThreadPanel
+                parentMessage={threadMessage}
+                replies={threadReplies}
+                isLoading={isLoadingThreadReplies}
+                onClose={() => setThreadMessage(null)}
+                onReply={handleSendReply}
+                conversationId={selectedConversationId || ''}
+              />
+            ) : (
+              <>
+                <div className="border-b border-white/10 px-5 py-4">
+                  <div className="flex items-center justify-between text-sm font-semibold text-white">
+                    <span>Command drawer</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsInspectorOpen(false)}
+                      className="rounded-full text-white hover:bg-white/10"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    {insightCards.map(card => (
+                      <div
+                        key={card.label}
+                        className="rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-white/70"
+                      >
+                        <p className="uppercase tracking-widest">{card.label}</p>
+                        <p className="mt-2 text-base font-semibold text-white">{card.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  <ConversationInfoPanel
+                    conversation={selectedConversation}
+                    onClose={() => setIsInspectorOpen(false)}
+                    messages={[]}
+                  />
+                </div>
+              </>
+            )}
+          </aside>
         )}
       </div>
 
-      {/* New Message Dialog */}
       <NewMessageDialog
         isOpen={isNewMessageDialogOpen}
         onClose={() => setIsNewMessageDialogOpen(false)}
         onSelectUser={handleSelectUser}
         onSelectEvent={handleSelectEvent}
-        events={[]} // This should be fetched from API
+        events={[]}
       />
 
-      {/* Global Search Dialog */}
       <GlobalSearchDialog
         isOpen={isGlobalSearchOpen}
         onClose={() => setIsGlobalSearchOpen(false)}
@@ -599,15 +792,13 @@ export default function Messages() {
         onConversationClick={handleGlobalSearchConversationClick}
       />
 
-      {/* Notification Settings Modal */}
       {isNotificationSettingsOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <NotificationSettings onClose={() => setIsNotificationSettingsOpen(false)} />
         </div>
       )}
 
-      {/* Notification Toasts */}
-      {notificationToasts.map((toast) => (
+      {notificationToasts.map(toast => (
         <NotificationToast
           key={toast.id}
           senderName={toast.senderName}

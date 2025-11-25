@@ -81,8 +81,8 @@ export function InvitationGenerator({
 
   return (
     <Card className="p-6">
-      <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-        <Link2 className="w-5 h-5" />
+      <h3 className="text-xl font-semibold mb-4 flex items-center gap-2 text-foreground">
+        <Link2 className="w-5 h-5 text-primary" />
         Generate Invitation Link
       </h3>
 
@@ -94,13 +94,13 @@ export function InvitationGenerator({
 
         <TabsContent value="personalized">
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Generate a unique invitation link that tracks clicks and registrations attributed to you.
             </p>
             <Button
               onClick={handleGenerate}
               disabled={generateMutation.isPending}
-              className="w-full"
+              className="w-full bg-brand-gradient text-foreground dark:text-primary-foreground"
             >
               {generateMutation.isPending ? (
                 <>
@@ -119,13 +119,13 @@ export function InvitationGenerator({
 
         <TabsContent value="generic">
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Generate a general invitation link that can be shared with anyone. {isOrganizer ? 'Clicks and registrations will be tracked but not attributed to specific users.' : 'This link is the same for all users.'}
             </p>
             <Button
               onClick={handleGenerate}
               disabled={generateMutation.isPending}
-              className="w-full"
+              className="w-full bg-brand-gradient text-foreground dark:text-primary-foreground"
             >
               {generateMutation.isPending ? (
                 <>
@@ -144,9 +144,9 @@ export function InvitationGenerator({
       </Tabs>
 
       {currentInvitation && (
-        <div className="mt-6 space-y-4 pt-6 border-t">
+        <div className="mt-6 space-y-4 pt-6 border-t border-border">
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
+            <label className="text-sm font-medium text-foreground mb-2 block">
               Invitation Code
             </label>
             <div className="flex gap-2">
@@ -159,6 +159,7 @@ export function InvitationGenerator({
                 size="sm"
                 variant="outline"
                 onClick={handleCopyCode}
+                className="border-border hover:bg-muted"
               >
                 <Copy className="w-4 h-4" />
               </Button>
@@ -166,7 +167,7 @@ export function InvitationGenerator({
           </div>
 
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
+            <label className="text-sm font-medium text-foreground mb-2 block">
               Invitation Link
             </label>
             <div className="flex gap-2">
@@ -179,15 +180,16 @@ export function InvitationGenerator({
                 size="sm"
                 variant="outline"
                 onClick={handleCopyLink}
+                className="border-border hover:bg-muted"
               >
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-between">
+          <div className="bg-muted/50 rounded-lg p-4 flex items-center justify-between border border-border">
             <div className="flex items-center gap-4">
-              <div className="bg-white p-2 rounded border">
+              <div className="bg-background p-2 rounded border border-border">
                 <img
                   src={currentInvitation.qrUrl}
                   alt="Invitation QR Code"
@@ -195,8 +197,8 @@ export function InvitationGenerator({
                 />
               </div>
               <div>
-                <h4 className="font-medium text-sm mb-1">QR Code</h4>
-                <p className="text-xs text-gray-600">
+                <h4 className="font-medium text-sm mb-1 text-foreground">QR Code</h4>
+                <p className="text-xs text-muted-foreground">
                   Scan to access the invitation
                 </p>
               </div>
@@ -205,6 +207,7 @@ export function InvitationGenerator({
               size="sm"
               variant="outline"
               onClick={handleDownloadQR}
+              className="border-border hover:bg-muted"
             >
               <Download className="w-4 h-4 mr-2" />
               Download

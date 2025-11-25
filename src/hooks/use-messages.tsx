@@ -13,6 +13,7 @@ import {
   getUnreadMessages,
 } from '../lib/api'
 import { api } from '../lib/api'
+import { shouldUseWebsocket, getPollingInterval } from '@/config/messaging'
 import type {
   Message,
   Conversation,
@@ -26,6 +27,7 @@ import { useAuth } from './use-auth'
 // Hook for managing conversations
 export const useConversations = () => {
   const { isAuthenticated } = useAuth()
+  const refetchInterval = isAuthenticated ? getPollingInterval(3000) : false
   
   return useQuery({
     queryKey: ['conversations'],
@@ -55,9 +57,9 @@ export const useConversations = () => {
       }
     },
     enabled: isAuthenticated, // Only run when user is authenticated
-    refetchInterval: isAuthenticated ? 3000 : false, // Poll every 3 seconds for real-time updates
-    refetchOnWindowFocus: isAuthenticated, // Refetch when window gains focus
-    refetchIntervalInBackground: isAuthenticated, // Continue polling even when tab is not active
+    refetchInterval,
+    refetchOnWindowFocus: isAuthenticated && !shouldUseWebsocket,
+    refetchIntervalInBackground: Boolean(refetchInterval),
     retry: (failureCount, error: any) => {
       // Don't retry on 401 errors
       if (error?.response?.status === 401) return false
@@ -70,12 +72,13 @@ export const useConversations = () => {
 // Hook for managing direct messages with a specific user
 export const useDirectMessages = (userId: string | null, page = 1, perPage = 50) => {
   const { isAuthenticated } = useAuth()
+  const refetchInterval = isAuthenticated ? getPollingInterval(30000) : false
   
   return useQuery({
     queryKey: ['directMessages', userId, page, perPage],
     queryFn: () => userId ? getDirectMessages(userId, page, perPage) : Promise.resolve({ data: [] }),
     enabled: !!userId && isAuthenticated, // Only run when user is authenticated and userId is provided
-    refetchInterval: isAuthenticated ? 30000 : false, // Poll every 30 seconds for real-time updates
+    refetchInterval,
     retry: (failureCount, error: any) => {
       // Don't retry on 401 errors
       if (error?.response?.status === 401) return false
@@ -176,14 +179,15 @@ export const useSearchMessages = (query: string, filters: MessageFilters = {}) =
 // Hook for unread message count
 export const useUnreadCount = () => {
   const { isAuthenticated } = useAuth()
+  const refetchInterval = isAuthenticated ? getPollingInterval(3000) : false
   
   return useQuery({
     queryKey: ['unreadCount'],
     queryFn: getUnreadMessageCount,
     enabled: isAuthenticated, // Only run when user is authenticated
-    refetchInterval: isAuthenticated ? 3000 : false, // Poll every 3 seconds for real-time updates
-    refetchOnWindowFocus: isAuthenticated,
-    refetchIntervalInBackground: isAuthenticated,
+    refetchInterval,
+    refetchOnWindowFocus: isAuthenticated && !shouldUseWebsocket,
+    refetchIntervalInBackground: Boolean(refetchInterval),
     retry: (failureCount, error: any) => {
       // Don't retry on 401 errors
       if (error?.response?.status === 401) return false
@@ -195,14 +199,15 @@ export const useUnreadCount = () => {
 // Hook for unread messages list
 export const useUnreadMessages = () => {
   const { isAuthenticated } = useAuth()
+  const refetchInterval = isAuthenticated ? getPollingInterval(3000) : false
   
   return useQuery({
     queryKey: ['unreadMessages'],
     queryFn: getUnreadMessages,
     enabled: isAuthenticated, // Only run when user is authenticated
-    refetchInterval: isAuthenticated ? 3000 : false, // Poll every 3 seconds for real-time updates
-    refetchOnWindowFocus: isAuthenticated,
-    refetchIntervalInBackground: isAuthenticated,
+    refetchInterval,
+    refetchOnWindowFocus: isAuthenticated && !shouldUseWebsocket,
+    refetchIntervalInBackground: Boolean(refetchInterval),
     retry: (failureCount, error: any) => {
       // Don't retry on 401 errors
       if (error?.response?.status === 401) return false
@@ -286,6 +291,7 @@ export const useMessageUpdates = (conversationId: string | null) => {
 // Hook for managing message reactions
 export const useMessageReactions = (messageId: number) => {
   const { isAuthenticated } = useAuth()
+  const refetchInterval = isAuthenticated ? getPollingInterval(30000) : false
   
   return useQuery({
     queryKey: ['messageReactions', messageId],
@@ -300,7 +306,7 @@ export const useMessageReactions = (messageId: number) => {
     },
     enabled: !!messageId && isAuthenticated, // Only run when user is authenticated and messageId is provided
     staleTime: 30000, // 30 seconds
-    refetchInterval: isAuthenticated ? 30000 : false, // Poll every 30 seconds for real-time updates
+    refetchInterval,
     retry: (failureCount, error: any) => {
       // Don't retry on 401 errors
       if (error?.response?.status === 401) return false

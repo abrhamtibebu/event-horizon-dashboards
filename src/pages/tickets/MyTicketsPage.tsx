@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { TicketCard } from '@/components/tickets/TicketCard';
 import { TicketQRCodeModal } from '@/components/tickets/TicketQRCodeModal';
 import { Button } from '@/components/ui/button';
-import { Loader2, Ticket as TicketIcon, AlertCircle } from 'lucide-react';
+import { Ticket as TicketIcon, AlertCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { getMyTickets, refundTicket, downloadTicketPDF } from '@/lib/api/tickets';
 import { toast } from 'sonner';
 import type { Ticket, TicketStatus } from '@/types';
@@ -86,7 +87,7 @@ export default function MyTicketsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <Spinner size="lg" variant="primary" text="Loading tickets..." />
       </div>
     );
   }
@@ -137,7 +138,7 @@ export default function MyTicketsPage() {
             <CardTitle className="text-sm font-medium">Active</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-success">
               {tickets?.data?.filter((t: Ticket) => t.status === 'confirmed').length || 0}
             </div>
           </CardContent>
@@ -147,7 +148,7 @@ export default function MyTicketsPage() {
             <CardTitle className="text-sm font-medium">Used</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
+            <div className="text-2xl font-bold text-info">
               {tickets?.data?.filter((t: Ticket) => t.status === 'used').length || 0}
             </div>
           </CardContent>

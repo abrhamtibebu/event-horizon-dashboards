@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Shield, Search, Filter, Calendar, User, Activity } from 'lucide-react'
+import Breadcrumbs from '@/components/Breadcrumbs'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { DashboardCard } from '@/components/DashboardCard'
@@ -104,7 +106,7 @@ export default function AuditLogs() {
       case 'high':
         return 'bg-purple-100 text-purple-800 border-purple-200'
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+        return 'bg-muted text-muted-foreground border-border'
     }
   }
 
@@ -145,20 +147,32 @@ export default function AuditLogs() {
     high: logs.filter((l) => l.severity === 'high').length,
   }
 
-  if (loading) return <div>Loading logs...</div>
+  if (loading) return (
+    <div className="min-h-[300px] flex items-center justify-center">
+      <Spinner size="lg" variant="info" text="Loading logs..." />
+    </div>
+  )
   if (error) return <div className="text-red-500">{error}</div>
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumbs */}
+      <Breadcrumbs 
+        items={[
+          { label: 'Audit Logs', href: '/dashboard/audit-logs' }
+        ]}
+        className="mb-4"
+      />
+      
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Audit Logs</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-foreground">Audit Logs</h1>
+          <p className="text-muted-foreground mt-1">
             Monitor system activities and security events
           </p>
         </div>
-        <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+        <Button className="bg-brand-gradient bg-brand-gradient-hover text-foreground">
           <Calendar className="w-4 h-4 mr-2" />
           Export Logs
         </Button>
@@ -196,7 +210,7 @@ export default function AuditLogs() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             placeholder="Search logs..."
             value={searchTerm}
@@ -248,11 +262,11 @@ export default function AuditLogs() {
           <TableBody>
             {filteredLogs.map((log) => (
               <TableRow key={log.id}>
-                <TableCell className="font-mono text-sm text-gray-600">
+                <TableCell className="font-mono text-sm text-muted-foreground">
                   {new Date(log.created_at).toLocaleString()}
                 </TableCell>
                 <TableCell>
-                  <div className="font-medium text-gray-900">
+                  <div className="font-medium text-card-foreground">
                     {log.user?.email}
                   </div>
                 </TableCell>
@@ -300,11 +314,11 @@ export default function AuditLogs() {
 
       {filteredLogs.length === 0 && (
         <div className="text-center py-12">
-          <Shield className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-card-foreground mb-2">
             No audit logs found
           </h3>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Try adjusting your search or filter criteria
           </p>
         </div>

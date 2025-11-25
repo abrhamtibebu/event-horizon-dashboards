@@ -94,7 +94,7 @@ const SearchInput: React.FC<SearchInputProps> = ({
   return (
     <div className={`relative ${className}`}>
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
         <Input
           ref={inputRef}
           value={value}
@@ -152,12 +152,12 @@ const SearchInput: React.FC<SearchInputProps> = ({
 
       {/* Suggestions dropdown */}
       {(showSuggestions || isOpen) && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
           {/* Recent searches */}
           {filteredRecentSearches.length > 0 && (
             <div className="p-2">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-gray-500 flex items-center">
+                <span className="text-xs font-medium text-muted-foreground flex items-center">
                   <Clock className="w-3 h-3 mr-1" />
                   Recent searches
                 </span>
@@ -173,7 +173,7 @@ const SearchInput: React.FC<SearchInputProps> = ({
               {filteredRecentSearches.map((search, index) => (
                 <div
                   key={index}
-                  className="px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer"
+                  className="px-2 py-1 text-sm text-foreground hover:bg-muted rounded cursor-pointer"
                   onClick={() => handleSuggestionClick(search)}
                 >
                   {search}
@@ -184,10 +184,10 @@ const SearchInput: React.FC<SearchInputProps> = ({
 
           {/* Quick suggestions */}
           {value.length > 0 && (
-            <div className="p-2 border-t border-gray-100">
-              <div className="text-xs font-medium text-gray-500 mb-2">Quick search</div>
+            <div className="p-2 border-t border-border">
+              <div className="text-xs font-medium text-muted-foreground mb-2">Quick search</div>
               <div
-                className="px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer"
+                className="px-2 py-1 text-sm text-foreground hover:bg-muted rounded cursor-pointer"
                 onClick={() => handleSuggestionClick(value)}
               >
                 Search for "{value}"

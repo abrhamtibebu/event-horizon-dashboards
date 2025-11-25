@@ -20,6 +20,8 @@ interface ScheduleReviewProps {
   subject: string
   emailContent: string
   smsContent: string
+  selectedTicketTypes?: string[]
+  onlyCheckedIn?: boolean
 }
 
 export function ScheduleReview({
@@ -33,6 +35,8 @@ export function ScheduleReview({
   subject,
   emailContent,
   smsContent,
+  selectedTicketTypes = [],
+  onlyCheckedIn = false,
 }: ScheduleReviewProps) {
   const [sendOption, setSendOption] = useState<'now' | 'later'>('now')
   const [scheduledDate, setScheduledDate] = useState('')
@@ -42,15 +46,15 @@ export function ScheduleReview({
   const handleFinalSend = async () => {
     setIsSending(true)
     try {
-      const campaignData = {
+      const campaignData: any = {
         name: `Campaign - ${selectedTemplate?.name || 'Custom'}`,
         type: campaignType,
-        template_id: selectedTemplate?.id,
+        template_id: selectedTemplate?.id || null,
         event_id: selectedEventId,
         segment_id: null, // Will be created from audience type
-        subject: campaignType !== 'sms' ? subject : '',
-        email_content: campaignType !== 'sms' ? emailContent : '',
-        sms_content: campaignType !== 'email' ? smsContent : '',
+        audience_type: audienceType,
+        selected_ticket_types: selectedTicketTypes,
+        only_checked_in: onlyCheckedIn,
         scheduled_at: sendOption === 'later' && scheduledDate && scheduledTime 
           ? `${scheduledDate}T${scheduledTime}:00`
           : null,
@@ -58,14 +62,33 @@ export function ScheduleReview({
         total_recipients: recipientCount,
       }
 
+      // Only include content fields that are relevant to the campaign type
+      if (campaignType !== 'sms') {
+        campaignData.subject = subject
+        campaignData.email_content = emailContent
+      }
+      if (campaignType !== 'email') {
+        campaignData.sms_content = smsContent
+      }
+
       const response = await api.post('/marketing/campaigns', campaignData)
       
       if (sendOption === 'now') {
-        // Send immediately
-        await api.post(`/marketing/campaigns/${response.data.campaign.id}/send`)
-        toast.success('Campaign Sent!', {
-          description: `Your campaign has been sent to ${recipientCount} recipients`,
-        })
+        // Send immediately - handle timeout gracefully
+        try {
+          await api.post(`/marketing/campaigns/${response.data.campaign.id}/send`, {}, {
+            timeout: 60000 // 60 seconds for email sending
+          })
+          toast.success('Campaign Sent!', {
+            description: `Your campaign has been sent to ${recipientCount} recipients`,
+          })
+        } catch (sendError: any) {
+          // If send fails, campaign is still created - just inform user
+          console.warn('Campaign created but sending may be in progress:', sendError)
+          toast.warning('Campaign Created', {
+            description: `Campaign created successfully. Sending emails in the background. You can check the status in the campaigns list.`,
+          })
+        }
       } else {
         toast.success('Campaign Scheduled', {
           description: `Your campaign is scheduled to send to ${recipientCount} recipients`,
@@ -73,10 +96,24 @@ export function ScheduleReview({
       }
 
       onSend(response.data.campaign)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating campaign:', error)
+      // Log detailed error information
+      if (error.response) {
+        console.error('Error response:', {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers
+        })
+      } else if (error.request) {
+        console.error('Error request:', error.request)
+      } else {
+        console.error('Error message:', error.message)
+      }
+      
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Please try again.'
       toast.error('Failed to create campaign', {
-        description: 'Please try again.',
+        description: errorMessage,
       })
     } finally {
       setIsSending(false)

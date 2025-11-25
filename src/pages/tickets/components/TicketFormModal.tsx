@@ -24,7 +24,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { createTicketType, updateTicketType } from '@/lib/api/tickets';
-import { Loader2, Plus, X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
+import { SpinnerInline } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import type { TicketType } from '@/types';
 import { useState } from 'react';
@@ -358,7 +359,7 @@ export function TicketFormModal({
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <SpinnerInline className="mr-2" />
                     {isEditing ? 'Updating...' : 'Creating...'}
                   </>
                 ) : (

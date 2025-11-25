@@ -1,6 +1,7 @@
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { Card } from '@/components/ui/card';
 import { getPlatformIcon, getPlatformName } from '@/lib/invitationUtils';
+import { getChartStyles, getChartColorPalette } from '@/utils/reportTransformers';
 
 interface PlatformChartProps {
   data: Array<{
@@ -11,9 +12,10 @@ interface PlatformChartProps {
   }>;
 }
 
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
-
 export function PlatformChart({ data }: PlatformChartProps) {
+  const styles = getChartStyles();
+  const colors = getChartColorPalette('primary');
+  
   const chartData = data.map(item => ({
     name: `${getPlatformIcon(item.platform)} ${getPlatformName(item.platform)}`,
     value: item.shares
@@ -32,19 +34,28 @@ export function PlatformChart({ data }: PlatformChartProps) {
               labelLine={false}
               label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
               outerRadius={80}
-              fill="#8884d8"
+              fill={colors[0]}
               dataKey="value"
+              labelStyle={{ fill: styles.labelColor }}
             >
               {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
               ))}
             </Pie>
-            <Tooltip />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: styles.tooltipBg,
+                border: `1px solid ${styles.tooltipBorder}`,
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                color: styles.tooltipText,
+              }}
+            />
             <Legend />
           </PieChart>
         </ResponsiveContainer>
       ) : (
-        <div className="flex items-center justify-center h-64 text-gray-500">
+        <div className="flex items-center justify-center h-64 text-muted-foreground">
           No platform data available yet
         </div>
       )}

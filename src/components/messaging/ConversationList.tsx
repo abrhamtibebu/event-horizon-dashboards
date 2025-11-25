@@ -105,17 +105,17 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   if (isLoading) {
     return (
       <div className="flex flex-col h-full">
-        <div className="p-4 border-b">
-          <div className="h-10 bg-gray-200 rounded animate-pulse mb-2" />
-          <div className="h-8 bg-gray-200 rounded animate-pulse" />
+        <div className="p-4 border-b border-border">
+          <div className="h-10 bg-muted rounded animate-pulse mb-2" />
+          <div className="h-8 bg-muted rounded animate-pulse" />
         </div>
         <div className="flex-1 p-4 space-y-3">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse" />
+              <div className="w-12 h-12 bg-muted rounded-full animate-pulse" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 bg-gray-200 rounded animate-pulse" />
-                <div className="h-3 bg-gray-200 rounded animate-pulse w-3/4" />
+                <div className="h-4 bg-muted rounded animate-pulse" />
+                <div className="h-3 bg-muted rounded animate-pulse w-3/4" />
               </div>
             </div>
           ))}
@@ -127,9 +127,9 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-        <MessageCircle className="w-12 h-12 text-gray-400 mb-4" />
-        <h3 className="text-lg font-semibold text-gray-600 mb-2">Failed to load conversations</h3>
-        <p className="text-sm text-gray-500 mb-4">Please try refreshing the page</p>
+        <MessageCircle className="w-12 h-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-semibold text-foreground mb-2">Failed to load conversations</h3>
+        <p className="text-sm text-muted-foreground mb-4">Please try refreshing the page</p>
         <Button onClick={() => window.location.reload()} variant="outline">
           Refresh
         </Button>
@@ -138,9 +138,9 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-background min-h-0">
       {/* Corporate Gradient Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 shadow-md">
+      <div className="flex-shrink-0 bg-brand-gradient px-6 py-4 shadow-md">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-3">
             <h2 className="text-xl font-bold text-white">Messages</h2>
@@ -163,7 +163,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             <Button 
               onClick={onStartNewConversation} 
               size="sm" 
-              className="bg-white text-blue-600 hover:bg-blue-50 font-semibold shadow-sm"
+              className="bg-white text-[hsl(var(--color-rich-black))] hover:bg-white/90 font-semibold shadow-sm"
             >
               <MessageCircle className="w-4 h-4 mr-1.5" />
               New
@@ -173,12 +173,12 @@ export const ConversationList: React.FC<ConversationListProps> = ({
         
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             placeholder="Search conversations..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white/95 backdrop-blur-sm border-white/20 focus:border-white focus:ring-2 focus:ring-white/50 placeholder:text-slate-400 text-slate-900"
+            className="pl-10 bg-background/95 backdrop-blur-sm border-border/50 focus:border-background focus:ring-2 focus:ring-background/50 placeholder:text-muted-foreground text-foreground"
           />
         </div>
         
@@ -190,7 +190,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             onClick={() => setFilterType('all')}
             className={`flex-1 transition-all ${
               filterType === 'all' 
-                ? 'bg-white text-blue-600 hover:bg-white font-semibold shadow-sm' 
+                ? 'bg-white text-[hsl(var(--color-rich-black))] hover:bg-white font-semibold shadow-sm' 
                 : 'text-white hover:bg-white/10 border border-white/20'
             }`}
           >
@@ -202,7 +202,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             onClick={() => setFilterType('direct')}
             className={`flex-1 transition-all ${
               filterType === 'direct' 
-                ? 'bg-white text-blue-600 hover:bg-white font-semibold shadow-sm' 
+                ? 'bg-white text-[hsl(var(--color-rich-black))] hover:bg-white font-semibold shadow-sm' 
                 : 'text-white hover:bg-white/10 border border-white/20'
             }`}
           >
@@ -215,7 +215,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             onClick={() => setFilterType('event')}
             className={`flex-1 transition-all ${
               filterType === 'event' 
-                ? 'bg-white text-blue-600 hover:bg-white font-semibold shadow-sm' 
+                ? 'bg-white text-[hsl(var(--color-rich-black))] hover:bg-white font-semibold shadow-sm' 
                 : 'text-white hover:bg-white/10 border border-white/20'
             }`}
           >
@@ -226,14 +226,14 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       </div>
 
       {/* Conversations List */}
-      <ScrollArea className="flex-1 elegant-scrollbar">
+      <ScrollArea className="flex-1 min-h-0 elegant-scrollbar">
         {filteredConversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-            <MessageCircle className="w-12 h-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-600 mb-2">
+            <MessageCircle className="w-12 h-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
               {searchQuery ? 'No conversations found' : 'No conversations yet'}
             </h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               {searchQuery 
                 ? 'Try adjusting your search terms'
                 : 'Start a conversation to get started'
@@ -254,18 +254,18 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                 className={`
                   flex items-center px-4 py-4 cursor-pointer transition-all duration-150 relative group
                   ${selectedConversationId === conversation.id
-                    ? 'bg-blue-50 border-l-4 border-blue-600 shadow-sm'
-                    : 'hover:bg-slate-50 border-l-4 border-transparent'
+                    ? 'bg-primary/10 border-l-4 border-primary shadow-sm'
+                    : 'hover:bg-muted/50 border-l-4 border-transparent'
                   }
                 `}
               >
                 <div className="relative flex-shrink-0">
-                  <Avatar className="w-14 h-14 ring-2 ring-white shadow-sm">
+                  <Avatar className="w-14 h-14 ring-2 ring-background shadow-sm">
                     <AvatarImage src={conversation.avatar} />
                     <AvatarFallback className={`${
                       conversation.type === 'event' 
-                        ? 'bg-indigo-100 text-indigo-700' 
-                        : 'bg-blue-100 text-blue-700'
+                        ? 'bg-info/15 text-info' 
+                        : 'bg-primary/10 text-primary'
                     } font-semibold text-base`}>
                       {getInitials(conversation.name)}
                     </AvatarFallback>
@@ -275,15 +275,15 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                     const participant = conversation.participants[0]
                     const isOnline = participant ? isUserOnline(participant.id) : false
                     return (
-                      <div className={`absolute bottom-0 right-0 w-4 h-4 border-2 border-white rounded-full ${
-                        isOnline ? 'bg-green-500' : 'bg-gray-400'
+                      <div className={`absolute bottom-0 right-0 w-4 h-4 border-2 border-background rounded-full ${
+                        isOnline ? 'bg-success' : 'bg-muted-foreground'
                       }`}></div>
                     )
                   })()}
                   {/* Event badge for event conversations */}
                   {conversation.type === 'event' && (
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center shadow-sm">
-                      <Calendar className="w-3.5 h-3.5 text-white" />
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-info rounded-full flex items-center justify-center shadow-sm">
+                      <Calendar className="w-3.5 h-3.5 text-info-foreground" />
                     </div>
                   )}
                 </div>
@@ -292,19 +292,19 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                   <div className="flex items-center justify-between mb-1.5">
                     <h3 className={`truncate text-sm ${
                       conversation.unreadCount > 0 
-                        ? 'font-bold text-slate-900' 
-                        : 'font-semibold text-slate-800'
+                        ? 'font-bold text-foreground' 
+                        : 'font-semibold text-foreground'
                     }`}>
                       {conversation.name}
                     </h3>
                     <div className="flex items-center space-x-2 ml-2 flex-shrink-0">
                       {conversation.lastMessage && (
-                        <span className="text-xs font-medium text-slate-500">
+                        <span className="text-xs font-medium text-muted-foreground">
                           {formatLastMessageTime(conversation.lastMessage.created_at)}
                         </span>
                       )}
                       {conversation.unreadCount > 0 && (
-                        <Badge className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full font-semibold shadow-sm">
+                        <Badge className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full font-semibold shadow-sm">
                           {conversation.unreadCount}
                         </Badge>
                       )}
@@ -314,8 +314,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             <div className="flex items-center justify-between">
               <p className={`text-sm truncate flex-1 ${
                 conversation.unreadCount > 0 
-                  ? 'text-slate-700 font-medium' 
-                  : 'text-slate-600'
+                  ? 'text-foreground font-medium' 
+                  : 'text-muted-foreground'
               }`}>
                 {(() => {
                   // For direct messages, show last seen if no recent message
@@ -323,7 +323,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                     const participant = conversation.participants[0]
                     if (participant) {
                       const lastSeenText = getLastSeenText(participant.id)
-                      return <span className="text-xs text-slate-500">{lastSeenText}</span>
+                      return <span className="text-xs text-muted-foreground">{lastSeenText}</span>
                     }
                   }
                   return conversation.lastMessage?.content || 'No messages yet'
@@ -335,10 +335,10 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 h-7 w-7 hover:bg-slate-200"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 h-7 w-7 hover:bg-accent"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <MoreVertical className="w-4 h-4 text-slate-600" />
+                            <MoreVertical className="w-4 h-4 text-muted-foreground" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
@@ -350,7 +350,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                             <Archive className="w-4 h-4 mr-2" />
                             Archive
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
+                          <DropdownMenuItem className="text-destructive">
                             Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>

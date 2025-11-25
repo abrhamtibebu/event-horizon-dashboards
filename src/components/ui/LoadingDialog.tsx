@@ -3,7 +3,8 @@ import {
   Dialog,
   DialogContent,
 } from '@/components/ui/dialog';
-import { Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 interface LoadingDialogProps {
   isOpen: boolean;
@@ -30,7 +31,7 @@ export function LoadingDialog({
         return <XCircle className="h-8 w-8 text-red-600" />;
       case 'loading':
       default:
-        return <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />;
+        return <Spinner size="lg" variant="primary" />;
     }
   };
 

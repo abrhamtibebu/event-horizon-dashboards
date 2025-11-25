@@ -19,6 +19,7 @@ import {
   Calendar,
   Clock,
 } from 'lucide-react'
+import Breadcrumbs from '@/components/Breadcrumbs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -61,6 +62,7 @@ import {
 } from '@/components/ui/tooltip'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Spinner, SpinnerInline } from '@/components/ui/spinner'
 import Pagination from '@/components/Pagination'
 import { usePagination } from '@/hooks/usePagination'
 
@@ -190,13 +192,13 @@ export default function Organizers() {
       case 'active':
         return 'bg-green-100 text-green-800 border-green-200'
       case 'inactive':
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+        return 'bg-muted text-muted-foreground border-border'
       case 'suspended':
         return 'bg-red-100 text-red-800 border-red-200'
       case 'pending':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200'
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+        return 'bg-muted text-muted-foreground border-border'
     }
   }
 
@@ -489,15 +491,23 @@ export default function Organizers() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen w-full bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8 px-2 sm:px-6 lg:px-12">
+      <div className="min-h-screen w-full bg-background py-8 px-2 sm:px-6 lg:px-12">
+        {/* Breadcrumbs */}
+        <Breadcrumbs 
+          items={[
+            { label: 'Organizers', href: '/dashboard/organizers' }
+          ]}
+          className="mb-4"
+        />
+        
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-4xl font-extrabold text-gray-900 drop-shadow-sm">Organizer Management</h1>
-            <p className="text-lg text-gray-600 mt-2">Manage event organizers, contacts, and permissions</p>
+            <h1 className="text-4xl font-extrabold text-foreground drop-shadow-sm">Organizer Management</h1>
+            <p className="text-lg text-muted-foreground mt-2">Manage event organizers, contacts, and permissions</p>
           </div>
           <Link to="/dashboard/organizers/add">
-            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg text-lg px-6 py-3 rounded-xl">
+            <Button className="bg-brand-gradient bg-brand-gradient-hover text-foreground shadow-lg text-lg px-6 py-3 rounded-xl">
               <Plus className="w-5 h-5 mr-2" /> Add Organizer
             </Button>
           </Link>
@@ -505,15 +515,15 @@ export default function Organizers() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-blue-200 text-center">
+          <Card className="bg-card/80 backdrop-blur-md rounded-2xl shadow-xl border border-info/30 text-center">
             <CardHeader>
-              <CardTitle className="text-blue-600 text-lg font-semibold">Total Organizers</CardTitle>
+              <CardTitle className="text-info text-lg font-semibold">Total Organizers</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{organizerStats.total}</div>
             </CardContent>
           </Card>
-          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-green-200 text-center">
+          <Card className="bg-card/80 backdrop-blur-md rounded-2xl shadow-xl border border-green-200 dark:border-green-700/50 text-center">
             <CardHeader>
               <CardTitle className="text-green-600 text-lg font-semibold">Active</CardTitle>
             </CardHeader>
@@ -522,7 +532,7 @@ export default function Organizers() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-red-200 text-center">
+          <Card className="bg-card/80 backdrop-blur-md rounded-2xl shadow-xl border border-red-200 dark:border-red-700/50 text-center">
             <CardHeader>
               <CardTitle className="text-red-600 text-lg font-semibold">Suspended</CardTitle>
             </CardHeader>
@@ -531,9 +541,9 @@ export default function Organizers() {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-purple-200 text-center">
+          <Card className="bg-card/80 backdrop-blur-md rounded-2xl shadow-xl border border-info/30 text-center">
             <CardHeader>
-              <CardTitle className="text-purple-600 text-lg font-semibold">Total Events</CardTitle>
+              <CardTitle className="text-info text-lg font-semibold">Total Events</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{totalEvents}</div>
@@ -544,7 +554,7 @@ export default function Organizers() {
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 w-full mb-8">
           <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
             <Input
               placeholder="Search organizers..."
               value={searchTerm}
@@ -572,48 +582,47 @@ export default function Organizers() {
         {/* Loading/Error States */}
         {loading && (
           <div className="flex justify-center items-center py-24">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
-            <span className="ml-4 text-xl text-gray-500">Loading organizers...</span>
+            <Spinner size="lg" variant="primary" text="Loading organizers..." />
           </div>
         )}
         {error && <div className="text-center py-12 text-red-500 text-xl">{error}</div>}
 
         {/* Organizer Table View */}
         {!loading && !error && (
-          <Card className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl border border-gray-200 p-0 overflow-x-auto mt-8">
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold text-gray-900 px-6 pt-6 pb-2">Organizers</CardTitle>
+          <Card className="bg-card/80 backdrop-blur-md rounded-2xl shadow-xl border border-border p-0 overflow-x-auto mt-8">
+              <CardHeader>
+              <CardTitle className="text-2xl font-bold text-card-foreground px-6 pt-6 pb-2">Organizers</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gradient-to-r from-blue-50 to-purple-50">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-info/10 dark:bg-info/20">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Organization</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Events Managed</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contacts</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Organization</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Events Managed</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contacts</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white/60 divide-y divide-gray-100">
+                <tbody className="bg-card/60 divide-y divide-border">
                   {filteredOrganizers.map((organizer) => (
                     <tr key={organizer.id} className="hover:bg-blue-50/40 transition">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center text-white text-lg font-bold shadow-md">
+                          <div className="w-10 h-10 rounded-full bg-primary text-[hsl(var(--color-rich-black))] flex items-center justify-center text-lg font-bold shadow-md">
                             {organizer.name?.[0] || <Users className="w-6 h-6" />}
                           </div>
                           <div>
-                            <div className="font-semibold text-gray-900">{organizer.name}</div>
+                            <div className="font-semibold text-card-foreground">{organizer.name}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge className={getStatusColor(organizer.status) + ' text-xs px-2 py-1 rounded-full'}>{organizer.status}</Badge>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap text-muted-foreground">
                         {eventsCountMap[organizer.id] === undefined ? (
-                          <span className="inline-block w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin align-middle" />
+                          <SpinnerInline className="align-middle" />
                         ) : (
                           eventsCountMap[organizer.id]
                         )}
@@ -622,10 +631,10 @@ export default function Organizers() {
                         {contactsMap[organizer.id]?.length > 0 ? (
                           <div className="space-y-1">
                             {contactsMap[organizer.id].slice(0, 2).map((contact: any) => (
-                              <div key={contact.id} className={`flex items-center justify-between gap-1 px-2 py-1 rounded text-xs font-medium ${contact.is_primary_contact ? 'bg-purple-100 text-purple-700 border border-purple-300' : 'bg-gray-100 text-gray-700'}`}>
+                              <div key={contact.id} className={`flex items-center justify-between gap-1 px-2 py-1 rounded text-xs font-medium ${contact.is_primary_contact ? 'bg-info/10 dark:bg-info/20 text-info border border-info/30' : 'bg-muted text-muted-foreground border-border'}`}>
                                 <div className="flex items-center gap-1 min-w-0 flex-1">
                                   <span className="truncate">{contact.name}</span>
-                                  {contact.is_primary_contact && <Star className="w-3 h-3 text-purple-500 flex-shrink-0" />}
+                                  {contact.is_primary_contact && <Star className="w-3 h-3 text-info flex-shrink-0" />}
                                 </div>
                                 {isCurrentSuperAdmin && (
                                   <div className="flex gap-1 flex-shrink-0">
@@ -635,7 +644,7 @@ export default function Organizers() {
                                           <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="h-4 w-4 p-0 hover:bg-purple-200"
+                                            className="h-4 w-4 p-0 hover:bg-info/20"
                                             onClick={() => handleSetPrimary(organizer.id, contact.id)}
                                           >
                                             <Star className="w-3 h-3" />
@@ -671,7 +680,7 @@ export default function Organizers() {
                               </div>
                             ))}
                             {contactsMap[organizer.id].length > 2 && (
-                              <div className="text-xs text-gray-500 text-center">
+                              <div className="text-xs text-muted-foreground/70 text-center">
                                 +{contactsMap[organizer.id].length - 2} more
                               </div>
                             )}
@@ -688,7 +697,7 @@ export default function Organizers() {
                           </div>
                         ) : (
                           <div className="text-center">
-                            <span className="text-gray-400 text-xs">No contacts</span>
+                            <span className="text-muted-foreground/70 text-xs">No contacts</span>
                             {isCurrentSuperAdmin && (
                               <Button
                                 size="sm"
@@ -736,7 +745,7 @@ export default function Organizers() {
                                       disabled={statusLoadingId === organizer.id}
                                     >
                                       {statusLoadingId === organizer.id ? (
-                                        <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                                        <SpinnerInline />
                                       ) : (
                                         <PauseCircle className="w-5 h-5 text-red-500" />
                                       )}
@@ -755,7 +764,7 @@ export default function Organizers() {
                                       disabled={statusLoadingId === organizer.id}
                                     >
                                       {statusLoadingId === organizer.id ? (
-                                        <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                                        <SpinnerInline />
                                       ) : (
                                         <PlayCircle className="w-5 h-5 text-green-500" />
                                       )}
@@ -868,7 +877,7 @@ export default function Organizers() {
               </Label>
               
               {existingPrimaryContact && (
-                <div className="text-sm text-gray-600 mb-2">
+                <div className="text-sm text-muted-foreground mb-2">
                   Leave blank to keep the current primary contact unchanged.
                 </div>
               )}
@@ -882,7 +891,7 @@ export default function Organizers() {
                       checked={primaryContact === ''}
                       onChange={() => setPrimaryContact('')}
                     />
-                    <span className="text-gray-600">
+                    <span className="text-muted-foreground">
                       Keep current primary contact ({existingPrimaryContact.name})
                     </span>
                   </label>
@@ -1016,7 +1025,7 @@ export default function Organizers() {
                   >
                     <div>
                       <p className="font-semibold">{contact.name}</p>
-                      <p className="text-sm text-gray-500">{contact.email}</p>
+                      <p className="text-sm text-muted-foreground/70">{contact.email}</p>
                     </div>
                     {contact.is_primary_contact && (
                       <Badge variant="secondary">Primary</Badge>
@@ -1024,7 +1033,7 @@ export default function Organizers() {
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500 text-center py-4">
+                <p className="text-muted-foreground text-center py-4">
                   No contacts assigned.
                 </p>
               )}
@@ -1054,7 +1063,7 @@ export default function Organizers() {
             ) : eventsError ? (
               <div className="py-8 text-center text-red-500">{eventsError}</div>
             ) : selectedEvents.length === 0 ? (
-              <div className="py-8 text-center text-gray-500">
+              <div className="py-8 text-center text-muted-foreground">
                 No events found for this organizer.
               </div>
             ) : (
@@ -1106,20 +1115,20 @@ export default function Organizers() {
                   {contactsMap[selectedOrganizerForContacts.id].map((contact: any) => (
                     <div
                       key={contact.id}
-                      className={`flex items-center justify-between p-3 border rounded-lg ${contact.is_primary_contact ? 'bg-purple-50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}
+                      className={`flex items-center justify-between p-3 border rounded-lg ${contact.is_primary_contact ? 'bg-info/10 dark:bg-info/20 border-info/30' : 'bg-muted/50 border-border'}`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center text-white text-sm font-bold">
+                        <div className="w-8 h-8 rounded-full bg-primary text-[hsl(var(--color-rich-black))] flex items-center justify-center text-sm font-bold">
                           {contact.name?.[0] || 'U'}
                         </div>
                         <div>
-                          <div className="font-semibold text-gray-900">{contact.name}</div>
-                          <div className="text-sm text-gray-500">{contact.email}</div>
+                          <div className="font-semibold text-card-foreground">{contact.name}</div>
+                          <div className="text-sm text-muted-foreground">{contact.email}</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         {contact.is_primary_contact ? (
-                          <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+                          <Badge className="bg-info/15 text-info border-info/30">
                             <Star className="w-3 h-3 mr-1" />
                             Primary
                           </Badge>
@@ -1130,7 +1139,7 @@ export default function Organizers() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleSetPrimary(selectedOrganizerForContacts.id, contact.id)}
-                                className="text-purple-600 border-purple-300 hover:bg-purple-50"
+                                className="text-info border-info/40 hover:bg-info/10"
                               >
                                 <Star className="w-3 h-3 mr-1" />
                                 Set Primary
@@ -1168,9 +1177,9 @@ export default function Organizers() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No contacts assigned</h3>
-                  <p className="text-gray-600 mb-4">This organizer doesn't have any contacts assigned yet.</p>
+                  <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-card-foreground mb-2">No contacts assigned</h3>
+                  <p className="text-muted-foreground mb-4">This organizer doesn't have any contacts assigned yet.</p>
                   <Button onClick={() => openAssignDialog(selectedOrganizerForContacts)}>
                     <UserPlus className="w-4 h-4 mr-2" />
                     Assign Contacts
@@ -1224,7 +1233,7 @@ export default function Organizers() {
                 disabled={statusLoadingId === selectedOrganizerForSuspension?.id}
               >
                 {statusLoadingId === selectedOrganizerForSuspension?.id ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  <SpinnerInline className="mr-2" />
                 ) : (
                   <PauseCircle className="w-4 h-4 mr-2" />
                 )}

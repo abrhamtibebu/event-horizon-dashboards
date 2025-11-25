@@ -36,12 +36,12 @@ export function InvitationsTab({
   return (
     <div className="space-y-6">
       {/* Info Banner */}
-      <Card className="p-4 bg-blue-50 border-blue-200">
+      <Card className="p-4 bg-info/10 border-info/30">
         <div className="flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+          <AlertCircle className="w-5 h-5 text-info mt-0.5" />
           <div className="flex-1">
-            <h4 className="font-semibold text-blue-900 mb-1">Invitation Tracking</h4>
-            <p className="text-sm text-blue-800">
+            <h4 className="font-semibold text-info dark:text-info mb-1">Invitation Tracking</h4>
+            <p className="text-sm text-info/80 dark:text-info/70">
               Generate unique invitation links to track who clicks, shares, and registers for your event.
               {eventType === 'ticketed' 
                 ? ' Track ticket purchases from your invitations!' 
@@ -68,8 +68,8 @@ export function InvitationsTab({
             eventType={eventType}
           />
         ) : (
-          <Card className="p-6 flex items-center justify-center bg-gray-50">
-            <div className="text-center text-gray-500">
+          <Card className="p-6 flex items-center justify-center bg-muted/50">
+            <div className="text-center text-muted-foreground">
               <p className="font-medium">Generate an invitation link first</p>
               <p className="text-sm mt-1">Then share it via social media</p>
             </div>

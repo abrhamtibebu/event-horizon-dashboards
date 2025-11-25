@@ -17,7 +17,8 @@ import { TicketFormModal } from './components/TicketFormModal';
 import { TicketActionsMenu } from './components/TicketActionsMenu';
 import { TicketStatusBadge } from '@/components/tickets/TicketStatusBadge';
 import { getEventTickets, getTicketSales } from '@/lib/api/tickets';
-import { Loader2, Plus, Search, DollarSign, Ticket, TrendingUp, AlertCircle } from 'lucide-react';
+import { Plus, Search, DollarSign, Ticket, TrendingUp, AlertCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import type { TicketType } from '@/types';
@@ -133,7 +134,7 @@ export default function OrganizerTicketsPage() {
         <CardContent>
           {eventsLoading ? (
             <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <Spinner size="md" variant="primary" text="Loading events..." />
             </div>
           ) : (() => {
               // Handle both array and paginated response structures
@@ -189,7 +190,7 @@ export default function OrganizerTicketsPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center">
-                  <DollarSign className="w-4 h-4 mr-2 text-green-600" />
+                  <DollarSign className="w-4 h-4 mr-2 text-success" />
                   Total Revenue
                 </CardTitle>
               </CardHeader>
@@ -203,7 +204,7 @@ export default function OrganizerTicketsPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center">
-                  <Ticket className="w-4 h-4 mr-2 text-blue-600" />
+                  <Ticket className="w-4 h-4 mr-2 text-info" />
                   Tickets Sold
                 </CardTitle>
               </CardHeader>
@@ -215,7 +216,7 @@ export default function OrganizerTicketsPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center">
-                  <TrendingUp className="w-4 h-4 mr-2 text-purple-600" />
+                  <TrendingUp className="w-4 h-4 mr-2 text-primary" />
                   Active Ticket Types
                 </CardTitle>
               </CardHeader>
@@ -257,7 +258,7 @@ export default function OrganizerTicketsPage() {
               {/* Ticket Types Table */}
               {ticketTypesLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <Spinner size="md" variant="primary" text="Loading ticket types..." />
                 </div>
               ) : filteredTicketTypes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -311,7 +312,7 @@ export default function OrganizerTicketsPage() {
                                 <>
                                   {ticketType.quantity - ticketType.sold_count} / {ticketType.quantity}
                                   {ticketType.sold_count >= ticketType.quantity && (
-                                    <span className="ml-2 text-xs text-red-600 font-semibold">
+                                    <span className="ml-2 text-xs text-error font-semibold">
                                       SOLD OUT
                                     </span>
                                   )}
@@ -326,11 +327,11 @@ export default function OrganizerTicketsPage() {
                             </TableCell>
                             <TableCell>
                               {ticketType.is_active ? (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success/10 text-success">
                                   Active
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
                                   Inactive
                                 </span>
                               )}

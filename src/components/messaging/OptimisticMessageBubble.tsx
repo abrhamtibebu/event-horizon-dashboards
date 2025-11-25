@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { RefreshCw, AlertCircle, Check, CheckCheck, Download, Image as ImageIcon, Reply, Trash2 } from 'lucide-react'
+import { RefreshCw, AlertCircle, Check, CheckCheck, Download, Reply, Trash2 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { useModernAlerts } from '../../hooks/useModernAlerts'
-import { getMessageImageUrl, getOptimalImageSize, getImageAspectRatio } from '../../lib/image-utils'
+import { getMessageFileUrl } from '../../lib/image-utils'
 import MessageContent from './MessageContent'
+import OptimizedImage from './OptimizedImage'
 import type { Message } from '../../types/message'
 
 interface OptimisticMessageBubbleProps {
@@ -73,60 +74,56 @@ export const OptimisticMessageBubble: React.FC<OptimisticMessageBubbleProps> = (
   }
 
   const renderFileAttachment = () => {
-    if (!message.file_path) return null
+    if (!(message.file_path || message.file_url)) return null
+
+    const fileUrl = getMessageFileUrl(message)
+    if (!fileUrl) return null
 
     const isImage = message.file_type?.startsWith('image/')
-    const fileUrl = message.file_path?.startsWith('blob:')
-      ? message.file_path
-      : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/storage/${message.file_path}`
 
     if (isImage) {
-      const { width, height } = getOptimalImageSize(
-        message.original_width || 0,
-        message.original_height || 0,
-        200, // Max width
-        200  // Max height
-      )
-      const aspectRatio = getImageAspectRatio(message.original_width, message.original_height)
-
       return (
-        <div className="relative group cursor-pointer" onClick={() => onImageClick?.(fileUrl)}>
-          <img
-            src={fileUrl}
-            alt={message.file_name || 'Attached image'}
-            className="rounded-lg object-cover"
-            style={{ width: `${width}px`, height: `${height}px`, aspectRatio: aspectRatio || '1/1' }}
+        <div className="mt-2">
+          <OptimizedImage
+            message={message}
+            containerWidth={280}
+            maxWidth={300}
+            maxHeight={300}
+            onClick={(originalUrl) => onImageClick?.(originalUrl || fileUrl)}
+            showLoadingIndicator={false}
           />
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
-            <ImageIcon className="w-6 h-6 text-white" />
-          </div>
         </div>
       )
-    } else {
-      return (
-        <a
-          href={fileUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center space-x-2 p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-        >
-          <Download className="w-5 h-5 text-gray-600" />
-          <span className="text-sm font-medium text-gray-700">{message.file_name}</span>
-          <span className="text-xs text-gray-500">({(message.file_size / 1024).toFixed(2)} KB)</span>
-        </a>
-      )
     }
+
+    const sizeLabel = message.file_size ? `${(message.file_size / 1024).toFixed(2)} KB` : ''
+
+    return (
+      <a
+        href={fileUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center space-x-2 p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+      >
+        <Download className="w-5 h-5 text-gray-600" />
+        <span className="text-sm font-medium text-gray-700 truncate">{message.file_name || 'Attachment'}</span>
+        {sizeLabel && (
+          <span className="text-xs text-gray-500 whitespace-nowrap">({sizeLabel})</span>
+        )}
+      </a>
+    )
   }
 
   const handleDownloadAttachment = () => {
-    if (message.file_path && !message.file_path.startsWith('blob:')) {
-      const link = document.createElement('a')
-      link.href = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/storage/${message.file_path}`
-      link.download = message.file_name || 'attachment'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    }
+    const fileUrl = getMessageFileUrl(message)
+    if (!fileUrl || fileUrl.startsWith('blob:')) return
+
+    const link = document.createElement('a')
+    link.href = fileUrl
+    link.download = message.file_name || 'attachment'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const renderReactions = () => {

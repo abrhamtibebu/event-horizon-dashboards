@@ -13,6 +13,7 @@ import { Switch } from '../ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import type { Conversation, Message } from '../../types/message'
+import { getMessageImageUrl, getMessageFileUrl } from '@/lib/image-utils'
 
 interface ConversationInfoPanelProps {
   conversation: Conversation | null
@@ -47,11 +48,11 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
 
   // Extract media files from messages
   const mediaFiles = messages.filter(msg => 
-    msg.file_path && msg.file_type?.startsWith('image/')
+    (msg.file_path || msg.file_url) && msg.file_type?.startsWith('image/')
   )
 
   const documentFiles = messages.filter(msg => 
-    msg.file_path && !msg.file_type?.startsWith('image/')
+    (msg.file_path || msg.file_url) && !msg.file_type?.startsWith('image/')
   )
 
   const formatFileSize = (bytes?: number) => {
@@ -63,15 +64,15 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
   }
 
   return (
-    <div className="w-80 bg-white border-l border-slate-200 flex flex-col h-full shadow-lg">
+    <div className="w-80 bg-card border-l border-border flex flex-col h-full shadow-lg">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-4 flex items-center justify-between">
-        <h3 className="text-lg font-bold text-white">Details</h3>
+      <div className="bg-brand-gradient px-4 py-4 flex items-center justify-between">
+        <h3 className="text-lg font-bold text-foreground">Details</h3>
         <Button
           variant="ghost"
           size="sm"
           onClick={onClose}
-          className="text-white hover:bg-white/10 p-2 rounded-lg"
+          className="text-foreground hover:bg-background/10 p-2 rounded-lg"
         >
           <X className="w-5 h-5" />
         </Button>
@@ -82,28 +83,28 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
           {/* Profile Section */}
           <div className="flex flex-col items-center text-center space-y-3">
             <div className="relative">
-              <Avatar className="w-24 h-24 ring-4 ring-white shadow-lg">
+              <Avatar className="w-24 h-24 ring-4 ring-background shadow-lg">
                 <AvatarImage src={conversation.avatar} />
                 <AvatarFallback className={`${
                   isEventConversation 
-                    ? 'bg-indigo-100 text-indigo-700' 
-                    : 'bg-blue-100 text-blue-700'
+                    ? 'bg-info/10 text-info' 
+                    : 'bg-primary/10 text-primary'
                 } text-2xl font-bold`}>
                   {getInitials(conversation.name)}
                 </AvatarFallback>
               </Avatar>
               {isDirect && (
-                <div className="absolute bottom-2 right-2 w-5 h-5 bg-green-400 border-4 border-white rounded-full"></div>
+                <div className="absolute bottom-2 right-2 w-5 h-5 bg-success border-4 border-background rounded-full"></div>
               )}
             </div>
 
             <div>
-              <h2 className="text-xl font-bold text-slate-900">{conversation.name}</h2>
+              <h2 className="text-xl font-bold text-foreground">{conversation.name}</h2>
               {isDirect && participant && (
-                <p className="text-sm text-slate-500 mt-1">{participant.email}</p>
+                <p className="text-sm text-muted-foreground mt-1">{participant.email}</p>
               )}
               {isEventConversation && (
-                <Badge className="mt-2 bg-indigo-100 text-indigo-700 border-indigo-200">
+                <Badge className="mt-2 bg-info/10 text-info border-info/30">
                   <Users className="w-3 h-3 mr-1" />
                   Event Chat
                 </Badge>
@@ -116,7 +117,7 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => setIsMuted(!isMuted)}
-                className={`${isMuted ? 'bg-slate-100' : ''}`}
+                className={`${isMuted ? 'bg-muted' : ''}`}
                 title={isMuted ? 'Unmute' : 'Mute'}
               >
                 {isMuted ? <BellOff className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
@@ -125,7 +126,7 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => setIsStarred(!isStarred)}
-                className={`${isStarred ? 'bg-yellow-50 text-yellow-600' : ''}`}
+                className={`${isStarred ? 'bg-warning/10 text-warning' : ''}`}
                 title={isStarred ? 'Unstar' : 'Star'}
               >
                 <Star className={`w-4 h-4 ${isStarred ? 'fill-current' : ''}`} />
@@ -141,7 +142,7 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
                     <Archive className="w-4 h-4 mr-2" />
                     Archive
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-red-600">
+                  <DropdownMenuItem className="text-destructive">
                     <Trash2 className="w-4 h-4 mr-2" />
                     Delete Chat
                   </DropdownMenuItem>
@@ -155,12 +156,12 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
           {/* About Section */}
           {isEventConversation && conversation.event && (
             <div>
-              <h3 className="text-sm font-semibold text-slate-900 mb-2">About Event</h3>
-              <p className="text-sm text-slate-600">
+              <h3 className="text-sm font-semibold text-foreground mb-2">About Event</h3>
+              <p className="text-sm text-muted-foreground">
                 {conversation.event.description || 'No description available'}
               </p>
               {conversation.event.location && (
-                <p className="text-xs text-slate-500 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   📍 {conversation.event.location}
                 </p>
               )}
@@ -169,8 +170,8 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
 
           {isDirect && participant && (
             <div>
-              <h3 className="text-sm font-semibold text-slate-900 mb-2">About</h3>
-              <p className="text-sm text-slate-600">
+              <h3 className="text-sm font-semibold text-foreground mb-2">About</h3>
+              <p className="text-sm text-muted-foreground">
                 {(participant as any).bio || 'No bio available'}
               </p>
             </div>
@@ -195,14 +196,13 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
               {mediaFiles.length > 0 ? (
                 <div className="grid grid-cols-3 gap-2">
                   {mediaFiles.slice(0, 9).map((msg) => {
-                    const fileUrl = msg.file_path?.startsWith('blob:')
-                      ? msg.file_path
-                      : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/storage/${msg.file_path}`
-                    
+                    const fileUrl = getMessageImageUrl(msg, 'medium') || getMessageFileUrl(msg)
+                    if (!fileUrl) return null
+
                     return (
                       <div
                         key={msg.id}
-                        className="aspect-square rounded-lg overflow-hidden bg-slate-100 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer group relative"
+                        className="aspect-square rounded-lg overflow-hidden bg-muted hover:ring-2 hover:ring-primary transition-all cursor-pointer group relative"
                       >
                         <img
                           src={fileUrl}
@@ -217,8 +217,8 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
                   })}
                 </div>
               ) : (
-                <div className="text-center py-8 text-slate-500">
-                  <ImageIcon className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+                <div className="text-center py-8 text-muted-foreground">
+                  <ImageIcon className="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
                   <p className="text-sm">No media shared yet</p>
                 </div>
               )}
@@ -227,19 +227,21 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
             <TabsContent value="files" className="mt-4">
               {documentFiles.length > 0 ? (
                 <div className="space-y-2">
-                  {documentFiles.slice(0, 10).map((msg) => (
+                  {documentFiles.slice(0, 10).map((msg) => {
+                    const fileUrl = getMessageFileUrl(msg)
+                    return (
                     <div
                       key={msg.id}
-                      className="flex items-center space-x-3 p-2 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer group"
+                      className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
                     >
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <FileText className="w-5 h-5 text-blue-600" />
+                      <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <FileText className="w-5 h-5 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">
+                        <p className="text-sm font-medium text-foreground truncate">
                           {msg.file_name || 'Unknown file'}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-muted-foreground">
                           {formatFileSize(msg.file_size)}
                         </p>
                       </div>
@@ -247,15 +249,22 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
                         variant="ghost"
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity p-2"
+                        disabled={!fileUrl}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (fileUrl) {
+                            window.open(fileUrl, '_blank', 'noopener,noreferrer')
+                          }
+                        }}
                       >
                         <Download className="w-4 h-4" />
                       </Button>
                     </div>
-                  ))}
+                  )})}
                 </div>
               ) : (
-                <div className="text-center py-8 text-slate-500">
-                  <FileText className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
                   <p className="text-sm">No files shared yet</p>
                 </div>
               )}
@@ -268,23 +277,23 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
           {isEventConversation && conversation.participants && conversation.participants.length > 0 && (
             <>
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 mb-3">
+                <h3 className="text-sm font-semibold text-foreground mb-3">
                   Participants ({conversation.participants.length})
                 </h3>
                 <div className="space-y-2">
                   {conversation.participants.slice(0, 5).map((participant) => (
-                    <div key={participant.id} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                    <div key={participant.id} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
                       <Avatar className="w-10 h-10">
                         <AvatarImage src={participant.profile_image} />
-                        <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-semibold">
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
                           {getInitials(participant.name)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">
+                        <p className="text-sm font-medium text-foreground truncate">
                           {participant.name}
                         </p>
-                        <p className="text-xs text-slate-500 truncate">
+                        <p className="text-xs text-muted-foreground truncate">
                           {participant.email}
                         </p>
                       </div>
@@ -303,12 +312,12 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
 
           {/* Settings */}
           <div>
-            <h3 className="text-sm font-semibold text-slate-900 mb-3">Settings</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-3">Settings</h3>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  {isMuted ? <VolumeX className="w-4 h-4 text-slate-500" /> : <Volume2 className="w-4 h-4 text-slate-500" />}
-                  <span className="text-sm text-slate-700">Notifications</span>
+                  {isMuted ? <VolumeX className="w-4 h-4 text-muted-foreground" /> : <Volume2 className="w-4 h-4 text-muted-foreground" />}
+                  <span className="text-sm text-foreground">Notifications</span>
                 </div>
                 <Switch
                   checked={!isMuted}
@@ -317,8 +326,8 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Pin className="w-4 h-4 text-slate-500" />
-                  <span className="text-sm text-slate-700">Pin to top</span>
+                  <Pin className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-foreground">Pin to top</span>
                 </div>
                 <Switch
                   checked={conversation.is_pinned || false}
@@ -331,14 +340,14 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
           <Separator />
 
           {/* Privacy Info */}
-          <div className="bg-slate-50 rounded-lg p-4">
+          <div className="bg-muted/50 rounded-lg p-4">
             <div className="flex items-start space-x-2">
-              <Shield className="w-4 h-4 text-slate-500 mt-0.5" />
+              <Shield className="w-4 h-4 text-muted-foreground mt-0.5" />
               <div>
-                <h4 className="text-xs font-semibold text-slate-900 mb-1">
+                <h4 className="text-xs font-semibold text-foreground mb-1">
                   Privacy & Security
                 </h4>
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-muted-foreground">
                   Messages are encrypted and stored securely. Only participants can see this conversation.
                 </p>
               </div>

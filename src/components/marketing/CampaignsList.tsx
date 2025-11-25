@@ -19,6 +19,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CampaignCard } from './CampaignCard';
+import { usePermissionCheck } from '@/hooks/use-permission-check';
+import { ProtectedButton } from '@/components/ProtectedButton';
 import api from '@/lib/api';
 
 interface Campaign {
@@ -46,10 +48,27 @@ export function CampaignsList({ onCreateNew }: CampaignsListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const { checkPermission } = usePermissionCheck();
 
   useEffect(() => {
     fetchCampaigns();
   }, [statusFilter, typeFilter]);
+
+  // Poll for campaigns in "sending" status to get real-time updates
+  useEffect(() => {
+    const sendingCampaigns = campaigns.filter(c => c.status === 'sending');
+    
+    if (sendingCampaigns.length === 0) {
+      return; // No campaigns sending, no need to poll
+    }
+
+    // Poll every 3 seconds for sending campaigns
+    const interval = setInterval(() => {
+      fetchCampaigns();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [campaigns]);
 
   const fetchCampaigns = async () => {
     try {
@@ -105,10 +124,19 @@ export function CampaignsList({ onCreateNew }: CampaignsListProps) {
           <h2 className="text-2xl font-bold">Campaigns</h2>
           <p className="text-gray-600">Manage your email and SMS marketing campaigns</p>
         </div>
-        <Button onClick={onCreateNew} size="lg">
+        <ProtectedButton
+          permission="marketing.campaigns"
+          onClick={() => {
+            if (checkPermission('marketing.campaigns', 'create campaigns')) {
+              onCreateNew();
+            }
+          }}
+          size="lg"
+          actionName="create campaigns"
+        >
           <Plus className="w-4 h-4 mr-2" />
           Create Campaign
-        </Button>
+        </ProtectedButton>
       </div>
 
       {/* Filters Bar */}

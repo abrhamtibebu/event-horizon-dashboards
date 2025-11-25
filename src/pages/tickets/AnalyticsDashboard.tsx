@@ -11,7 +11,8 @@ import { RevenueTrendChart } from '@/components/tickets/analytics/RevenueTrendCh
 import { TicketTypeBreakdownChart } from '@/components/tickets/analytics/TicketTypeBreakdownChart';
 import { ExportReportButton } from '@/components/tickets/analytics/ExportReportButton';
 import { getTicketAnalytics } from '@/lib/api/tickets';
-import { Loader2, TrendingUp, DollarSign, Ticket, BarChart3, Download, Users, CheckCircle, XCircle, RefreshCw, TrendingDown, Percent } from 'lucide-react';
+import { TrendingUp, DollarSign, Ticket, BarChart3, Download, Users, CheckCircle, XCircle, RefreshCw, TrendingDown, Percent } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import api from '@/lib/api';
 
 export default function AnalyticsDashboard() {
@@ -44,7 +45,7 @@ export default function AnalyticsDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-brand-gradient bg-clip-text text-transparent">
             Event Analytics Dashboard
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -94,7 +95,7 @@ export default function AnalyticsDashboard() {
 
       {isLoading ? (
         <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <Spinner size="lg" variant="primary" text="Loading analytics..." />
         </div>
       ) : !analytics ? (
         <Card>
@@ -109,20 +110,20 @@ export default function AnalyticsDashboard() {
           {/* Key Revenue Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Total Revenue Card */}
-            <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <Card className="bg-success/10 border-success/30">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center text-green-800">
+                <CardTitle className="text-sm font-medium flex items-center text-success">
                   <DollarSign className="w-4 h-4 mr-2" />
                   Total Revenue
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-green-900">
+                <div className="text-3xl font-bold text-success">
                   ETB {analytics.total_revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </div>
                 <div className="flex items-center justify-between mt-3">
-                  <span className="text-sm text-green-700">Avg. ETB {analytics.average_ticket_price.toFixed(2)}</span>
-                  <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                  <span className="text-sm text-success">Avg. ETB {analytics.average_ticket_price.toFixed(2)}</span>
+                  <span className="text-xs bg-success/10 text-success px-2 py-1 rounded-full">
                     {analytics.total_tickets_sold} tickets
                   </span>
                 </div>
@@ -130,21 +131,21 @@ export default function AnalyticsDashboard() {
             </Card>
 
             {/* Attendance Metrics */}
-            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+            <Card className="bg-info/10 border-info/30">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center text-blue-800">
+                <CardTitle className="text-sm font-medium flex items-center text-info">
                   <Users className="w-4 h-4 mr-2" />
                   Attendance
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-blue-900">
+                <div className="text-3xl font-bold text-info">
                   {analytics.tickets_by_status.used}
                 </div>
                 <div className="mt-3 space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-blue-700">Attendance Rate</span>
-                    <span className="font-semibold text-blue-900">{analytics.validation_rate.toFixed(1)}%</span>
+                    <span className="text-info">Attendance Rate</span>
+                    <span className="font-semibold text-info">{analytics.validation_rate.toFixed(1)}%</span>
                   </div>
                   <Progress value={analytics.validation_rate} className="h-2" />
                 </div>
@@ -152,25 +153,25 @@ export default function AnalyticsDashboard() {
             </Card>
 
             {/* Sales Performance */}
-            <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+            <Card className="bg-primary/10 border-primary/30">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center text-purple-800">
+                <CardTitle className="text-sm font-medium flex items-center text-primary">
                   <TrendingUp className="w-4 h-4 mr-2" />
                   Sales Performance
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-purple-900">
+                <div className="text-3xl font-bold text-primary">
                   {analytics.total_tickets_sold}
                 </div>
                 <div className="flex items-center justify-between mt-3">
                   <div className="text-sm">
-                    <div className="text-purple-700">Confirmed</div>
-                    <div className="font-semibold text-purple-900">{analytics.tickets_by_status.confirmed}</div>
+                    <div className="text-primary">Confirmed</div>
+                    <div className="font-semibold text-primary">{analytics.tickets_by_status.confirmed}</div>
                   </div>
                   <div className="text-sm text-right">
-                    <div className="text-purple-700">Pending</div>
-                    <div className="font-semibold text-purple-900">{analytics.tickets_by_status.pending}</div>
+                    <div className="text-warning">Pending</div>
+                    <div className="font-semibold text-warning">{analytics.tickets_by_status.pending}</div>
                   </div>
                 </div>
               </CardContent>
@@ -190,7 +191,7 @@ export default function AnalyticsDashboard() {
                         : 0}%
                     </p>
                   </div>
-                  <RefreshCw className="w-8 h-8 text-orange-500" />
+                  <RefreshCw className="w-8 h-8 text-warning" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   {analytics.tickets_by_status.refunded} refunded
@@ -209,7 +210,7 @@ export default function AnalyticsDashboard() {
                         : 0}%
                     </p>
                   </div>
-                  <XCircle className="w-8 h-8 text-red-500" />
+                  <XCircle className="w-8 h-8 text-error" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   {analytics.tickets_by_status.cancelled} cancelled
@@ -222,13 +223,13 @@ export default function AnalyticsDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Success Rate</p>
-                    <p className="text-2xl font-bold mt-1 text-green-600">
+                    <p className="text-2xl font-bold mt-1 text-success">
                       {analytics.total_tickets_sold > 0 
                         ? ((analytics.tickets_by_status.confirmed / analytics.total_tickets_sold) * 100).toFixed(1)
                         : 0}%
                     </p>
                   </div>
-                  <CheckCircle className="w-8 h-8 text-green-500" />
+                  <CheckCircle className="w-8 h-8 text-success" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   {analytics.tickets_by_status.confirmed} confirmed
@@ -245,7 +246,7 @@ export default function AnalyticsDashboard() {
                       ETB {analytics.average_ticket_price.toFixed(0)}
                     </p>
                   </div>
-                  <Percent className="w-8 h-8 text-blue-500" />
+                  <Percent className="w-8 h-8 text-info" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   Per ticket sold
@@ -255,9 +256,9 @@ export default function AnalyticsDashboard() {
           </div>
 
           {/* Revenue Breakdown Section */}
-          <Card className="border-2 border-green-100">
+            <Card className="border-2 border-success/30">
             <CardHeader>
-              <CardTitle className="flex items-center text-green-800">
+              <CardTitle className="flex items-center text-success">
                 <DollarSign className="w-5 h-5 mr-2" />
                 Revenue Breakdown by Ticket Type
               </CardTitle>
@@ -279,7 +280,7 @@ export default function AnalyticsDashboard() {
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
                             <h4 className="font-semibold text-lg">{type.ticket_type_name}</h4>
-                            <span className="text-2xl font-bold text-green-600">
+                            <span className="text-2xl font-bold text-success">
                               ETB {type.revenue.toLocaleString()}
                             </span>
                           </div>

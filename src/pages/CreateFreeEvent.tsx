@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import Breadcrumbs from '@/components/Breadcrumbs'
 import {
   Calendar,
   MapPin,
@@ -13,13 +14,20 @@ import {
   Plus,
   Trash2,
   UserCheck,
+  Sparkles,
+  CheckCircle2,
+  ArrowRight,
+  Info,
 } from 'lucide-react'
+import { CustomFieldsManager } from '@/components/event-creation/CustomFieldsManager'
+import type { CustomField } from '@/types/customFields'
+import { createCustomField } from '@/lib/customFieldsApi'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { toast } from 'sonner'
+import { showSuccessToast, showErrorToast } from '@/components/ui/ModernToast'
 import api from '@/lib/api'
 import { DateRange } from 'react-date-range'
 import 'react-date-range/dist/styles.css'
@@ -32,6 +40,10 @@ import {
   SelectItem,
   SelectValue,
 } from '@/components/ui/select'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { Progress } from '@/components/ui/progress'
 
 // Ethiopian major cities
 const ETHIOPIAN_CITIES = [
@@ -81,7 +93,7 @@ export default function CreateFreeEvent() {
     requirements: '',
     agenda: '',
     event_image: null as File | null,
-    event_type: 'free', // Add event_type field
+    event_type: 'free',
   })
 
   const [eventRange, setEventRange] = useState([{
@@ -98,6 +110,7 @@ export default function CreateFreeEvent() {
 
   const [selectedGuestTypes, setSelectedGuestTypes] = useState<string[]>([])
   const [customGuestTypes, setCustomGuestTypes] = useState<GuestType[]>([])
+  const [customFields, setCustomFields] = useState<CustomField[]>([])
   const [loading, setLoading] = useState({
     eventTypes: true,
     eventCategories: true,
@@ -107,18 +120,17 @@ export default function CreateFreeEvent() {
   const [eventCategories, setEventCategories] = useState([])
   const [organizers, setOrganizers] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [activeStep, setActiveStep] = useState(1)
 
   useEffect(() => {
     const fetchData = async (endpoint: string, setData: Function, loaderKey: string) => {
       try {
         setLoading(prev => ({ ...prev, [loaderKey]: true }))
         const response = await api.get(endpoint)
-        // Ensure we always set an array - handle both response.data and response.data.data
         const data = Array.isArray(response.data) ? response.data : (response.data?.data || [])
         setData(data)
       } catch (err: any) {
         console.error(`Error fetching ${endpoint}:`, err)
-        // Set empty array on error to prevent .map errors
         setData([])
       } finally {
         setLoading(prev => ({ ...prev, [loaderKey]: false }))
@@ -137,13 +149,11 @@ export default function CreateFreeEvent() {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
-
-
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        toast.error('Image size must be less than 2MB')
+        showErrorToast('Image size must be less than 2MB')
         return
       }
       setFormData(prev => ({ ...prev, event_image: file }))
@@ -177,10 +187,25 @@ export default function CreateFreeEvent() {
     setCustomGuestTypes(prev => prev.filter((_, i) => i !== index))
   }
 
+  // Calculate form completion progress
+  const calculateProgress = () => {
+    let completed = 0
+    const total = 7
+    
+    if (formData.name) completed++
+    if (formData.event_type_id) completed++
+    if (formData.event_category_id) completed++
+    if (formData.city && formData.venue) completed++
+    if (formData.max_guests) completed++
+    if (selectedGuestTypes.length > 0 || customGuestTypes.filter(gt => gt.name.trim()).length > 0) completed++
+    if (eventRange[0].startDate && regRange[0].startDate) completed++
+    
+    return Math.round((completed / total) * 100)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Validate guest types
     const validCustomGuestTypes = customGuestTypes.filter(gt => gt.name.trim())
     const allGuestTypes = [
       ...selectedGuestTypes.map(name => {
@@ -195,59 +220,53 @@ export default function CreateFreeEvent() {
     ]
     
     if (allGuestTypes.length === 0) {
-      toast.error('Please select at least one guest type.')
+      showErrorToast('Please select at least one guest type.')
       return
     }
 
-    // Validate required fields
     if (!formData.name || !formData.event_type_id || !formData.event_category_id || !formData.max_guests) {
-      toast.error('Please fill in all required fields.')
+      showErrorToast('Please fill in all required fields.')
       return
     }
 
-    // Validate location data
     if (!formData.city || !formData.venue) {
-      toast.error('Please fill in both city and venue.')
+      showErrorToast('Please fill in both city and venue.')
       return
     }
 
-    // Validate that event type and category are selected
     if (!eventTypes.some(et => String(et.id) === formData.event_type_id)) {
-      toast.error('Please select a valid event type.')
+      showErrorToast('Please select a valid event type.')
       return
     }
 
     if (!eventCategories.some(ec => String(ec.id) === formData.event_category_id)) {
-      toast.error('Please select a valid event category.')
+      showErrorToast('Please select a valid event category.')
       return
     }
 
-    // Validate max_guests is a valid number
     const maxGuests = parseInt(formData.max_guests, 10)
     if (isNaN(maxGuests) || maxGuests <= 0) {
-      toast.error('Please enter a valid number of maximum guests.')
+      showErrorToast('Please enter a valid number of maximum guests.')
       return
     }
 
-    // Validate organizer_id for admin users
     if (user?.role !== 'organizer' && !formData.organizer_id) {
-      toast.error('Please select an organizer.')
+      showErrorToast('Please select an organizer.')
       return
     }
 
-    // Validate dates
     if (eventRange[0].startDate >= eventRange[0].endDate) {
-      toast.error('Event end date must be after start date.')
+      showErrorToast('Event end date must be after start date.')
       return
     }
 
     if (regRange[0].startDate >= regRange[0].endDate) {
-      toast.error('Registration end date must be after start date.')
+      showErrorToast('Registration end date must be after start date.')
       return
     }
 
     if (regRange[0].endDate > eventRange[0].endDate) {
-      toast.error('Registration must end before or on the event end date.')
+      showErrorToast('Registration must end before or on the event end date.')
       return
     }
 
@@ -263,7 +282,6 @@ export default function CreateFreeEvent() {
         location: formData.city && formData.venue ? `${formData.city}, ${formData.venue}` : formData.venue || formData.city || '',
         max_guests: maxGuests,
         ...(user?.role !== 'organizer' && { organizer_id: formData.organizer_id }),
-        // Convert guest types to array of objects
         guest_types: allGuestTypes,
       }
 
@@ -276,17 +294,13 @@ export default function CreateFreeEvent() {
           if (key === 'event_image' && value) {
             payload.append('event_image', value)
           } else if (key === 'event_image' && !value) {
-            // Skip event_image if no file is uploaded
           } else if (key === 'guest_types') {
             if (Array.isArray(value)) {
-              // Send guest types as JSON string for FormData
               payload.append('guest_types', JSON.stringify(value))
             }
           } else if (value !== null && value !== undefined && value !== '') {
             if (key === 'organizer_id' && user?.role === 'organizer') {
-              // Skip organizer_id for organizer users as it's determined from JWT
             } else if (key === 'event_image' && !value) {
-              // Skip event_image if no file is uploaded
             } else {
               payload.append(key, value as any)
             }
@@ -294,253 +308,319 @@ export default function CreateFreeEvent() {
         })
         headers = { 'Content-Type': 'multipart/form-data' }
       } else {
-        // Remove empty values from payload
         payload = Object.fromEntries(
           Object.entries(processedFormData).filter(([key, value]) => {
             if (key === 'organizer_id' && user?.role === 'organizer') {
-              return false // Skip organizer_id for organizer users
+              return false
             }
             if (key === 'event_image' && !value) {
-              return false // Skip event_image if no file is uploaded
+              return false
             }
             return value !== null && value !== undefined && value !== ''
           })
         )
       }
 
-      console.log('Sending payload:', payload)
-      console.log('Headers:', headers)
-      console.log('Guest types being sent:', allGuestTypes)
-      if (formData.event_image) {
-        console.log('FormData entries:')
-        for (let [key, value] of payload.entries()) {
-          console.log(`${key}:`, value)
+      const response = await api.post('/events/free/add', payload, { headers })
+      const eventId = response.data?.id || response.data?.data?.id
+      
+      if (eventId && customFields.length > 0) {
+        try {
+          for (const field of customFields) {
+            await createCustomField(eventId, {
+              ...field,
+              event_id: eventId,
+            })
+          }
+        } catch (error: any) {
+          console.error('Error saving custom fields:', error)
+          showErrorToast('Event created but some custom fields could not be saved.')
         }
       }
-      await api.post('/events/free/add', payload, { headers })
-      toast.success('Free event created successfully!')
+      
+      showSuccessToast('Free event created successfully!')
       navigate('/dashboard/events')
     } catch (error: any) {
       console.error('Error creating event:', error)
-      console.error('Error response:', error.response?.data)
-      toast.error(error.response?.data?.message || error.response?.data?.error || 'Failed to create free event.')
+      showErrorToast(error.response?.data?.message || error.response?.data?.error || 'Failed to create free event.')
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const progress = calculateProgress()
+  const totalSelectedGuestTypes = selectedGuestTypes.length + customGuestTypes.filter(gt => gt.name.trim()).length
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+        {/* Header Section */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Create Free Event</h1>
-              <p className="text-gray-600 mt-2">
-                Set up a free or corporate event with guest type management
-              </p>
+          <Breadcrumbs 
+            items={[
+              { label: 'Events', href: '/dashboard/events' },
+              { label: 'Create Free Event' }
+            ]}
+            className="mb-6"
+          />
+          
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                    Create Free Event
+                  </h1>
+                  <p className="text-muted-foreground text-sm sm:text-base mt-1">
+                    Set up your event and start welcoming guests
+                  </p>
+                </div>
+              </div>
             </div>
             <Button
               onClick={() => navigate('/dashboard/events')}
-              variant="outline"
-              className="flex items-center gap-2"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
           </div>
+
+          {/* Progress Indicator */}
+          <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-foreground">Form Completion</span>
+                <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{progress}%</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+              <p className="text-xs text-muted-foreground mt-2">
+                Complete all required fields to create your event
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Event Information */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
-                <Gift className="w-5 h-5 text-white" />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Information Card */}
+          <Card className="border-border/50 shadow-lg shadow-black/5 bg-card/80 backdrop-blur-sm">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-md">
+                  <FileText className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Basic Information</CardTitle>
+                  <CardDescription>Tell us about your event</CardDescription>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Free Event</h3>
-                <p className="text-gray-500 text-sm">No cost to attendees</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div>
-                <Label htmlFor="name" className="flex items-center gap-2 text-gray-700 font-medium">
-                  <Tag className="w-4 h-4 text-blue-500" /> Event Name
-                </Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  placeholder="Enter event name"
-                  required
-                  className="mt-2 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="organizer_id" className="flex items-center gap-2 text-gray-700 font-medium">
-                  <Tag className="w-4 h-4 text-green-500" /> Organizer
-                </Label>
-                {user?.role === 'organizer' ? (
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-sm font-semibold">
+                    Event Name <span className="text-destructive">*</span>
+                  </Label>
                   <Input
-                    value={user.organizer?.name || ''}
-                    disabled
-                    className="mt-2 h-12 border-gray-300 bg-gray-50 rounded-xl"
-                  />
-                ) : (
-                  <Select
-                    value={formData.organizer_id}
-                    onValueChange={(value) => handleInputChange('organizer_id', value)}
-                    disabled={loading.organizers}
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    placeholder="e.g., Annual Tech Conference 2024"
                     required
-                  >
-                    <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl">
-                      <SelectValue placeholder="Select an organizer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {organizers.map((org: any) => (
-                        <SelectItem key={org.id} value={String(org.id)}>
-                          {org.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+                    className="h-11 border-border focus:border-blue-500 focus:ring-blue-500/20"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="organizer_id" className="text-sm font-semibold">
+                    Organizer <span className="text-destructive">*</span>
+                  </Label>
+                  {user?.role === 'organizer' ? (
+                    <Input
+                      value={user.organizer?.name || ''}
+                      disabled
+                      className="h-11 bg-muted/50"
+                    />
+                  ) : (
+                    <Select
+                      value={formData.organizer_id}
+                      onValueChange={(value) => handleInputChange('organizer_id', value)}
+                      disabled={loading.organizers}
+                      required
+                    >
+                      <SelectTrigger className="h-11 border-border focus:border-blue-500 focus:ring-blue-500/20">
+                        <SelectValue placeholder="Select organizer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {organizers.map((org: any) => (
+                          <SelectItem key={org.id} value={String(org.id)}>
+                            {org.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
               </div>
               
-              <div className="lg:col-span-2">
-                <Label htmlFor="description" className="flex items-center gap-2 text-gray-700 font-medium">
-                  <FileText className="w-4 h-4 text-green-500" /> Description
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-sm font-semibold">
+                  Description
                 </Label>
                 <Textarea
                   id="description"
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
-                  placeholder="Describe your free event..."
+                  placeholder="Describe your event, what attendees can expect, and any important details..."
                   rows={4}
-                  className="mt-2 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl resize-none"
+                  className="border-border focus:border-blue-500 focus:ring-blue-500/20 resize-none"
                 />
               </div>
               
-              <div>
-                <Label htmlFor="event_type_id" className="flex items-center gap-2 text-gray-700 font-medium">
-                  <Tag className="w-4 h-4 text-orange-500" /> Event Type
-                </Label>
-                <Select
-                  value={formData.event_type_id}
-                  onValueChange={(value) => handleInputChange('event_type_id', value)}
-                  disabled={loading.eventTypes}
-                  required
-                >
-                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-orange-500 focus:ring-orange-500 rounded-xl">
-                    <SelectValue placeholder="Select event type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {eventTypes.map((type: any) => (
-                      <SelectItem key={type.id} value={String(type.id)}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="event_type_id" className="text-sm font-semibold">
+                    Event Type <span className="text-destructive">*</span>
+                  </Label>
+                  <Select
+                    value={formData.event_type_id}
+                    onValueChange={(value) => handleInputChange('event_type_id', value)}
+                    disabled={loading.eventTypes}
+                    required
+                  >
+                    <SelectTrigger className="h-11 border-border focus:border-blue-500 focus:ring-blue-500/20">
+                      <SelectValue placeholder="Select event type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {eventTypes.map((type: any) => (
+                        <SelectItem key={type.id} value={String(type.id)}>
+                          {type.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="event_category_id" className="text-sm font-semibold">
+                    Event Category <span className="text-destructive">*</span>
+                  </Label>
+                  <Select
+                    value={formData.event_category_id}
+                    onValueChange={(value) => handleInputChange('event_category_id', value)}
+                    disabled={loading.eventCategories}
+                    required
+                  >
+                    <SelectTrigger className="h-11 border-border focus:border-blue-500 focus:ring-blue-500/20">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {eventCategories.map((cat: any) => (
+                        <SelectItem key={cat.id} value={String(cat.id)}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Location & Capacity Card */}
+          <Card className="border-border/50 shadow-lg shadow-black/5 bg-card/80 backdrop-blur-sm">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-md">
+                  <MapPin className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Location & Capacity</CardTitle>
+                  <CardDescription>Where and how many guests</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="city" className="text-sm font-semibold">
+                    City <span className="text-destructive">*</span>
+                  </Label>
+                  <Select
+                    value={formData.city}
+                    onValueChange={(value) => handleInputChange('city', value)}
+                    required
+                  >
+                    <SelectTrigger className="h-11 border-border focus:border-purple-500 focus:ring-purple-500/20">
+                      <SelectValue placeholder="Select a city" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ETHIOPIAN_CITIES.map((city) => (
+                        <SelectItem key={city} value={city}>
+                          {city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="venue" className="text-sm font-semibold">
+                    Venue <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="venue"
+                    value={formData.venue}
+                    onChange={(e) => handleInputChange('venue', e.target.value)}
+                    placeholder="e.g., Millennium Hall"
+                    required
+                    className="h-11 border-border focus:border-purple-500 focus:ring-purple-500/20"
+                  />
+                </div>
               </div>
               
-              <div>
-                <Label htmlFor="event_category_id" className="flex items-center gap-2 text-gray-700 font-medium">
-                  <Tag className="w-4 h-4 text-indigo-500" /> Event Category
-                </Label>
-                <Select
-                  value={formData.event_category_id}
-                  onValueChange={(value) => handleInputChange('event_category_id', value)}
-                  disabled={loading.eventCategories}
-                  required
-                >
-                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-xl">
-                    <SelectValue placeholder="Select event category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {eventCategories.map((cat: any) => (
-                      <SelectItem key={cat.id} value={String(cat.id)}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label htmlFor="city" className="flex items-center gap-2 text-gray-700 font-medium">
-                  <MapPin className="w-4 h-4 text-blue-500" /> City
-                </Label>
-                <Select
-                  value={formData.city}
-                  onValueChange={(value) => handleInputChange('city', value)}
-                  required
-                >
-                  <SelectTrigger className="mt-2 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl">
-                    <SelectValue placeholder="Select a city" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ETHIOPIAN_CITIES.map((city) => (
-                      <SelectItem key={city} value={city}>
-                        {city}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label htmlFor="venue" className="flex items-center gap-2 text-gray-700 font-medium">
-                  <MapPin className="w-4 h-4 text-green-500" /> Venue
-                </Label>
-                <Input
-                  id="venue"
-                  value={formData.venue}
-                  onChange={(e) => handleInputChange('venue', e.target.value)}
-                  placeholder="Enter venue name"
-                  required
-                  className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="max_guests" className="flex items-center gap-2 text-gray-700 font-medium">
-                  <Users className="w-4 h-4 text-teal-500" /> Max Guests
+              <div className="space-y-2">
+                <Label htmlFor="max_guests" className="text-sm font-semibold">
+                  Maximum Guests <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="max_guests"
                   type="number"
                   value={formData.max_guests}
                   onChange={(e) => handleInputChange('max_guests', e.target.value)}
-                  placeholder="e.g. 500"
-                  className="mt-2 h-12 border-gray-300 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                  placeholder="e.g., 500"
+                  className="h-11 border-border focus:border-purple-500 focus:ring-purple-500/20"
                 />
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Info className="w-3 h-3" />
+                  Set the maximum number of attendees for your event
+                </p>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          {/* Event Image Upload */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                <Image className="w-5 h-5 text-white" />
+          {/* Event Image Card */}
+          <Card className="border-border/50 shadow-lg shadow-black/5 bg-card/80 backdrop-blur-sm">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-md">
+                  <Image className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Event Image</CardTitle>
+                  <CardDescription>Upload a banner image (optional)</CardDescription>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Event Image</h3>
-                <p className="text-gray-500 text-sm">Upload an image for your event (optional)</p>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <Label htmlFor="event_image" className="flex items-center gap-2 text-gray-700 font-medium">
-                    <Upload className="w-4 h-4 text-purple-500" /> Event Image
-                  </Label>
-                  <div className="mt-2">
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row gap-6">
+                <div className="flex-1 space-y-4">
+                  <div className="flex items-center gap-3">
                     <input
                       ref={imageInputRef}
                       type="file"
@@ -549,41 +629,39 @@ export default function CreateFreeEvent() {
                       onChange={handleImageUpload}
                       className="hidden"
                     />
-                    <div className="flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => imageInputRef.current?.click()}
+                      className="flex items-center gap-2 border-2 border-dashed hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-all"
+                    >
+                      <Upload className="w-4 h-4" />
+                      {formData.event_image ? 'Change Image' : 'Choose Image'}
+                    </Button>
+                    {formData.event_image && (
                       <Button
                         type="button"
-                        variant="outline"
-                        onClick={() => imageInputRef.current?.click()}
-                        className="flex items-center gap-2 border-2 border-dashed border-gray-300 hover:border-purple-500 hover:bg-purple-50 transition-all duration-200"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, event_image: null }))
+                          if (imageInputRef.current) {
+                            imageInputRef.current.value = ''
+                          }
+                        }}
+                        className="text-destructive hover:text-destructive"
                       >
-                        <Upload className="w-4 h-4" />
-                        Choose Image
+                        <X className="w-4 h-4 mr-2" />
+                        Remove
                       </Button>
-                      {formData.event_image && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setFormData(prev => ({ ...prev, event_image: null }))
-                            if (imageInputRef.current) {
-                              imageInputRef.current.value = ''
-                            }
-                          }}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <X className="w-4 h-4" />
-                          Remove
-                        </Button>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-500 mt-2">
-                      Maximum file size: 2MB. Supported formats: JPG, PNG, GIF
-                    </p>
+                    )}
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Maximum file size: 2MB. Supported formats: JPG, PNG, GIF
+                  </p>
                 </div>
                 
-                {/* Image Preview */}
-                <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center">
+                <div className="w-full sm:w-48 h-48 rounded-xl border-2 border-dashed border-border overflow-hidden bg-muted/30 flex items-center justify-center">
                   {formData.event_image ? (
                     <img
                       src={URL.createObjectURL(formData.event_image)}
@@ -591,99 +669,96 @@ export default function CreateFreeEvent() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="text-center text-gray-400">
-                      <Image className="w-8 h-8 mx-auto mb-2" />
-                      <p className="text-xs">No image</p>
+                    <div className="text-center text-muted-foreground">
+                      <Image className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-xs">No image selected</p>
                     </div>
                   )}
                 </div>
               </div>
-              
-              {!formData.event_image && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Image className="w-3 h-3 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-blue-900">Default Image</p>
-                      <p className="text-sm text-blue-700 mt-1">
-                        If no image is uploaded, the default banner image will be used for your event.
-                      </p>
-                    </div>
+            </CardContent>
+          </Card>
+
+          {/* Date & Time Card */}
+          <Card className="border-border/50 shadow-lg shadow-black/5 bg-card/80 backdrop-blur-sm">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center shadow-md">
+                  <Calendar className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Date & Time</CardTitle>
+                  <CardDescription>Event schedule and registration period</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-indigo-500" />
+                    Event Date Range
+                  </Label>
+                  <div className="border border-border rounded-xl overflow-hidden">
+                    <DateRange
+                      ranges={eventRange}
+                      onChange={(item) => setEventRange([item.selection])}
+                      minDate={new Date()}
+                    />
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
+                
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-blue-500" />
+                    Registration Period
+                  </Label>
+                  <div className="border border-border rounded-xl overflow-hidden">
+                    <DateRange
+                      ranges={regRange}
+                      onChange={(item) => setRegRange([item.selection])}
+                      minDate={new Date()}
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Date & Time */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-white" />
+          {/* Guest Types Card */}
+          <Card className="border-border/50 shadow-lg shadow-black/5 bg-card/80 backdrop-blur-sm">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-md">
+                    <UserCheck className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl">Guest Types</CardTitle>
+                    <CardDescription>
+                      {totalSelectedGuestTypes > 0 
+                        ? `${totalSelectedGuestTypes} type${totalSelectedGuestTypes > 1 ? 's' : ''} selected`
+                        : 'Choose guest types for your event'
+                      }
+                    </CardDescription>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={addCustomGuestType}
+                  variant="outline"
+                  size="sm"
+                  className="border-emerald-500/50 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Custom Type
+                </Button>
               </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Date & Time</h3>
-                <p className="text-gray-500 text-sm">Event schedule and registration period</p>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div>
-                <Label className="flex items-center gap-2 text-gray-700 font-medium mb-4">
-                  <Calendar className="w-4 h-4 text-orange-500" /> Event Date Range
-                </Label>
-                <DateRange
-                  ranges={eventRange}
-                  onChange={(item) => setEventRange([item.selection])}
-                  minDate={new Date()}
-                  className="rounded-xl border border-gray-300"
-                />
-              </div>
-              
-              <div>
-                <Label className="flex items-center gap-2 text-gray-700 font-medium mb-4">
-                  <Calendar className="w-4 h-4 text-green-500" /> Registration Period
-                </Label>
-                <DateRange
-                  ranges={regRange}
-                  onChange={(item) => setRegRange([item.selection])}
-                  minDate={new Date()}
-                  className="rounded-xl border border-gray-300"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Guest Types */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
-                <UserCheck className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-bold text-gray-900">Guest Types</h3>
-                <p className="text-gray-500 text-sm">Choose the types of guests that can attend your event</p>
-              </div>
-              <Button
-                type="button"
-                onClick={addCustomGuestType}
-                variant="outline"
-                size="sm"
-                className="border-green-300 text-green-700 hover:bg-green-50"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Custom Type
-              </Button>
-            </div>
-            
-            {/* Guest Type Selection */}
-            <div className="space-y-6">
-              {/* Predefined Guest Types */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Common Guest Types</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                <Label className="text-sm font-semibold mb-3 block">Common Guest Types</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                   {PREDEFINED_GUEST_TYPES.map((guestType) => {
                     const isSelected = selectedGuestTypes.includes(guestType.name)
                     return (
@@ -692,13 +767,14 @@ export default function CreateFreeEvent() {
                         type="button"
                         variant={isSelected ? 'default' : 'outline'}
                         size="sm"
-                        className={`${
+                        className={`h-auto py-2.5 px-3 transition-all ${
                           isSelected 
-                            ? 'bg-green-600 text-white border-green-600 shadow-sm' 
-                            : 'border-gray-200 hover:border-green-300 hover:bg-green-50 text-gray-700'
-                        } rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 h-auto`}
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/30' 
+                            : 'hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10'
+                        }`}
                         onClick={() => toggleGuestType(guestType.name)}
                       >
+                        {isSelected && <CheckCircle2 className="w-4 h-4 mr-1.5" />}
                         {guestType.name}
                       </Button>
                     )
@@ -706,125 +782,135 @@ export default function CreateFreeEvent() {
                 </div>
               </div>
 
-              {/* Custom Guest Types */}
               {customGuestTypes.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Custom Guest Types</h4>
-                  <div className="space-y-3">
-                    {customGuestTypes.map((guestType, index) => (
-                      <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                        <div className="flex items-center justify-between mb-3">
-                          <h5 className="text-sm font-medium text-gray-900">Custom Type {index + 1}</h5>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeCustomGuestType(index)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Name</Label>
-                            <Input
-                              value={guestType.name}
-                              onChange={(e) => updateCustomGuestType(index, 'name', e.target.value)}
-                              placeholder="e.g. VIP, Corporate"
-                              className="mt-1 h-9 text-sm"
-                            />
-                          </div>
-                          
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Price (ETB)</Label>
-                            <Input
-                              type="number"
-                              value={guestType.price}
-                              onChange={(e) => updateCustomGuestType(index, 'price', parseFloat(e.target.value) || 0)}
-                              placeholder="0"
-                              className="mt-1 h-9 text-sm"
-                            />
-                          </div>
-                          
-                          <div>
-                            <Label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Description</Label>
-                            <Input
-                              value={guestType.description}
-                              onChange={(e) => updateCustomGuestType(index, 'description', e.target.value)}
-                              placeholder="Brief description..."
-                              className="mt-1 h-9 text-sm"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                <>
+                  <Separator />
+                  <div>
+                    <Label className="text-sm font-semibold mb-3 block">Custom Guest Types</Label>
+                    <div className="space-y-3">
+                      {customGuestTypes.map((guestType, index) => (
+                        <Card key={index} className="border-border/50 bg-muted/30">
+                          <CardContent className="pt-4">
+                            <div className="flex items-center justify-between mb-4">
+                              <span className="text-sm font-medium">Custom Type {index + 1}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeCustomGuestType(index)}
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">Name</Label>
+                                <Input
+                                  value={guestType.name}
+                                  onChange={(e) => updateCustomGuestType(index, 'name', e.target.value)}
+                                  placeholder="e.g., VIP, Corporate"
+                                  className="h-9 text-sm"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">Price (ETB)</Label>
+                                <Input
+                                  type="number"
+                                  value={guestType.price}
+                                  onChange={(e) => updateCustomGuestType(index, 'price', parseFloat(e.target.value) || 0)}
+                                  placeholder="0"
+                                  className="h-9 text-sm"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">Description</Label>
+                                <Input
+                                  value={guestType.description}
+                                  onChange={(e) => updateCustomGuestType(index, 'description', e.target.value)}
+                                  placeholder="Brief description..."
+                                  className="h-9 text-sm"
+                                />
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
+                </>
+              )}
+
+              {totalSelectedGuestTypes === 0 && (
+                <div className="text-center py-8 border-2 border-dashed border-border rounded-xl bg-muted/20">
+                  <UserCheck className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+                  <p className="text-sm font-medium text-foreground mb-1">No guest types selected</p>
+                  <p className="text-xs text-muted-foreground">Select from common types above or add custom ones</p>
                 </div>
               )}
 
-              {/* Selection Summary */}
-              {(selectedGuestTypes.length > 0 || customGuestTypes.filter(gt => gt.name.trim()).length > 0) && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-semibold text-blue-900">
-                      Selected Guest Types ({selectedGuestTypes.length + customGuestTypes.filter(gt => gt.name.trim()).length})
-                    </h4>
-                    <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
-                      {selectedGuestTypes.length + customGuestTypes.filter(gt => gt.name.trim()).length} selected
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedGuestTypes.map((name) => (
-                      <span key={name} className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-xs font-medium">
-                        {name}
-                      </span>
-                    ))}
-                    {customGuestTypes.filter(gt => gt.name.trim()).map((gt, index) => (
-                      <span key={`custom-${index}`} className="bg-green-100 text-green-800 px-2 py-1 rounded-md text-xs font-medium">
-                        {gt.name}
-                      </span>
-                    ))}
-                  </div>
+              {totalSelectedGuestTypes > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {selectedGuestTypes.map((name) => (
+                    <Badge key={name} variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800">
+                      {name}
+                    </Badge>
+                  ))}
+                  {customGuestTypes.filter(gt => gt.name.trim()).map((gt, index) => (
+                    <Badge key={`custom-${index}`} variant="secondary" className="bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300 border-teal-300 dark:border-teal-800">
+                      {gt.name}
+                    </Badge>
+                  ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
 
-              {/* Empty State */}
-              {selectedGuestTypes.length === 0 && customGuestTypes.length === 0 && (
-                <div className="text-center py-6 text-gray-500">
-                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <UserCheck className="w-6 h-6 text-gray-400" />
-                  </div>
-                  <p className="text-sm font-medium text-gray-600">No guest types selected</p>
-                  <p className="text-xs text-gray-500 mt-1">Select from common types above or add custom ones</p>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Custom Fields Card */}
+          <Card className="border-border/50 shadow-lg shadow-black/5 bg-card/80 backdrop-blur-sm">
+            <CardContent className="pt-6">
+              <CustomFieldsManager
+                fields={customFields}
+                onChange={setCustomFields}
+                guestTypes={[
+                  ...selectedGuestTypes.map(name => ({
+                    id: 0,
+                    name: name
+                  })),
+                  ...customGuestTypes.filter(gt => gt.name.trim()).map(gt => ({
+                    id: 0,
+                    name: gt.name
+                  }))
+                ]}
+              />
+            </CardContent>
+          </Card>
 
           {/* Action Buttons */}
-          <div className="flex justify-end gap-3 pt-6 border-t mt-8">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-border/50">
             <Button
               type="button"
               variant="outline"
               onClick={() => navigate('/dashboard/events')}
-              className="px-6 py-2 rounded-xl"
+              className="h-11 px-6"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || (selectedGuestTypes.length === 0 && customGuestTypes.length === 0)}
-              className="bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+              disabled={isSubmitting || totalSelectedGuestTypes === 0}
+              className="h-11 px-8 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <span className="flex items-center">
-                  <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
-                  Creating...
+                  <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></span>
+                  Creating Event...
                 </span>
               ) : (
-                'Create Free Event'
+                <span className="flex items-center">
+                  Create Free Event
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </span>
               )}
             </Button>
           </div>
@@ -832,4 +918,4 @@ export default function CreateFreeEvent() {
       </div>
     </div>
   )
-} 
+}

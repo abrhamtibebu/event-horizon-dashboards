@@ -53,6 +53,18 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				/* Brand semantic tokens */
+				success: 'hsl(var(--color-success))',
+				warning: 'hsl(var(--color-warning))',
+				info: 'hsl(var(--color-info))',
+				error: 'hsl(var(--color-error))',
+				/* Named brand colors for convenience */
+				'honey-yellow': 'hsl(var(--color-primary))',
+				'safety-yellow': 'hsl(var(--color-warning))',
+				'minion-yellow': 'hsl(var(--color-minion))',
+				'rich-black': 'hsl(var(--color-rich-black))',
+				'eton-blue': 'hsl(var(--color-success))',
+				'blue-sapphire': 'hsl(var(--color-info))',
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',

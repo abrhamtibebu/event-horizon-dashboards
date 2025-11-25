@@ -91,15 +91,15 @@ export const GlobalSearchDialog: React.FC<GlobalSearchDialogProps> = ({
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center py-12">
-              <Search className="w-12 h-12 text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-600 mb-2">
+              <Search className="w-12 h-12 text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">
                 Search your messages
               </h3>
-              <p className="text-gray-500 max-w-md">
+              <p className="text-muted-foreground max-w-md">
                 Find any message across all your conversations. Search by content, 
                 file names, or keywords.
               </p>
-              <div className="mt-6 text-sm text-gray-400">
+              <div className="mt-6 text-sm text-muted-foreground">
                 <p>Try searching for:</p>
                 <ul className="mt-2 space-y-1">
                   <li>• Specific words or phrases</li>

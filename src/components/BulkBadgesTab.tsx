@@ -289,13 +289,13 @@ export function BulkBadgesTab({ eventId, guestTypes, eventName }: BulkBadgesTabP
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'available':
-        return 'bg-green-100 text-green-800'
+        return 'bg-success/10 text-success dark:text-success border border-success/30'
       case 'assigned':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-info/10 text-info dark:text-info border border-info/30'
       case 'void':
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-muted text-muted-foreground border border-border'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-muted text-muted-foreground border border-border'
     }
   }
 
@@ -317,39 +317,39 @@ export function BulkBadgesTab({ eventId, guestTypes, eventName }: BulkBadgesTabP
     <div className="space-y-6">
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm font-medium text-gray-500">Total Badges</div>
-          <div className="text-2xl font-bold text-gray-900 mt-1">
+        <div className="bg-card rounded-lg shadow p-4 border border-border">
+          <div className="text-sm font-medium text-muted-foreground">Total Badges</div>
+          <div className="text-2xl font-bold text-foreground mt-1">
             {statistics?.total || 0}
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm font-medium text-gray-500">Available</div>
-          <div className="text-2xl font-bold text-green-600 mt-1">
+        <div className="bg-card rounded-lg shadow p-4 border border-border">
+          <div className="text-sm font-medium text-muted-foreground">Available</div>
+          <div className="text-2xl font-bold text-success mt-1">
             {statistics?.available || 0}
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm font-medium text-gray-500">Assigned</div>
-          <div className="text-2xl font-bold text-blue-600 mt-1">
+        <div className="bg-card rounded-lg shadow p-4 border border-border">
+          <div className="text-sm font-medium text-muted-foreground">Assigned</div>
+          <div className="text-2xl font-bold text-info mt-1">
             {statistics?.assigned || 0}
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm font-medium text-gray-500">Void</div>
-          <div className="text-2xl font-bold text-gray-600 mt-1">
+        <div className="bg-card rounded-lg shadow p-4 border border-border">
+          <div className="text-sm font-medium text-muted-foreground">Void</div>
+          <div className="text-2xl font-bold text-muted-foreground mt-1">
             {statistics?.void || 0}
           </div>
         </div>
       </div>
 
       {/* Generation Section */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-card rounded-lg shadow p-6 border border-border">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Generate Badges</h3>
+          <h3 className="text-lg font-semibold text-foreground">Generate Badges</h3>
           <Dialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="bg-brand-gradient text-foreground dark:text-primary-foreground">
                 <Plus className="h-4 w-4 mr-2" />
                 Generate Badges
               </Button>
@@ -403,11 +403,11 @@ export function BulkBadgesTab({ eventId, guestTypes, eventName }: BulkBadgesTabP
       </div>
 
       {/* Filters and Export */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="bg-card rounded-lg shadow p-4 border border-border">
         <div className="flex flex-col md:flex-row gap-4 mb-4">
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Search badges..."
                 value={searchTerm}
@@ -462,7 +462,7 @@ export function BulkBadgesTab({ eventId, guestTypes, eventName }: BulkBadgesTabP
             size="sm"
             onClick={handleDownloadQRCodes}
             disabled={downloadingQRs || selectedBadges.size === 0}
-            className="bg-green-600 hover:bg-green-700 text-white"
+            className="bg-success hover:bg-success/90 text-success-foreground"
           >
             <QrCode className="h-4 w-4 mr-2" />
             {downloadingQRs ? 'Generating...' : `Generate & Export QR Codes (${selectedBadges.size})`}
@@ -489,12 +489,12 @@ export function BulkBadgesTab({ eventId, guestTypes, eventName }: BulkBadgesTabP
       </div>
 
       {/* Badges Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-card rounded-lg shadow overflow-hidden border border-border">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>
+              <TableRow className="bg-muted/50">
+                <TableHead className="text-foreground">
                   <Checkbox
                     checked={selectedBadges.size === badges.length && badges.length > 0}
                     onCheckedChange={(checked) => {
@@ -506,30 +506,30 @@ export function BulkBadgesTab({ eventId, guestTypes, eventName }: BulkBadgesTabP
                     }}
                   />
                 </TableHead>
-                <TableHead>Badge Code</TableHead>
-                <TableHead>Guest Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Assigned To</TableHead>
-                <TableHead>Assigned At</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="text-foreground">Badge Code</TableHead>
+                <TableHead className="text-foreground">Guest Type</TableHead>
+                <TableHead className="text-foreground">Status</TableHead>
+                <TableHead className="text-foreground">Assigned To</TableHead>
+                <TableHead className="text-foreground">Assigned At</TableHead>
+                <TableHead className="text-foreground">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
-                    <RefreshCw className="h-6 w-6 animate-spin mx-auto" />
+                    <RefreshCw className="h-6 w-6 animate-spin mx-auto text-primary" />
                   </TableCell>
                 </TableRow>
               ) : badges.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No badges found. Generate badges to get started.
                   </TableCell>
                 </TableRow>
               ) : (
                 badges.map((badge) => (
-                  <TableRow key={badge.id}>
+                  <TableRow key={badge.id} className="hover:bg-muted/50">
                     <TableCell>
                       <Checkbox
                         checked={selectedBadges.has(badge.id)}
@@ -544,18 +544,18 @@ export function BulkBadgesTab({ eventId, guestTypes, eventName }: BulkBadgesTabP
                         }}
                       />
                     </TableCell>
-                    <TableCell className="font-mono text-sm">{badge.badge_code}</TableCell>
-                    <TableCell>{badge.guest_type?.name || 'Unknown'}</TableCell>
+                    <TableCell className="font-mono text-sm text-foreground">{badge.badge_code}</TableCell>
+                    <TableCell className="text-foreground">{badge.guest_type?.name || 'Unknown'}</TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(badge.status)}>
                         {getStatusIcon(badge.status)}
                         <span className="ml-1 capitalize">{badge.status}</span>
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-foreground">
                       {badge.assigned_to_guest?.name || '-'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-muted-foreground">
                       {badge.assigned_at ? format(new Date(badge.assigned_at), 'MMM d, yyyy HH:mm') : '-'}
                     </TableCell>
                     <TableCell>
@@ -564,6 +564,7 @@ export function BulkBadgesTab({ eventId, guestTypes, eventName }: BulkBadgesTabP
                           variant="ghost"
                           size="sm"
                           onClick={() => handleUnassign(badge)}
+                          className="hover:bg-muted"
                         >
                           Unassign
                         </Button>
@@ -580,7 +581,7 @@ export function BulkBadgesTab({ eventId, guestTypes, eventName }: BulkBadgesTabP
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-muted-foreground">
             Showing {badges.length} of {totalRecords} badges
           </div>
           <div className="flex gap-2">

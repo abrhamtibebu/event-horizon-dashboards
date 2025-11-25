@@ -1,714 +1,1097 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Calendar,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
   Plus,
-  Edit,
-  Trash2,
-  Filter,
-  Search,
-  User,
-  DollarSign,
-  Flag,
-  FileText,
-  Loader2,
   RefreshCw,
+  List,
+  Users,
+  BarChart3,
+  Filter,
+  X,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
-import { format, parseISO, isAfter, isBefore, addDays } from 'date-fns'
+import { useAuth } from '@/hooks/use-auth'
+import { usePermissionCheck } from '@/hooks/use-permission-check'
+import { ProtectedButton } from '@/components/ProtectedButton'
+import { PermissionGuard } from '@/components/PermissionGuard'
 import api from '@/lib/api'
-
-interface Deliverable {
-  id: number
-  title: string
-  description: string
-  status: 'pending' | 'in_progress' | 'completed' | 'delayed' | 'cancelled'
-  due_date: string | null
-  completed_date: string | null
-  amount: number | null
-  priority: 1 | 2 | 3
-  notes: string | null
-  quotation: {
-    id: number
-    quotation_number: string
-  }
-  vendor: {
-    id: number
-    name: string
-  }
-  event: {
-    id: number
-    name: string
-    start_date: string
-  }
-  assignedTo: {
-    id: number
-    name: string
-  } | null
-  createdBy: {
-    id: number
-    name: string
-  }
-}
-
-interface DeliverableFormData {
-  title: string
-  description: string
-  status: string
-  due_date: string
-  amount: string
-  priority: number
-  notes: string
-  assigned_to: string
-}
-
-const STATUS_OPTIONS = [
-  { value: 'pending', label: 'Pending', color: 'bg-gray-100 text-gray-800' },
-  { value: 'in_progress', label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
-  { value: 'completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
-  { value: 'delayed', label: 'Delayed', color: 'bg-red-100 text-red-800' },
-  { value: 'cancelled', label: 'Cancelled', color: 'bg-gray-100 text-gray-800' },
-]
-
-const PRIORITY_OPTIONS = [
-  { value: 1, label: 'Low', color: 'bg-gray-100 text-gray-800' },
-  { value: 2, label: 'Medium', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 3, label: 'High', color: 'bg-red-100 text-red-800' },
-]
+import { taskApi, Task as EventTask } from '@/lib/taskApi'
+import { getEventUshers, getEventSessions, getSessionUshers } from '@/lib/api'
+import {
+  UnifiedTask,
+  TaskFormData,
+  TaskFilters as TaskFiltersType,
+  TaskStatistics,
+  ViewMode,
+} from '@/types/tasks'
+import { TaskList } from '@/components/tasks/TaskList'
+import { TaskFilters } from '@/components/tasks/TaskFilters'
+import { CreateTaskDialog } from '@/components/tasks/CreateTaskDialog'
+import { TaskDetailsModal } from '@/components/tasks/TaskDetailsModal'
+import { TaskStatistics as TaskStatisticsComponent } from '@/components/tasks/TaskStatistics'
+import { TeamWorkloadView } from '@/components/tasks/TeamWorkloadView'
+import { BulkActionsBar } from '@/components/tasks/BulkActionsBar'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import Breadcrumbs from '@/components/Breadcrumbs'
+import { SpinnerInline } from '@/components/ui/spinner'
+import { isPast, isToday, addDays, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 
 export default function Tasks() {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [priorityFilter, setPriorityFilter] = useState('all')
-  const [vendorFilter, setVendorFilter] = useState('all')
-  const [eventFilter, setEventFilter] = useState('all')
-  const [selectedDeliverable, setSelectedDeliverable] = useState<Deliverable | null>(null)
-  const [showEditDialog, setShowEditDialog] = useState(false)
-  const [editForm, setEditForm] = useState<DeliverableFormData>({
-    title: '',
-    description: '',
-    status: 'pending',
-    due_date: '',
-    amount: '',
-    priority: 1,
-    notes: '',
-    assigned_to: '',
-  })
-
+  const { user } = useAuth()
+  const { hasPermission, checkPermission } = usePermissionCheck()
   const queryClient = useQueryClient()
 
-  // Fetch deliverables
-  const { data: deliverables = [], isLoading, refetch } = useQuery({
-    queryKey: ['deliverables', { search: searchTerm, status: statusFilter, priority: priorityFilter, vendor: vendorFilter, event: eventFilter }],
-    queryFn: async () => {
-      const params = new URLSearchParams()
-      if (searchTerm) params.append('search', searchTerm)
-      if (statusFilter !== 'all') params.append('status', statusFilter)
-      if (vendorFilter !== 'all') params.append('vendor_id', vendorFilter)
-      if (eventFilter !== 'all') params.append('event_id', eventFilter)
+  // View state
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [showStatistics, setShowStatistics] = useState(false)
+  const [showFilters, setShowFilters] = useState(true)
 
-      const response = await api.get(`/deliverables?${params.toString()}`)
-      return response.data.data || []
-    },
+  // Task management state
+  const [tasks, setTasks] = useState<UnifiedTask[]>([])
+  const [selectedTask, setSelectedTask] = useState<UnifiedTask | null>(null)
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false)
+  const [taskDetailsOpen, setTaskDetailsOpen] = useState(false)
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
+  const [showCheckboxes, setShowCheckboxes] = useState(false)
+
+  // Filters
+  const [filters, setFilters] = useState<TaskFiltersType>({
+    status: 'all',
+    priority: 'all',
+    assigned_to: 'all',
+    event_id: 'all',
+    task_type: 'all',
+    task_category: 'all',
+    due_date: 'all',
+    search: '',
+    group_by: 'none',
   })
 
-  // Fetch vendors for filter
-  const { data: vendors = [] } = useQuery({
+  // Loading states
+  const [loading, setLoading] = useState(true)
+
+  // Fetch events
+  const { data: eventsData = [] } = useQuery({
+    queryKey: ['events-for-tasks', user?.organizer_id],
+    queryFn: async () => {
+      try {
+        // Fetch events with pagination - get all events for the organizer
+        const response = await api.get('/events', {
+          params: {
+            per_page: 100, // Get up to 100 events
+          }
+        })
+        
+        // Handle different response structures
+        // For organizers: response.data is a direct array
+        // For admins: response.data might be paginated with response.data.data
+        let events = []
+        
+        // Check if response.data is an array (direct response for organizers)
+        if (Array.isArray(response.data)) {
+          events = response.data
+        } 
+        // Check if response.data.data exists (paginated response for admins)
+        else if (response.data?.data) {
+          if (Array.isArray(response.data.data)) {
+            events = response.data.data
+          } else if (response.data.data?.data) {
+            // Nested data structure
+            events = Array.isArray(response.data.data.data) ? response.data.data.data : []
+          }
+        }
+        // Check if response.data is an object with events array
+        else if (response.data && typeof response.data === 'object') {
+          // Try to find an array in the response
+          if (Array.isArray(response.data.events)) {
+            events = response.data.events
+          } else if (response.data.id) {
+            // Single event object
+            events = [response.data]
+          }
+        }
+        
+        // Transform events to have consistent structure with id and title
+        // Events API returns 'name' field, but we need 'title' for the dropdown
+        const transformedEvents = events
+          .filter((event: any) => event && event.id) // Filter out invalid events
+          .map((event: any) => ({
+            id: event.id,
+            title: event.name || event.title || `Event ${event.id}`, // Use 'name' field as 'title'
+            name: event.name || event.title,
+            organizer_id: event.organizer_id,
+            start_date: event.start_date || event.event_date,
+            status: event.status,
+          }))
+        
+        console.log('Fetched events for task dropdown:', {
+          count: transformedEvents.length,
+          events: transformedEvents.map((e: any) => ({ id: e.id, title: e.title })),
+          rawResponse: response.data
+        })
+        
+        return transformedEvents
+      } catch (error) {
+        console.error('Error fetching events for task creation:', error)
+        return []
+      }
+    },
+    enabled: !!user, // Only fetch if user is logged in
+  })
+
+  // Fetch team members
+  const { data: teamMembersData = [] } = useQuery({
+    queryKey: ['team-members-for-tasks', user?.organizer_id],
+    queryFn: async () => {
+      if (!user?.organizer_id) return []
+      const response = await api.get(`/organizers/${user.organizer_id}/contacts`)
+      return response.data || []
+    },
+    enabled: !!user?.organizer_id,
+  })
+
+  // Fetch vendors
+  const { data: vendorsData = [] } = useQuery({
     queryKey: ['vendors-for-tasks'],
     queryFn: async () => {
+      try {
       const response = await api.get('/vendors')
-      return response.data.data || []
+        return response.data.data || response.data || []
+      } catch {
+        return []
+      }
     },
   })
 
-  // Fetch events for filter
-  const { data: events = [] } = useQuery({
-    queryKey: ['events-for-tasks'],
+  // Fetch sponsors (if endpoint exists)
+  const { data: sponsorsData = [] } = useQuery({
+    queryKey: ['sponsors-for-tasks'],
     queryFn: async () => {
-      const response = await api.get('/events')
-      return response.data.data || []
+      try {
+        const response = await api.get('/sponsors')
+        return response.data.data || response.data || []
+      } catch {
+        return []
+      }
     },
   })
 
-  // Update deliverable mutation
-  const updateDeliverableMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<DeliverableFormData> }) => {
-      const response = await api.put(`/deliverables/${id}`, data)
-      return response.data
-    },
-    onSuccess: () => {
-      toast.success('Deliverable updated successfully!')
-      queryClient.invalidateQueries({ queryKey: ['deliverables'] })
-      setShowEditDialog(false)
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to update deliverable')
-    },
-  })
+  // Normalize EventTask to UnifiedTask
+  const normalizeEventTask = (task: EventTask): UnifiedTask => {
+    // Determine if this is an operational task (no event_id) or event task
+    const isOperational = !task.event_id;
+    
+    // Handle assignedUser - check multiple possible field names (camelCase and snake_case)
+    // Laravel may serialize relationships differently depending on configuration
+    // Check both camelCase (assignedUser) and snake_case (assigned_user)
+    const taskAny = task as any;
+    let assignedUser = task.assignedUser || taskAny.assigned_user || taskAny.assignedUser;
+    
+    // Debug: Log the task structure to see what we're getting
+    if (task.assigned_to) {
+      console.log(`Task ${task.id} - assigned_to: ${task.assigned_to}`, {
+        hasAssignedUser: !!task.assignedUser,
+        hasAssigned_user: !!taskAny.assigned_user,
+        taskKeys: Object.keys(task),
+        assignedUser: task.assignedUser,
+        assigned_user: taskAny.assigned_user
+      });
+    }
+    
+    // If we have assigned_to but no assignedUser, log a warning
+    if (task.assigned_to && !assignedUser) {
+      console.warn(`Task ${task.id} has assigned_to (${task.assigned_to}) but no assignedUser object.`, {
+        taskId: task.id,
+        assigned_to: task.assigned_to,
+        availableKeys: Object.keys(task),
+        fullTask: task
+      });
+    }
+    
+    // Ensure assignedUser has required fields if it exists
+    const normalizedAssignedUser = assignedUser ? {
+      id: assignedUser.id || task.assigned_to,
+      name: assignedUser.name || assignedUser.full_name || 'Unknown User',
+      email: assignedUser.email || assignedUser.email_address || '',
+    } : undefined;
+    
+    return {
+      id: `event_task_${task.id}`,
+      type: isOperational ? 'operational_task' : 'event_task',
+      source: 'api',
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      priority: task.priority,
+      assigned_to: task.assigned_to,
+      assignedUser: normalizedAssignedUser,
+      event_id: task.event_id || undefined,
+      event: task.event ? {
+        id: task.event.id,
+        title: task.event.name || task.event.title || `Event ${task.event.id}`, // Event model uses 'name' field
+        start_date: task.event.event_date || task.event.start_date,
+      } : undefined,
+      due_date: task.due_date,
+      completed_date: task.completed_date,
+      created_at: task.created_at,
+      updated_at: task.updated_at,
+      notes: task.notes,
+      task_category: task.task_category,
+      vendor_id: task.vendor_id,
+      vendor: task.vendor,
+      original_id: task.id,
+    }
+  }
 
-  // Delete deliverable mutation
-  const deleteDeliverableMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const response = await api.delete(`/deliverables/${id}`)
-      return response.data
-    },
-    onSuccess: () => {
-      toast.success('Deliverable deleted successfully!')
-      queryClient.invalidateQueries({ queryKey: ['deliverables'] })
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to delete deliverable')
-    },
-  })
+  // Normalize usher task from event_usher pivot
+  const normalizeEventUsherTask = (
+    task: string,
+    usherId: number,
+    usherName: string,
+    usherEmail: string,
+    eventId: number,
+    eventTitle: string,
+    eventStartDate: string,
+    index: number
+  ): UnifiedTask => {
+    return {
+      id: `event_usher_${eventId}_${usherId}_${index}`,
+      type: 'usher_task',
+      source: 'event_usher',
+      title: task,
+      status: 'pending',
+      priority: 'medium',
+      assigned_to: usherId,
+      assignedUser: { id: usherId, name: usherName, email: usherEmail },
+      event_id: eventId,
+      event: { id: eventId, title: eventTitle, start_date: eventStartDate },
+      usher_id: usherId,
+      usher: { id: usherId, name: usherName, email: usherEmail },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  }
 
-  // Bulk update status mutation
-  const bulkUpdateMutation = useMutation({
-    mutationFn: async ({ ids, status }: { ids: number[]; status: string }) => {
-      const response = await api.post('/deliverables/bulk-update-status', {
-        deliverable_ids: ids,
-        status,
+  // Normalize usher task from session_usher pivot
+  const normalizeSessionUsherTask = (
+    task: string,
+    usherId: number,
+    usherName: string,
+    usherEmail: string,
+    sessionId: number,
+    sessionName: string,
+    eventId: number,
+    eventTitle: string,
+    eventStartDate: string,
+    index: number
+  ): UnifiedTask => {
+    return {
+      id: `session_usher_${sessionId}_${usherId}_${index}`,
+      type: 'usher_task',
+      source: 'session_usher',
+      title: task,
+      status: 'pending',
+      priority: 'medium',
+      assigned_to: usherId,
+      assignedUser: { id: usherId, name: usherName, email: usherEmail },
+      event_id: eventId,
+      event: { id: eventId, title: eventTitle, start_date: eventStartDate },
+      session_id: sessionId,
+      session: { id: sessionId, name: sessionName },
+      usher_id: usherId,
+      usher: { id: usherId, name: usherName, email: usherEmail },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  }
+
+  // Fetch all tasks
+  const fetchAllTasks = async (showLoading = true) => {
+    if (showLoading) {
+      setLoading(true)
+    }
+    try {
+      const allTasks: UnifiedTask[] = []
+
+      // Fetch EventTask tasks - fetch all statuses including cancelled
+      try {
+        const [pendingResponse, inProgressResponse, completedResponse, cancelledResponse] = await Promise.all([
+          taskApi.getTasks({ status: 'pending', per_page: 100 }).catch(() => ({ data: [] })),
+          taskApi.getTasks({ status: 'in_progress', per_page: 100 }).catch(() => ({ data: [] })),
+          taskApi.getTasks({ status: 'completed', per_page: 100 }).catch(() => ({ data: [] })),
+          taskApi.getTasks({ status: 'cancelled', per_page: 100 }).catch(() => ({ data: [] })),
+        ])
+
+        const eventTasks = [
+          ...(pendingResponse.data?.data || pendingResponse.data || []),
+          ...(inProgressResponse.data?.data || inProgressResponse.data || []),
+          ...(completedResponse.data?.data || completedResponse.data || []),
+          ...(cancelledResponse.data?.data || cancelledResponse.data || []),
+        ]
+
+        eventTasks.forEach((task: EventTask) => {
+          // Debug logging to check assignedUser data
+          if (task.assigned_to && !task.assignedUser) {
+            console.warn('Task has assigned_to but no assignedUser:', {
+              taskId: task.id,
+              assigned_to: task.assigned_to,
+              task: task
+            })
+          }
+          if (task.assignedUser) {
+            console.log('Task assignedUser found:', {
+              taskId: task.id,
+              assignedUser: task.assignedUser,
+              name: task.assignedUser?.name
+            })
+          }
+          allTasks.push(normalizeEventTask(task))
+        })
+      } catch (error) {
+        console.error('Error fetching event tasks:', error)
+      }
+
+      // Fetch event usher tasks
+      if (eventsData && Array.isArray(eventsData)) {
+        for (const event of eventsData) {
+          try {
+            const ushersResponse = await getEventUshers(event.id)
+            const ushers = ushersResponse.data || []
+
+            ushers.forEach((usher: any) => {
+              if (usher.pivot?.tasks && Array.isArray(usher.pivot.tasks)) {
+                usher.pivot.tasks.forEach((task: string, index: number) => {
+                  allTasks.push(normalizeEventUsherTask(
+                    task,
+                    usher.id,
+                    usher.name,
+                    usher.email,
+                    event.id,
+                    event.title || event.name,
+                    event.start_date || event.event_date,
+                    index
+                  ))
+                })
+              }
+            })
+          } catch (error) {
+            console.error(`Error fetching ushers for event ${event.id}:`, error)
+          }
+        }
+      }
+
+      // Fetch session usher tasks
+      if (eventsData && Array.isArray(eventsData)) {
+        for (const event of eventsData) {
+          try {
+            const sessionsResponse = await getEventSessions(event.id)
+            const sessions = sessionsResponse.data?.data || sessionsResponse.data || []
+
+            for (const session of sessions) {
+              try {
+                const sessionUshersResponse = await getSessionUshers(session.id)
+                const sessionUshers = sessionUshersResponse.data?.data || sessionUshersResponse.data || []
+
+                sessionUshers.forEach((usher: any) => {
+                  if (usher.pivot?.tasks && Array.isArray(usher.pivot.tasks)) {
+                    usher.pivot.tasks.forEach((task: string, index: number) => {
+                      allTasks.push(normalizeSessionUsherTask(
+                        task,
+                        usher.id,
+                        usher.name,
+                        usher.email,
+                        session.id,
+                        session.name,
+                        event.id,
+                        event.title || event.name,
+                        event.start_date || event.event_date,
+                        index
+                      ))
+                    })
+                  }
+                })
+              } catch (error) {
+                console.error(`Error fetching ushers for session ${session.id}:`, error)
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching sessions for event ${event.id}:`, error)
+          }
+        }
+      }
+
+      setTasks(allTasks)
+    } catch (error) {
+      console.error('Error fetching tasks:', error)
+      if (showLoading) {
+        toast.error('Failed to fetch tasks')
+      }
+    } finally {
+      if (showLoading) {
+        setLoading(false)
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (user) {
+      fetchAllTasks()
+    }
+  }, [user, eventsData])
+
+  // Filter tasks
+  const filteredTasks = useMemo(() => {
+    let filtered = [...tasks]
+
+    // Search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase()
+      filtered = filtered.filter(task =>
+        task.title.toLowerCase().includes(searchLower) ||
+        task.description?.toLowerCase().includes(searchLower)
+      )
+    }
+
+    // Status filter
+    if (filters.status && filters.status !== 'all') {
+      filtered = filtered.filter(task => task.status === filters.status)
+    }
+
+    // Priority filter
+    if (filters.priority && filters.priority !== 'all') {
+      filtered = filtered.filter(task => task.priority === filters.priority)
+    }
+
+    // Assigned to filter
+    if (filters.assigned_to && filters.assigned_to !== 'all') {
+      if (filters.assigned_to === 'unassigned') {
+        filtered = filtered.filter(task => !task.assigned_to)
+      } else {
+        filtered = filtered.filter(task => task.assigned_to === Number(filters.assigned_to))
+      }
+    }
+
+    // Event filter
+    if (filters.event_id && filters.event_id !== 'all') {
+      filtered = filtered.filter(task => task.event_id === Number(filters.event_id))
+    }
+
+    // Task type filter
+    if (filters.task_type && filters.task_type !== 'all') {
+      filtered = filtered.filter(task => task.type === filters.task_type)
+    }
+
+    // Task category filter
+    if (filters.task_category && filters.task_category !== 'all') {
+      filtered = filtered.filter(task => task.task_category === filters.task_category)
+    }
+
+    // Due date filter
+    if (filters.due_date && filters.due_date !== 'all') {
+      const now = new Date()
+      filtered = filtered.filter(task => {
+        if (!task.due_date) return false
+        const dueDate = parseISO(task.due_date)
+
+        switch (filters.due_date) {
+          case 'overdue':
+            return isPast(dueDate) && task.status !== 'completed' && task.status !== 'cancelled'
+          case 'due_today':
+            return isToday(dueDate)
+          case 'due_this_week':
+            const weekStart = startOfWeek(now)
+            const weekEnd = endOfWeek(now)
+            return dueDate >= weekStart && dueDate <= weekEnd
+          case 'due_this_month':
+            const monthStart = startOfMonth(now)
+            const monthEnd = endOfMonth(now)
+            return dueDate >= monthStart && dueDate <= monthEnd
+          default:
+            return true
+        }
       })
-      return response.data
+    }
+
+    return filtered
+  }, [tasks, filters])
+
+  // Calculate statistics
+  const statistics = useMemo((): TaskStatistics => {
+    const stats: TaskStatistics = {
+      total: tasks.length,
+      pending: tasks.filter(t => t.status === 'pending').length,
+      in_progress: tasks.filter(t => t.status === 'in_progress').length,
+      completed: tasks.filter(t => t.status === 'completed').length,
+      cancelled: tasks.filter(t => t.status === 'cancelled').length,
+      overdue: tasks.filter(t => {
+        if (!t.due_date || t.status === 'completed' || t.status === 'cancelled') return false
+        return isPast(parseISO(t.due_date))
+      }).length,
+      due_soon: tasks.filter(t => {
+        if (!t.due_date || t.status === 'completed' || t.status === 'cancelled') return false
+        const dueDate = parseISO(t.due_date)
+        const threeDaysFromNow = addDays(new Date(), 3)
+        return dueDate > new Date() && dueDate <= threeDaysFromNow
+      }).length,
+      by_priority: {
+        low: tasks.filter(t => t.priority === 'low').length,
+        medium: tasks.filter(t => t.priority === 'medium').length,
+        high: tasks.filter(t => t.priority === 'high').length,
+        urgent: tasks.filter(t => t.priority === 'urgent').length,
+      },
+      by_type: {
+        event_task: tasks.filter(t => t.type === 'event_task').length,
+        usher_task: tasks.filter(t => t.type === 'usher_task').length,
+        operational_task: tasks.filter(t => t.type === 'operational_task').length,
+      },
+      by_category: {
+        vendor_recruitment: tasks.filter(t => t.task_category === 'vendor_recruitment').length,
+        sponsor_followup: tasks.filter(t => t.task_category === 'sponsor_followup').length,
+        sponsor_listing: tasks.filter(t => t.task_category === 'sponsor_listing').length,
+        event_setup: tasks.filter(t => t.task_category === 'event_setup').length,
+        post_event: tasks.filter(t => t.task_category === 'post_event').length,
+        other: tasks.filter(t => !t.task_category || t.task_category === 'other').length,
+      },
+      team_workload: teamMembersData.map((member: any) => ({
+        user_id: member.id,
+        user_name: member.name,
+        task_count: tasks.filter(t => t.assigned_to === member.id).length,
+      })),
+    }
+    return stats
+  }, [tasks, teamMembersData])
+
+  // Create task mutation
+  const createTaskMutation = useMutation({
+    mutationFn: async (data: TaskFormData) => {
+      if (data.task_type === 'event_task') {
+        // Validate event_id is provided for event tasks
+        if (!data.event_id) {
+          throw new Error('Event is required for event tasks')
+        }
+        
+        // Create EventTask via API - status is always 'pending' for new tasks
+        const taskData = {
+          event_id: data.event_id,
+          organizer_id: user?.organizer_id,
+          title: data.title,
+          description: data.description,
+          status: 'pending', // Always pending for new tasks
+          priority: data.priority || 'medium',
+          type: 'other', // Default type
+          task_category: data.task_category,
+          due_date: data.due_date,
+          notes: data.notes,
+          assigned_to: data.assigned_to,
+        }
+        await taskApi.createTask(taskData)
+      } else if (data.task_type === 'operational_task') {
+        // Create operational task as EventTask with special handling (no event_id)
+        // Status is always 'pending' for new tasks
+        const taskData = {
+          event_id: null, // Operational tasks don't have event_id
+          organizer_id: user?.organizer_id,
+          title: data.title,
+          description: data.description,
+          status: 'pending', // Always pending for new tasks
+          priority: data.priority || 'medium',
+          type: 'other', // Default type
+          task_category: data.task_category,
+          due_date: data.due_date,
+          notes: data.notes,
+          assigned_to: data.assigned_to,
+        }
+        await taskApi.createTask(taskData)
+      } else if (data.task_type === 'usher_task') {
+        // Create usher task by updating event_usher or session_usher pivot
+        if (data.event_id && data.usher_id) {
+          if (data.session_id) {
+            // Session usher task
+            const sessionUshersResponse = await getSessionUshers(data.session_id)
+            const sessionUshers = sessionUshersResponse.data?.data || sessionUshersResponse.data || []
+            const existingUsher = sessionUshers.find((u: any) => u.id === data.usher_id)
+            const existingTasks = existingUsher?.pivot?.tasks || []
+            const newTasks = [...existingTasks, data.title]
+            await api.put(`/sessions/${data.session_id}/ushers/${data.usher_id}`, { tasks: newTasks })
+          } else {
+            // Event usher task
+            const eventUshersResponse = await getEventUshers(data.event_id)
+            const eventUshers = eventUshersResponse.data || []
+            const existingUsher = eventUshers.find((u: any) => u.id === data.usher_id)
+            const existingTasks = existingUsher?.pivot?.tasks || []
+            const newTasks = [...existingTasks, data.title]
+            await api.put(`/events/${data.event_id}/ushers/${data.usher_id}`, { tasks: newTasks })
+          }
+        }
+      }
     },
     onSuccess: () => {
-      toast.success('Deliverables updated successfully!')
-      queryClient.invalidateQueries({ queryKey: ['deliverables'] })
+      toast.success('Task created successfully')
+      setTaskDialogOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      fetchAllTasks()
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to update deliverables')
+      toast.error(error?.response?.data?.message || 'Failed to create task')
     },
   })
 
-  const handleEdit = (deliverable: Deliverable) => {
-    setSelectedDeliverable(deliverable)
-    setEditForm({
-      title: deliverable.title,
-      description: deliverable.description || '',
-      status: deliverable.status,
-      due_date: deliverable.due_date || '',
-      amount: deliverable.amount?.toString() || '',
-      priority: deliverable.priority,
-      notes: deliverable.notes || '',
-      assigned_to: deliverable.assignedTo?.id.toString() || '',
-    })
-    setShowEditDialog(true)
-  }
+  // Update task mutation
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ taskId, updates }: { taskId: string; updates: Partial<UnifiedTask> }) => {
+      const task = tasks.find(t => t.id === taskId)
+      if (!task) throw new Error('Task not found')
 
-  const handleUpdate = () => {
-    if (!selectedDeliverable) return
+      if (task.source === 'api' && task.original_id) {
+        // Update EventTask via API
+        // Build update payload - only include defined values
+        const updatePayload: any = {}
+        
+        // Always include status if it's being updated
+        if (updates.status !== undefined) {
+          updatePayload.status = updates.status
+        }
+        
+        // Include other fields if they're defined
+        if (updates.title !== undefined) updatePayload.title = updates.title
+        if (updates.description !== undefined) updatePayload.description = updates.description
+        if (updates.priority !== undefined) updatePayload.priority = updates.priority
+        if (updates.type !== undefined) updatePayload.type = updates.type
+        if (updates.task_category !== undefined) updatePayload.task_category = updates.task_category
+        if (updates.assigned_to !== undefined) updatePayload.assigned_to = updates.assigned_to
+        if (updates.due_date !== undefined) updatePayload.due_date = updates.due_date
+        if (updates.notes !== undefined) updatePayload.notes = updates.notes
+        if (updates.event_id !== undefined) updatePayload.event_id = updates.event_id
+        if (updates.completed_date !== undefined) updatePayload.completed_date = updates.completed_date
+        
+        console.log('Updating task:', {
+          taskId: task.original_id,
+          updates: updatePayload,
+          status: updatePayload.status
+        })
+        
+        const response = await taskApi.updateTask(task.original_id, updatePayload)
+        return { taskId, updatedTask: response, originalTask: task }
+      } else if (task.source === 'event_usher' || task.source === 'session_usher') {
+        // Update usher task by updating pivot table
+        // For now, we'll just refetch since updating individual tasks in pivot is complex
+        // In a real implementation, you'd need backend support for updating individual usher tasks
+        toast.info('Usher task updates require backend support')
+        return { taskId, updatedTask: null, originalTask: task }
+      }
+      return { taskId, updatedTask: null, originalTask: task }
+    },
+    onMutate: async ({ taskId, updates }) => {
+      // Cancel any outgoing refetches to avoid overwriting our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['tasks'] })
+      
+      // Snapshot the previous value for rollback
+      const previousTasks = [...tasks]
+      
+      // Optimistic update - immediately update the UI so task moves to correct column
+      setTasks(prevTasks => 
+        prevTasks.map(task => {
+          if (task.id === taskId) {
+            const updatedTask = {
+              ...task,
+              ...updates,
+              updated_at: new Date().toISOString(),
+            }
+            // Ensure completed_date is set/cleared correctly
+            if (updates.status === 'completed' && !updates.completed_date) {
+              updatedTask.completed_date = new Date().toISOString()
+            } else if (updates.status !== 'completed' && task.status === 'completed') {
+              updatedTask.completed_date = undefined
+            }
+            return updatedTask
+          }
+          return task
+        })
+      )
+      
+      return { previousTasks }
+    },
+    onSuccess: (data, variables, context) => {
+      // If we got updated task from backend, normalize and update with server data
+      // This ensures we have the latest data from the server
+      if (data?.updatedTask) {
+        const normalizedTask = normalizeEventTask(data.updatedTask)
+        setTasks(prevTasks =>
+          prevTasks.map(task =>
+            task.id === variables.taskId ? normalizedTask : task
+          )
+        )
+        
+        // Update selected task if modal is open for this task
+        setSelectedTask(prevTask => {
+          if (prevTask && prevTask.id === variables.taskId) {
+            return normalizedTask
+          }
+          return prevTask
+        })
+      }
+      
+      // Refetch to ensure consistency with backend (silent background refresh)
+      // This catches any changes that might have happened on the server
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      // Refetch in background without showing loading state
+      setTimeout(() => {
+        fetchAllTasks(false).catch(() => {
+          // Silently handle refetch errors - optimistic update is already applied
+        })
+      }, 500)
+    },
+    onError: (error: any, variables, context) => {
+      // Rollback optimistic update on error
+      if (context?.previousTasks) {
+        setTasks(context.previousTasks)
+        // Also update selected task if modal is open
+        if (selectedTask && selectedTask.id === variables.taskId) {
+          const previousTask = context.previousTasks.find(t => t.id === variables.taskId)
+          if (previousTask) {
+            setSelectedTask(previousTask)
+          }
+        }
+      }
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to update task'
+      toast.error(errorMessage)
+    },
+  })
 
-    const updateData = {
-      ...editForm,
-      amount: editForm.amount ? Number(editForm.amount) : null,
-      assigned_to: editForm.assigned_to ? Number(editForm.assigned_to) : null,
+  // Delete task mutation
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      const task = tasks.find(t => t.id === taskId)
+      if (!task) throw new Error('Task not found')
+
+      if (task.source === 'api' && task.original_id) {
+        await taskApi.deleteTask(task.original_id)
+      } else {
+        // For usher tasks, we'd need to remove from pivot table
+        toast.info('Usher task deletion requires backend support')
+      }
+    },
+    onSuccess: () => {
+      toast.success('Task deleted successfully')
+      setTaskDetailsOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      fetchAllTasks()
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to delete task')
+    },
+  })
+
+  // Handle task move (status change)
+  const handleTaskMove = async (taskId: string, newStatus: 'pending' | 'in_progress' | 'completed' | 'cancelled') => {
+    try {
+      const updates: Partial<UnifiedTask> = { status: newStatus }
+      
+      // Set completed_date when status is completed
+      if (newStatus === 'completed') {
+        updates.completed_date = new Date().toISOString()
+      } else {
+        // Clear completed_date when status changes from completed
+        const currentTask = tasks.find(t => t.id === taskId)
+        if (currentTask?.status === 'completed') {
+          updates.completed_date = undefined
+        }
+      }
+      
+      await updateTaskMutation.mutateAsync({
+        taskId,
+        updates,
+      })
+    } catch (error) {
+      console.error('Error updating task status:', error)
+      // Error is already handled in mutation onError
     }
-
-    updateDeliverableMutation.mutate({
-      id: selectedDeliverable.id,
-      data: updateData,
-    })
   }
 
-  const handleDelete = (id: number) => {
-    if (confirm('Are you sure you want to delete this deliverable?')) {
-      deleteDeliverableMutation.mutate(id)
+  // Handle task click
+  const handleTaskClick = (task: UnifiedTask) => {
+    setSelectedTask(task)
+    setTaskDetailsOpen(true)
+  }
+
+  // Handle bulk operations
+  const handleBulkAssign = async (userId: number) => {
+    for (const taskId of selectedTasks) {
+      await updateTaskMutation.mutateAsync({
+        taskId,
+        updates: { assigned_to: userId },
+      })
+    }
+    setSelectedTasks(new Set())
+    setShowCheckboxes(false)
+  }
+
+  const handleBulkStatusChange = async (status: string) => {
+    for (const taskId of selectedTasks) {
+      await updateTaskMutation.mutateAsync({
+        taskId,
+        updates: { status: status as any },
+      })
+    }
+    setSelectedTasks(new Set())
+    setShowCheckboxes(false)
+  }
+
+  const handleBulkPriorityChange = async (priority: string) => {
+    for (const taskId of selectedTasks) {
+      await updateTaskMutation.mutateAsync({
+        taskId,
+        updates: { priority: priority as any },
+      })
+    }
+    setSelectedTasks(new Set())
+    setShowCheckboxes(false)
+  }
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedTasks.size} tasks?`)) return
+    for (const taskId of selectedTasks) {
+      await deleteTaskMutation.mutateAsync(taskId)
+    }
+    setSelectedTasks(new Set())
+    setShowCheckboxes(false)
+  }
+
+  // Handle task select
+  const handleTaskSelect = (taskId: string, selected: boolean) => {
+    const newSelected = new Set(selectedTasks)
+    if (selected) {
+      newSelected.add(taskId)
+    } else {
+      newSelected.delete(taskId)
+    }
+    setSelectedTasks(newSelected)
+  }
+
+  // Get sessions for selected event
+  const getSessionsForEvent = async (eventId: number) => {
+    try {
+      const response = await getEventSessions(eventId)
+      const sessions = response.data?.data || response.data || []
+      return sessions.map((s: any) => ({ id: s.id, name: s.name }))
+    } catch {
+      return []
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    const statusOption = STATUS_OPTIONS.find(s => s.value === status)
-    return (
-      <Badge className={statusOption?.color || 'bg-gray-100 text-gray-800'}>
-        {statusOption?.label || status}
-      </Badge>
-    )
-  }
-
-  const getPriorityBadge = (priority: number) => {
-    const priorityOption = PRIORITY_OPTIONS.find(p => p.value === priority)
-    return (
-      <Badge className={priorityOption?.color || 'bg-gray-100 text-gray-800'}>
-        {priorityOption?.label || 'Low'}
-      </Badge>
-    )
-  }
-
-  const isOverdue = (dueDate: string | null, status: string) => {
-    if (!dueDate || status === 'completed' || status === 'cancelled') return false
-    return isBefore(parseISO(dueDate), new Date())
-  }
-
-  const isDueSoon = (dueDate: string | null, status: string) => {
-    if (!dueDate || status === 'completed' || status === 'cancelled') return false
-    const threeDaysFromNow = addDays(new Date(), 3)
-    return isAfter(parseISO(dueDate), new Date()) && isBefore(parseISO(dueDate), threeDaysFromNow)
-  }
-
-  const filteredDeliverables = Array.isArray(deliverables) ? deliverables.filter((deliverable: Deliverable) => {
-    if (priorityFilter !== 'all' && deliverable.priority.toString() !== priorityFilter) {
-      return false
-    }
-    return true
-  }) : []
-
-  const stats = {
-    total: Array.isArray(deliverables) ? deliverables.length : 0,
-    pending: Array.isArray(deliverables) ? deliverables.filter((d: Deliverable) => d.status === 'pending').length : 0,
-    inProgress: Array.isArray(deliverables) ? deliverables.filter((d: Deliverable) => d.status === 'in_progress').length : 0,
-    completed: Array.isArray(deliverables) ? deliverables.filter((d: Deliverable) => d.status === 'completed').length : 0,
-    overdue: Array.isArray(deliverables) ? deliverables.filter((d: Deliverable) => isOverdue(d.due_date, d.status)).length : 0,
-  }
+  // Format events for dropdown - eventsData is already transformed to have id and title
+  // But we need to ensure they're properly formatted and filtered
+  const events = Array.isArray(eventsData) 
+    ? eventsData
+        .filter((event: any) => {
+          // Filter events by organizer_id if user is an organizer
+          // The backend already filters, but we ensure here too
+          if ((user?.role === 'organizer' || user?.role === 'organizer_admin') && user?.organizer_id) {
+            return event.organizer_id === user.organizer_id
+          }
+          return true // Show all events for admins
+        })
+        .map((event: any) => ({
+          id: event.id,
+          title: event.title || event.name || `Event ${event.id}`,
+        }))
+        .filter((event: any) => event.id && event.title) // Ensure we have valid events
+    : []
+  const teamMembers = Array.isArray(teamMembersData) ? teamMembersData : []
+  const vendors = Array.isArray(vendorsData) ? vendorsData : []
+  const sponsors = Array.isArray(sponsorsData) ? sponsorsData : []
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs 
+        items={[
+          { label: 'Tasks & Team Management', href: '/dashboard/tasks' }
+        ]}
+        className="mb-4"
+      />
+      
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Tasks & Deliverables</h1>
-          <p className="text-gray-600">Manage vendor deliverables and track progress</p>
+          <h1 className="text-3xl font-bold text-foreground">Tasks & Team Management</h1>
+          <p className="text-muted-foreground">Manage tasks between teams and ushers</p>
         </div>
-        <Button onClick={() => refetch()} disabled={isLoading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            {showFilters ? 'Hide' : 'Show'} Filters
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowStatistics(!showStatistics)}
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            {showStatistics ? 'Hide' : 'Show'} Statistics
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchAllTasks}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
+          <ProtectedButton
+            permission="tasks.create"
+            onClick={() => setTaskDialogOpen(true)}
+            actionName="create tasks"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Task
+          </ProtectedButton>
+        </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-              </div>
-              <FileText className="h-8 w-8 text-gray-400" />
-            </div>
-          </CardContent>
+      {/* Statistics */}
+      {showStatistics && (
+        <Card className="p-4">
+          <TaskStatisticsComponent statistics={statistics} />
         </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.pending}</p>
-              </div>
-              <Clock className="h-8 w-8 text-gray-400" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">In Progress</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.inProgress}</p>
-              </div>
-              <RefreshCw className="h-8 w-8 text-blue-400" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Completed</p>
-                <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-400" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Overdue</p>
-                <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
-              </div>
-              <AlertCircle className="h-8 w-8 text-red-400" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      )}
 
       {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="space-y-2">
-              <Label>Search</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search deliverables..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+      {showFilters && (
+        <TaskFilters
+          filters={filters}
+          onFiltersChange={setFilters}
+          events={events}
+          teamMembers={teamMembers}
+        />
+      )}
+
+      {/* Bulk Actions */}
+      {selectedTasks.size > 0 && (
+        <BulkActionsBar
+          selectedCount={selectedTasks.size}
+          onBulkAssign={handleBulkAssign}
+          onBulkStatusChange={handleBulkStatusChange}
+          onBulkPriorityChange={handleBulkPriorityChange}
+          onBulkDelete={handleBulkDelete}
+          teamMembers={teamMembers}
+        />
+      )}
+
+      {/* View Mode Tabs */}
+      <div className="flex items-center justify-between">
+        <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as ViewMode)}>
+          <TabsList>
+            <TabsTrigger value="list">
+              <List className="h-4 w-4 mr-2" />
+              List
+            </TabsTrigger>
+            <TabsTrigger value="team">
+              <Users className="h-4 w-4 mr-2" />
+              Team
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {viewMode !== 'team' && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setShowCheckboxes(!showCheckboxes)
+              if (!showCheckboxes) {
+                setSelectedTasks(new Set())
+              }
+            }}
+          >
+            {showCheckboxes ? 'Cancel Selection' : 'Select Tasks'}
+          </Button>
+        )}
             </div>
 
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  {STATUS_OPTIONS.map((status) => (
-                    <SelectItem key={status.value} value={status.value}>
-                      {status.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Priority</Label>
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priorities</SelectItem>
-                  {PRIORITY_OPTIONS.map((priority) => (
-                    <SelectItem key={priority.value} value={priority.value.toString()}>
-                      {priority.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Vendor</Label>
-              <Select value={vendorFilter} onValueChange={setVendorFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Vendors</SelectItem>
-                  {Array.isArray(vendors) && vendors.map((vendor: any) => (
-                    <SelectItem key={vendor.id} value={vendor.id.toString()}>
-                      {vendor.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Event</Label>
-              <Select value={eventFilter} onValueChange={setEventFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Events</SelectItem>
-                  {Array.isArray(events) && events.map((event: any) => (
-                    <SelectItem key={event.id} value={event.id.toString()}>
-                      {event.name || event.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Deliverables Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Deliverables</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
+      {/* Task Views */}
+      {loading ? (
             <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <SpinnerInline />
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Vendor</TableHead>
-                    <TableHead>Event</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Array.isArray(filteredDeliverables) && filteredDeliverables.map((deliverable: Deliverable) => (
-                    <TableRow key={deliverable.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{deliverable.title}</div>
-                          {deliverable.description && (
-                            <div className="text-sm text-gray-500 truncate max-w-xs">
-                              {deliverable.description}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{deliverable.vendor.name}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{deliverable.event.name}</div>
-                          <div className="text-sm text-gray-500">
-                            {format(parseISO(deliverable.event.start_date), 'MMM d, yyyy')}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(deliverable.status)}
-                          {isOverdue(deliverable.due_date, deliverable.status) && (
-                            <AlertCircle className="h-4 w-4 text-red-500" />
-                          )}
-                          {isDueSoon(deliverable.due_date, deliverable.status) && (
-                            <Clock className="h-4 w-4 text-yellow-500" />
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{getPriorityBadge(deliverable.priority)}</TableCell>
-                      <TableCell>
-                        {deliverable.due_date ? (
-                          <div className={`text-sm ${
-                            isOverdue(deliverable.due_date, deliverable.status) 
-                              ? 'text-red-600 font-medium' 
-                              : isDueSoon(deliverable.due_date, deliverable.status)
-                              ? 'text-yellow-600 font-medium'
-                              : 'text-gray-600'
-                          }`}>
-                            {format(parseISO(deliverable.due_date), 'MMM d, yyyy')}
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">No due date</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {deliverable.amount ? (
-                          <span className="font-medium">
-                            ETB {deliverable.amount.toLocaleString()}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {deliverable.assignedTo ? (
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm">{deliverable.assignedTo.name}</span>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">Unassigned</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(deliverable)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(deliverable.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {(!Array.isArray(filteredDeliverables) || filteredDeliverables.length === 0) && (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8">
-                        <div className="flex flex-col items-center">
-                          <FileText className="h-12 w-12 text-gray-400 mb-4" />
-                          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Deliverables Found</h3>
-                          <p className="text-gray-600">No deliverables match your current filters.</p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+        <>
+          {viewMode === 'list' && (
+            <TaskList
+              tasks={filteredTasks}
+              onTaskClick={handleTaskClick}
+              onTaskStatusChange={handleTaskMove}
+              selectedTasks={selectedTasks}
+              onTaskSelect={handleTaskSelect}
+              showCheckboxes={showCheckboxes}
+            />
           )}
-        </CardContent>
-      </Card>
 
-      {/* Edit Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Deliverable</DialogTitle>
-            <DialogDescription>
-              Update the deliverable details and status
-            </DialogDescription>
-          </DialogHeader>
+          {viewMode === 'team' && (
+            <TeamWorkloadView
+              tasks={filteredTasks}
+              teamMembers={teamMembers.map((m: any) => ({
+                id: m.id,
+                name: m.name,
+                email: m.email || '',
+              }))}
+              onTaskClick={handleTaskClick}
+            />
+          )}
+        </>
+      )}
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Title *</Label>
-                <Input
-                  id="title"
-                  value={editForm.title}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
-                />
-              </div>
+      {/* Create Task Dialog */}
+      <CreateTaskDialog
+        open={taskDialogOpen}
+        onOpenChange={setTaskDialogOpen}
+        onSubmit={createTaskMutation.mutateAsync}
+        events={events}
+        teamMembers={teamMembers}
+        vendors={vendors}
+        sponsors={sponsors}
+        sessions={[]}
+        onEventChange={getSessionsForEvent}
+        isLoading={createTaskMutation.isPending}
+      />
 
-              <div className="space-y-2">
-                <Label htmlFor="status">Status *</Label>
-                <Select
-                  value={editForm.status}
-                  onValueChange={(value) => setEditForm(prev => ({ ...prev, status: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((status) => (
-                      <SelectItem key={status.value} value={status.value}>
-                        {status.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="due_date">Due Date</Label>
-                <Input
-                  id="due_date"
-                  type="date"
-                  value={editForm.due_date}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, due_date: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="amount">Amount (ETB)</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  value={editForm.amount}
-                  onChange={(e) => setEditForm(prev => ({ ...prev, amount: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="priority">Priority</Label>
-                <Select
-                  value={editForm.priority.toString()}
-                  onValueChange={(value) => setEditForm(prev => ({ ...prev, priority: parseInt(value) }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRIORITY_OPTIONS.map((priority) => (
-                      <SelectItem key={priority.value} value={priority.value.toString()}>
-                        {priority.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={editForm.description}
-                onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                rows={3}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={editForm.notes}
-                onChange={(e) => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
-                rows={2}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleUpdate}
-              disabled={updateDeliverableMutation.isPending}
-            >
-              {updateDeliverableMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
-              Update Deliverable
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Task Details Modal */}
+      <TaskDetailsModal
+        open={taskDetailsOpen}
+        onOpenChange={setTaskDetailsOpen}
+        task={selectedTask}
+        onUpdate={updateTaskMutation.mutateAsync}
+        onDelete={deleteTaskMutation.mutateAsync}
+        onDuplicate={async (task) => {
+          // Duplicate task logic
+          const duplicateData: TaskFormData = {
+            title: `${task.title} (Copy)`,
+            description: task.description,
+            task_type: task.type,
+            task_category: task.task_category,
+            status: 'pending',
+            priority: task.priority,
+            assigned_to: task.assigned_to,
+            event_id: task.event_id,
+            session_id: task.session_id,
+            due_date: task.due_date,
+            notes: task.notes,
+            vendor_id: task.vendor_id,
+            sponsor_id: task.sponsor_id,
+            usher_id: task.usher_id,
+          }
+          await createTaskMutation.mutateAsync(duplicateData)
+        }}
+        teamMembers={teamMembers}
+        events={events}
+        isLoading={updateTaskMutation.isPending || deleteTaskMutation.isPending}
+      />
     </div>
   )
 }

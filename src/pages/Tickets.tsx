@@ -12,8 +12,8 @@ export default function Tickets() {
           <CardTitle className="mt-4 text-2xl font-bold">My Tickets</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-gray-600">This page is under construction.</p>
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="text-muted-foreground">This page is under construction.</p>
+          <p className="mt-2 text-sm text-muted-foreground/70">
             Your tickets will be displayed here soon.
           </p>
         </CardContent>

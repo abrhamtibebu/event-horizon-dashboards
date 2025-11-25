@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/select'
 import api from '@/lib/api'
 import { toast } from 'sonner'
+import { usePermissionCheck } from '@/hooks/use-permission-check'
+import { ProtectedButton } from '@/components/ProtectedButton'
 
 interface Template {
   id: number
@@ -33,7 +35,7 @@ interface Segment {
   id: number
   name: string
   criteria: any
-  member_count: number
+  recipient_count?: number
   created_at: string
 }
 
@@ -43,6 +45,7 @@ export function LibraryView({ onNewTemplate, onNewSegment }: { onNewTemplate: ()
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
+  const { checkPermission } = usePermissionCheck()
 
   useEffect(() => {
     fetchData()
@@ -138,10 +141,18 @@ export function LibraryView({ onNewTemplate, onNewSegment }: { onNewTemplate: ()
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={onNewTemplate}>
+            <ProtectedButton
+              permission="marketing.templates"
+              onClick={() => {
+                if (checkPermission('marketing.templates', 'create templates')) {
+                  onNewTemplate();
+                }
+              }}
+              actionName="create templates"
+            >
               <Plus className="w-4 h-4 mr-2" />
               New Template
-            </Button>
+            </ProtectedButton>
           </div>
 
           {/* Templates Grid */}
@@ -194,10 +205,18 @@ export function LibraryView({ onNewTemplate, onNewSegment }: { onNewTemplate: ()
                 <Mail className="w-12 h-12 mx-auto text-gray-400 mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No templates found</h3>
                 <p className="text-gray-600 mb-4">Create your first template to get started</p>
-                <Button onClick={onNewTemplate}>
+                <ProtectedButton
+                  permission="marketing.templates"
+                  onClick={() => {
+                    if (checkPermission('marketing.templates', 'create templates')) {
+                      onNewTemplate();
+                    }
+                  }}
+                  actionName="create templates"
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Create Template
-                </Button>
+                </ProtectedButton>
               </CardContent>
             </Card>
           )}
@@ -217,10 +236,18 @@ export function LibraryView({ onNewTemplate, onNewSegment }: { onNewTemplate: ()
                 />
               </div>
             </div>
-            <Button onClick={onNewSegment}>
+            <ProtectedButton
+              permission="marketing.segments"
+              onClick={() => {
+                if (checkPermission('marketing.segments', 'create segments')) {
+                  onNewSegment();
+                }
+              }}
+              actionName="create segments"
+            >
               <Plus className="w-4 h-4 mr-2" />
               New Segment
-            </Button>
+            </ProtectedButton>
           </div>
 
           {/* Segments Grid */}
@@ -233,7 +260,7 @@ export function LibraryView({ onNewTemplate, onNewSegment }: { onNewTemplate: ()
                 <CardContent>
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-sm text-gray-600">Audience Size</span>
-                    <Badge>{segment.member_count.toLocaleString()} members</Badge>
+                    <Badge>{(segment.recipient_count || 0).toLocaleString()} members</Badge>
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="flex-1">
@@ -256,10 +283,18 @@ export function LibraryView({ onNewTemplate, onNewSegment }: { onNewTemplate: ()
                 <MessageSquare className="w-12 h-12 mx-auto text-gray-400 mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No segments found</h3>
                 <p className="text-gray-600 mb-4">Create your first audience segment</p>
-                <Button onClick={onNewSegment}>
+                <ProtectedButton
+                  permission="marketing.segments"
+                  onClick={() => {
+                    if (checkPermission('marketing.segments', 'create segments')) {
+                      onNewSegment();
+                    }
+                  }}
+                  actionName="create segments"
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Create Segment
-                </Button>
+                </ProtectedButton>
               </CardContent>
             </Card>
           )}

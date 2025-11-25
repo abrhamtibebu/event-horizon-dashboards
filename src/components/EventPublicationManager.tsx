@@ -458,7 +458,7 @@ export default function EventPublicationManager() {
               
               {/* Sort */}
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-40 border-gray-200">
+                <SelectTrigger className="w-40">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
@@ -621,7 +621,7 @@ export default function EventPublicationManager() {
                   value={event.advertisement_status}
                   onValueChange={(value) => updateAdvertisementStatus(event.id, value)}
                 >
-                    <SelectTrigger className="w-full border-gray-200 focus:border-blue-500 focus:ring-blue-500 bg-white">
+                    <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -825,7 +825,7 @@ export default function EventPublicationManager() {
                       value={event.advertisement_status}
                       onValueChange={(value) => updateAdvertisementStatus(event.id, value)}
                     >
-                      <SelectTrigger className="w-48 border-gray-200">
+                      <SelectTrigger className="w-48">
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>

@@ -24,6 +24,7 @@ import {
   Settings,
   Shield,
 } from 'lucide-react'
+import Breadcrumbs from '@/components/Breadcrumbs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -122,6 +123,14 @@ function TrashCategoryList({
   return (
     <TooltipProvider>
       <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 py-8 px-2 sm:px-6 lg:px-12">
+        {/* Breadcrumbs */}
+        <Breadcrumbs 
+          items={[
+            { label: 'Trash', href: '/dashboard/trash' }
+          ]}
+          className="mb-4"
+        />
+        
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>

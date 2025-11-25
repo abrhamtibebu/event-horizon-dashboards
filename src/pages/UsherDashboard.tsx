@@ -33,11 +33,6 @@ import { useOutletContext, useNavigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { Checkbox } from '@/components/ui/checkbox'
 import { RecentActivity } from '@/components/RecentActivity'
-import { QrReader } from '@blackbox-vision/react-qr-reader';
-// Suppress defaultProps warning for QrReader (temporary workaround)
-if (QrReader && QrReader.defaultProps) {
-  QrReader.defaultProps = undefined;
-}
 import {
   Dialog,
   DialogContent,
@@ -48,9 +43,11 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import axios from 'axios';
+import { Spinner } from '@/components/ui/spinner';
 
 
 export default function UsherDashboard() {
+  const navigate = useNavigate()
   const [dashboardData, setDashboardData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -59,9 +56,6 @@ export default function UsherDashboard() {
   const { searchQuery } = useOutletContext<{ searchQuery: string }>()
   const [taskCompletion, setTaskCompletion] = useState<{ [eventId: string]: { [task: string]: boolean } }>({})
   const [completingTask, setCompletingTask] = useState<{ [eventId: string]: boolean }>({})
-  const [qrDialogOpenEventId, setQrDialogOpenEventId] = useState<string | null>(null);
-  const [qrScanStatus, setQrScanStatus] = useState<string | null>(null);
-  const [qrLoading, setQrLoading] = useState(false);
   const [rejectDialogOpenId, setRejectDialogOpenId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
@@ -71,6 +65,14 @@ export default function UsherDashboard() {
       try {
         setLoading(true)
         const response = await api.get('/dashboard/usher')
+        // Deduplicate assignedEvents by ID to prevent duplicate key warnings
+        if (response.data?.assignedEvents) {
+          const uniqueEvents = response.data.assignedEvents.filter(
+            (event: any, index: number, self: any[]) =>
+              index === self.findIndex((e: any) => e.id === event.id)
+          )
+          response.data.assignedEvents = uniqueEvents
+        }
         setDashboardData(response.data)
         setError(null)
       } catch (err) {
@@ -114,13 +116,13 @@ export default function UsherDashboard() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
-        return 'bg-green-100 text-green-800'
+        return 'bg-green-500/10 dark:bg-green-900/30 text-green-800 dark:text-green-300'
       case 'upcoming':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-blue-500/10 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
       case 'completed':
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-muted text-muted-foreground'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-muted text-muted-foreground'
     }
   }
 
@@ -131,43 +133,16 @@ export default function UsherDashboard() {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high':
-        return 'bg-red-100 text-red-800'
+        return 'bg-red-500/10 dark:bg-red-900/30 text-red-800 dark:text-red-300'
       case 'medium':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'bg-yellow-500/10 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
       case 'low':
-        return 'bg-green-100 text-green-800'
+        return 'bg-green-500/10 dark:bg-green-900/30 text-green-800 dark:text-green-300'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-muted text-muted-foreground'
     }
   }
 
-  // Handler for QR scan (per event)
-  const handleQrScan = async (data: string | null, eventId: string) => {
-    if (!data || !eventId) return;
-    setQrLoading(true);
-    setQrScanStatus(null);
-    try {
-      // Fetch attendees for this event
-      const res = await api.get(`/events/${eventId}/attendees`);
-      let attendee = res.data.find((a: any) => a.id?.toString() === data || a.guest?.email === data);
-      if (!attendee) {
-        setQrScanStatus('No matching attendee found for this QR code.');
-        setQrLoading(false);
-        return;
-      }
-      // Mark as checked in
-      await api.post(`/events/${eventId}/attendees/${attendee.id}/check-in`, { checked_in: true });
-      setQrScanStatus(`Checked in: ${attendee.guest?.name || attendee.id}`);
-      // Optionally update dashboardData/recentCheckIns if needed
-    } catch (err: any) {
-      setQrScanStatus('Failed to check in attendee. Please try again.');
-    } finally {
-      setQrLoading(false);
-    }
-  };
-  const handleQrError = (err: any) => {
-    setQrScanStatus('QR scanner error. Please try again.');
-  };
 
   // Handler for navigating to event messaging
   const handleEventMessage = (eventId: string | number) => {
@@ -237,7 +212,11 @@ export default function UsherDashboard() {
     }
   };
 
-  if (loading) return <div>Loading dashboard...</div>
+  if (loading) return (
+    <div className="min-h-[300px] flex items-center justify-center">
+      <Spinner size="lg" variant="primary" text="Loading dashboard..." />
+    </div>
+  )
   if (error) return <div className="text-red-500">{error}</div>
   if (!dashboardData) return <div>No dashboard data available.</div>
 
@@ -295,24 +274,24 @@ export default function UsherDashboard() {
       {/* New prominent cards for Total Check-ins Today and Pending Issues */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-4">
         {/* Total Check-ins Today Card */}
-        <div className="bg-gradient-to-r from-green-100 to-blue-100 rounded-xl shadow p-6 flex flex-col items-center justify-center">
+        <div className="bg-gradient-to-r from-[hsl(var(--color-success))]/10 to-[hsl(var(--primary))]/10 dark:from-[hsl(var(--color-success))]/20 dark:to-[hsl(var(--primary))]/20 rounded-xl shadow p-6 flex flex-col items-center justify-center">
           <div className="flex items-center gap-3 mb-2">
-            <UserCheck className="w-8 h-8 text-green-600" />
-            <span className="text-2xl font-bold text-green-900">{keyMetrics?.totalCheckInsToday?.value || 'N/A'}</span>
+            <UserCheck className="w-8 h-8 text-green-600 dark:text-green-400" />
+            <span className="text-2xl font-bold text-green-800 dark:text-green-300">{keyMetrics?.totalCheckInsToday?.value || 'N/A'}</span>
           </div>
-          <div className="text-lg font-semibold text-green-800">Total Check-ins Today</div>
+          <div className="text-lg font-semibold text-green-800 dark:text-green-300">Total Check-ins Today</div>
           {keyMetrics?.totalCheckInsToday?.trend && (
-            <div className="text-sm text-green-700 mt-1">{keyMetrics.totalCheckInsToday.trend}</div>
+            <div className="text-sm text-green-700 dark:text-green-400 mt-1">{keyMetrics.totalCheckInsToday.trend}</div>
           )}
         </div>
         {/* Pending Issues Card */}
-        <div className="bg-orange-50 border-l-4 border-orange-400 rounded-xl shadow p-6 flex flex-col justify-center">
+        <div className="bg-orange-500/10 dark:bg-orange-900/20 border-l-4 border-orange-400 dark:border-orange-600 rounded-xl shadow p-6 flex flex-col justify-center">
           <div className="flex items-center gap-3 mb-2">
-            <AlertTriangle className="w-8 h-8 text-orange-500" />
-            <span className="text-2xl font-bold text-orange-800">{keyMetrics?.pendingIssues || 'N/A'}</span>
+            <AlertTriangle className="w-8 h-8 text-orange-500 dark:text-orange-400" />
+            <span className="text-2xl font-bold text-orange-800 dark:text-orange-300">{keyMetrics?.pendingIssues || 'N/A'}</span>
           </div>
-          <div className="text-lg font-semibold text-orange-700">Pending Issues</div>
-          <div className="text-sm text-orange-600 mt-1">Please review and resolve outstanding issues.</div>
+          <div className="text-lg font-semibold text-orange-700 dark:text-orange-300">Pending Issues</div>
+          <div className="text-sm text-orange-600 dark:text-orange-400 mt-1">Please review and resolve outstanding issues.</div>
         </div>
       </div>
 
@@ -323,13 +302,13 @@ export default function UsherDashboard() {
             {filteredAssignedEvents?.map((event: any) => {
               const tasks = getTasks(event)
               return (
-                <div key={event.id} className="p-4 bg-gray-50 rounded-lg flex flex-col gap-2 sm:gap-0">
+                <div key={event.id} className="p-4 bg-muted/50 rounded-lg flex flex-col gap-2 sm:gap-0">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
                     <div>
-                      <h4 className="font-semibold text-gray-900 text-lg sm:text-base">
+                      <h4 className="font-semibold text-card-foreground text-lg sm:text-base">
                         {event.name}
                       </h4>
-                      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 mt-1">
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mt-1">
                         <div className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
                           <span>{event.date}</span>
@@ -345,7 +324,7 @@ export default function UsherDashboard() {
                     </Badge>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-3">
                     <div className="flex items-center gap-1">
                       <MapPin className="w-4 h-4" />
                       <span>{event.location}</span>
@@ -381,7 +360,7 @@ export default function UsherDashboard() {
                     <div className="flex gap-2 mt-2">
                       <Button 
                         onClick={() => handleEventMessage(event.id)}
-                        className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-sm py-2"
+                        className="flex-1 bg-brand-gradient bg-brand-gradient-hover text-foreground text-sm py-2"
                       >
                         <MessageCircle className="w-4 h-4 mr-2" />
                         Event Chat
@@ -389,7 +368,7 @@ export default function UsherDashboard() {
                       <Button 
                         onClick={() => handleMessageOrganizer(event)}
                         variant="outline"
-                        className="flex-1 text-sm py-2"
+                        className="flex-1 text-sm py-2 border-[hsl(var(--color-warning))] text-[hsl(var(--color-warning))]"
                       >
                         <MessageCircle className="w-4 h-4 mr-2" />
                         Message Organizer
@@ -400,7 +379,7 @@ export default function UsherDashboard() {
                   <div className="mt-4">
                     <h5 className="font-semibold mb-2 text-base sm:text-sm">Assigned Tasks</h5>
                     {tasks.length === 0 ? (
-                      <div className="text-gray-500 text-sm">No tasks assigned.</div>
+                      <div className="text-muted-foreground text-sm">No tasks assigned.</div>
                     ) : (
                       <ul className="space-y-2">
                         {tasks.map((task: string) => (
@@ -431,7 +410,7 @@ export default function UsherDashboard() {
                               }}
                               disabled={completingTask[event.id]}
                             />
-                            <span className={taskCompletion[event.id]?.[task] ? 'line-through text-gray-400' : ''}>{task}</span>
+                            <span className={taskCompletion[event.id]?.[task] ? 'line-through text-muted-foreground/50' : ''}>{task}</span>
                           </li>
                         ))}
                       </ul>
@@ -440,20 +419,20 @@ export default function UsherDashboard() {
 
                   <div className="flex flex-col md:flex-row gap-2 mt-2">
                     <div className="flex-1">
-                      <span className="block text-sm font-medium text-gray-700">Assigned Tasks:</span>
-                      <span className="block text-gray-800">
+                      <span className="block text-sm font-medium text-foreground">Assigned Tasks:</span>
+                      <span className="block text-card-foreground">
                         {Array.isArray(event.tasks) && event.tasks.length > 0
                           ? event.tasks.join(', ')
                           : 'No tasks assigned.'}
                       </span>
                     </div>
                     <div className="flex-1">
-                      <span className="block text-sm font-medium text-gray-700">Daily Rate:</span>
-                      <span className="block text-gray-800">{event.daily_rate ? `${event.daily_rate} ETB` : '-'}</span>
+                      <span className="block text-sm font-medium text-foreground">Daily Rate:</span>
+                      <span className="block text-card-foreground">{event.daily_rate ? `${event.daily_rate} ETB` : '-'}</span>
                     </div>
                     <div className="flex-1">
-                      <span className="block text-sm font-medium text-gray-700">Ushering Days:</span>
-                      <span className="block text-gray-800">
+                      <span className="block text-sm font-medium text-foreground">Ushering Days:</span>
+                      <span className="block text-card-foreground">
                         {event.from_date ? event.from_date : '-'}
                         {event.from_date || event.to_date ? ' to ' : ''}
                         {event.to_date ? event.to_date : '-'}
@@ -462,15 +441,15 @@ export default function UsherDashboard() {
                   </div>
                   <div className="flex flex-col md:flex-row gap-2 mt-2 items-center">
                     <div className="flex-1">
-                      <span className="block text-sm font-medium text-gray-700">Status:</span>
-                      <span className="block text-gray-800 capitalize">{event.accepted}</span>
+                      <span className="block text-sm font-medium text-foreground">Status:</span>
+                      <span className="block text-card-foreground capitalize">{event.accepted}</span>
                     </div>
                     {event.accepted === 'pending' && (
                       <div className="flex gap-2">
-                        <Button size="sm" className="bg-green-600 text-white" disabled={actionLoading} onClick={() => handleAcceptJob(event.id)}>
+                        <Button size="sm" className="bg-green-600 text-foreground" disabled={actionLoading} onClick={() => handleAcceptJob(event.id)}>
                           Accept
                         </Button>
-                        <Button size="sm" className="bg-red-600 text-white" disabled={actionLoading} onClick={() => setRejectDialogOpenId(event.id)}>
+                        <Button size="sm" className="bg-red-600 text-foreground" disabled={actionLoading} onClick={() => setRejectDialogOpenId(event.id)}>
                           Reject
                         </Button>
                       </div>
@@ -502,7 +481,7 @@ export default function UsherDashboard() {
                       />
                       <DialogFooter>
                         <Button variant="outline" onClick={() => setRejectDialogOpenId(null)} disabled={actionLoading}>Cancel</Button>
-                        <Button onClick={() => handleRejectJob(event.id)} disabled={actionLoading || !rejectReason.trim()} className="bg-red-600 text-white">
+                        <Button onClick={() => handleRejectJob(event.id)} disabled={actionLoading || !rejectReason.trim()} className="bg-red-600 text-foreground">
                           {actionLoading ? 'Rejecting...' : 'Reject Job'}
                         </Button>
                       </DialogFooter>
@@ -510,7 +489,7 @@ export default function UsherDashboard() {
                   </Dialog>
 
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between mt-3 gap-2">
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-muted-foreground">
                       Zone: {event.zone}
                     </span>
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -518,53 +497,12 @@ export default function UsherDashboard() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="w-full sm:w-auto bg-gradient-to-r from-green-600 to-blue-600 text-white hover:from-green-700 hover:to-blue-700 text-sm py-2"
+                          className="w-full sm:w-auto bg-brand-gradient bg-brand-gradient-hover text-foreground text-sm py-2"
                         >
                           <Users className="w-4 h-4 mr-1" />
                           Manage
                         </Button>
                       </Link>
-                      <Button
-                        size="sm"
-                        className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 text-sm py-2"
-                        onClick={() => {
-                          setQrDialogOpenEventId(event.id.toString());
-                          setQrScanStatus(null);
-                        }}
-                      >
-                        <UserCheck className="w-4 h-4 mr-1" />
-                        Check-in
-                      </Button>
-                      {/* QR Scanner Dialog for this event */}
-                      <Dialog open={qrDialogOpenEventId === event.id.toString()} onOpenChange={open => {
-                        if (!open) setQrDialogOpenEventId(null);
-                      }}>
-                        <DialogContent className="max-w-md w-full">
-                          <DialogHeader>
-                            <DialogTitle>QR Code Check-In</DialogTitle>
-                            <DialogDescription>
-                              Scan a guest's QR code to check them in.<br />
-                              <span className="text-xs text-gray-500">If prompted, please allow camera access. For best results, use your phone's rear camera.</span>
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="flex flex-col items-center gap-4 py-4">
-                            <QrReader
-                              constraints={{ facingMode: { ideal: 'environment' } }}
-                              onResult={(result, error) => {
-                                if (!!result) handleQrScan(result.getText(), event.id.toString());
-                                if (!!error) handleQrError(error);
-                              }}
-                              containerStyle={{ width: '100%' }}
-                              videoStyle={{ width: '100%' }}
-                              scanDelay={200}
-                              videoId={`usher-qr-video-${event.id}`}
-                            />
-                            {qrLoading && <div className="text-blue-500">Checking in...</div>}
-                            {qrScanStatus && <div className="text-center text-sm text-blue-700">{qrScanStatus}</div>}
-                            <Button variant="outline" onClick={() => setQrDialogOpenEventId(null)}>Close</Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
                     </div>
                   </div>
 
@@ -602,14 +540,14 @@ export default function UsherDashboard() {
               </SelectContent>
             </Select>
 
-            <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg text-center">
-              <QrCode className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-600 text-sm">
+            <div className="p-4 border-2 border-dashed border-border rounded-lg text-center">
+              <QrCode className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+              <p className="text-muted-foreground text-sm">
                 Scan QR code or search manually
               </p>
             </div>
 
-            <Button className="w-full bg-gradient-to-r from-green-600 to-blue-600 text-sm py-2">
+            <Button className="w-full bg-brand-gradient bg-brand-gradient-hover text-foreground text-sm py-2">
               <UserCheck className="w-4 h-4 mr-2" />
               Manual Check-in
             </Button>
@@ -622,7 +560,7 @@ export default function UsherDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
           <Link
             to="/dashboard/locate-badges"
-            className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg"
+            className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg"
           >
             <MapPin className="w-8 h-8 mx-auto mb-2 text-blue-600" />
             <span className="font-medium">Locate Badges</span>
@@ -636,16 +574,16 @@ export default function UsherDashboard() {
           <div className="space-y-3">
             {filteredCheckIns?.map((checkIn: any) => (
               <div key={checkIn.id} className="flex items-center gap-3">
-                <div className="p-2 bg-gray-100 rounded-full">
-                  <UserCheck className="w-4 h-4 text-green-600" />
+                <div className="p-2 bg-muted rounded-full">
+                  <UserCheck className="w-4 h-4 text-green-600 dark:text-green-400" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium">{checkIn.name}</p>
-                  <p className="text-xs text-gray-500">{checkIn.company}</p>
+                  <p className="text-xs text-muted-foreground/70">{checkIn.company}</p>
                 </div>
                 <div className="text-right">
                   <Badge className={getTypeColor(checkIn.guest_type?.name)}>{checkIn.guest_type?.name || ''}</Badge>
-                  <p className="text-xs text-gray-500 mt-1">{checkIn.time}</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">{checkIn.time}</p>
                 </div>
               </div>
             ))}

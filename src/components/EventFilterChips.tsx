@@ -8,12 +8,12 @@ interface EventFilterChipsProps {
 }
 
 const filterOptions = [
-  { value: 'all', label: 'All Events', color: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
-  { value: 'active', label: 'Active', color: 'bg-green-100 text-green-700 hover:bg-green-200' },
-  { value: 'upcoming', label: 'Upcoming', color: 'bg-blue-100 text-blue-700 hover:bg-blue-200' },
-  { value: 'completed', label: 'Completed', color: 'bg-gray-100 text-gray-700 hover:bg-gray-200' },
-  { value: 'draft', label: 'Draft', color: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' },
-  { value: 'cancelled', label: 'Cancelled', color: 'bg-red-100 text-red-700 hover:bg-red-200' },
+  { value: 'all', label: 'All Events', color: 'bg-muted text-foreground hover:bg-muted/80 border-border' },
+  { value: 'active', label: 'Active', color: 'bg-success/10 text-success hover:bg-success/20 border-success/30' },
+  { value: 'upcoming', label: 'Upcoming', color: 'bg-info/10 text-info hover:bg-info/20 border-info/30' },
+  { value: 'completed', label: 'Completed', color: 'bg-info/10 text-info hover:bg-info/20 border-info/30' },
+  { value: 'draft', label: 'Draft', color: 'bg-warning/10 text-warning hover:bg-warning/20 border-warning/30' },
+  { value: 'cancelled', label: 'Cancelled', color: 'bg-error/10 text-error hover:bg-error/20 border-error/30' },
 ]
 
 export function EventFilterChips({ selectedFilters, onFilterChange }: EventFilterChipsProps) {
@@ -43,14 +43,14 @@ export function EventFilterChips({ selectedFilters, onFilterChange }: EventFilte
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm font-medium text-gray-600">Filter by:</span>
+      <span className="text-sm font-medium text-muted-foreground">Filter by:</span>
       {filterOptions.map(option => (
         <Badge
           key={option.value}
-          className={`cursor-pointer transition-all duration-200 ${
+          className={`cursor-pointer transition-all duration-200 border ${
             isActive(option.value)
-              ? option.color + ' ring-2 ring-offset-1 ring-gray-400'
-              : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+              ? option.color + ' ring-2 ring-offset-1 ring-primary/50'
+              : 'bg-muted/50 text-muted-foreground hover:bg-muted border-border'
           }`}
           onClick={() => toggleFilter(option.value)}
         >
@@ -62,7 +62,7 @@ export function EventFilterChips({ selectedFilters, onFilterChange }: EventFilte
           variant="ghost"
           size="sm"
           onClick={clearAllFilters}
-          className="h-6 px-2 text-xs text-gray-500 hover:text-gray-700"
+          className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
         >
           <X className="w-3 h-3 mr-1" />
           Clear

@@ -104,7 +104,9 @@ export const PaymentManagementModal: React.FC<PaymentManagementModalProps> = ({
   useEffect(() => {
     if (isOpen && vendor) {
       // Auto-setup test authentication if needed
-      autoSetupTestAuth();
+      autoSetupTestAuth().catch(err => {
+        console.warn('Failed to setup test auth:', err);
+      });
       
       loadPayments();
       loadApprovedQuotations();

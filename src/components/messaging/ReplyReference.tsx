@@ -39,9 +39,9 @@ export const ReplyReference: React.FC<ReplyReferenceProps> = ({
           {parentMessage.sender?.name || 'Unknown User'}
         </p>
         <p className="text-xs text-slate-600 truncate">
-          {parentMessage.file_path && !parentMessage.content 
+          {(parentMessage.file_path || parentMessage.file_url) && !parentMessage.content 
             ? `📎 ${parentMessage.file_name || 'Attachment'}`
-            : truncateText(parentMessage.content)
+            : truncateText(parentMessage.content || 'No content available')
           }
         </p>
       </div>

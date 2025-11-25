@@ -1,6 +1,7 @@
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { Card } from '@/components/ui/card';
 import { Monitor, Smartphone, Tablet } from 'lucide-react';
+import { getChartStyles, getChartColors } from '@/utils/reportTransformers';
 
 interface DeviceChartProps {
   data: Array<{
@@ -11,12 +12,6 @@ interface DeviceChartProps {
   }>;
 }
 
-const COLORS = {
-  mobile: '#3B82F6',
-  desktop: '#10B981',
-  tablet: '#F59E0B'
-};
-
 const ICONS = {
   mobile: '📱',
   desktop: '💻',
@@ -24,6 +19,16 @@ const ICONS = {
 };
 
 export function DeviceChart({ data }: DeviceChartProps) {
+  const styles = getChartStyles();
+  const chartColors = getChartColors();
+  
+  // Theme-aware colors for device types
+  const COLORS = {
+    mobile: chartColors.info,      // Blue Sapphire
+    desktop: chartColors.success,  // Eton Blue
+    tablet: chartColors.accent,    // Honey Yellow
+  };
+  
   // Aggregate by device type
   const deviceCounts = data.reduce((acc, item) => {
     acc[item.device_type] = (acc[item.device_type] || 0) + item.count;
@@ -48,24 +53,33 @@ export function DeviceChart({ data }: DeviceChartProps) {
               cy="50%"
               innerRadius={60}
               outerRadius={80}
-              fill="#8884d8"
+              fill={chartColors.info}
               paddingAngle={5}
               dataKey="value"
               label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+              labelStyle={{ fill: styles.labelColor }}
             >
               {chartData.map((entry, index) => (
                 <Cell 
                   key={`cell-${index}`} 
-                  fill={COLORS[entry.type as keyof typeof COLORS]} 
+                  fill={COLORS[entry.type as keyof typeof COLORS] || chartColors.info} 
                 />
               ))}
             </Pie>
-            <Tooltip />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: styles.tooltipBg,
+                border: `1px solid ${styles.tooltipBorder}`,
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                color: styles.tooltipText,
+              }}
+            />
             <Legend />
           </PieChart>
         </ResponsiveContainer>
       ) : (
-        <div className="flex items-center justify-center h-64 text-gray-500">
+        <div className="flex items-center justify-center h-64 text-muted-foreground">
           No device data available yet
         </div>
       )}

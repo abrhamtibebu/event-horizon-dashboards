@@ -50,6 +50,7 @@ export interface Message {
   recipient_id: number
   content: string
   file_path?: string
+  file_disk?: string
   file_name?: string
   file_type?: string
   file_size?: number
@@ -61,6 +62,9 @@ export interface Message {
   medium_height?: number
   original_width?: number
   original_height?: number
+  file_url?: string
+  thumbnail_url?: string
+  medium_url?: string
   parent_message_id?: number
   read_at?: string
   delivered_at?: string

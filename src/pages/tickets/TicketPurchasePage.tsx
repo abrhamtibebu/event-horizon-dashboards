@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PaymentProcessingModal } from '@/components/payments/PaymentProcessingModal';
 import { getAvailableTicketTypes } from '@/lib/api/tickets';
 import { initiatePayment, pollPaymentStatus } from '@/lib/api/payments';
-import { Loader2, Ticket, CreditCard, User, ArrowLeft, ArrowRight, CheckCircle2, Sparkles, Smartphone, Building, Lock } from 'lucide-react';
+import { Ticket, CreditCard, User, ArrowLeft, ArrowRight, CheckCircle2, Sparkles, Smartphone, Building, Lock } from 'lucide-react';
+import { Spinner, SpinnerInline } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import type { PaymentMethod } from '@/types/tickets';
@@ -251,7 +252,7 @@ export default function TicketPurchasePage() {
   if (eventLoading || ticketTypesLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-200">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <Spinner size="lg" variant="primary" text="Loading tickets..." />
       </div>
     );
   }
@@ -271,7 +272,7 @@ export default function TicketPurchasePage() {
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
-            <h1 className="text-4xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-5xl font-bold mb-3 bg-brand-gradient bg-clip-text text-transparent">
               🎟️ Get Your Tickets
             </h1>
             <p className="text-lg text-muted-foreground">{event?.name}</p>
@@ -280,9 +281,9 @@ export default function TicketPurchasePage() {
           {/* Step Indicator */}
           <div className="flex items-center justify-center gap-4 mt-6">
             <StepIndicator active={step === 'select'} completed={step !== 'select'} label="Select" icon={<Ticket className="w-4 h-4" />} />
-            <div className={`h-0.5 w-12 ${step !== 'select' ? 'bg-primary' : 'bg-gray-300'}`} />
+            <div className={`h-0.5 w-12 ${step !== 'select' ? 'bg-primary' : 'bg-muted'}`} />
             <StepIndicator active={step === 'details'} completed={step === 'payment'} label="Details" icon={<User className="w-4 h-4" />} />
-            <div className={`h-0.5 w-12 ${step === 'payment' ? 'bg-primary' : 'bg-gray-300'}`} />
+            <div className={`h-0.5 w-12 ${step === 'payment' ? 'bg-primary' : 'bg-muted'}`} />
             <StepIndicator active={step === 'payment'} completed={false} label="Payment" icon={<CreditCard className="w-4 h-4" />} />
           </div>
       </div>
@@ -314,7 +315,7 @@ export default function TicketPurchasePage() {
                           className={`border-2 rounded-xl p-5 cursor-pointer transition-all ${
                     selectedTicketType?.id === ticketType.id
                               ? 'border-primary bg-primary/10 shadow-md'
-                              : 'border-gray-200 hover:border-primary/50 hover:shadow'
+                              : 'border-border hover:border-primary/50 hover:shadow'
                   }`}
                   onClick={() => setSelectedTicketType(ticketType)}
                 >
@@ -390,7 +391,7 @@ export default function TicketPurchasePage() {
                         />
                 </div>
 
-                      <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                      <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>Subtotal ({quantity} × ETB {Number(selectedTicketType.price).toFixed(2)})</span>
                           <span className="font-semibold">ETB {subtotal.toFixed(2)}</span>
@@ -399,7 +400,7 @@ export default function TicketPurchasePage() {
                           <span>Service Fee (5%)</span>
                           <span>ETB {serviceFee.toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between text-xl font-bold pt-2 border-t border-gray-200">
+                        <div className="flex justify-between text-xl font-bold pt-2 border-t border-border">
                           <span>Total</span>
                           <span className="text-primary">ETB {total.toFixed(2)}</span>
                         </div>
@@ -474,7 +475,7 @@ export default function TicketPurchasePage() {
                       </div>
 
                       {/* Order Summary */}
-                      <div className="bg-gray-50 rounded-lg p-4 mt-6">
+                      <div className="bg-muted/50 rounded-lg p-4 mt-6">
                         <h3 className="font-semibold mb-3">Order Summary</h3>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
@@ -561,19 +562,19 @@ export default function TicketPurchasePage() {
                           transition={{ duration: 0.2 }}
                           className="mt-6"
                         >
-                          <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
+                          <div className="bg-info/10 border border-info/30 rounded-xl p-5">
                             <div className="flex items-start gap-3 mb-4">
-                              <Smartphone className="w-5 h-5 text-blue-600 mt-0.5" />
+                              <Smartphone className="w-5 h-5 text-info mt-0.5" />
                               <div>
-                                <h3 className="font-semibold text-blue-900 mb-1">ℹ️ Payment Details</h3>
-                                <p className="text-sm text-blue-700">
+                                <h3 className="font-semibold text-card-foreground mb-1">ℹ️ Payment Details</h3>
+                                <p className="text-sm text-info">
                                   You will receive a {selectedPaymentMethod === 'telebirr' ? 'Telebirr' : 'CBE Birr'} payment request via USSD or SMS. 
                                   Please complete the payment on your phone to finalize your purchase.
                                 </p>
                               </div>
                             </div>
                             <div>
-                              <Label htmlFor="paymentPhone" className="text-base font-medium text-blue-900">
+                              <Label htmlFor="paymentPhone" className="text-base font-medium text-card-foreground">
                                 Phone Number *
                               </Label>
                               <Input
@@ -582,9 +583,9 @@ export default function TicketPurchasePage() {
                                 placeholder="0912345678 or +251912345678"
                                 value={paymentPhoneNumber}
                                 onChange={(e) => setPaymentPhoneNumber(e.target.value)}
-                                className="mt-2 h-12 text-base bg-white"
+                                className="mt-2 h-12 text-base bg-background"
                               />
-                              <p className="text-sm text-blue-600 mt-2">
+                              <p className="text-sm text-info mt-2">
                                 Enter your {selectedPaymentMethod === 'telebirr' ? 'Telebirr' : 'CBE Birr'} registered phone number
                               </p>
                             </div>
@@ -606,7 +607,7 @@ export default function TicketPurchasePage() {
                     )}
 
                     {/* Final Summary */}
-                    <div className="bg-gradient-to-br from-primary/10 to-purple-50 rounded-lg p-5 mt-6">
+                    <div className="bg-gradient-to-br from-primary/10 to-info/10 rounded-lg p-5 mt-6">
                       <h3 className="font-semibold mb-3 text-lg">Purchase Summary</h3>
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
@@ -646,12 +647,12 @@ export default function TicketPurchasePage() {
                     <Button
                     onClick={handlePurchase}
                     disabled={!selectedPaymentMethod || !paymentPhoneNumber || purchaseMutation.isPending}
-                      className="flex-1 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
+                      className="flex-1 bg-brand-gradient"
                       size="lg"
                   >
                     {purchaseMutation.isPending ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <SpinnerInline className="mr-2" />
                         Processing...
                       </>
                     ) : (
@@ -692,12 +693,12 @@ function StepIndicator({ active, completed, label, icon }: { active: boolean; co
             ? 'bg-primary text-white'
             : active
             ? 'bg-primary text-white ring-4 ring-primary/20'
-            : 'bg-gray-200 text-gray-400'
+            : 'bg-muted text-muted-foreground'
         }`}
       >
         {completed ? <CheckCircle2 className="w-5 h-5" /> : icon}
       </div>
-      <span className={`text-xs font-medium ${active || completed ? 'text-primary' : 'text-gray-400'}`}>
+      <span className={`text-xs font-medium ${active || completed ? 'text-primary' : 'text-muted-foreground'}`}>
         {label}
       </span>
     </div>

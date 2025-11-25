@@ -6,18 +6,18 @@ export default function PrivacyPolicy() {
   const [searchParams] = useSearchParams()
   const returnUrl = searchParams.get('returnUrl') || '/'
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50">
+    <div className="min-h-screen bg-background dark:bg-background">
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200">
+      <div className="bg-card/80 backdrop-blur-sm border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                 <Shield className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Privacy Policy</h1>
-                <p className="text-sm text-gray-600">Your data protection and privacy rights</p>
+                <h1 className="text-2xl font-bold text-card-foreground">Privacy Policy</h1>
+                <p className="text-sm text-muted-foreground">Your data protection and privacy rights</p>
               </div>
         </div>
             <Button asChild variant="outline">
@@ -32,7 +32,7 @@ export default function PrivacyPolicy() {
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 p-8">
+        <div className="bg-card/90 backdrop-blur-sm rounded-2xl shadow-xl border border-border/50 p-8">
           {/* Last Updated */}
           <div className="flex items-center gap-2 mb-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <FileText className="w-5 h-5 text-blue-600" />
@@ -47,29 +47,29 @@ export default function PrivacyPolicy() {
           </div>
 
           <div className="prose prose-gray max-w-none">
-            <p className="text-lg text-gray-700 leading-relaxed mb-8">
+            <p className="text-lg text-muted-foreground leading-relaxed mb-8">
               At VEMS (Validity Event Management System), we are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our event management platform.
             </p>
 
             {/* Information We Collect */}
             <div className="mb-8">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-info rounded-lg flex items-center justify-center">
                   <Users className="w-4 h-4 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900">Information We Collect</h2>
+                <h2 className="text-2xl font-bold text-card-foreground">Information We Collect</h2>
               </div>
-              <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Personal Information</h3>
-                <ul className="space-y-2 text-gray-700">
+              <div className="bg-muted/50 rounded-lg p-6 border border-border">
+                <h3 className="text-lg font-semibold text-card-foreground mb-3">Personal Information</h3>
+                <ul className="space-y-2 text-muted-foreground">
                   <li>• Name, email address, and contact information</li>
                   <li>• Event registration and attendance data</li>
                   <li>• User preferences and settings</li>
                   <li>• Communication history and support interactions</li>
                 </ul>
                 
-                <h3 className="text-lg font-semibold text-gray-900 mb-3 mt-6">Technical Information</h3>
-                <ul className="space-y-2 text-gray-700">
+                <h3 className="text-lg font-semibold text-card-foreground mb-3 mt-6">Technical Information</h3>
+                <ul className="space-y-2 text-muted-foreground">
                   <li>• IP address and device information</li>
                   <li>• Browser type and version</li>
                   <li>• Usage analytics and performance data</li>
@@ -81,10 +81,10 @@ export default function PrivacyPolicy() {
             {/* How We Use Information */}
             <div className="mb-8">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-600 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-success rounded-lg flex items-center justify-center">
                   <Eye className="w-4 h-4 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900">How We Use Your Information</h2>
+                <h2 className="text-2xl font-bold text-card-foreground">How We Use Your Information</h2>
               </div>
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="bg-green-50 rounded-lg p-6 border border-green-200">
@@ -111,10 +111,10 @@ export default function PrivacyPolicy() {
             {/* Data Protection */}
             <div className="mb-8">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-red-500 to-orange-600 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-error rounded-lg flex items-center justify-center">
                   <Lock className="w-4 h-4 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900">Data Protection & Security</h2>
+                <h2 className="text-2xl font-bold text-card-foreground">Data Protection & Security</h2>
               </div>
               <div className="bg-red-50 rounded-lg p-6 border border-red-200">
                 <div className="grid md:grid-cols-2 gap-6">
@@ -142,7 +142,7 @@ export default function PrivacyPolicy() {
 
             {/* Data Sharing */}
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Data Sharing & Third Parties</h2>
+              <h2 className="text-2xl font-bold text-card-foreground mb-4">Data Sharing & Third Parties</h2>
               <div className="bg-yellow-50 rounded-lg p-6 border border-yellow-200">
                 <p className="text-yellow-800 mb-4">
                   We do not sell, trade, or rent your personal information to third parties. We may share your information only in the following circumstances:
@@ -158,7 +158,7 @@ export default function PrivacyPolicy() {
 
             {/* Contact Information */}
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Contact Us</h2>
+              <h2 className="text-2xl font-bold text-card-foreground mb-4">Contact Us</h2>
               <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
                 <p className="text-blue-800 mb-4">
                   If you have any questions about this Privacy Policy or our data practices, please contact us:
@@ -174,9 +174,9 @@ export default function PrivacyPolicy() {
 
             {/* Policy Updates */}
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Updates to This Policy</h2>
-              <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                <p className="text-gray-700">
+              <h2 className="text-2xl font-bold text-card-foreground mb-4">Updates to This Policy</h2>
+              <div className="bg-muted/50 rounded-lg p-6 border border-border">
+                <p className="text-muted-foreground">
                   We may update this Privacy Policy from time to time to reflect changes in our practices or for other operational, legal, or regulatory reasons. We will notify you of any material changes by posting the new Privacy Policy on this page and updating the "Last Updated" date.
                 </p>
               </div>

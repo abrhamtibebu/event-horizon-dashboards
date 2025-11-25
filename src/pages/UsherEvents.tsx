@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import Breadcrumbs from '@/components/Breadcrumbs'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -9,17 +10,13 @@ import { useAuth } from '@/hooks/use-auth'
 import api from '@/lib/api'
 import { getGuestTypeBadgeClasses, getCheckInBadgeClasses } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Printer, QrCode, Search } from 'lucide-react'
+import { Printer, Search, QrCode } from 'lucide-react'
+import { Spinner, SpinnerInline } from '@/components/ui/spinner'
 import BadgePrint from '@/components/Badge'
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Label } from '@/components/ui/label'
 import { useSearchParams } from 'react-router-dom'
-import { QrReader } from '@blackbox-vision/react-qr-reader';
-// Suppress defaultProps warning for QrReader (temporary workaround)
-if (QrReader && QrReader.defaultProps) {
-  QrReader.defaultProps = undefined;
-}
 
 export default function UsherEvents() {
   const { toast } = useToast()
@@ -46,9 +43,6 @@ export default function UsherEvents() {
   const [searching, setSearching] = useState(false)
   const searchTimeout = useRef<NodeJS.Timeout | null>(null)
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
-  const [qrDialogOpen, setQrDialogOpen] = useState(false);
-  const [qrScanStatus, setQrScanStatus] = useState<string | null>(null);
-  const [qrLoading, setQrLoading] = useState(false);
 
   // Add form state
   const [addForm, setAddForm] = useState({
@@ -493,57 +487,48 @@ export default function UsherEvents() {
     }, 150); // Reduced timeout from 300ms to 150ms for faster response
   }
 
-  // Handler for QR scan
-  const handleQrScan = async (data: string | null) => {
-    if (!data || !selectedEventId) return;
-    setQrLoading(true);
-    setQrScanStatus(null);
-    try {
-      // Assume QR contains attendee id or email
-      // Try to find attendee by id or email
-      let attendee = attendees.find((a) => a.id?.toString() === data || a.guest?.email === data);
-      if (!attendee) {
-        // Try to fetch all attendees in case not loaded
-        const res = await api.get(`/events/${selectedEventId}/attendees`);
-        const attendeesData = res.data?.data ? res.data.data : res.data
-        const allAttendees = Array.isArray(attendeesData) ? attendeesData : []
-        attendee = allAttendees.find((a: any) => a.id?.toString() === data || a.guest?.email === data);
-      }
-      if (!attendee) {
-        setQrScanStatus('No matching attendee found for this QR code.');
-        setQrLoading(false);
-        return;
-      }
-      // Mark as checked in
-      await api.post(`/events/${selectedEventId}/attendees/${attendee.id}/check-in`, { checked_in: true });
-      setQrScanStatus(`Checked in: ${attendee.guest?.name || attendee.id}`);
-      setAttendees((prev) => prev.map((a) => a.id === attendee.id ? { ...a, checked_in: true } : a));
-      toast({ title: 'Success', description: `Checked in: ${attendee.guest?.name || attendee.id}` });
-    } catch (err: any) {
-      setQrScanStatus('Failed to check in attendee. Please try again.');
-      toast({ title: 'Error', description: 'Failed to check in attendee.', variant: 'destructive' });
-    } finally {
-      setQrLoading(false);
-    }
-  };
-  const handleQrError = (err: any) => {
-    setQrScanStatus('QR scanner error. Please try again.');
-  };
 
   // Use filteredAttendees for rendering results
   const filteredAttendees = searchPerformed ? attendees : [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex flex-col items-center py-12 px-3 md:px-6">
-      <div className="w-full max-w-7xl mx-auto">
-        <div className="bg-white/90 rounded-2xl shadow-xl p-8 flex flex-col items-center gap-6 border border-blue-100">
-          <h1 className="text-3xl font-extrabold text-blue-900 tracking-tight mb-2">Guest Management</h1>
-          <p className="text-gray-500 text-center mb-4">Search for guests by name, email, phone, or company. Add and edit attendees for your assigned event.</p>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        {/* Breadcrumbs */}
+        <div className="mb-6">
+          <Breadcrumbs 
+            items={[
+              { label: 'Usher Events', href: '/dashboard/usher-events' }
+            ]}
+          />
+        </div>
+        
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+              <Search className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">
+                Guest Management
+              </h1>
+              <p className="text-muted-foreground">
+                Search for guests by name, email, phone, or company. Add and edit attendees for your assigned event.
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        {/* Main Content Card */}
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6 mb-6">
 
           {/* Event Selection Dropdown */}
           {events.length > 1 && (
-            <div className="w-full flex flex-col items-center mb-4">
-              <Label htmlFor="event-select" className="mb-1 text-base font-medium text-blue-900">Select Event</Label>
+            <div className="mb-6">
+              <Label htmlFor="event-select" className="text-sm font-medium text-foreground mb-2 block">
+                Select Event
+              </Label>
               <Select
                 value={selectedEventId}
                 onValueChange={value => {
@@ -555,7 +540,7 @@ export default function UsherEvents() {
                 }}
                 disabled={eventSelectionLocked}
               >
-                <SelectTrigger id="event-select" className="w-full max-w-md text-base border-blue-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100" disabled={eventSelectionLocked}>
+                <SelectTrigger id="event-select" className="w-full max-w-md" disabled={eventSelectionLocked}>
                   <SelectValue placeholder="Choose an event" />
                 </SelectTrigger>
                 <SelectContent>
@@ -569,189 +554,182 @@ export default function UsherEvents() {
             </div>
           )}
 
-          {/* QR Check-In Button */}
-          <div className="w-full flex justify-end mb-4">
-            <Button
-              variant="outline"
-              onClick={() => setQrDialogOpen(true)}
-              className="focus:outline-none focus:ring-2 focus:ring-blue-400 active:scale-95"
-              autoFocus
-            >
-              Scan QR Code for Check-In
-            </Button>
-          </div>
 
-          {/* QR Scanner Dialog */}
-          <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>QR Code Check-In</DialogTitle>
-                <DialogDescription>
-                  Scan a guest's QR code to check them in.<br />
-                  <span className="text-xs text-gray-500">If prompted, allow camera access. For best results, use your phone's rear camera.</span>
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex flex-col items-center gap-4 py-4">
-                <QrReader
-                  constraints={{ facingMode: { ideal: 'environment' } }}
-                  onResult={(result, error) => {
-                    if (!!result) handleQrScan(result.getText());
-                    if (!!error) handleQrError(error);
-                  }}
-                  containerStyle={{ width: '100%' }}
-                  videoStyle={{ width: '100%' }}
-                  scanDelay={200}
-                  videoId="usher-qr-video"
-                />
-                {qrLoading && <div className="text-blue-500">Checking in...</div>}
-                {qrScanStatus && <div className="text-center text-sm text-blue-700">{qrScanStatus}</div>}
-                <Button variant="outline" onClick={() => setQrDialogOpen(false)}>Close</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <form onSubmit={handleSearch} className="w-full flex flex-col sm:flex-row gap-3 items-center justify-center">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 w-5 h-5" />
-          <Input
-                placeholder="Search guests..."
-            value={searchTerm}
+          {/* Search and Actions */}
+          <form onSubmit={handleSearch} className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
+              <Input
+                placeholder="Search guests by name, email, phone, company, or UUID..."
+                value={searchTerm}
                 onChange={e => {
                   setSearchTerm(e.target.value)
                   setSearchPerformed(false)
                 }}
-                className="pl-10 py-3 rounded-full border-blue-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 text-lg shadow-sm"
+                className="pl-10 h-11"
                 autoFocus
               />
               {/* Suggestions dropdown */}
               {searchTerm && suggestions.length > 0 && !searchPerformed && (
-                <div className="absolute left-0 right-0 mt-2 bg-white border border-blue-100 rounded-xl shadow-lg z-20 max-h-64 overflow-y-auto">
+                <div className="absolute left-0 right-0 mt-2 bg-popover border border-border rounded-lg shadow-lg z-20 max-h-64 overflow-y-auto">
                   {suggestions.slice(0, 8).map(s => (
                     <div
                       key={s.id}
-                      className="px-4 py-2 hover:bg-blue-50 cursor-pointer flex flex-col"
+                      className="px-4 py-3 hover:bg-accent cursor-pointer flex flex-col border-b border-border last:border-0 transition-colors"
                       onClick={() => {
                         setAttendees([s])
                         setSearchPerformed(true)
                         setSearchTerm(s.guest?.name || s.guest?.email || s.guest?.uuid || '')
                       }}
                     >
-                      <span className="font-semibold text-blue-900">{s.guest?.name}</span>
-                      <span className="text-xs text-gray-500">{s.guest?.email} {s.guest?.uuid ? `• ${s.guest?.uuid}` : ''}</span>
+                      <span className="font-semibold text-foreground">{s.guest?.name}</span>
+                      <span className="text-xs text-muted-foreground mt-0.5">
+                        {s.guest?.email} {s.guest?.uuid ? `• ${s.guest?.uuid}` : ''}
+                      </span>
                     </div>
                   ))}
                 </div>
               )}
               {searchTerm && searching && !searchPerformed && (
-                <div className="absolute left-0 right-0 mt-2 bg-white border border-blue-100 rounded-xl shadow-lg z-20 flex items-center justify-center py-4">
-                  <svg className="animate-spin h-6 w-6 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <div className="absolute left-0 right-0 mt-2 bg-popover border border-border rounded-lg shadow-lg z-20 flex items-center justify-center py-4">
+                  <SpinnerInline />
                 </div>
               )}
             </div>
-            <Button type="submit" className="rounded-full px-6 py-3 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow">
-              Search
-            </Button>
-            {searchPerformed && (
-              <Button 
-                onClick={() => {
-                  setSearchPerformed(false)
-                  setSearchTerm('')
-                  setSuggestions([])
-                  setAttendees([]) // Clear the displayed results
-                }} 
-                type="button" 
-                variant="outline" 
-                className="rounded-full px-6 py-3 text-lg border-red-200 hover:bg-red-50 shadow"
-              >
-                Clear
+            
+            <div className="flex flex-wrap gap-3">
+              <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Search className="w-4 h-4 mr-2" />
+                Search
               </Button>
-            )}
-            <Button onClick={() => setAddDialogOpen(true)} type="button" variant="outline" className="rounded-full px-6 py-3 text-lg border-blue-200 shadow">
-              Add Attendee
-            </Button>
+              {searchPerformed && (
+                <Button 
+                  onClick={() => {
+                    setSearchPerformed(false)
+                    setSearchTerm('')
+                    setSuggestions([])
+                    setAttendees([])
+                  }} 
+                  type="button" 
+                  variant="outline"
+                >
+                  Clear
+                </Button>
+              )}
+              <Button 
+                onClick={() => setAddDialogOpen(true)} 
+                type="button" 
+                variant="outline"
+                className="ml-auto"
+              >
+                <QrCode className="w-4 h-4 mr-2" />
+                Add Attendee
+              </Button>
+            </div>
           </form>
-                    </div>
+        </div>
         {/* Results Section */}
-        <div className="mt-10">
+        <div>
           {!searchPerformed && (
-            <div className="flex flex-col items-center justify-center py-24">
-              <Search className="w-16 h-16 text-blue-200 mb-4" />
-              <h2 className="text-xl font-semibold text-gray-400 mb-2">Start by searching for a guest</h2>
-              <p className="text-gray-400">Enter a name, email, or other info to find a guest for your event.</p>
-                    </div>
+            <div className="bg-card rounded-xl border border-border p-12">
+              <div className="flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <Search className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">Start by searching for a guest</h2>
+                <p className="text-muted-foreground max-w-md">
+                  Enter a name, email, phone number, company, or UUID to find a guest for your event.
+                </p>
+              </div>
+            </div>
           )}
           {searchPerformed && loading && (
-            <div className="flex flex-col items-center justify-center py-24">
-              <svg className="animate-spin h-10 w-10 text-blue-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              <span className="text-blue-400 text-lg">Searching guests...</span>
-                    </div>
+            <div className="bg-card rounded-xl border border-border p-12">
+              <div className="flex flex-col items-center justify-center">
+                <Spinner size="lg" variant="info" text="Searching guests..." />
+              </div>
+            </div>
           )}
           {searchPerformed && !loading && error && (
-            <div className="flex flex-col items-center justify-center py-24">
-              <span className="text-red-500 text-lg">{error}</span>
-                  </div>
-          )}
-          {searchPerformed && !loading && !error && filteredAttendees.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-24">
-              <svg className="w-16 h-16 text-blue-100 mb-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-3A2.25 2.25 0 008.25 5.25V9m10.5 0v10.5A2.25 2.25 0 0116.5 21h-9a2.25 2.25 0 01-2.25-2.25V9m13.5 0H4.5m16.5 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0v10.5A2.25 2.25 0 0118.75 21H5.25A2.25 2.25 0 013 19.5V9" /></svg>
-              <h2 className="text-xl font-semibold text-gray-400 mb-2">No guests found</h2>
-              <p className="text-gray-400">Try a different search term.</p>
-                    </div>
-                  )}
-          {searchPerformed && !loading && !error && filteredAttendees.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-lg p-6 mt-4 border border-blue-100">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Job Title</TableHead>
-                    <TableHead>Gender</TableHead>
-                    <TableHead>Country</TableHead>
-                    <TableHead>Guest Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAttendees.map(attendee => (
-                    <TableRow key={attendee.id}>
-                      <TableCell>{attendee.guest?.name}</TableCell>
-                      <TableCell>{attendee.guest?.email}</TableCell>
-                      <TableCell>{attendee.guest?.phone}</TableCell>
-                      <TableCell>{attendee.guest?.company}</TableCell>
-                      <TableCell>{attendee.guest?.jobtitle}</TableCell>
-                      <TableCell>{attendee.guest?.gender}</TableCell>
-                      <TableCell>{attendee.guest?.country}</TableCell>
-                                                  <TableCell>
-                              <Badge className={getGuestTypeBadgeClasses(attendee.guest_type?.name)}>
-                                {attendee.guest_type?.name || '-'}
-                              </Badge>
-                            </TableCell>
-                      <TableCell>
-                        <Badge className={getCheckInBadgeClasses(attendee.checked_in)}>
-                          {attendee.checked_in ? 'Checked In' : 'Not Checked In'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button size="sm" variant="outline" onClick={() => openEditDialog(attendee)}>
-                          Edit
-                       </Button>
-                        <Button size="sm" variant="outline" onClick={() => handlePrintBadge(attendee)} className="ml-2 flex items-center gap-1" title="Print Badge">
-                      <Printer className="w-4 h-4" />
-                    </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="bg-card rounded-xl border border-border p-12">
+              <div className="flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+                  <Search className="w-8 h-8 text-destructive" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">Error loading guests</h2>
+                <p className="text-destructive">{error}</p>
+              </div>
             </div>
           )}
           {searchPerformed && !loading && !error && filteredAttendees.length === 0 && (
-            <div className="bg-white rounded-2xl shadow p-4 mt-4 text-gray-600 text-sm border">
-              No matching guests found for "{searchTerm}".
+            <div className="bg-card rounded-xl border border-border p-12">
+              <div className="flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <Search className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">No guests found</h2>
+                <p className="text-muted-foreground">Try a different search term or add a new attendee.</p>
+              </div>
+            </div>
+          )}
+          {searchPerformed && !loading && !error && filteredAttendees.length > 0 && (
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Company</TableHead>
+                      <TableHead>Job Title</TableHead>
+                      <TableHead>Guest Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAttendees.map(attendee => (
+                      <TableRow key={attendee.id} className="hover:bg-muted/50">
+                        <TableCell className="font-medium">{attendee.guest?.name || '-'}</TableCell>
+                        <TableCell className="text-muted-foreground">{attendee.guest?.email || '-'}</TableCell>
+                        <TableCell className="text-muted-foreground">{attendee.guest?.phone || '-'}</TableCell>
+                        <TableCell className="text-muted-foreground">{attendee.guest?.company || '-'}</TableCell>
+                        <TableCell className="text-muted-foreground">{attendee.guest?.jobtitle || '-'}</TableCell>
+                        <TableCell>
+                          <Badge className={getGuestTypeBadgeClasses(attendee.guest_type?.name)} variant="outline">
+                            {attendee.guest_type?.name || '-'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getCheckInBadgeClasses(attendee.checked_in)} variant="outline">
+                            {attendee.checked_in ? 'Checked In' : 'Not Checked In'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => openEditDialog(attendee)}
+                            >
+                              Edit
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => handlePrintBadge(attendee)} 
+                              title="Print Badge"
+                            >
+                              <Printer className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
         </div>
@@ -822,11 +800,11 @@ export default function UsherEvents() {
           setAddForm({ first_name: '', last_name: '', email: '', phone: '', company: '', jobtitle: '', gender: '', country: '', guest_type_id: '' })
         }
       }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Attendee</DialogTitle>
+            <DialogTitle className="text-2xl font-semibold">Add New Attendee</DialogTitle>
             <DialogDescription>
-              Enter the details of the new attendee for this event.
+              Enter the details of the new attendee for this event. You can optionally assign a pre-generated badge.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddAttendee} className="space-y-4 py-4">
@@ -844,34 +822,40 @@ export default function UsherEvents() {
                   placeholder="Scan or enter badge code to assign pre-generated badge"
                   className="font-mono"
                 />
-                {loadingBadgeInfo && (
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                    <svg className="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  </div>
-                )}
+              {loadingBadgeInfo && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <SpinnerInline />
+                </div>
+              )}
               </div>
               {loadingBadgeInfo && (
-                <p className="text-xs text-blue-500 mt-1">Looking up badge...</p>
+                <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                  <SpinnerInline className="w-3 h-3" />
+                  Looking up badge...
+                </p>
               )}
               {!loadingBadgeInfo && badgeInfo && (
-                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
-                  <p className="text-green-700 font-semibold">✓ Badge found: {badgeInfo.badge_code}</p>
+                <div className="mt-2 p-3 bg-success/10 border border-success/20 rounded-lg">
+                  <p className="text-sm font-semibold text-success flex items-center gap-2">
+                    <span>✓</span> Badge found: {badgeInfo.badge_code}
+                  </p>
                   {badgeInfo.guest_type && (
-                    <p className="text-green-600">Guest Type auto-selected: {badgeInfo.guest_type.name}</p>
+                    <p className="text-xs text-success/80 mt-1">
+                      Guest Type auto-selected: {badgeInfo.guest_type.name}
+                    </p>
                   )}
                   {badgeInfo.status !== 'available' && (
-                    <p className="text-orange-600">Status: {badgeInfo.status}</p>
+                    <p className="text-xs text-warning mt-1">Status: {badgeInfo.status}</p>
                   )}
                 </div>
               )}
               {!loadingBadgeInfo && badgeCode.trim() && !badgeInfo && (
-                <p className="text-xs text-orange-500 mt-1">Badge code not found. You can still proceed without a pre-generated badge.</p>
+                <p className="text-xs text-warning mt-2">
+                  Badge code not found. You can still proceed without a pre-generated badge.
+                </p>
               )}
               {!badgeCode.trim() && (
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-2">
                   Leave blank to register without a pre-generated badge
                 </p>
               )}
@@ -991,8 +975,8 @@ export default function UsherEvents() {
                           type.id !== null &&
                           type.id !== ''
                       )
-                      .map((type) => (
-                        <SelectItem key={type.id} value={String(type.id)}>
+                      .map((type, index) => (
+                        <SelectItem key={`guest-type-${type.id}-${index}`} value={String(type.id)}>
                           {type.name}
                         </SelectItem>
                       ))}
@@ -1000,15 +984,19 @@ export default function UsherEvents() {
                 </Select>
               </div>
             </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)} disabled={addAttendeeLoading}>Cancel</Button>
-              <Button type="submit" disabled={addAttendeeLoading}>
+            <div className="flex justify-end gap-3 pt-4 border-t border-border">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setAddDialogOpen(false)} 
+                disabled={addAttendeeLoading}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addAttendeeLoading} className="bg-primary hover:bg-primary/90">
                 {addAttendeeLoading ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+                    <SpinnerInline className="mr-2" />
                     Adding...
                   </>
                 ) : (
@@ -1021,16 +1009,14 @@ export default function UsherEvents() {
       </Dialog>
       {/* Edit Attendee Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-[560px] p-0 overflow-hidden">
-          <div className="px-6 pt-6 pb-2 border-b">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-              <DialogTitle className="text-xl font-semibold">Edit Guest</DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground">
-                Update guest information and type. All fields are optional unless marked.
-              </DialogDescription>
+            <DialogTitle className="text-2xl font-semibold">Edit Guest</DialogTitle>
+            <DialogDescription>
+              Update guest information and type. All fields are optional unless marked.
+            </DialogDescription>
           </DialogHeader>
-          </div>
-          <form onSubmit={handleEditAttendee} className="p-6 space-y-5">
+          <form onSubmit={handleEditAttendee} className="space-y-4 pt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Name</Label>
@@ -1067,16 +1053,31 @@ export default function UsherEvents() {
                     <SelectValue placeholder={editForm.guest_type_id ? undefined : 'Select Guest Type'} />
               </SelectTrigger>
               <SelectContent>
-                {guestTypes.map((gt) => (
-                  <SelectItem key={gt.id} value={gt.id.toString()}>{gt.name}</SelectItem>
-                ))}
+                {guestTypes
+                  .filter(
+                    (gt) =>
+                      gt.id !== undefined &&
+                      gt.id !== null &&
+                      gt.id !== ''
+                  )
+                  .map((gt, index) => (
+                    <SelectItem key={`edit-guest-type-${gt.id}-${index}`} value={gt.id.toString()}>{gt.name}</SelectItem>
+                  ))}
               </SelectContent>
             </Select>
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-              <Button type="submit">Save Changes</Button>
+            <div className="flex justify-end gap-3 pt-4 border-t border-border">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setEditDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90">
+                Save Changes
+              </Button>
             </div>
           </form>
         </DialogContent>

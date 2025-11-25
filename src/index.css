@@ -7,89 +7,123 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Brand semantic tokens (HSL only) */
+    --color-primary: 41 100% 61%; /* Honey Yellow #fbb339 */
+    --color-primary-hover: 42 62% 41%; /* Darkened Honey #d6982d */
+    --color-warning: 54 94% 51%; /* Safety Yellow #f3d70e */
+    --color-minion: 50 88% 66%; /* Minion Yellow #f5e35e */
+    --color-success: 134 28% 72%; /* Eton Blue #a4cea4 */
+    --color-info: 195 67% 29%; /* Blue Sapphire #19647e */
+    --color-error: 0 61% 56%; /* Red #d34b4b */
+    --color-rich-black: 200 100% 2%; /* Rich Black #040707 */
+    --color-eton-blue: var(--color-success);
+    --color-blue-sapphire: var(--color-info);
 
+    /* Base & text */
+    --background: 0 0% 100%; /* White */
+    --foreground: 200 100% 2%; /* Rich Black #040707 */
+
+    /* Surfaces / borders */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: var(--foreground);
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: var(--foreground);
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Map shadcn tokens to brand */
+    --primary: var(--color-primary);
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 54 94% 96%;
+    --secondary-foreground: var(--foreground);
 
-    --muted: 210 40% 96.1%;
+    --muted: 54 94% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 54 94% 96%;
+    --accent-foreground: var(--foreground);
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: var(--color-error);
+    --destructive-foreground: 0 0% 100%;
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: var(--color-warning); /* focus ring uses Safety Yellow */
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
-
+    /* Sidebar (light) */
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
+    --sidebar-primary: var(--color-primary);
+    --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
+    --sidebar-ring: var(--ring);
 
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Chart colors for light theme */
+    --chart-1: 195 67% 29%; /* Blue Sapphire */
+    --chart-2: 134 28% 72%; /* Eton Blue */
+    --chart-3: 41 100% 61%; /* Honey Yellow */
+    --chart-4: 54 94% 51%; /* Safety Yellow */
+    --chart-5: 0 61% 56%; /* Red */
+    --chart-line: 194 67% 29%; /* Line chart color #18637b */
+    --chart-grid: 214.3 31.8% 91.4%; /* Border color for grids */
+    --chart-axis: 215.4 16.3% 46.9%; /* Muted foreground for axes */
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Base Colors - Deep Navy base for modern dark mode */
+    --background: 222 44% 10%; /* ~ #0f1729 */
+    --foreground: 210 40% 98%; /* off-white */
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    /* Surfaces */
+    --card: 221 26% 19%; /* ~ #242c3f */
+    --card-foreground: var(--foreground);
+    --popover: 221 26% 19%;
+    --popover-foreground: var(--foreground);
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    /* Brand */
+    --primary: var(--color-primary);
+    --primary-foreground: 222 44% 10%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary / muted */
+    --secondary: 221 26% 15%;
+    --secondary-foreground: var(--foreground);
+    --muted: 221 26% 15%;
+    --muted-foreground: 215 16% 70%;
+    --accent: 221 26% 22%;
+    --accent-foreground: var(--foreground);
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    /* Semantics */
+    --destructive: var(--color-error);
+    --destructive-foreground: 0 0% 100%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    /* Borders / inputs / ring */
+    --border: 221 26% 18%;
+    --input: 221 26% 18%;
+    --ring: var(--color-warning);
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    /* Sidebar - slightly darker than base */
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: var(--color-primary);
+    --sidebar-primary-foreground: 222 44% 10%;
+    --sidebar-accent: 221 39% 18%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 221 26% 18%;
+    --sidebar-ring: var(--ring);
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Chart colors for dark theme - brighter for visibility */
+    --chart-1: 195 67% 45%; /* Brighter Blue Sapphire */
+    --chart-2: 134 28% 65%; /* Brighter Eton Blue */
+    --chart-3: 41 100% 65%; /* Brighter Honey Yellow */
+    --chart-4: 54 94% 60%; /* Brighter Safety Yellow */
+    --chart-5: 0 61% 65%; /* Brighter Red */
+    --chart-line: 132 29% 65%; /* Line chart color #8dbf98 for dark mode */
+    --chart-grid: 221 26% 18%; /* Border color for grids */
+    --chart-axis: 215 16% 70%; /* Muted foreground for axes */
   }
 }
 
@@ -100,11 +134,42 @@
 
   body {
     @apply bg-background text-foreground;
+    /* Smooth theme transitions */
+    transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+                color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Smooth transitions for theme-dependent elements */
+  html {
+    transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Theme-aware transitions for key elements */
+  div,
+  section,
+  article,
+  aside,
+  header,
+  footer,
+  nav,
+  main {
+    transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                border-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Disable transitions during theme change animation to avoid conflicts */
+  body.theme-transitioning * {
+    transition: none !important;
   }
 }
 
 /* Custom animations for the sign-in page */
 @layer utilities {
+  /* Brand gradient utilities */
+  .bg-brand-gradient { @apply bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--color-warning))]; }
+  .bg-brand-gradient-hover { @apply hover:from-[hsl(var(--color-primary-hover))] hover:to-[hsl(var(--color-warning))]; }
+
   .animate-fade-in {
     animation: fadeIn 0.6s ease-out forwards;
   }
@@ -255,5 +320,302 @@
 
   .dark .message-thread-scrollbar::-webkit-scrollbar-thumb:active {
     background-color: rgba(75, 85, 99, 0.6);
+  }
+
+  /* React Date Range Dark Mode Support */
+  .dark .rdrDateRangePickerWrapper,
+  .dark .rdrCalendarWrapper {
+    background-color: hsl(var(--card)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .dark .rdrMonth {
+    background-color: hsl(var(--card)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .dark .rdrMonthName {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .dark .rdrWeekDay {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  .dark .rdrDay {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .dark .rdrDayNumber {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .dark .rdrDayPassive .rdrDayNumber {
+    color: hsl(var(--muted-foreground)) !important;
+    opacity: 0.5;
+  }
+
+  .dark .rdrDayToday .rdrDayNumber span:after {
+    background-color: hsl(var(--primary)) !important;
+  }
+
+  .dark .rdrDayActive .rdrDayNumber span,
+  .dark .rdrDayInRange .rdrDayNumber span,
+  .dark .rdrDayStartEdge .rdrDayNumber span,
+  .dark .rdrDayEndEdge .rdrDayNumber span {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+  }
+
+  .dark .rdrDayInRange {
+    background-color: hsl(var(--primary) / 0.1) !important;
+  }
+
+  .dark .rdrDayHovered .rdrDayNumber span {
+    background-color: hsl(var(--accent)) !important;
+    color: hsl(var(--accent-foreground)) !important;
+  }
+
+  .dark .rdrNextPrevButton {
+    background-color: hsl(var(--muted)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+
+  .dark .rdrNextPrevButton:hover {
+    background-color: hsl(var(--accent)) !important;
+  }
+
+  .dark .rdrMonthAndYearWrapper {
+    background-color: hsl(var(--card)) !important;
+    border-bottom-color: hsl(var(--border)) !important;
+  }
+
+  .dark .rdrMonthAndYearPickers select {
+    background-color: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+
+  .dark .rdrMonthAndYearPickers select:hover {
+    background-color: hsl(var(--accent)) !important;
+  }
+
+  /* Date Range Input Fields */
+  .dark .rdrInputRange,
+  .dark .rdrInputRangeInput {
+    background-color: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+
+  .dark .rdrInputRangeInput:focus {
+    background-color: hsl(var(--accent)) !important;
+    border-color: hsl(var(--primary)) !important;
+    outline: none !important;
+  }
+
+  .dark .rdrInputRangeInput:hover {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  /* Date Range Input Wrapper */
+  .dark .rdrInputRanges {
+    background-color: hsl(var(--card)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+
+  /* Date Range Input Label */
+  .dark .rdrInputRangeLabel {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Calendar Input Fields */
+  .dark .rdrDateInput {
+    background-color: hsl(var(--background)) !important;
+  }
+
+  .dark .rdrDateInput input {
+    background-color: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+
+  .dark .rdrDateInput input:focus {
+    background-color: hsl(var(--accent)) !important;
+    border-color: hsl(var(--primary)) !important;
+    outline: none !important;
+  }
+
+  .dark .rdrDateInput input:hover {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  /* Modern Sidebar Enhancements */
+  [data-sidebar="sidebar"] {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .dark [data-sidebar="sidebar"] {
+    box-shadow: inset -1px 0 0 0 hsl(var(--sidebar-border));
+  }
+
+  /* Sidebar Scrollbar Styling */
+  [data-sidebar="content"] {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  [data-sidebar="content"]::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  [data-sidebar="content"]::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  [data-sidebar="content"]::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--sidebar-foreground) / 0.1);
+    border-radius: 3px;
+    transition: all 0.2s ease;
+  }
+
+  [data-sidebar="content"]::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--sidebar-foreground) / 0.2);
+  }
+
+  .dark [data-sidebar="content"]::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--sidebar-foreground) / 0.15);
+  }
+
+  .dark [data-sidebar="content"]::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--sidebar-foreground) / 0.25);
+  }
+
+  /* Sidebar menu item hover effect */
+  [data-sidebar="menu-button"]:hover {
+    transform: translateX(2px);
+  }
+
+  [data-sidebar="menu-button"][data-active="true"] {
+    transform: translateX(0);
+  }
+
+  /* Smooth sidebar transitions */
+  [data-sidebar="sidebar"] {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Sidebar badge animation */
+  [data-sidebar="menu-badge"] {
+    animation: badgePulse 2s ease-in-out infinite;
+  }
+
+  @keyframes badgePulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+
+  /* React Day Picker (Calendar) Dark Mode Support */
+  .dark .rdp {
+    --rdp-cell-size: 40px;
+    --rdp-accent-color: hsl(var(--primary));
+    --rdp-background-color: hsl(var(--card));
+    --rdp-accent-color-dark: hsl(var(--primary));
+    --rdp-background-color-dark: hsl(var(--card));
+    --rdp-outline: 2px solid hsl(var(--primary));
+    --rdp-outline-selected: 3px solid hsl(var(--primary));
+    color: hsl(var(--foreground));
+  }
+
+  .dark .rdp-months {
+    background-color: hsl(var(--card));
+  }
+
+  .dark .rdp-month {
+    background-color: hsl(var(--card));
+    color: hsl(var(--foreground));
+  }
+
+  .dark .rdp-caption {
+    color: hsl(var(--foreground));
+  }
+
+  .dark .rdp-caption_label {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+  }
+
+  .dark .rdp-nav_button {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border));
+  }
+
+  .dark .rdp-nav_button:hover {
+    background-color: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+
+  .dark .rdp-head_cell {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .dark .rdp-day {
+    color: hsl(var(--foreground));
+  }
+
+  .dark .rdp-day:hover:not([disabled]):not(.rdp-day_selected) {
+    background-color: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+
+  .dark .rdp-day_selected,
+  .dark .rdp-day_selected:focus-visible,
+  .dark .rdp-day_selected:hover {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+
+  .dark .rdp-day_today:not(.rdp-day_outside) {
+    background-color: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+    font-weight: 600;
+  }
+
+  .dark .rdp-day_outside {
+    color: hsl(var(--muted-foreground));
+    opacity: 0.5;
+  }
+
+  .dark .rdp-day_disabled {
+    color: hsl(var(--muted-foreground));
+    opacity: 0.3;
+  }
+
+  .dark .rdp-day_range_middle {
+    background-color: hsl(var(--primary) / 0.2);
+    color: hsl(var(--foreground));
+  }
+
+  .dark .rdp-day_range_start,
+  .dark .rdp-day_range_end {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+
+  /* Hide scrollbar utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari and Opera */
   }
 }

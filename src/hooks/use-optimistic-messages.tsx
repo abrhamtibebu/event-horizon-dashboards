@@ -37,6 +37,7 @@ export const useOptimisticMessages = ({
     parentMessageId?: number
   ): OptimisticMessage => {
     const tempId = generateTempId()
+    const objectUrl = file ? URL.createObjectURL(file) : undefined
     const optimisticMessage: OptimisticMessage = {
       id: tempId,
       tempId,
@@ -68,7 +69,8 @@ export const useOptimisticMessages = ({
       isOptimistic: true,
       status: 'sending',
       // File handling
-      file_path: file ? URL.createObjectURL(file) : undefined,
+      file_path: objectUrl,
+      file_url: objectUrl,
       file_name: file?.name,
       file_type: file?.type,
       file_size: file?.size,

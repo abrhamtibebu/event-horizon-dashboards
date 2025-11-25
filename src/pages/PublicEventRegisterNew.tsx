@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle } from 'lucide-react';
+import { SpinnerInline } from '@/components/ui/spinner';
 
 export default function PublicEventRegisterNew() {
   const { eventUuid } = useParams();
@@ -286,10 +287,10 @@ export default function PublicEventRegisterNew() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading event details...</p>
+          <SpinnerInline className="mx-auto" />
+          <p className="mt-4 text-muted-foreground">Loading event details...</p>
         </div>
       </div>
     );
@@ -297,11 +298,11 @@ export default function PublicEventRegisterNew() {
 
   if (error || !event) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Event Not Found</h1>
-          <p className="text-gray-600">{error || 'This event is not available for registration.'}</p>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Event Not Found</h1>
+          <p className="text-muted-foreground">{error || 'This event is not available for registration.'}</p>
         </div>
       </div>
     );
@@ -329,7 +330,7 @@ export default function PublicEventRegisterNew() {
             </p>
           </div>
           
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground/70">
             You will receive a confirmation email shortly with all the event details.
           </div>
         </div>
@@ -374,37 +375,37 @@ export default function PublicEventRegisterNew() {
   const daysRemaining = getDaysRemaining();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 py-2 px-4">
+      <div className="bg-card border-b border-border py-2 px-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-yellow-500 rounded flex items-center justify-center">
               <span className="text-white font-bold text-sm">E</span>
             </div>
-            <span className="font-semibold text-gray-900">Evella</span>
+            <span className="font-semibold text-foreground">Evella</span>
           </div>
-          <span className="text-gray-500 text-sm">{organizerName}</span>
+          <span className="text-muted-foreground text-sm">{organizerName}</span>
         </div>
       </div>
 
       {/* Hero Section */}
-      <div className="bg-white py-8 px-4">
+      <div className="bg-card py-8 px-4">
         <div className="max-w-7xl mx-auto text-center">
           {/* Event Tag */}
-          <div className="inline-flex items-center gap-2 bg-yellow-100 text-gray-800 px-3 py-1 rounded-full text-sm font-medium mb-4">
+          <div className="inline-flex items-center gap-2 bg-yellow-500/10 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-3 py-1 rounded-full text-sm font-medium mb-4">
             <Lamp className="w-4 h-4" />
             <span>{event.category?.name || 'Tech Conference'} • Premium Event</span>
           </div>
           
           {/* Main Title */}
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4">
             <span className="block">Welcome to</span>
             <span className="block text-yellow-600">{event.name}</span>
           </h1>
           
           {/* Subtitle */}
-          <p className="text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
             {event.description || 'An exclusive industry gathering designed for visionary professionals. Limited seats available for this premium experience.'}
           </p>
         </div>
@@ -415,51 +416,51 @@ export default function PublicEventRegisterNew() {
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Event Date Card */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-6 text-center">
               <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-3">
                 <Calendar className="w-6 h-6 text-yellow-600" />
               </div>
-              <h3 className="text-gray-500 text-sm font-medium mb-1">Event Date</h3>
-              <p className="text-gray-900 font-bold text-lg">
+              <h3 className="text-muted-foreground text-sm font-medium mb-1">Event Date</h3>
+              <p className="text-card-foreground font-bold text-lg">
                 {startDate ? startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'TBD'}
                 {endDate && startDate && endDate.getTime() !== startDate.getTime() && 
                   ` - ${endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`
                 }
               </p>
-              <p className="text-gray-500 text-sm">
+              <p className="text-muted-foreground/70 text-sm">
                 {startDate ? startDate.getFullYear() : ''}
               </p>
             </div>
 
             {/* Location Card */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-6 text-center">
               <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-3">
                 <MapPin className="w-6 h-6 text-yellow-600" />
               </div>
-              <h3 className="text-gray-500 text-sm font-medium mb-1">Location</h3>
-              <p className="text-gray-900 font-bold text-lg">
+              <h3 className="text-muted-foreground text-sm font-medium mb-1">Location</h3>
+              <p className="text-card-foreground font-bold text-lg">
                 {event.venue_name || event.location || 'TBD'}
               </p>
             </div>
 
             {/* Attendees Card */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-6 text-center">
               <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-3">
                 <Users className="w-6 h-6 text-yellow-600" />
               </div>
-              <h3 className="text-gray-500 text-sm font-medium mb-1">Attendees</h3>
-              <p className="text-gray-900 font-bold text-lg">{getAttendeeInfo()}</p>
-              <p className="text-gray-500 text-sm">Still accepting</p>
+              <h3 className="text-muted-foreground text-sm font-medium mb-1">Attendees</h3>
+              <p className="text-card-foreground font-bold text-lg">{getAttendeeInfo()}</p>
+              <p className="text-muted-foreground/70 text-sm">Still accepting</p>
             </div>
 
             {/* Duration Card */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
+            <div className="bg-card rounded-xl shadow-sm border border-border p-6 text-center">
               <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-3">
                 <Clock className="w-6 h-6 text-yellow-600" />
               </div>
-              <h3 className="text-gray-500 text-sm font-medium mb-1">Duration</h3>
-              <p className="text-gray-900 font-bold text-lg">{getEventDuration()}</p>
-              <p className="text-gray-500 text-sm">Full Event</p>
+              <h3 className="text-muted-foreground text-sm font-medium mb-1">Duration</h3>
+              <p className="text-card-foreground font-bold text-lg">{getEventDuration()}</p>
+              <p className="text-muted-foreground/70 text-sm">Full Event</p>
             </div>
           </div>
         </div>
@@ -477,7 +478,7 @@ export default function PublicEventRegisterNew() {
                 <h3 className="font-semibold text-gray-900">Event Organizer</h3>
               </div>
               <p className="font-semibold text-gray-900">{organizerName}</p>
-              <p className="text-gray-500 text-sm">Professional Event Management</p>
+              <p className="text-muted-foreground/70 text-sm">Professional Event Management</p>
             </div>
 
             {/* What's Included Card */}
@@ -498,11 +499,11 @@ export default function PublicEventRegisterNew() {
 
             {/* Event Countdown Card */}
             {daysRemaining !== null && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
+              <div className="bg-card rounded-xl shadow-sm border border-border p-6 text-center">
                 <Clock className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
                 <p className="text-gray-500 text-sm mb-1">Event starts in</p>
                 <p className="text-3xl font-bold text-yellow-600 mb-1">{daysRemaining}</p>
-                <p className="text-gray-500 text-sm">days remaining</p>
+                <p className="text-muted-foreground/70 text-sm">days remaining</p>
               </div>
             )}
           </div>
@@ -645,7 +646,7 @@ export default function PublicEventRegisterNew() {
                       Gender*
                     </Label>
                     <Select value={form.gender} onValueChange={(value) => handleFieldChange('gender', value)} disabled={submitting}>
-                      <SelectTrigger className={`mt-1 ${touchedFields.gender && fieldErrors.gender ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`}>
+                      <SelectTrigger className={`mt-1 ${touchedFields.gender && fieldErrors.gender ? 'border-error focus:border-error focus:ring-error/20' : ''}`}>
                         <SelectValue placeholder="Select gender" />
                       </SelectTrigger>
                       <SelectContent>
@@ -667,7 +668,7 @@ export default function PublicEventRegisterNew() {
                       Country*
                     </Label>
                     <Select value={form.country} onValueChange={(value) => handleFieldChange('country', value)} disabled={submitting}>
-                      <SelectTrigger className={`mt-1 ${touchedFields.country && fieldErrors.country ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`}>
+                      <SelectTrigger className={`mt-1 ${touchedFields.country && fieldErrors.country ? 'border-error focus:border-error focus:ring-error/20' : ''}`}>
                         <SelectValue placeholder="Select country" />
                       </SelectTrigger>
                       <SelectContent>

@@ -6,7 +6,6 @@ import {
   AlertTriangle, 
   Info, 
   X,
-  Loader2,
   Sparkles,
   Zap,
   Shield,
@@ -14,6 +13,7 @@ import {
   MessageCircle,
   User
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Avatar, AvatarFallback, AvatarImage } from './avatar';
 
 interface ToastProps {
@@ -39,44 +39,44 @@ const getToastIcon = (variant: string) => {
     case 'success':
       return (
         <div className="relative">
-          <CheckCircle className="h-5 w-5 text-green-600 animate-pulse" />
-          <Sparkles className="h-3 w-3 text-green-500 absolute -top-1 -right-1 animate-bounce" />
+          <CheckCircle className="h-5 w-5 text-success animate-pulse" />
+          <Sparkles className="h-3 w-3 text-success absolute -top-1 -right-1 animate-bounce" />
         </div>
       );
     case 'error':
       return (
         <div className="relative">
-          <XCircle className="h-5 w-5 text-red-600 animate-pulse" />
-          <Zap className="h-3 w-3 text-red-500 absolute -top-1 -right-1 animate-bounce" />
+          <XCircle className="h-5 w-5 text-error animate-pulse" />
+          <Zap className="h-3 w-3 text-error absolute -top-1 -right-1 animate-bounce" />
         </div>
       );
     case 'warning':
       return (
         <div className="relative">
-          <AlertTriangle className="h-5 w-5 text-yellow-600 animate-pulse" />
-          <Shield className="h-3 w-3 text-yellow-500 absolute -top-1 -right-1 animate-bounce" />
+          <AlertTriangle className="h-5 w-5 text-[hsl(var(--color-warning))] animate-pulse" />
+          <Shield className="h-3 w-3 text-[hsl(var(--color-warning))] absolute -top-1 -right-1 animate-bounce" />
         </div>
       );
-    case 'loading':
-      return (
-        <div className="relative">
-          <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
-          <Heart className="h-3 w-3 text-blue-500 absolute -top-1 -right-1 animate-pulse" />
-        </div>
-      );
+      case 'loading':
+        return (
+          <div className="relative">
+            <Spinner size="sm" variant="primary" />
+            <Heart className="h-3 w-3 text-info absolute -top-1 -right-1 animate-pulse" />
+          </div>
+        );
     case 'message':
       return (
         <div className="relative">
-          <MessageCircle className="h-5 w-5 text-blue-600 animate-pulse" />
-          <Sparkles className="h-3 w-3 text-blue-500 absolute -top-1 -right-1 animate-bounce" />
+          <MessageCircle className="h-5 w-5 text-info animate-pulse" />
+          <Sparkles className="h-3 w-3 text-info absolute -top-1 -right-1 animate-bounce" />
         </div>
       );
     case 'info':
     default:
       return (
         <div className="relative">
-          <Info className="h-5 w-5 text-blue-600 animate-pulse" />
-          <Sparkles className="h-3 w-3 text-blue-500 absolute -top-1 -right-1 animate-bounce" />
+          <Info className="h-5 w-5 text-info animate-pulse" />
+          <Sparkles className="h-3 w-3 text-info absolute -top-1 -right-1 animate-bounce" />
         </div>
       );
   }
@@ -85,18 +85,18 @@ const getToastIcon = (variant: string) => {
 const getToastStyles = (variant: string) => {
   switch (variant) {
     case 'success':
-      return 'border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 shadow-green-200/50';
+      return 'border-success/30 bg-success/5 shadow-success/30';
     case 'error':
-      return 'border-red-200 bg-gradient-to-r from-red-50 to-rose-50 shadow-red-200/50';
+      return 'border-error/30 bg-error/5 shadow-error/30';
     case 'warning':
-      return 'border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50 shadow-yellow-200/50';
+      return 'border-[hsl(var(--color-warning))]/30 bg-[hsl(var(--color-warning))]/5 shadow-[hsl(var(--color-warning))]/30';
     case 'loading':
-      return 'border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-blue-200/50';
+      return 'border-info/30 bg-info/5 shadow-info/30';
     case 'message':
-      return 'border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-blue-200/50';
+      return 'border-info/30 bg-info/5 shadow-info/30';
     case 'info':
     default:
-      return 'border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-blue-200/50';
+      return 'border-info/30 bg-info/5 shadow-info/30';
   }
 };
 
@@ -120,7 +120,7 @@ export const showModernToast = ({
       
       {/* Progress bar for loading toasts */}
       {showProgress && variant === 'loading' && (
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-t-xl animate-pulse"></div>
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--color-warning))] rounded-t-xl animate-pulse"></div>
       )}
       
       {/* Icon with enhanced animations */}
@@ -128,7 +128,7 @@ export const showModernToast = ({
         {variant === 'message' && senderAvatar ? (
           <Avatar className="h-8 w-8">
             <AvatarImage src={senderAvatar} alt={senderName} />
-            <AvatarFallback className="bg-blue-100 text-blue-600 text-xs">
+            <AvatarFallback className="bg-info/10 text-info text-xs">
               {senderName ? senderName.charAt(0).toUpperCase() : <User className="h-4 w-4" />}
             </AvatarFallback>
           </Avatar>
@@ -144,25 +144,25 @@ export const showModernToast = ({
         {variant === 'message' ? (
           <>
             <div className="flex items-center gap-2 mb-1">
-              <p className="text-sm font-semibold text-gray-900">
+              <p className="text-sm font-semibold text-card-foreground">
                 {senderName}
               </p>
-              <span className="text-xs text-gray-500">•</span>
-              <p className="text-xs text-gray-500">New message</p>
+              <span className="text-xs text-muted-foreground/70">•</span>
+              <p className="text-xs text-muted-foreground/70">New message</p>
             </div>
             {messagePreview && (
-              <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">
+              <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
                 {messagePreview}
               </p>
             )}
           </>
         ) : (
           <>
-            <p className="text-sm font-semibold text-gray-900 transition-colors duration-200 group-hover:text-gray-800">
+            <p className="text-sm font-semibold text-card-foreground transition-colors duration-200">
               {title}
             </p>
             {description && (
-              <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+              <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
                 {description}
               </p>
             )}
@@ -171,7 +171,7 @@ export const showModernToast = ({
         {action && (
           <button
             onClick={action.onClick}
-            className="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 mt-2 transition-colors duration-200 hover:underline"
+            className="inline-flex items-center text-sm font-medium text-primary mt-2 transition-colors duration-200 hover:underline"
           >
             <span className="mr-1">→</span>
             {action.label}
@@ -182,7 +182,7 @@ export const showModernToast = ({
       {/* Close button with enhanced hover effects */}
       <button
         onClick={() => toast.dismiss(t)}
-        className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-all duration-200 hover:bg-gray-100 rounded-full p-1 hover:scale-110"
+        className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-all duration-200 hover:bg-accent rounded-full p-1 hover:scale-110"
       >
         <X className="h-4 w-4" />
       </button>

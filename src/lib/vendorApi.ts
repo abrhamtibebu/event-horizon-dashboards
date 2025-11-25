@@ -220,13 +220,11 @@ class VendorApiService {
 
   // Get authentication headers
   private getAuthHeaders(isFormData = false) {
-    let token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt');
+    // Get token from localStorage or sessionStorage (same as main API)
+    const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt');
     
-    // Auto-set test token if no token exists (for development)
-    if (!token) {
-      this.setTestToken();
-      token = localStorage.getItem('jwt');
-    }
+    // Don't auto-set test token - user must be properly authenticated
+    // If no token, the request will fail with 401, which is expected behavior
     
     const headers: Record<string, string> = {
       'Accept': 'application/json',
@@ -239,6 +237,11 @@ class VendorApiService {
     }
     
     return headers;
+  }
+
+  // Helper method for FormData requests
+  getAuthHeadersForFormData() {
+    return this.getAuthHeaders(true);
   }
 
   // Set a test token for development (remove in production)
@@ -326,8 +329,18 @@ class VendorApiService {
 
   // Vendor methods
   async getVendors(params: any = {}): Promise<any[]> {
-    const queryString = new URLSearchParams(params).toString();
+    // Clean up params - remove undefined, null, or 'all' values
+    const cleanParams: any = {};
+    Object.keys(params).forEach(key => {
+      const value = params[key];
+      if (value !== undefined && value !== null && value !== 'all' && value !== '') {
+        cleanParams[key] = value;
+      }
+    });
+    
+    const queryString = new URLSearchParams(cleanParams).toString();
     const endpoint = `/vendors${queryString ? `?${queryString}` : ''}`;
+    console.log('Fetching vendors from:', endpoint, 'with clean params:', cleanParams);
     
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, {
@@ -336,76 +349,170 @@ class VendorApiService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // If 401, throw error instead of falling back to mock data
+        // This allows the error to propagate and be handled by React Query
+        if (response.status === 401) {
+          throw new Error(`HTTP ${response.status}: Unauthorized - Please log in again`);
+        }
+        // For other errors, fall back to mock data if available
+        console.warn(`API request failed (${response.status}), falling back to mock data`);
+        return this.getVendorsFromMock(params);
       }
 
       const data = await response.json();
+      console.log('Vendors API response:', {
+        success: data.success,
+        total: data.data?.total,
+        count: data.data?.data?.length,
+        filters: data.filters,
+        firstVendor: data.data?.data?.[0]
+      });
       
       // Handle paginated response from Laravel
       if (data.success && data.data && data.data.data) {
         // Laravel paginated response: { success: true, data: { data: [...], current_page: 1, ... } }
         const apiVendors = data.data.data;
-        // Only use API vendors, don't merge with mock data to avoid non-existent vendors
+        console.log(`Returning ${apiVendors.length} vendors from API`);
         return this.normalizeServicesProvided(apiVendors);
       } else if (data.success && Array.isArray(data.data)) {
         // Direct array response: { success: true, data: [...] }
         const apiVendors = data.data;
-        // Only use API vendors, don't merge with mock data to avoid non-existent vendors
+        console.log(`Returning ${apiVendors.length} vendors from API (direct array)`);
         return this.normalizeServicesProvided(apiVendors);
       } else if (Array.isArray(data)) {
         // Direct array response: [...]
         const apiVendors = data;
-        // Only use API vendors, don't merge with mock data to avoid non-existent vendors
+        console.log(`Returning ${apiVendors.length} vendors from API (root array)`);
         return this.normalizeServicesProvided(apiVendors);
       }
       
-      return this.normalizeServicesProvided(this.mockVendors);
+      // If we get here, the response format is unexpected
+      console.warn('Unexpected response format from vendors API:', data);
+      return this.getVendorsFromMock(params);
     } catch (error) {
+      // Network error or other failure - fall back to mock data
       console.warn(`Failed to fetch vendors from API, using mock data:`, error);
-      return this.normalizeServicesProvided(this.mockVendors);
+      return this.getVendorsFromMock(params);
     }
   }
 
+  // Get vendors from mock data with filtering
+  private getVendorsFromMock(params: any = {}): any[] {
+    let filteredVendors = [...this.mockVendors];
+
+    // Apply search filter
+    if (params.search) {
+      const searchLower = params.search.toLowerCase();
+      filteredVendors = filteredVendors.filter(v => 
+        v.name?.toLowerCase().includes(searchLower) ||
+        v.email?.toLowerCase().includes(searchLower) ||
+        v.phone?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply status filter
+    if (params.status && params.status !== 'all') {
+      filteredVendors = filteredVendors.filter(v => v.status === params.status);
+    }
+
+    return this.normalizeServicesProvided(filteredVendors);
+  }
+
   async getVendor(id: number): Promise<any> {
-    const vendor = this.mockVendors.find(v => v.id === id);
-    return this.apiCall(`/vendors/${id}`, { method: 'GET' }, vendor);
+    try {
+      const response = await fetch(`${this.baseURL}/vendors/${id}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error(`HTTP ${response.status}: Unauthorized - Please log in again`);
+        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Handle API response format
+      if (data.success && data.data) {
+        return this.normalizeServicesProvided([data.data])[0];
+      } else if (data.data) {
+        return this.normalizeServicesProvided([data.data])[0];
+      }
+      
+      // Fallback to mock data
+      const vendor = this.mockVendors.find(v => v.id === id);
+      if (vendor) {
+        return this.normalizeServicesProvided([vendor])[0];
+      }
+      
+      throw new Error('Vendor not found');
+    } catch (error) {
+      console.warn(`Failed to fetch vendor ${id} from API, using mock data:`, error);
+      
+      // Fallback to mock data
+      const vendor = this.mockVendors.find(v => v.id === id);
+      if (vendor) {
+        return this.normalizeServicesProvided([vendor])[0];
+      }
+      
+      throw error;
+    }
   }
 
   async createVendor(data: any): Promise<any> {
+    // Process data: convert services_provided array to JSON string
+    let processedData = data;
+    if (!(data instanceof FormData)) {
+      processedData = { ...data };
+      if (Array.isArray(processedData.services_provided)) {
+        processedData.services_provided = JSON.stringify(processedData.services_provided);
+      }
+    }
+
     // Handle FormData vs regular data
     const requestOptions: RequestInit = {
       method: 'POST',
     };
 
-    if (data instanceof FormData) {
-      requestOptions.body = data;
+    if (processedData instanceof FormData) {
+      requestOptions.body = processedData;
       // Don't set Content-Type for FormData, let browser set it with boundary
     } else {
-      requestOptions.body = JSON.stringify(data);
+      requestOptions.body = JSON.stringify(processedData);
       requestOptions.headers = {
         'Content-Type': 'application/json',
       };
     }
 
     try {
-      console.log('Creating vendor with data:', data instanceof FormData ? 'FormData' : data);
+      console.log('Creating vendor with data:', processedData instanceof FormData ? 'FormData' : processedData);
       
       const response = await fetch(`${this.baseURL}/vendors`, {
         ...requestOptions,
         headers: {
-          ...this.getAuthHeaders(data instanceof FormData),
+          ...this.getAuthHeaders(processedData instanceof FormData),
           ...requestOptions.headers,
         },
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('Vendor creation API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+          errors: errorData.errors,
+          sentData: data instanceof FormData ? 'FormData' : processedData
+        });
         const error = new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
         (error as any).response = { data: errorData, status: response.status };
         throw error;
       }
 
       const result = await response.json();
+      console.log('Vendor creation API response:', result);
       
       // If successful, add to mock data for offline fallback
       if (result.success && result.data) {
@@ -421,11 +528,24 @@ class VendorApiService {
         // Save to localStorage and clear cache to force refresh
         this.saveMockVendorsToStorage();
         this.cache.clear();
+        console.log('Vendor added to mock data and cache cleared');
         return result.data;
       }
       
+      console.warn('Unexpected vendor creation response format:', result);
       return result;
     } catch (error) {
+      // Don't create mock data on validation errors (422) - these are real errors
+      // Only create mock data for network/server errors where we can't reach the API
+      const errorResponse = (error as any)?.response;
+      const isValidationError = errorResponse?.status === 422;
+      
+      if (isValidationError) {
+        // For validation errors, re-throw so the UI can show the error properly
+        // Don't create mock data as the vendor wasn't actually created
+        throw error;
+      }
+      
       console.warn('Failed to create vendor via API, using mock data:', error);
       
       // Extract data from FormData if needed
@@ -447,7 +567,7 @@ class VendorApiService {
         vendorData = data;
       }
       
-      // Fallback to mock data
+      // Fallback to mock data only for non-validation errors
       const newVendor = {
         id: this.mockVendors.length + 1,
         ...vendorData,
@@ -484,11 +604,20 @@ class VendorApiService {
 
   // Update vendor method
   async updateVendor(id: number, data: any): Promise<any> {
+    // Process data: convert services_provided array to JSON string if it's an array
+    const processedData = { ...data };
+    if (Array.isArray(processedData.services_provided)) {
+      processedData.services_provided = JSON.stringify(processedData.services_provided);
+    }
+
     try {
       const response = await fetch(`${this.baseURL}/vendors/${id}`, {
         method: 'PUT',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(data),
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(processedData),
       });
 
       if (!response.ok) {
@@ -597,6 +726,10 @@ class VendorApiService {
       });
 
       if (!response.ok) {
+        // If 401, throw error instead of falling back to mock data
+        if (response.status === 401) {
+          throw new Error(`HTTP ${response.status}: Unauthorized - Please log in again`);
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -612,18 +745,9 @@ class VendorApiService {
       // Sort quotations by creation date (newest first)
       return quotations.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     } catch (error) {
-      console.warn('Failed to fetch quotations from API, using mock data:', error);
-      
-      // Return mock quotations for the specific vendor, sorted by creation date
-      let filteredQuotations = [];
-      if (params.vendor_id) {
-        filteredQuotations = this.mockQuotations.filter(q => q.vendor_id === params.vendor_id);
-      } else {
-        filteredQuotations = this.mockQuotations;
-      }
-      
-      // Sort quotations by creation date (newest first)
-      return filteredQuotations.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      // Re-throw the error so React Query can handle it properly
+      console.error('Failed to fetch quotations from API:', error);
+      throw error;
     }
   }
 
@@ -794,10 +918,13 @@ class VendorApiService {
         return data;
       }
       
-      return this.mockStatistics;
+      // If we get here, the response format is unexpected
+      console.warn('Unexpected response format from statistics API:', data);
+      return {};
     } catch (error) {
-      console.warn('Failed to fetch statistics from API, using mock data:', error);
-      return this.mockStatistics;
+      // Re-throw the error so React Query can handle it properly
+      console.error('Failed to fetch statistics from API:', error);
+      throw error;
     }
   }
 
@@ -962,6 +1089,194 @@ class VendorApiService {
           }
         }
       ];
+    }
+  }
+
+  // RFQ Invites
+  async getRfqInvites(params: any = {}): Promise<any[]> {
+    try {
+      const queryString = new URLSearchParams(params).toString();
+      const response = await fetch(`${this.baseURL}/vendors/rfq-invites${queryString ? `?${queryString}` : ''}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.success ? (data.data?.data || data.data || []) : [];
+    } catch (error) {
+      console.error('Failed to fetch RFQ invites:', error);
+      throw error;
+    }
+  }
+
+  async updateRfqInvite(id: number, data: any): Promise<any> {
+    try {
+      const headers = this.getAuthHeaders();
+      headers['Content-Type'] = 'application/json';
+      
+      const response = await fetch(`${this.baseURL}/vendors/rfq-invites/${id}`, {
+        method: 'PUT',
+        headers: headers,
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      return result.data || result;
+    } catch (error) {
+      console.error('Failed to update RFQ invite:', error);
+      throw error;
+    }
+  }
+
+  // Vendor Reviews
+  async getReviews(params: any = {}): Promise<any[]> {
+    try {
+      const queryString = new URLSearchParams(params).toString();
+      const response = await fetch(`${this.baseURL}/vendors/reviews${queryString ? `?${queryString}` : ''}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.success ? (data.data?.data || data.data || []) : [];
+    } catch (error) {
+      console.error('Failed to fetch reviews:', error);
+      throw error;
+    }
+  }
+
+  async createReview(data: any): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseURL}/vendors/reviews`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      return result.data || result;
+    } catch (error) {
+      console.error('Failed to create review:', error);
+      throw error;
+    }
+  }
+
+  async getVendorReliabilityScore(vendorId: number): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseURL}/vendors/vendors/${vendorId}/reliability-score`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.success ? data.data : {};
+    } catch (error) {
+      console.error('Failed to fetch reliability score:', error);
+      throw error;
+    }
+  }
+
+  // Deliverable Updates
+  async addDeliverableUpdate(deliverableId: number, data: FormData): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseURL}/deliverables/${deliverableId}/updates`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(true),
+        body: data,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      return result.data || result;
+    } catch (error) {
+      console.error('Failed to add deliverable update:', error);
+      throw error;
+    }
+  }
+
+  async getDeliverableUpdates(deliverableId: number): Promise<any[]> {
+    try {
+      const response = await fetch(`${this.baseURL}/deliverables/${deliverableId}/updates`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.success ? (data.data || []) : [];
+    } catch (error) {
+      console.error('Failed to fetch deliverable updates:', error);
+      throw error;
+    }
+  }
+
+  // Compare quotations
+  async compareQuotations(quotationId: number): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseURL}/vendors/quotations/${quotationId}/compare`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.success ? data.data : {};
+    } catch (error) {
+      console.error('Failed to compare quotations:', error);
+      throw error;
+    }
+  }
+
+  // Lookup business information by TIN number
+  async lookupByTin(tinNumber: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseURL}/vendors/lookup-by-tin/${tinNumber}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const error = new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        (error as any).response = { data: errorData, status: response.status };
+        throw error;
+      }
+
+      const data = await response.json();
+      return data.success ? data.data : null;
+    } catch (error) {
+      console.error('Failed to lookup business info by TIN:', error);
+      throw error;
     }
   }
 }

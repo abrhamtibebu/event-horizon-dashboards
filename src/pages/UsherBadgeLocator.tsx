@@ -79,7 +79,7 @@ function SearchBarWithAutocomplete({ badges, onSelect, isSearching }: { badges: 
   return (
     <div className="relative w-full">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
         <Input
           placeholder="Search by name, QR code, registration ID, or company..."
           value={input}
@@ -95,19 +95,19 @@ function SearchBarWithAutocomplete({ badges, onSelect, isSearching }: { badges: 
         )}
       </div>
       {showDropdown && (
-        <div className="absolute z-10 w-full bg-white border border-gray-200 rounded shadow-lg mt-1 max-h-60 overflow-auto">
+        <div className="absolute z-10 w-full bg-popover border border-border rounded shadow-lg mt-1 max-h-60 overflow-auto">
           {filtered.map((badge, idx) => (
             <div
               key={badge.badgeId + idx}
-              className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+              className="px-4 py-2 hover:bg-accent cursor-pointer text-sm"
               onMouseDown={() => { onSelect(badge); setInput(''); setShowDropdown(false); }}
             >
-              <span className="font-medium">{badge.name}</span> <span className="text-gray-500">({badge.organization})</span>
-              <div className="text-xs text-gray-400">ID: {badge.registrationId} | QR: {badge.qrCode}</div>
+              <span className="font-medium">{badge.name}</span> <span className="text-muted-foreground">({badge.organization})</span>
+              <div className="text-xs text-muted-foreground/70">ID: {badge.registrationId} | QR: {badge.qrCode}</div>
             </div>
           ))}
           {filtered.length === 0 && (
-            <div className="px-4 py-2 text-gray-400 text-sm">No results</div>
+            <div className="px-4 py-2 text-muted-foreground text-sm">No results</div>
           )}
         </div>
       )}
@@ -130,7 +130,7 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
       case 'collected':
         return <CheckCircle className="inline w-5 h-5 text-green-600 mr-1" title="Collected" />;
       default:
-        return <Box className="inline w-5 h-5 text-gray-400 mr-1" title="Unknown status" />;
+        return <Box className="inline w-5 h-5 text-muted-foreground mr-1" title="Unknown status" />;
     }
   };
 
@@ -140,26 +140,26 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
         {/* Left: Info */}
         <div className="flex-1 space-y-2">
           <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-gray-400" />
-            <span className="font-bold text-lg text-gray-900">{badge.name}</span>
-            <span className="ml-2 text-xs text-gray-500">({badge.organization})</span>
+            <Users className="w-5 h-5 text-muted-foreground" />
+            <span className="font-bold text-lg text-card-foreground">{badge.name}</span>
+            <span className="ml-2 text-xs text-muted-foreground/70">({badge.organization})</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-500">Badge Type:</span>
+            <span className="text-muted-foreground">Badge Type:</span>
             <span className="font-medium">{badge.badgeType}</span>
-            <span className="ml-4 text-gray-500">Guest Type:</span>
+            <span className="ml-4 text-muted-foreground">Guest Type:</span>
             <Badge className={getGuestTypeBadgeClasses(badge.guest_type)}>
               {badge.guest_type}
             </Badge>
           </div>
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-500">Registration ID:</span>
+            <span className="text-muted-foreground">Registration ID:</span>
             <span className="font-mono">{badge.registrationId}</span>
-            <span className="ml-4 text-gray-500">QR:</span>
+            <span className="ml-4 text-muted-foreground">QR:</span>
             <span className="font-mono">{badge.qrCode}</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-500">Email:</span>
+            <span className="text-muted-foreground">Email:</span>
             <span>{badge.email}</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
@@ -167,20 +167,20 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
             <span>Zone <b>{badge.zone}</b>, Section <b>{badge.section}</b>, Tray <b>{badge.tray}</b></span>
           </div>
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-500">Notes:</span>
-            <span>{badge.notes || <span className="italic text-gray-400">None</span>}</span>
+            <span className="text-muted-foreground">Notes:</span>
+            <span>{badge.notes || <span className="italic text-muted-foreground/70">None</span>}</span>
           </div>
         </div>
         {/* Right: Status & Actions */}
         <div className="flex flex-col gap-4 min-w-[220px]">
           <div className="flex items-center gap-2">
-            <span className="text-gray-500">Print Status:</span>
+            <span className="text-muted-foreground">Print Status:</span>
             {getStatusIcon(badge.status)}
             <span className="font-medium capitalize">{badge.status}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-gray-500">Collected:</span>
-            {badge.collected ? <CheckCircle className="w-5 h-5 text-green-600" /> : <XCircle className="w-5 h-5 text-gray-400" />}
+            <span className="text-muted-foreground">Collected:</span>
+            {badge.collected ? <CheckCircle className="w-5 h-5 text-green-600" /> : <XCircle className="w-5 h-5 text-muted-foreground" />}
           </div>
           <div className="flex flex-col gap-2 mt-2">
             {!badge.collected && (
@@ -219,19 +219,19 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
 function HistoryLog({ history }: { history: BadgeData['printHistory'] }) {
   if (!history || history.length === 0) {
     return (
-      <DashboardCard title="Badge History" icon={<History className="w-6 h-6 text-gray-500" />}>
-        <div className="text-gray-400 italic">No history available.</div>
+      <DashboardCard title="Badge History" icon={<History className="w-6 h-6 text-muted-foreground" />}>
+        <div className="text-muted-foreground/70 italic">No history available.</div>
       </DashboardCard>
     );
   }
   return (
-    <DashboardCard title="Badge History" icon={<History className="w-6 h-6 text-gray-500" />}>
-      <ul className="divide-y divide-gray-100">
+    <DashboardCard title="Badge History" icon={<History className="w-6 h-6 text-muted-foreground" />}>
+      <ul className="divide-y divide-border">
         {history.map((entry, idx) => (
           <li key={idx} className="py-2 flex items-center gap-4">
-            <span className="text-xs text-gray-500 w-32">{entry.timestamp}</span>
-            <span className="font-medium text-gray-800">{entry.status}</span>
-            <span className="text-gray-500 text-xs">by {entry.staff}</span>
+            <span className="text-xs text-muted-foreground/70 w-32">{entry.timestamp}</span>
+            <span className="font-medium text-card-foreground">{entry.status}</span>
+            <span className="text-muted-foreground/70 text-xs">by {entry.staff}</span>
             {entry.note && <span className="text-blue-600 text-xs italic">{entry.note}</span>}
           </li>
         ))}
@@ -536,7 +536,7 @@ export default function UsherBadgeLocator() {
       {/* --- Event Selector --- */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700">Select Assigned Event</label>
+          <label className="block text-sm font-medium text-foreground">Select Assigned Event</label>
           {selectedEventId && (
             <Badge variant="outline" className="text-xs">
               {data.length} badges loaded
@@ -559,7 +559,7 @@ export default function UsherBadgeLocator() {
               <SelectItem key={`usher-event-${event.id}-${index}`} value={event.id.toString()}>
                 <div className="flex flex-col">
                   <span className="font-medium">{event.name}</span>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-muted-foreground/70">
                     {new Date(event.start_date).toLocaleDateString()}
                   </span>
                 </div>
@@ -583,8 +583,8 @@ export default function UsherBadgeLocator() {
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Badge Locator</h1>
-          <p className="text-gray-600 mt-1">Search and manage guest badges for your assigned events.</p>
+          <h1 className="text-3xl font-bold text-foreground">Badge Locator</h1>
+          <p className="text-muted-foreground mt-1">Search and manage guest badges for your assigned events.</p>
         </div>
         <div className="w-full md:w-1/2 lg:w-1/3 flex flex-col gap-2">
           <SearchBarWithAutocomplete badges={filteredData} onSelect={setSelectedGuest} isSearching={isSearching} />
@@ -594,35 +594,35 @@ export default function UsherBadgeLocator() {
       {/* Statistics Summary */}
       {data.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
+          <div className="bg-card rounded-lg p-4 border border-border">
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-600" />
-              <span className="text-sm text-gray-600">Total Badges</span>
+              <span className="text-sm text-muted-foreground">Total Badges</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900 mt-1">{data.length}</div>
+            <div className="text-2xl font-bold text-card-foreground mt-1">{data.length}</div>
           </div>
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
+          <div className="bg-card rounded-lg p-4 border border-border">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-green-600" />
-              <span className="text-sm text-gray-600">Collected</span>
+              <span className="text-sm text-muted-foreground">Collected</span>
             </div>
             <div className="text-2xl font-bold text-green-600 mt-1">
               {data.filter(b => b.collected).length}
             </div>
           </div>
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
+          <div className="bg-card rounded-lg p-4 border border-border">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-red-600" />
-              <span className="text-sm text-gray-600">Missing</span>
+              <span className="text-sm text-muted-foreground">Missing</span>
             </div>
             <div className="text-2xl font-bold text-red-600 mt-1">
               {data.filter(b => b.status === 'missing').length}
             </div>
           </div>
-          <div className="bg-white rounded-lg p-4 border border-gray-200">
+          <div className="bg-card rounded-lg p-4 border border-border">
             <div className="flex items-center gap-2">
               <RefreshCw className="w-5 h-5 text-yellow-600" />
-              <span className="text-sm text-gray-600">Reprint Needed</span>
+              <span className="text-sm text-muted-foreground">Reprint Needed</span>
             </div>
             <div className="text-2xl font-bold text-yellow-600 mt-1">
               {data.filter(b => b.status === 'reprint requested').length}

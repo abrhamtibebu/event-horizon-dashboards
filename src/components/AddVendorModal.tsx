@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { X, Plus, Loader2 } from 'lucide-react';
+import { X, Plus, Loader2, Search } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { createVendor } from '@/lib/api';
+import vendorApi from '@/lib/vendorApi';
 
 interface AddVendorModalProps {
   isOpen: boolean;
@@ -55,6 +56,7 @@ export default function AddVendorModal({ isOpen, onClose }: AddVendorModalProps)
   });
 
   const [newService, setNewService] = useState('');
+  const [isLookingUpTin, setIsLookingUpTin] = useState(false);
   const queryClient = useQueryClient();
 
   const createVendorMutation = useMutation({
@@ -88,6 +90,68 @@ export default function AddVendorModal({ isOpen, onClose }: AddVendorModalProps)
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleLookupByTin = async () => {
+    if (!formData.tax_id.trim()) {
+      toast.error('Please enter a TIN number first');
+      return;
+    }
+
+    // Validate TIN format (numeric only)
+    if (!/^\d+$/.test(formData.tax_id.trim())) {
+      toast.error('TIN number must contain only digits');
+      return;
+    }
+
+    setIsLookingUpTin(true);
+    try {
+      const businessInfo = await vendorApi.lookupByTin(formData.tax_id.trim());
+      
+      if (businessInfo) {
+        // Map business info to form fields (only fill if field is empty)
+        const updates: any = {};
+        
+        if (!formData.name && (businessInfo.businessName || businessInfo.name)) {
+          updates.name = businessInfo.businessName || businessInfo.name;
+        }
+        
+        if (!formData.address && (businessInfo.address || businessInfo.location)) {
+          updates.address = businessInfo.address || businessInfo.location;
+        }
+        
+        if (!formData.email && businessInfo.email) {
+          updates.email = businessInfo.email;
+        }
+        
+        if (!formData.phone && (businessInfo.phone || businessInfo.phoneNumber)) {
+          updates.phone = businessInfo.phone || businessInfo.phoneNumber;
+        }
+        
+        if (!formData.website && businessInfo.website) {
+          updates.website = businessInfo.website;
+        }
+        
+        if (!formData.business_license && (businessInfo.licenseNumber || businessInfo.businessLicense)) {
+          updates.business_license = businessInfo.licenseNumber || businessInfo.businessLicense;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          setFormData(prev => ({ ...prev, ...updates }));
+          toast.success(`Fetched business information! Filled ${Object.keys(updates).length} field(s).`);
+        } else {
+          toast.info('Business information retrieved, but all fields are already filled.');
+        }
+      } else {
+        toast.warning('No business information found for this TIN number');
+      }
+    } catch (error: any) {
+      console.error('TIN lookup error:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to lookup business information';
+      toast.error(errorMessage);
+    } finally {
+      setIsLookingUpTin(false);
+    }
   };
 
   const handleAddService = () => {
@@ -174,6 +238,11 @@ export default function AddVendorModal({ isOpen, onClose }: AddVendorModalProps)
     // Add services as JSON
     submitData.append('services_provided', JSON.stringify(formData.services_provided));
     
+    // Enable auto-fill from TIN if tax_id is provided
+    if (formData.tax_id && formData.tax_id.trim()) {
+      submitData.append('auto_fill_from_tin', 'true');
+    }
+    
     // Add files
     formData.documents.forEach((file, index) => {
       submitData.append(`documents[${index}]`, file);
@@ -211,6 +280,49 @@ export default function AddVendorModal({ isOpen, onClose }: AddVendorModalProps)
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* TIN Lookup Section - Moved to Top */}
+          <div className="space-y-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Search className="h-5 w-5 text-blue-600" />
+              <h3 className="text-lg font-semibold text-blue-900">Business Registration Lookup</h3>
+            </div>
+            <p className="text-sm text-blue-700 mb-4">
+              Enter a TIN (Tax Identification Number) to automatically fetch business information from the Ethiopian Trade Registry.
+            </p>
+            <div className="flex gap-2">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="tax_id">Tax ID (TIN) Number</Label>
+                <Input
+                  id="tax_id"
+                  value={formData.tax_id}
+                  onChange={(e) => handleInputChange('tax_id', e.target.value)}
+                  placeholder="Enter TIN number (e.g., 1234567890)"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  onClick={handleLookupByTin}
+                  disabled={!formData.tax_id.trim() || isLookingUpTin}
+                  variant="outline"
+                  className="min-w-[140px]"
+                >
+                  {isLookingUpTin ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Looking up...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" />
+                      Fetch Info
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+
           {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Basic Information</h3>
@@ -334,16 +446,6 @@ export default function AddVendorModal({ isOpen, onClose }: AddVendorModalProps)
             <h3 className="text-lg font-semibold">Business Information</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="tax_id">Tax ID</Label>
-                <Input
-                  id="tax_id"
-                  value={formData.tax_id}
-                  onChange={(e) => handleInputChange('tax_id', e.target.value)}
-                  placeholder="Tax identification number"
-                />
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="business_license">Business License</Label>
                 <Input

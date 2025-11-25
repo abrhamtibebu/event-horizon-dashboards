@@ -2,30 +2,46 @@ import type { Message } from '../types/message'
 
 export type ImageSize = 'thumbnail' | 'medium' | 'original'
 
+const getStorageBaseUrl = () => {
+  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+  const withoutApi = apiBase.replace(/\/api\/?$/, '')
+  return withoutApi.replace(/\/$/, '')
+}
+
+const buildStorageUrl = (path?: string) => {
+  if (!path) return ''
+  if (path.startsWith('http')) return path
+  return `${getStorageBaseUrl()}/storage/${path.replace(/^\/?storage\//, '')}`
+}
+
+const resolveFileUrl = (path?: string, explicitUrl?: string) => {
+  if (path && path.startsWith('blob:')) {
+    return path
+  }
+  if (explicitUrl) {
+    return explicitUrl
+  }
+  return buildStorageUrl(path)
+}
+
 /**
  * Get image URL for a message with specified size
  */
 export const getMessageImageUrl = (message: Message, size: ImageSize = 'original'): string => {
-  if (!message.file_path || !message.file_type?.startsWith('image/')) {
+  if (!message.file_type?.startsWith('image/')) {
     return ''
   }
 
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-  
   switch (size) {
     case 'thumbnail':
-      return message.thumbnail_path 
-        ? `${baseUrl}/storage/${message.thumbnail_path}`
-        : `${baseUrl}/storage/${message.file_path}`
+      return resolveFileUrl(message.thumbnail_path, message.thumbnail_url || message.file_url)
     
     case 'medium':
-      return message.medium_path 
-        ? `${baseUrl}/storage/${message.medium_path}`
-        : `${baseUrl}/storage/${message.file_path}`
+      return resolveFileUrl(message.medium_path, message.medium_url || message.file_url)
     
     case 'original':
     default:
-      return `${baseUrl}/storage/${message.file_path}`
+      return resolveFileUrl(message.file_path, message.file_url)
   }
 }
 
@@ -138,5 +154,9 @@ export const isImageSquare = (message: Message, size: ImageSize = 'original'): b
   return ratio >= 0.9 && ratio <= 1.1
 }
 
-
-
+/**
+ * Get a resolved file URL for any attachment
+ */
+export const getMessageFileUrl = (message: Partial<Message>): string => {
+  return resolveFileUrl(message.file_path, message.file_url)
+}

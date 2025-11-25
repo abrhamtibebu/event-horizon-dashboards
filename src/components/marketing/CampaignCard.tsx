@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   Mail, 
   MessageSquare, 
@@ -12,7 +12,9 @@ import {
   CheckCircle2,
   Edit,
   Trash2,
-  MoreVertical
+  MoreVertical,
+  CalendarDays,
+  Clock
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -47,6 +49,31 @@ interface CampaignCardProps {
 
 export function CampaignCard({ campaign, onUpdate }: CampaignCardProps) {
   const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+
+  // Fetch updated campaign data when in sending status
+  useEffect(() => {
+    if (campaign.status === 'sending') {
+      const interval = setInterval(async () => {
+        try {
+          setRefreshing(true)
+          const response = await api.get(`/marketing/campaigns/${campaign.id}/statistics`)
+          const stats = response.data.statistics
+          
+          // Update campaign stats if changed
+          if (stats.sent_count !== campaign.sent_count || stats.status !== campaign.status) {
+            onUpdate?.() // Trigger parent refresh
+          }
+        } catch (error) {
+          console.error('Error refreshing campaign stats:', error)
+        } finally {
+          setRefreshing(false)
+        }
+      }, 3000) // Poll every 3 seconds
+
+      return () => clearInterval(interval)
+    }
+  }, [campaign.id, campaign.status])
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -84,7 +111,12 @@ export function CampaignCard({ campaign, onUpdate }: CampaignCardProps) {
 
     setLoading(true)
     try {
-      await api.post(`/marketing/campaigns/${campaign.id}/${action}`)
+      // Delete uses DELETE method, other actions use POST
+      if (action === 'delete') {
+        await api.delete(`/marketing/campaigns/${campaign.id}`)
+      } else {
+        await api.post(`/marketing/campaigns/${campaign.id}/${action}`)
+      }
       toast.success(`Campaign ${action}ed successfully`)
       onUpdate?.()
     } catch (error) {
@@ -126,9 +158,18 @@ export function CampaignCard({ campaign, onUpdate }: CampaignCardProps) {
             {campaign.description && (
               <CardDescription className="line-clamp-2">{campaign.description}</CardDescription>
             )}
-            {campaign.event && (
-              <div className="text-sm text-gray-600 mt-1">{campaign.event.title}</div>
-            )}
+            <div className="flex items-center gap-3 mt-2">
+              {campaign.event && (
+                <div className="flex items-center gap-1 text-sm text-gray-600">
+                  <CalendarDays className="w-4 h-4" />
+                  <span className="font-medium">{campaign.event.title}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-1 text-xs text-gray-500">
+                <Clock className="w-3 h-3" />
+                <span>Created {new Date(campaign.created_at).toLocaleDateString()}</span>
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Badge className={`${getStatusColor(campaign.status)} border`}>
@@ -185,15 +226,32 @@ export function CampaignCard({ campaign, onUpdate }: CampaignCardProps) {
       </CardHeader>
       <CardContent>
         {/* Progress Bar */}
-        {campaign.status === 'sending' && (
+        {(campaign.status === 'sending' || campaign.status === 'scheduled') && (
           <div className="mb-4">
             <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-600">Sending progress</span>
+              <span className="text-gray-600">
+                {campaign.status === 'sending' ? 'Sending progress' : 'Scheduled'}
+                {campaign.status === 'sending' && refreshing && (
+                  <span className="ml-2 text-xs text-gray-400">(updating...)</span>
+                )}
+              </span>
               <span className="font-semibold">
                 {campaign.sent_count} / {campaign.total_recipients}
+                {campaign.status === 'sending' && (
+                  <span className="ml-1 text-xs text-gray-500">
+                    ({progressPercentage.toFixed(1)}%)
+                  </span>
+                )}
               </span>
             </div>
-            <Progress value={progressPercentage} className="h-2" />
+            {campaign.status === 'sending' && (
+              <Progress value={progressPercentage} className="h-2" />
+            )}
+            {campaign.status === 'scheduled' && campaign.scheduled_at && (
+              <div className="text-xs text-gray-500 mt-1">
+                Scheduled for: {new Date(campaign.scheduled_at).toLocaleString()}
+              </div>
+            )}
           </div>
         )}
 

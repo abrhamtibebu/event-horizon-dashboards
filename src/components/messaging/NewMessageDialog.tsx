@@ -91,7 +91,7 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
         <div className="space-y-4">
           {/* Search input */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
               placeholder="Search users or events..."
               value={searchQuery}
@@ -132,17 +132,17 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
                   <div className="space-y-2">
                     {[...Array(5)].map((_, i) => (
                       <div key={i} className="flex items-center space-x-3 p-2">
-                        <div className="w-10 h-10 bg-gray-200 rounded-full animate-pulse" />
+                        <div className="w-10 h-10 bg-muted rounded-full animate-pulse" />
                         <div className="flex-1 space-y-2">
-                          <div className="h-4 bg-gray-200 rounded animate-pulse" />
-                          <div className="h-3 bg-gray-200 rounded animate-pulse w-2/3" />
+                          <div className="h-4 bg-muted rounded animate-pulse" />
+                          <div className="h-3 bg-muted rounded animate-pulse w-2/3" />
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : filteredUsers.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                     <p>No users found</p>
                     <p className="text-sm">Try adjusting your search terms</p>
                   </div>
@@ -151,19 +151,19 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
                     <div
                       key={user.id}
                       onClick={() => handleUserSelect(user)}
-                      className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                     >
                       <Avatar className="w-10 h-10">
                         <AvatarImage src={user.profile_image} />
-                        <AvatarFallback className="bg-gray-200 text-gray-600">
+                        <AvatarFallback className="bg-muted text-muted-foreground">
                           {getInitials(user.name)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-gray-900 truncate">
+                        <h3 className="font-medium text-foreground truncate">
                           {user.name}
                         </h3>
-                        <p className="text-sm text-gray-500 truncate">
+                        <p className="text-sm text-muted-foreground truncate">
                           {user.email}
                         </p>
                         {user.role && (
@@ -179,8 +179,8 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
             ) : (
               <div className="space-y-2">
                 {filteredEvents.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                     <p>No events found</p>
                     <p className="text-sm">Try adjusting your search terms</p>
                   </div>
@@ -189,23 +189,23 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
                     <div
                       key={event.id}
                       onClick={() => handleEventSelect(event)}
-                      className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                     >
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Calendar className="w-5 h-5 text-blue-600" />
+                      <div className="w-10 h-10 bg-info/10 rounded-lg flex items-center justify-center">
+                        <Calendar className="w-5 h-5 text-info" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-gray-900 truncate">
+                        <h3 className="font-medium text-foreground truncate">
                           {event.title}
                         </h3>
-                        <p className="text-sm text-gray-500 truncate">
+                        <p className="text-sm text-muted-foreground truncate">
                           {event.location}
                         </p>
                         <div className="flex items-center space-x-2 mt-1">
                           <Badge variant="outline" className="text-xs">
                             Event Chat
                           </Badge>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-muted-foreground">
                             {new Date(event.start_date).toLocaleDateString()}
                           </span>
                         </div>
@@ -218,7 +218,7 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
           </ScrollArea>
           
           {/* Footer */}
-          <div className="flex justify-end space-x-2 pt-4 border-t">
+          <div className="flex justify-end space-x-2 pt-4 border-t border-border">
             <Button variant="outline" onClick={handleClose}>
               Cancel
             </Button>

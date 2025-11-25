@@ -41,29 +41,29 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
       {isGroup && (
         <div className="flex -space-x-1">
           {users.slice(0, 3).map((user) => (
-            <Avatar key={user.id} className="w-6 h-6 border border-white">
+            <Avatar key={user.id} className="w-6 h-6 border border-background">
               <AvatarImage src={user.profile_image} />
-              <AvatarFallback className="bg-blue-100 text-blue-600 text-xs">
+              <AvatarFallback className="bg-primary/10 text-primary text-xs">
                 {getInitials(user.name)}
               </AvatarFallback>
             </Avatar>
           ))}
           {users.length > 3 && (
-            <div className="w-6 h-6 rounded-full bg-gray-200 border border-white flex items-center justify-center">
-              <span className="text-xs text-gray-600 font-medium">+{users.length - 3}</span>
+            <div className="w-6 h-6 rounded-full bg-muted border border-background flex items-center justify-center">
+              <span className="text-xs text-muted-foreground font-medium">+{users.length - 3}</span>
             </div>
           )}
         </div>
       )}
 
       {/* Typing animation */}
-      <div className="flex items-center space-x-2 bg-gray-100 rounded-full px-3 py-2">
+      <div className="flex items-center space-x-2 bg-muted rounded-full px-3 py-2">
         <div className="flex space-x-1">
-          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+          <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+          <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
         </div>
-        <span className="text-sm text-gray-600 font-medium">
+        <span className="text-sm text-muted-foreground font-medium">
           {getTypingText()}
         </span>
       </div>

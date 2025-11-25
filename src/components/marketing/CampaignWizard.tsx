@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { X, CheckCircle2 } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { X } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import { TemplateSelector } from './WizardSteps/TemplateSelector'
 import { AudienceSelector } from './WizardSteps/AudienceSelector'
 import { MessageEditor } from './WizardSteps/MessageEditor'
@@ -15,15 +14,14 @@ interface CampaignWizardProps {
 }
 
 const STEPS = [
-  { id: 1, name: 'Choose Template', component: 'template' },
-  { id: 2, name: 'Select Audience', component: 'audience' },
-  { id: 3, name: 'Customize Message', component: 'message' },
-  { id: 4, name: 'Review & Send', component: 'review' },
+  { id: 1, name: 'Template', shortName: 'Template' },
+  { id: 2, name: 'Audience', shortName: 'Audience' },
+  { id: 3, name: 'Message', shortName: 'Message' },
+  { id: 4, name: 'Review', shortName: 'Review' },
 ]
 
 export function CampaignWizard({ open, onClose, onComplete }: CampaignWizardProps) {
   const [currentStep, setCurrentStep] = useState(1)
-  const [progress, setProgress] = useState(25)
 
   // Wizard state
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null)
@@ -42,14 +40,12 @@ export function CampaignWizard({ open, onClose, onComplete }: CampaignWizardProp
   const handleNext = () => {
     if (currentStep < STEPS.length) {
       setCurrentStep(currentStep + 1)
-      setProgress(((currentStep + 1) / STEPS.length) * 100)
     }
   }
 
   const handlePrevious = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1)
-      setProgress(((currentStep - 1) / STEPS.length) * 100)
     }
   }
 
@@ -67,7 +63,6 @@ export function CampaignWizard({ open, onClose, onComplete }: CampaignWizardProp
     onComplete()
     // Reset state
     setCurrentStep(1)
-    setProgress(25)
     setSelectedTemplate(null)
     setSelectedEventId('')
     setAudienceType('all')
@@ -101,6 +96,8 @@ export function CampaignWizard({ open, onClose, onComplete }: CampaignWizardProp
             onlyCheckedIn={onlyCheckedIn}
             onSetCheckedIn={setOnlyCheckedIn}
             onNext={handleNext}
+            onPrevious={handlePrevious}
+            onRecipientCountChange={setRecipientCount}
           />
         )
       case 3:
@@ -126,11 +123,13 @@ export function CampaignWizard({ open, onClose, onComplete }: CampaignWizardProp
             selectedTemplate={selectedTemplate}
             selectedEventId={selectedEventId}
             audienceType={audienceType}
-            recipientCount={recipientCount || 250}
+            recipientCount={recipientCount}
             campaignType={campaignType}
             subject={subject}
             emailContent={emailContent}
             smsContent={smsContent}
+            selectedTicketTypes={selectedTicketTypes}
+            onlyCheckedIn={onlyCheckedIn}
           />
         )
       default:
@@ -138,70 +137,79 @@ export function CampaignWizard({ open, onClose, onComplete }: CampaignWizardProp
     }
   }
 
+  const progressPercentage = (currentStep / STEPS.length) * 100
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-2xl">Create New Campaign</DialogTitle>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="w-4 h-4" />
-            </Button>
+      <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto p-0">
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b z-10">
+          <div className="px-6 py-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-2xl font-bold text-gray-900">
+                  Create New Campaign
+                </DialogTitle>
+                <DialogDescription className="text-gray-600 mt-1">
+                  Step {currentStep} of {STEPS.length}
+                </DialogDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
-        </DialogHeader>
 
-        {/* Progress Indicator */}
-        <div className="space-y-4 py-4">
-          <Progress value={progress} className="h-2" />
-          <div className="flex justify-between items-center">
-            {STEPS.map((step, index) => (
-              <div
-                key={step.id}
-                className="flex items-center"
-              >
-                <div
-                  className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all ${
-                    currentStep > index + 1
-                      ? 'bg-green-500 border-green-500 text-white'
-                      : currentStep === index + 1
-                      ? 'bg-blue-500 border-blue-500 text-white'
-                      : 'border-gray-300 text-gray-500'
-                  }`}
-                >
-                  {currentStep > index + 1 ? (
-                    <CheckCircle2 className="w-5 h-5" />
-                  ) : (
-                    <span className="font-semibold">{step.id}</span>
+          {/* Simplified Step Indicator */}
+          <div className="px-6 pb-5">
+            <div className="flex items-center justify-between">
+              {STEPS.map((step, index) => (
+                <div key={step.id} className="flex items-center flex-1">
+                  <div className="flex items-center">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
+                        currentStep > index + 1
+                          ? 'bg-blue-600 text-white'
+                          : currentStep === index + 1
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'bg-gray-100 text-gray-500'
+                      }`}
+                    >
+                      {currentStep > index + 1 ? '✓' : step.id}
+                    </div>
+                    <div className="ml-2 hidden sm:block">
+                      <div
+                        className={`text-sm font-medium ${
+                          currentStep >= index + 1 ? 'text-gray-900' : 'text-gray-500'
+                        }`}
+                      >
+                        {step.shortName}
+                      </div>
+                    </div>
+                  </div>
+                  {index < STEPS.length - 1 && (
+                    <div
+                      className={`flex-1 h-0.5 mx-2 transition-all ${
+                        currentStep > index + 1 ? 'bg-blue-600' : 'bg-gray-200'
+                      }`}
+                    />
                   )}
                 </div>
-                {index < STEPS.length - 1 && (
-                  <div
-                    className={`h-0.5 w-16 mx-2 ${
-                      currentStep > index + 1 ? 'bg-green-500' : 'bg-gray-300'
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
-          {/* Step Names */}
-          <div className="flex justify-between text-xs text-gray-600 mt-2">
-            {STEPS.map(step => (
-              <div
-                key={step.id}
-                className={`w-[80px] text-center ${
-                  currentStep === step.id ? 'font-semibold text-blue-600' : ''
-                }`}
-              >
-                {step.name}
-              </div>
-            ))}
+          {/* Progress Bar */}
+          <div className="h-1 bg-gray-100">
+            <div
+              className="h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all duration-300"
+              style={{ width: `${progressPercentage}%` }}
+            />
           </div>
         </div>
 
-        {/* Step Content */}
-        <div className="mt-8">
+        {/* Content */}
+        <div className="px-6 py-6">
           {renderStepContent()}
         </div>
       </DialogContent>

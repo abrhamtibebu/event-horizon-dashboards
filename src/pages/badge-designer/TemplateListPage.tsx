@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Edit, Trash2, Copy } from 'lucide-react'
 import { useBadgeTemplates, useDeleteBadgeTemplate } from '@/hooks/badge-designer/useBadgeTemplates'
+import { usePermissionCheck } from '@/hooks/use-permission-check'
+import { ProtectedButton } from '@/components/ProtectedButton'
 import { format } from 'date-fns'
 
 export function TemplateListPage() {
@@ -11,6 +13,7 @@ export function TemplateListPage() {
   const navigate = useNavigate()
   const { data: templates, isLoading } = useBadgeTemplates(Number(eventId))
   const deleteMutation = useDeleteBadgeTemplate(Number(eventId))
+  const { checkPermission } = usePermissionCheck()
   
   // Debug: Log templates data
   console.log('Templates raw data:', templates)
@@ -44,6 +47,10 @@ export function TemplateListPage() {
   })
   
   const handleDelete = async (templateId: number) => {
+    if (!checkPermission('badges.manage', 'delete badge templates')) {
+      return
+    }
+    
     if (confirm('Are you sure you want to delete this template?')) {
       await deleteMutation.mutateAsync(templateId)
     }
@@ -59,13 +66,19 @@ export function TemplateListPage() {
               Create and manage badge designs for your event
             </p>
           </div>
-          <Button 
-            onClick={() => navigate(`/badge-designer/designer/${eventId}/new`)}
+          <ProtectedButton
+            permission="badges.design"
+            onClick={() => {
+              if (checkPermission('badges.design', 'create badge templates')) {
+                navigate(`/badge-designer/designer/${eventId}/new`)
+              }
+            }}
             size="lg"
+            actionName="create badge templates"
           >
             <Plus className="h-5 w-5" />
             <span className="ml-2">Create New Template</span>
-          </Button>
+          </ProtectedButton>
         </div>
         
         {isLoading ? (
@@ -137,24 +150,32 @@ export function TemplateListPage() {
                   </div>
                   
                   <div className="flex gap-2">
-                    <Button
+                    <ProtectedButton
+                      permission="badges.design"
+                      onClick={() => {
+                        if (checkPermission('badges.design', 'edit badge templates')) {
+                          navigate(`/badge-designer/designer/${eventId}/${template.id}`)
+                        }
+                      }}
                       variant="default"
                       size="sm"
                       className="flex-1"
-                      onClick={() => navigate(`/badge-designer/designer/${eventId}/${template.id}`)}
+                      actionName="edit badge templates"
                     >
                       <Edit className="h-4 w-4" />
                       <span className="ml-2">Edit</span>
-                    </Button>
+                    </ProtectedButton>
                     
-                    <Button
+                    <ProtectedButton
+                      permission="badges.manage"
+                      onClick={() => handleDelete(template.id)}
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDelete(template.id)}
                       disabled={deleteMutation.isPending}
+                      actionName="delete badge templates"
                     >
                       <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </ProtectedButton>
                   </div>
                 </CardContent>
               </Card>

@@ -728,7 +728,7 @@ export default function VendorManagementModal({
                     value={quotationForm.event_id}
                     onValueChange={(value) => handleQuotationInputChange('event_id', value)}
                   >
-                    <SelectTrigger className={quotationErrors.event_id ? 'border-red-500' : ''}>
+                    <SelectTrigger className={quotationErrors.event_id ? 'border-error' : ''}>
                       <SelectValue
                         placeholder={loadingEvents ? "Loading events..." : "Select an event"}
                       />

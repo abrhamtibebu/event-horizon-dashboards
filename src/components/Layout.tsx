@@ -9,7 +9,7 @@ export function Layout() {
   const [searchQuery, setSearchQuery] = useState('')
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
           <Header onSearch={setSearchQuery} />

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Activity, Eye, EyeOff, Mail, Lock, User, ArrowRight } from 'lucide-react';
+import { SpinnerInline } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/use-toast';
 
 const Register = () => {
@@ -96,27 +97,27 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-purple-400/20 to-blue-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-primary/15 to-info/15 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-info/15 to-primary/15 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
 
       <div className="relative w-full max-w-md animate-fade-in">
         {/* Logo and Branding */}
         <div className="text-center mb-8 animate-scale-in">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-lg mb-4 transform hover:scale-105 transition-transform duration-200">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-gradient rounded-2xl shadow-lg mb-4 transform hover:scale-105 transition-transform duration-200">
             <Activity className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Join VEMS</h1>
-          <p className="text-gray-600">Create your account to get started</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Join VEMS</h1>
+          <p className="text-muted-foreground">Create your account to get started</p>
         </div>
 
-        <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm animate-slide-in-up">
+        <Card className="shadow-2xl border-0 bg-card/80 backdrop-blur-sm animate-slide-in-up">
           <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl font-semibold text-gray-900">Create Account</CardTitle>
-            <CardDescription className="text-gray-600">
+            <CardTitle className="text-2xl font-semibold text-card-foreground">Create Account</CardTitle>
+            <CardDescription className="text-muted-foreground">
               Fill in your details to create your account
             </CardDescription>
           </CardHeader>
@@ -125,11 +126,11 @@ const Register = () => {
             <CardContent className="space-y-4">
               {/* Name Field */}
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+                <Label htmlFor="name" className="text-sm font-medium text-foreground">
                   Full Name
                 </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="name"
                     name="name"
@@ -137,7 +138,7 @@ const Register = () => {
                     value={formData.name}
                     onChange={handleChange}
                     placeholder="Enter your full name"
-                    className={`pl-10 transition-all duration-200 focus:ring-2 focus:ring-blue-500/20 ${
+                    className={`pl-10 transition-all duration-200 focus:ring-2 focus:ring-info/20 ${
                       errors.name ? 'border-red-500 focus:ring-red-500/20' : ''
                     }`}
                     disabled={isLoading}
@@ -150,11 +151,11 @@ const Register = () => {
 
               {/* Email Field */}
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                <Label htmlFor="email" className="text-sm font-medium text-foreground">
                   Email Address
                 </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
                     name="email"
@@ -162,7 +163,7 @@ const Register = () => {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="Enter your email"
-                    className={`pl-10 transition-all duration-200 focus:ring-2 focus:ring-blue-500/20 ${
+                    className={`pl-10 transition-all duration-200 focus:ring-2 focus:ring-info/20 ${
                       errors.email ? 'border-red-500 focus:ring-red-500/20' : ''
                     }`}
                     disabled={isLoading}
@@ -175,11 +176,11 @@ const Register = () => {
 
               {/* Password Field */}
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                <Label htmlFor="password" className="text-sm font-medium text-foreground">
                   Password
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
                     name="password"
@@ -187,7 +188,7 @@ const Register = () => {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="Create a password"
-                    className={`pl-10 pr-10 transition-all duration-200 focus:ring-2 focus:ring-blue-500/20 ${
+                    className={`pl-10 pr-10 transition-all duration-200 focus:ring-2 focus:ring-info/20 ${
                       errors.password ? 'border-red-500 focus:ring-red-500/20' : ''
                     }`}
                     disabled={isLoading}
@@ -195,7 +196,7 @@ const Register = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                    className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors duration-200"
                     disabled={isLoading}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -208,11 +209,11 @@ const Register = () => {
 
               {/* Confirm Password Field */}
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
+                <Label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
                   Confirm Password
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="confirmPassword"
                     name="confirmPassword"
@@ -220,7 +221,7 @@ const Register = () => {
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     placeholder="Confirm your password"
-                    className={`pl-10 pr-10 transition-all duration-200 focus:ring-2 focus:ring-blue-500/20 ${
+                    className={`pl-10 pr-10 transition-all duration-200 focus:ring-2 focus:ring-info/20 ${
                       errors.confirmPassword ? 'border-red-500 focus:ring-red-500/20' : ''
                     }`}
                     disabled={isLoading}
@@ -228,7 +229,7 @@ const Register = () => {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                    className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors duration-200"
                     disabled={isLoading}
                   >
                     {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -244,17 +245,17 @@ const Register = () => {
                 <input
                   type="checkbox"
                   id="terms"
-                  className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="mt-0.5 rounded border-border text-primary focus:ring-primary"
                   disabled={isLoading}
                   required
                 />
-                <label htmlFor="terms" className="text-gray-600 leading-relaxed">
+                <label htmlFor="terms" className="text-muted-foreground leading-relaxed">
                   I agree to the{' '}
-                  <Link to="/terms" className="text-blue-600 hover:text-blue-500 hover:underline">
+                  <Link to="/terms" className="text-info hover:text-info/80 hover:underline">
                     Terms of Service
                   </Link>{' '}
                   and{' '}
-                  <Link to="/privacy" className="text-blue-600 hover:text-blue-500 hover:underline">
+                  <Link to="/privacy" className="text-info hover:text-info/80 hover:underline">
                     Privacy Policy
                   </Link>
                 </label>
@@ -264,12 +265,12 @@ const Register = () => {
             <CardFooter className="flex flex-col space-y-4">
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium py-2.5 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className="w-full bg-brand-gradient text-foreground font-medium py-2.5 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <SpinnerInline />
                     <span>Creating account...</span>
                   </div>
                 ) : (
@@ -280,11 +281,11 @@ const Register = () => {
                 )}
               </Button>
 
-              <div className="text-center text-sm text-gray-600">
+              <div className="text-center text-sm text-muted-foreground">
                 Already have an account?{' '}
                 <Link
                   to="/signin"
-                  className="text-blue-600 hover:text-blue-500 font-medium transition-colors duration-200 hover:underline"
+                  className="text-primary hover:text-primary/80 font-medium transition-colors duration-200 hover:underline"
                 >
                   Sign in
                 </Link>
@@ -294,7 +295,7 @@ const Register = () => {
         </Card>
 
         {/* Footer */}
-        <div className="mt-8 text-center text-xs text-gray-500">
+        <div className="mt-8 text-center text-xs text-muted-foreground/70">
           <p>© 2024 VEMS. All rights reserved.</p>
         </div>
       </div>

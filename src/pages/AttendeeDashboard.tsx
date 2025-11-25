@@ -15,6 +15,7 @@ import {
   Share2,
 } from 'lucide-react'
 import { MetricCard } from '@/components/MetricCard'
+import { Spinner } from '@/components/ui/spinner'
 import { DashboardCard } from '@/components/DashboardCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -60,17 +61,21 @@ export default function AttendeeDashboard() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
-        return 'bg-green-100 text-green-800'
+        return 'bg-green-500/10 dark:bg-green-900/30 text-green-800 dark:text-green-300'
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'bg-yellow-500/10 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
       case 'cancelled':
-        return 'bg-red-100 text-red-800'
+        return 'bg-red-500/10 dark:bg-red-900/30 text-red-800 dark:text-red-300'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-muted text-muted-foreground'
     }
   }
 
-  if (loading) return <div>Loading dashboard...</div>
+  if (loading) return (
+    <div className="min-h-[300px] flex items-center justify-center">
+      <Spinner size="lg" variant="primary" text="Loading dashboard..." />
+    </div>
+  )
   if (error) return <div className="text-red-500">{error}</div>
   if (!dashboardData) return <div>No dashboard data available.</div>
 
@@ -142,7 +147,7 @@ export default function AttendeeDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-4">
         <Link
           to="/dashboard/locate-badges"
-          className="block p-4 text-center bg-gray-50 hover:bg-gray-100 rounded-lg w-full"
+          className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg w-full"
         >
           <MapPin className="w-8 h-8 mx-auto mb-2 text-blue-600" />
           <span className="font-medium">Locate Badges</span>
@@ -154,7 +159,7 @@ export default function AttendeeDashboard() {
         {/* Search and Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
               placeholder="Search events..."
               value={searchTerm}
@@ -183,9 +188,9 @@ export default function AttendeeDashboard() {
           {filteredEvents?.map((event: any) => (
             <div
               key={event.id}
-              className="bg-white border rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+              className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow"
             >
-              <div className="h-48 bg-gradient-to-r from-blue-100 to-purple-100 overflow-hidden">
+              <div className="h-48 bg-gradient-to-r from-[hsl(var(--color-warning))]/20 to-[hsl(var(--primary))]/20 overflow-hidden">
                 {event.event_image ? (
                   <img
                                     src={getImageUrl(event.event_image)}
@@ -193,7 +198,7 @@ export default function AttendeeDashboard() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="flex items-center justify-center w-full h-full text-gray-300">
+                  <div className="flex items-center justify-center w-full h-full text-muted-foreground/50">
                     <Calendar className="w-16 h-16" />
                   </div>
                 )}
@@ -207,32 +212,32 @@ export default function AttendeeDashboard() {
                       size="sm"
                       variant="ghost"
                       className={
-                        event.isFavorite ? 'text-red-500' : 'text-gray-400'
+                        event.isFavorite ? 'text-red-500' : 'text-muted-foreground'
                       }
                     >
                       <Heart className="w-4 h-4" />
                     </Button>
-                    <Button size="sm" variant="ghost" className="text-gray-400">
+                    <Button size="sm" variant="ghost" className="text-muted-foreground">
                       <Share2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
 
-                <h3 className="font-semibold text-gray-900">{event.name}</h3>
-                <p className="text-sm text-gray-600 line-clamp-2">
+                <h3 className="font-semibold text-card-foreground">{event.name}</h3>
+                <p className="text-sm text-muted-foreground line-clamp-2">
                   {event.description}
                 </p>
 
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="w-4 h-4" />
                     <span>{event.date}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="w-4 h-4" />
                     <span>{event.time}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <MapPin className="w-4 h-4" />
                     <span>{event.location}</span>
                   </div>
@@ -246,11 +251,11 @@ export default function AttendeeDashboard() {
                         {event.rating}
                       </span>
                     </div>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-muted-foreground/70">
                       ({event.attendees} attending)
                     </span>
                   </div>
-                  <span className="font-bold text-lg text-gray-900">
+                  <span className="font-bold text-lg text-card-foreground">
                     ${event.price}
                   </span>
                 </div>
@@ -259,7 +264,7 @@ export default function AttendeeDashboard() {
                   <Link to={`/events/${event.id}`} className="w-full">
                     <Button
                       size="sm"
-                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600"
+                      className="w-full bg-brand-gradient bg-brand-gradient-hover text-foreground"
                       disabled={event.isRegistered}
                     >
                       {event.isRegistered ? 'Registered' : 'View Event'}
@@ -277,15 +282,15 @@ export default function AttendeeDashboard() {
         <DashboardCard title="My Registered Events">
           <div className="space-y-4">
             {filteredRegisteredEvents?.map((event: any) => (
-              <div key={event.id} className="p-4 bg-gray-50 rounded-lg">
+              <div key={event.id} className="p-4 bg-muted/50 rounded-lg">
                 <div className="flex justify-between items-start mb-2">
-                  <h4 className="font-medium text-gray-900">{event.name}</h4>
+                  <h4 className="font-medium text-card-foreground">{event.name}</h4>
                   <Badge className={getStatusColor(event.status)}>
                     {event.status}
                   </Badge>
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm text-gray-600 mb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm text-muted-foreground mb-2">
                   <div className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
                     <span>{event.date}</span>
@@ -296,13 +301,13 @@ export default function AttendeeDashboard() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
                   <MapPin className="w-4 h-4" />
                   <span>{event.location}</span>
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-muted-foreground/70">
                     Ticket: {event.ticket}
                   </span>
                   <div className="flex gap-2 w-full sm:w-auto">
@@ -327,11 +332,11 @@ export default function AttendeeDashboard() {
         <DashboardCard title="Networking Opportunities">
           <div className="space-y-4">
             {networkingOpportunities?.map((group: any) => (
-              <div key={group.id} className="p-4 bg-gray-50 rounded-lg">
+              <div key={group.id} className="p-4 bg-muted/50 rounded-lg">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
-                    <h4 className="font-medium text-gray-900">{group.name}</h4>
-                    <p className="text-sm text-gray-600">
+                    <h4 className="font-medium text-card-foreground">{group.name}</h4>
+                    <p className="text-sm text-muted-foreground">
                       {group.members} members • {group.category}
                     </p>
                   </div>
@@ -341,11 +346,11 @@ export default function AttendeeDashboard() {
             ))}
           </div>
 
-          <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">
+          <div className="mt-4 p-4 bg-blue-500/10 dark:bg-blue-900/20 rounded-lg">
+            <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">
               Start a Conversation
             </h4>
-            <p className="text-sm text-blue-700 mb-3">
+            <p className="text-sm text-blue-700 dark:text-blue-400 mb-3">
               Connect with other attendees and share experiences
             </p>
             <Button size="sm" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
@@ -360,13 +365,13 @@ export default function AttendeeDashboard() {
       <DashboardCard title="Recommended for You">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {recommendedEvents?.map((event: any) => (
-            <div key={event.id} className="p-4 bg-gray-50 rounded-lg">
+            <div key={event.id} className="p-4 bg-muted/50 rounded-lg">
               <div className="flex justify-between items-start mb-2">
-                <h4 className="font-medium text-gray-900">{event.name}</h4>
+                <h4 className="font-medium text-card-foreground">{event.name}</h4>
                 <Badge variant="outline">{event.category}</Badge>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-4 text-sm text-gray-600">
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   <span>{event.date}</span>
                   <div className="flex items-center gap-1">
                     <Star className="w-4 h-4 text-yellow-500" />

@@ -20,8 +20,9 @@ import {
 } from '@/components/ui/select'
 import { UserPlus, X, Plus } from 'lucide-react'
 import { toast } from 'sonner'
-import api, { getEventUshers, updateUsherTasks, assignUshersToEvent, getUshers } from '@/lib/api'
+import api, { getEventUshers, updateUsherTasks, assignUshersToEvent, getAvailableUshersForEvent } from '@/lib/api'
 import { useAuth } from '@/hooks/use-auth'
+import { Spinner } from '@/components/ui/spinner'
 
 interface UsherAssignmentDialogProps {
   eventId: number
@@ -69,11 +70,15 @@ export function UsherAssignmentDialog({
   const loadAllUshers = async () => {
     setLoading(true)
     try {
-      const response = await getUshers()
-      setAvailableUshers(response.data)
-    } catch (error) {
-      console.error('Failed to load ushers:', error)
-      toast.error('Failed to load ushers')
+      const response = await getAvailableUshersForEvent(eventId)
+      // Handle paginated response structure
+      const ushersData = response.data?.data || response.data || []
+      setAvailableUshers(Array.isArray(ushersData) ? ushersData : [])
+    } catch (error: any) {
+      console.error('Failed to load available ushers:', error)
+      const errorMessage = error.response?.data?.message || 'Failed to load available ushers'
+      toast.error(errorMessage)
+      setAvailableUshers([])
     } finally {
       setLoading(false)
     }
@@ -82,9 +87,12 @@ export function UsherAssignmentDialog({
   const loadAssignedUshers = async () => {
     try {
       const response = await getEventUshers(eventId)
-      setAssignedUshers(response.data)
-    } catch (error) {
+      // Handle paginated response structure
+      const ushersData = response.data?.data || response.data || []
+      setAssignedUshers(Array.isArray(ushersData) ? ushersData : [])
+    } catch (error: any) {
       console.error('Failed to load assigned ushers:', error)
+      setAssignedUshers([])
     }
   }
 
@@ -176,8 +184,8 @@ export function UsherAssignmentDialog({
 
         {/* Show current usher assignments */}
         {assignedUshers.length > 0 && (
-          <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-            <div className="font-semibold mb-2">Currently Assigned Ushers:</div>
+          <div className="mb-4 p-4 bg-muted/50 rounded-lg border border-border">
+            <div className="font-semibold mb-2 text-foreground">Currently Assigned Ushers:</div>
             <ul className="space-y-2">
               {assignedUshers.map((usher: any) => (
                 <li key={usher.id} className="flex flex-col md:flex-row md:items-center md:gap-4">
@@ -217,13 +225,17 @@ export function UsherAssignmentDialog({
 
         <div className="space-y-4 max-h-96 overflow-y-auto">
           {loading ? (
-            <div className="text-center py-4">Loading available ushers...</div>
+            <div className="text-center py-8">
+              <Spinner size="md" text="Loading available ushers..." />
+            </div>
           ) : availableUshers.length === 0 ? (
-            <div className="text-center py-4 text-gray-500">
-              No available ushers found.
+            <div className="text-center py-8 text-muted-foreground">
+              <UserPlus className="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
+              <p className="font-medium">No available ushers found</p>
+              <p className="text-sm mt-1">All ushers may already be assigned to this event.</p>
             </div>
           ) : usherAssignments.map((assignment, index) => (
-            <div key={index} className="p-4 border rounded-lg mb-4 bg-gray-50 space-y-2">
+            <div key={index} className="p-4 border rounded-lg mb-4 bg-muted/30 space-y-2">
               <div className="flex flex-col md:flex-row md:items-center gap-2">
                 <div className="flex-1">
                   <Label>Usher</Label>

@@ -62,14 +62,14 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="relative w-full max-w-md animate-fade-in">
-        <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm">
+        <Card className="shadow-2xl border-0 bg-card/80 backdrop-blur-sm">
           <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl font-semibold text-gray-900">
+            <CardTitle className="text-2xl font-semibold text-card-foreground">
               Reset Password
             </CardTitle>
-            <CardDescription className="text-gray-600">
+            <CardDescription className="text-muted-foreground">
               Enter your new password below.
             </CardDescription>
           </CardHeader>
@@ -79,12 +79,12 @@ export default function ResetPassword() {
               <div className="space-y-2">
                 <Label
                   htmlFor="password"
-                  className="text-sm font-medium text-gray-700"
+                  className="text-sm font-medium text-foreground"
                 >
                   New Password
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
@@ -97,7 +97,7 @@ export default function ResetPassword() {
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-700"
+                    className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
                     tabIndex={-1}
                     onClick={() => setShowPassword((v) => !v)}
                   >
@@ -112,12 +112,12 @@ export default function ResetPassword() {
               <div className="space-y-2">
                 <Label
                   htmlFor="password-confirmation"
-                  className="text-sm font-medium text-gray-700"
+                  className="text-sm font-medium text-foreground"
                 >
                   Confirm New Password
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password-confirmation"
                     type={showPasswordConfirm ? 'text' : 'password'}
@@ -130,7 +130,7 @@ export default function ResetPassword() {
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-700"
+                    className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
                     tabIndex={-1}
                     onClick={() => setShowPasswordConfirm((v) => !v)}
                   >
@@ -144,17 +144,17 @@ export default function ResetPassword() {
               </div>
 
               {error && (
-                <p className="text-red-500 text-sm text-center">{error}</p>
+                <p className="text-error text-sm text-center">{error}</p>
               )}
               {message && (
-                <p className="text-green-600 text-sm text-center">{message}</p>
+                <p className="text-success text-sm text-center">{message}</p>
               )}
             </CardContent>
 
             <CardContent className="flex flex-col space-y-4">
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                className="w-full bg-brand-gradient text-white"
                 disabled={isLoading || !token}
               >
                 {isLoading ? 'Resetting...' : 'Reset Password'}

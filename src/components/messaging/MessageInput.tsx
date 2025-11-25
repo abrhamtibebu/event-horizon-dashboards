@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react'
-import { Send, Paperclip, X, Smile, Image as ImageIcon, Upload } from 'lucide-react'
+import { Send, Paperclip, X, Smile, Image as ImageIcon, Upload, Loader2 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
 import { Badge } from '../ui/badge'
@@ -9,11 +9,27 @@ import { useMessageInput, useSendDirectMessage } from '../../hooks/use-messages'
 import { useModernAlerts } from '../../hooks/useModernAlerts'
 import { useTypingIndicator } from '../../hooks/use-typing-indicator'
 import { useAuth } from '../../hooks/use-auth'
+import { usePermissionCheck } from '../../hooks/use-permission-check'
 import { useMentionDetection } from '../../hooks/use-mention-detection'
 import { useUserSearch } from '../../hooks/use-user-search'
 import { MentionDropdown } from './MentionDropdown'
 import { playMessageSent } from '../../lib/sounds'
 import type { Message, User } from '../../types/message'
+
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]
+const ACCEPTED_FILE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf', '.doc', '.docx', '.xls', '.xlsx']
+const FILE_TYPES_LABEL = 'JPG, PNG, WEBP, GIF, PDF, DOC, DOCX, XLS, XLSX'
 
 interface MessageInputProps {
   conversationId: string | null
@@ -47,6 +63,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   // Modern alerts system
   const { showError } = useModernAlerts()
   const { user } = useAuth()
+  const { checkPermission } = usePermissionCheck()
   
   const {
     content,
@@ -63,8 +80,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   // Typing indicator hook
   const { startTyping, stopTyping } = useTypingIndicator({
     conversationId,
-    currentUserId: user?.id || 1,
-    isGroup,
+    currentUserId: user?.id ?? null,
   })
 
   // Mention detection
@@ -153,7 +169,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }, [mentionState.isActive])
 
   const handleSend = async () => {
-    if (!canSend || !recipientId || !user?.id) return
+    if (!canSend || !recipientId || !user?.id || sendMessageMutation.isPending) return
 
     // Extract event ID from conversation ID for group messages
     const eventId = conversationId?.startsWith('event_') 
@@ -235,6 +251,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       }
     } catch (error) {
       console.error('Failed to send message:', error)
+      showError('Message not sent', 'Something went wrong while sending. Please try again.')
       // The optimistic message will show as failed
       // The parent component should handle retry logic
     }
@@ -283,12 +300,23 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }
 
+  const validateFile = useCallback((file: File) => {
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      showError('Unsupported File Type', `Allowed types: ${FILE_TYPES_LABEL}`)
+      return false
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      showError('File Too Large', 'File size must be less than 10MB')
+      return false
+    }
+    return true
+  }, [showError])
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      // Check file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
-        showError('File Too Large', 'File size must be less than 10MB')
+      if (!validateFile(file)) {
+        e.target.value = ''
         return
       }
       handleFileSelect(file)
@@ -329,15 +357,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     if (files.length > 0) {
       const file = files[0] // Only handle first file for now
       
-      // Check file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
-        showError('File Too Large', 'File size must be less than 10MB')
+      if (!validateFile(file)) {
         return
       }
       
       handleFileSelect(file)
     }
-  }, [showError, handleFileSelect])
+  }, [showError, handleFileSelect, validateFile])
 
   // Paste handler for images
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
@@ -347,15 +373,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     if (imageItem) {
       const file = imageItem.getAsFile()
       if (file) {
-        // Check file size (10MB limit)
-        if (file.size > 10 * 1024 * 1024) {
-          showError('File Too Large', 'File size must be less than 10MB')
+        if (!validateFile(file)) {
           return
         }
         handleFileSelect(file)
       }
     }
-  }, [showError, handleFileSelect])
+  }, [showError, handleFileSelect, validateFile])
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
@@ -374,7 +398,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   if (!conversationId) {
     return (
-      <div className="p-6 border-t border-slate-200 bg-slate-50 text-center text-slate-500">
+      <div className="p-6 border-t border-border bg-muted/30 text-center text-muted-foreground">
         <p className="text-sm font-medium">Select a conversation to start messaging</p>
       </div>
     )
@@ -382,7 +406,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   return (
     <div 
-      className="bg-white relative"
+      className="bg-card relative"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -390,28 +414,28 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     >
       {/* Enhanced Drag overlay */}
       {isDragOver && (
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-2 border-dashed border-blue-500 rounded-lg flex items-center justify-center z-50 backdrop-blur-sm">
+        <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-lg flex items-center justify-center z-50 backdrop-blur-sm">
           <div className="text-center">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Upload className="w-8 h-8 text-blue-600" />
+            <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Upload className="w-8 h-8 text-primary" />
             </div>
-            <p className="text-blue-600 font-bold text-lg mb-1">Drop file here to upload</p>
-            <p className="text-blue-500 text-sm">Supports images, documents, and more</p>
+            <p className="text-primary font-bold text-lg mb-1">Drop file here to upload</p>
+            <p className="text-muted-foreground text-sm">Supports images, documents, and more</p>
           </div>
         </div>
       )}
 
       {/* WhatsApp-style Reply indicator */}
       {replyingTo && (
-        <div className="px-6 py-2 bg-slate-50 border-b border-slate-200 shadow-sm">
+        <div className="px-6 py-2 bg-muted/30 border-b border-border shadow-sm">
           <div className="flex items-start justify-between space-x-3">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2 px-3 py-2 bg-white border-l-4 border-blue-500 rounded hover:bg-slate-50 transition-colors">
+              <div className="flex items-center space-x-2 px-3 py-2 bg-card border-l-4 border-primary rounded hover:bg-muted/50 transition-colors">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-blue-600 mb-0.5">
+                  <p className="text-xs font-semibold text-primary mb-0.5">
                     {replyingTo.sender.name}
                   </p>
-                  <p className="text-sm text-slate-700 truncate">
+                  <p className="text-sm text-foreground truncate">
                     {replyingTo.file_path && !replyingTo.content 
                       ? `📎 ${replyingTo.file_name || 'Attachment'}`
                       : (replyingTo.content.length > 60 
@@ -424,7 +448,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                   variant="ghost"
                   size="sm"
                   onClick={onCancelReply}
-                  className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-full flex-shrink-0"
+                  className="text-muted-foreground hover:text-foreground hover:bg-accent p-1.5 rounded-full flex-shrink-0"
                   title="Cancel reply"
                 >
                   <X className="w-4 h-4" />
@@ -437,17 +461,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
       {/* Enhanced File preview */}
       {selectedFile && (
-        <div className="px-6 py-3 bg-slate-50 border-b border-slate-200">
+        <div className="px-6 py-3 bg-muted/30 border-b border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center shadow-sm">
+              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center shadow-sm">
                 {getFileIcon(selectedFile)}
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-900">
+                <p className="text-sm font-semibold text-foreground">
                   {selectedFile.name}
                 </p>
-                <p className="text-xs text-slate-500 font-medium">
+                <p className="text-xs text-muted-foreground font-medium">
                   {formatFileSize(selectedFile.size)}
                 </p>
               </div>
@@ -456,7 +480,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               variant="ghost"
               size="sm"
               onClick={clearFile}
-              className="text-slate-500 hover:text-slate-700 hover:bg-slate-200 p-2 rounded-full"
+              className="text-muted-foreground hover:text-foreground hover:bg-accent p-2 rounded-full"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -472,7 +496,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
-            className="text-slate-500 hover:text-blue-600 hover:bg-blue-50 p-2.5 rounded-lg transition-colors"
+            className="text-muted-foreground hover:text-primary hover:bg-primary/10 p-2.5 rounded-lg transition-colors"
             title="Attach file"
           >
             <Paperclip className="w-5 h-5" />
@@ -484,7 +508,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             type="file"
             onChange={handleFileChange}
             className="hidden"
-            accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
+            accept={ACCEPTED_FILE_EXTENSIONS.join(',')}
           />
           
           {/* Text input */}
@@ -498,7 +522,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               onSelect={handleCursorChange}
               onClick={handleCursorChange}
               placeholder="Type a message... (use @ to mention someone)"
-              className="min-h-[48px] max-h-32 resize-none border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pr-14 text-slate-900 placeholder:text-slate-400 shadow-sm"
+              className="min-h-[48px] max-h-32 resize-none border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl pr-14 text-foreground placeholder:text-muted-foreground shadow-sm"
               rows={1}
             />
             
@@ -508,7 +532,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors h-8 w-8"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-primary hover:bg-primary/10 p-2 rounded-lg transition-colors h-8 w-8"
                   title="Add emoji"
                 >
                   <Smile className="w-4 h-4" />
@@ -537,20 +561,24 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             disabled={!canSend || sendMessageMutation.isPending}
             className={`rounded-full px-5 py-2.5 h-auto font-semibold shadow-md transition-all ${
               canSend 
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white' 
-                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                ? 'bg-brand-gradient text-foreground hover:opacity-90' 
+                : 'bg-muted text-muted-foreground cursor-not-allowed'
             }`}
             title="Send message"
           >
-            <Send className="w-4 h-4" />
+            {sendMessageMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </Button>
         </div>
         
         {/* Character count */}
-        <div className="flex justify-between items-center mt-2 text-xs text-slate-500">
+        <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground">
           <span>
             {selectedFile && (
-              <span className="text-blue-600 flex items-center font-medium">
+              <span className="text-primary flex items-center font-medium">
                 <Paperclip className="w-3 h-3 mr-1" />
                 {selectedFile.name}
               </span>

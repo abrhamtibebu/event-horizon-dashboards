@@ -50,7 +50,7 @@ export function InvitationsList({ eventId, userId, isOrganizer }: InvitationsLis
     return (
       <Card className="p-6">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       </Card>
     );
@@ -58,13 +58,13 @@ export function InvitationsList({ eventId, userId, isOrganizer }: InvitationsLis
 
   return (
     <>
-      <Card className="p-6">
-        <h3 className="text-xl font-semibold mb-4">
+      <Card className="p-6 border border-border">
+        <h3 className="text-xl font-semibold mb-4 text-foreground">
           {isOrganizer ? 'All Invitations' : 'My Invitations'}
         </h3>
 
         {!invitations || invitations.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-muted-foreground">
             <p>No invitations generated yet.</p>
             <p className="text-sm mt-2">Generate your first invitation link above to start tracking!</p>
           </div>
@@ -72,23 +72,23 @@ export function InvitationsList({ eventId, userId, isOrganizer }: InvitationsLis
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Type</TableHead>
-                  {isOrganizer && <TableHead>User</TableHead>}
-                  <TableHead>Created</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-center">Clicks</TableHead>
-                  <TableHead className="text-center">Shares</TableHead>
-                  <TableHead className="text-center">Registrations</TableHead>
-                  <TableHead className="text-center">Conv. Rate</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="text-foreground">Code</TableHead>
+                  <TableHead className="text-foreground">Type</TableHead>
+                  {isOrganizer && <TableHead className="text-foreground">User</TableHead>}
+                  <TableHead className="text-foreground">Created</TableHead>
+                  <TableHead className="text-foreground">Status</TableHead>
+                  <TableHead className="text-center text-foreground">Clicks</TableHead>
+                  <TableHead className="text-center text-foreground">Shares</TableHead>
+                  <TableHead className="text-center text-foreground">Registrations</TableHead>
+                  <TableHead className="text-center text-foreground">Conv. Rate</TableHead>
+                  <TableHead className="text-right text-foreground">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {invitations.map((invitation) => (
-                  <TableRow key={invitation.id}>
-                    <TableCell className="font-mono text-sm">
+                  <TableRow key={invitation.id} className="hover:bg-muted/50">
+                    <TableCell className="font-mono text-sm text-foreground">
                       {invitation.invitation_code}
                     </TableCell>
                     <TableCell>
@@ -97,11 +97,11 @@ export function InvitationsList({ eventId, userId, isOrganizer }: InvitationsLis
                       </Badge>
                     </TableCell>
                     {isOrganizer && (
-                      <TableCell className="text-sm">
+                      <TableCell className="text-sm text-foreground">
                         {invitation.user_name}
                       </TableCell>
                     )}
-                    <TableCell className="text-sm">
+                    <TableCell className="text-sm text-muted-foreground">
                       {format(parseISO(invitation.created_at), 'MMM d, yyyy')}
                     </TableCell>
                     <TableCell>
@@ -115,17 +115,17 @@ export function InvitationsList({ eventId, userId, isOrganizer }: InvitationsLis
                         {invitation.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-center font-semibold">
+                    <TableCell className="text-center font-semibold text-foreground">
                       {invitation.stats.total_clicks}
                     </TableCell>
-                    <TableCell className="text-center font-semibold">
+                    <TableCell className="text-center font-semibold text-foreground">
                       {invitation.stats.total_shares}
                     </TableCell>
-                    <TableCell className="text-center font-semibold text-green-600">
+                    <TableCell className="text-center font-semibold text-success">
                       {invitation.stats.total_registrations}
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className="text-sm font-medium">
+                      <span className="text-sm font-medium text-foreground">
                         {formatConversionRate(
                           invitation.stats.total_registrations,
                           invitation.stats.total_clicks
@@ -139,6 +139,7 @@ export function InvitationsList({ eventId, userId, isOrganizer }: InvitationsLis
                           variant="ghost"
                           onClick={() => handleCopyLink(invitation.invitation_url)}
                           title="Copy Link"
+                          className="hover:bg-muted"
                         >
                           <Copy className="w-4 h-4" />
                         </Button>
@@ -150,6 +151,7 @@ export function InvitationsList({ eventId, userId, isOrganizer }: InvitationsLis
                             code: invitation.invitation_code 
                           })}
                           title="View QR Code"
+                          className="hover:bg-muted"
                         >
                           <QrCode className="w-4 h-4" />
                         </Button>
@@ -158,6 +160,7 @@ export function InvitationsList({ eventId, userId, isOrganizer }: InvitationsLis
                           variant="ghost"
                           onClick={() => window.open(invitation.invitation_url, '_blank')}
                           title="Open Link"
+                          className="hover:bg-muted"
                         >
                           <ExternalLink className="w-4 h-4" />
                         </Button>
@@ -168,8 +171,9 @@ export function InvitationsList({ eventId, userId, isOrganizer }: InvitationsLis
                             onClick={() => handleRevoke(invitation.id)}
                             title="Revoke Invitation"
                             disabled={revokeMutation.isPending}
+                            className="hover:bg-error/10"
                           >
-                            <X className="w-4 h-4 text-red-600" />
+                            <X className="w-4 h-4 text-error" />
                           </Button>
                         )}
                       </div>
@@ -195,7 +199,7 @@ export function InvitationsList({ eventId, userId, isOrganizer }: InvitationsLis
                 alt="Invitation QR Code"
                 className="w-64 h-64 border rounded"
               />
-              <p className="text-sm text-gray-600 font-mono">
+              <p className="text-sm text-muted-foreground font-mono">
                 Code: {selectedQR.code}
               </p>
               <Button

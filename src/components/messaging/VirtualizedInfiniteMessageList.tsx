@@ -128,11 +128,10 @@ export const VirtualizedInfiniteMessageList: React.FC<VirtualizedInfiniteMessage
   }
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-2 space-y-4 min-h-0 message-thread-scrollbar"
-      >
+    <div 
+      ref={scrollRef}
+      className="flex-1 overflow-y-auto px-4 py-2 space-y-4 min-h-0 message-thread-scrollbar"
+    >
         {/* Load more trigger */}
         {hasMore && (
           <div ref={loadingRef} className="flex justify-center py-4">
@@ -187,8 +186,7 @@ export const VirtualizedInfiniteMessageList: React.FC<VirtualizedInfiniteMessage
               )}
             </div>
           )
-        })}
-      </div>
+          })}
     </div>
   )
 }

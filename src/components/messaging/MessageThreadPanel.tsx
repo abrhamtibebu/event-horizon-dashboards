@@ -75,57 +75,57 @@ export const MessageThreadPanel: React.FC<MessageThreadPanelProps> = ({
   const isOwnMessage = parentMessage.sender_id === user?.id
 
   return (
-    <div className="w-[480px] bg-white border-l border-slate-200 flex flex-col h-full shadow-xl">
+    <div className="w-[480px] bg-card border-l border-border flex flex-col h-full shadow-xl">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+      <div className="bg-brand-gradient px-6 py-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
-            <MessageSquare className="w-5 h-5 text-white" />
-            <h3 className="text-lg font-bold text-white">Thread</h3>
+            <MessageSquare className="w-5 h-5 text-foreground" />
+            <h3 className="text-lg font-bold text-foreground">Thread</h3>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="text-white hover:bg-white/10 p-2 rounded-lg"
+            className="text-foreground hover:bg-background/10 p-2 rounded-lg"
           >
             <X className="w-5 h-5" />
           </Button>
         </div>
-        <div className="flex items-center space-x-2 text-white/90 text-sm">
+        <div className="flex items-center space-x-2 text-foreground/90 text-sm">
           <MessageSquare className="w-4 h-4" />
           <span>{replies.length} {replies.length === 1 ? 'reply' : 'replies'}</span>
         </div>
       </div>
 
       {/* Parent Message */}
-      <div className="px-6 py-4 bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-50 border-b border-blue-100">
+      <div className="px-6 py-4 bg-muted/30 border-b border-border">
         <div className="flex items-start space-x-3">
-          <Avatar className="w-10 h-10 flex-shrink-0 ring-2 ring-white shadow-sm">
+          <Avatar className="w-10 h-10 flex-shrink-0 ring-2 ring-background shadow-sm">
             <AvatarImage src={parentMessage.sender?.profile_image} />
-            <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-semibold">
+            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
               {getInitials(parentMessage.sender?.name || 'User')}
             </AvatarFallback>
           </Avatar>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-2 mb-1">
-              <span className="font-semibold text-slate-900 text-sm">
+              <span className="font-semibold text-foreground text-sm">
                 {parentMessage.sender?.name || 'Unknown'}
               </span>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-muted-foreground">
                 {formatTime(parentMessage.created_at)}
               </span>
             </div>
             
-            <div className="bg-white rounded-lg px-4 py-3 shadow-sm border border-slate-200">
-              <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">
+            <div className="bg-card rounded-lg px-4 py-3 shadow-sm border border-border">
+              <p className="text-sm text-foreground whitespace-pre-wrap break-words">
                 {parentMessage.content}
               </p>
               
-              {parentMessage.file_path && (
-                <div className="mt-3 pt-3 border-t border-slate-100">
-                  <div className="flex items-center space-x-2 text-sm text-slate-600">
+              {(parentMessage.file_path || parentMessage.file_url) && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                     <Paperclip className="w-4 h-4" />
                     <span className="truncate">{parentMessage.file_name || 'Attachment'}</span>
                   </div>
@@ -140,7 +140,7 @@ export const MessageThreadPanel: React.FC<MessageThreadPanelProps> = ({
       <ScrollArea className="flex-1 px-6 py-4">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : replies.length > 0 ? (
           <div className="space-y-4">
@@ -148,34 +148,34 @@ export const MessageThreadPanel: React.FC<MessageThreadPanelProps> = ({
               <div key={reply.id} className="flex items-start space-x-3">
                 <Avatar className="w-9 h-9 flex-shrink-0">
                   <AvatarImage src={reply.sender?.profile_image} />
-                  <AvatarFallback className="bg-slate-100 text-slate-700 text-xs font-semibold">
+                  <AvatarFallback className="bg-muted text-muted-foreground text-xs font-semibold">
                     {getInitials(reply.sender?.name || 'User')}
                   </AvatarFallback>
                 </Avatar>
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2 mb-1">
-                    <span className="font-semibold text-slate-900 text-sm">
+                    <span className="font-semibold text-foreground text-sm">
                       {reply.sender?.name || 'Unknown'}
                     </span>
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-muted-foreground">
                       {formatTime(reply.created_at)}
                     </span>
                   </div>
                   
                   <div className={`rounded-lg px-4 py-2.5 ${
                     reply.sender_id === user?.id
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-900'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-foreground'
                   }`}>
                     <p className="text-sm whitespace-pre-wrap break-words">
                       {reply.content}
                     </p>
                   </div>
                   
-                  {reply.file_path && (
-                    <div className="mt-2 bg-slate-50 rounded-lg px-3 py-2 border border-slate-200">
-                      <div className="flex items-center space-x-2 text-sm text-slate-600">
+                  {(reply.file_path || reply.file_url) && (
+                    <div className="mt-2 bg-muted/50 rounded-lg px-3 py-2 border border-border">
+                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                         <Paperclip className="w-3 h-3" />
                         <span className="truncate text-xs">{reply.file_name || 'Attachment'}</span>
                       </div>
@@ -187,11 +187,11 @@ export const MessageThreadPanel: React.FC<MessageThreadPanelProps> = ({
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full flex items-center justify-center mb-4">
-              <MessageSquare className="w-8 h-8 text-blue-400" />
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+              <MessageSquare className="w-8 h-8 text-primary" />
             </div>
-            <h4 className="text-sm font-semibold text-slate-900 mb-1">No replies yet</h4>
-            <p className="text-xs text-slate-500 max-w-xs">
+            <h4 className="text-sm font-semibold text-foreground mb-1">No replies yet</h4>
+            <p className="text-xs text-muted-foreground max-w-xs">
               Start the conversation by adding a reply below
             </p>
           </div>
@@ -199,11 +199,11 @@ export const MessageThreadPanel: React.FC<MessageThreadPanelProps> = ({
       </ScrollArea>
 
       {/* Reply Input */}
-      <div className="border-t border-slate-200 bg-slate-50 px-6 py-4">
+      <div className="border-t border-border bg-muted/30 px-6 py-4">
         <div className="flex items-end space-x-3">
           <Avatar className="w-9 h-9 flex-shrink-0">
             <AvatarImage src={user?.profile_image} />
-            <AvatarFallback className="bg-blue-100 text-blue-700 text-xs font-semibold">
+            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
               {getInitials(user?.name || 'You')}
             </AvatarFallback>
           </Avatar>
@@ -214,12 +214,12 @@ export const MessageThreadPanel: React.FC<MessageThreadPanelProps> = ({
               onChange={(e) => setReplyContent(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Reply to thread..."
-              className="min-h-[44px] max-h-32 resize-none border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl text-sm"
+              className="min-h-[44px] max-h-32 resize-none border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl text-sm"
               rows={1}
               disabled={isSending}
             />
             <div className="flex items-center justify-between mt-2">
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-muted-foreground">
                 {replyContent.length}/2000
               </span>
             </div>
@@ -228,10 +228,10 @@ export const MessageThreadPanel: React.FC<MessageThreadPanelProps> = ({
           <Button
             onClick={handleSendReply}
             disabled={!replyContent.trim() || isSending}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2.5 rounded-xl"
+            className="bg-brand-gradient text-foreground shadow-lg disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2.5 rounded-xl"
           >
             {isSending ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
             ) : (
               <Send className="w-4 h-4" />
             )}

@@ -1,7 +1,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import type { PaymentStatus } from '@/types/tickets';
 
 interface PaymentProcessingModalProps {
@@ -45,7 +46,7 @@ export function PaymentProcessingModal({
           {/* Status Icon */}
           <div className="flex justify-center">
             {isProcessing && (
-              <Loader2 className="w-16 h-16 text-primary animate-spin" />
+              <Spinner size="xl" variant="primary" />
             )}
             {isSuccess && (
               <CheckCircle className="w-16 h-16 text-green-500" />

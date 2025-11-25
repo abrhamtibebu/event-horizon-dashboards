@@ -13,8 +13,10 @@ import api from '@/lib/api'
 
 interface Event {
   id: number
-  title: string
+  title?: string
+  name?: string
   start_date: string
+  status?: string
 }
 
 interface AudienceSelectorProps {
@@ -27,6 +29,8 @@ interface AudienceSelectorProps {
   onlyCheckedIn: boolean
   onSetCheckedIn: (value: boolean) => void
   onNext: () => void
+  onPrevious?: () => void
+  onRecipientCountChange?: (count: number) => void
 }
 
 export function AudienceSelector({
@@ -39,6 +43,8 @@ export function AudienceSelector({
   onlyCheckedIn,
   onSetCheckedIn,
   onNext,
+  onPrevious,
+  onRecipientCountChange,
 }: AudienceSelectorProps) {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
@@ -58,7 +64,11 @@ export function AudienceSelector({
     try {
       const response = await api.get('/events')
       const data = response.data.data || response.data
-      setEvents(Array.isArray(data) ? data : [])
+      // Filter to show only active and completed events
+      const filteredEvents = Array.isArray(data) ? data.filter((event: any) => 
+        event.status === 'active' || event.status === 'completed'
+      ) : []
+      setEvents(filteredEvents)
     } catch (error) {
       console.error('Error fetching events:', error)
       setEvents([])
@@ -70,24 +80,33 @@ export function AudienceSelector({
   const calculateRecipientCount = async () => {
     if (!selectedEventId) {
       setRecipientCount(null)
+      onRecipientCountChange?.(0)
       return
     }
 
     setCalculatingCount(true)
     try {
-      // Simulate count calculation - in real implementation, call API
-      // const response = await api.post(`/marketing/segments/preview`, {
-      //   event_id: selectedEventId,
-      //   ticket_types: selectedTicketTypes,
-      //   only_checked_in: onlyCheckedIn,
-      // })
-      // setRecipientCount(response.data.count)
-      
-      // For now, return a mock count
-      const mockCount = 250
-      setRecipientCount(mockCount)
-    } catch (error) {
+      const response = await api.post('/marketing/campaigns/calculate-recipients', {
+        event_id: selectedEventId,
+        audience_type: audienceType,
+        selected_ticket_types: selectedTicketTypes,
+        only_checked_in: onlyCheckedIn,
+      })
+      const count = response.data.count || 0
+      setRecipientCount(count)
+      onRecipientCountChange?.(count)
+    } catch (error: any) {
       console.error('Error calculating recipient count:', error)
+      // Log detailed error information
+      if (error.response) {
+        console.error('Error response:', {
+          status: error.response.status,
+          data: error.response.data,
+        })
+      }
+      // Set to 0 on error to show that count couldn't be calculated
+      setRecipientCount(0)
+      onRecipientCountChange?.(0)
     } finally {
       setCalculatingCount(false)
     }
@@ -115,29 +134,44 @@ export function AudienceSelector({
       {!useAdvanced && (
         <div className="space-y-4">
           {/* Event Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-blue-600" />
-                Select Event
-              </CardTitle>
-              <CardDescription>Choose which event's attendees to message</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Event Selection</h3>
+                <p className="text-sm text-gray-600">Choose which event's attendees to message</p>
+              </div>
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                <Calendar className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            
+            <div>
+              <Label className="text-sm font-medium text-gray-700 mb-2 block">Select Event</Label>
               <Select value={selectedEventId} onValueChange={onSelectEvent}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select an event" />
+                  <SelectValue placeholder="Choose an event" />
                 </SelectTrigger>
                 <SelectContent>
-                  {events.map(event => (
+                  {events.map((event) => (
                     <SelectItem key={event.id} value={event.id.toString()}>
-                      {event.title}
+                      <div className="flex flex-col">
+                        <span className="font-medium">{event.title || event.name}</span>
+                        {event.start_date && (
+                          <span className="text-sm text-gray-500">
+                            {new Date(event.start_date).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
           {/* Audience Type Selection */}
           {selectedEventId && (
@@ -257,22 +291,23 @@ export function AudienceSelector({
 
       {/* Validation Alert */}
       {!selectedEventId && (
-        <Alert variant="warning">
+        <Alert variant="default">
           <Info className="w-4 h-4" />
           <AlertDescription>Please select an event to continue</AlertDescription>
         </Alert>
       )}
 
       {/* Navigation */}
-      <div className="flex justify-between mt-8">
-        <Button variant="outline" onClick={() => {/* Go back */}}>
-          Back
-        </Button>
+      <div className="flex justify-between mt-8 pt-6 border-t">
+        {onPrevious && (
+          <Button variant="outline" onClick={onPrevious}>
+            Back
+          </Button>
+        )}
         <Button 
           onClick={onNext}
           disabled={!selectedEventId}
-          size="lg"
-          className="px-8"
+          className="ml-auto px-8"
         >
           Next Step
         </Button>

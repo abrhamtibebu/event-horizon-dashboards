@@ -28,6 +28,7 @@ import {
   Download,
   RefreshCw
 } from 'lucide-react';
+import Breadcrumbs from '@/components/Breadcrumbs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,9 @@ import { CreateSegment } from '@/components/marketing/CreateSegment';
 import { LibraryView } from '@/components/marketing/LibraryView';
 import { EnhancedAnalytics } from '@/components/marketing/EnhancedAnalytics';
 import { toast } from 'sonner';
+import { Spinner } from '@/components/ui/spinner';
+import { usePermissionCheck } from '@/hooks/use-permission-check';
+import { ProtectedButton } from '@/components/ProtectedButton';
 import api from '@/lib/api';
 
 interface MarketingStats {
@@ -176,12 +180,12 @@ export default function Marketing() {
     subtitle?: string;
   }) => {
     const colorClasses = {
-      blue: 'text-blue-600 bg-blue-50',
-      green: 'text-green-600 bg-green-50',
-      orange: 'text-orange-600 bg-orange-50',
-      purple: 'text-purple-600 bg-purple-50',
-      red: 'text-red-600 bg-red-50',
-    };
+      blue: 'text-info bg-info/10',
+      green: 'text-success bg-success/10',
+      orange: 'text-warning bg-warning/10',
+      purple: 'text-primary bg-primary/10',
+      red: 'text-error bg-error/10',
+    } as const;
 
     return (
       <Card className="relative overflow-hidden">
@@ -192,7 +196,7 @@ export default function Marketing() {
             </div>
             {growth !== undefined && (
               <div className={`flex items-center text-sm ${
-                growth >= 0 ? 'text-green-600' : 'text-red-600'
+                growth >= 0 ? 'text-success' : 'text-error'
               }`}>
                 {growth >= 0 ? (
                   <ArrowUpRight className="w-4 h-4 mr-1" />
@@ -203,14 +207,14 @@ export default function Marketing() {
               </div>
             )}
           </div>
-          <CardDescription className="text-sm font-medium text-gray-600">
+          <CardDescription className="text-sm font-medium text-muted-foreground">
             {title}
           </CardDescription>
-          <CardTitle className="text-2xl font-bold text-gray-900">
+          <CardTitle className="text-2xl font-bold text-card-foreground">
             {typeof value === 'number' ? value.toLocaleString() : value}
           </CardTitle>
           {subtitle && (
-            <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">{subtitle}</p>
           )}
         </CardHeader>
       </Card>
@@ -219,29 +223,36 @@ export default function Marketing() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading marketing dashboard...</p>
+          <Spinner size="lg" variant="primary" text="Loading marketing dashboard..." />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
+        {/* Breadcrumbs */}
+        <Breadcrumbs 
+          items={[
+            { label: 'Marketing', href: '/dashboard/marketing' }
+          ]}
+          className="mb-4"
+        />
+        
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg">
-                  <Mail className="w-8 h-8 text-white" />
+              <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
+                <div className="p-2 bg-primary rounded-lg">
+                  <Mail className="w-8 h-8 text-primary-foreground" />
                 </div>
                 Marketing Center
               </h1>
-              <p className="mt-2 text-gray-600 dark:text-gray-400">
+              <p className="mt-2 text-muted-foreground">
                 Create, manage, and analyze your email and SMS marketing campaigns
               </p>
             </div>
@@ -258,7 +269,7 @@ export default function Marketing() {
             <Button 
               onClick={() => setShowCampaignWizard(true)}
               size="lg"
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
+              className="bg-brand-gradient text-foreground shadow-lg"
             >
               <Plus className="w-5 h-5 mr-2" />
               Create Campaign
@@ -364,7 +375,7 @@ export default function Marketing() {
 
         {/* Main Content Tabs - Simplified to 3 tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid bg-white shadow-sm">
+          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid bg-card shadow-sm">
             <TabsTrigger value="campaigns" className="flex items-center gap-2">
               <Send className="w-4 h-4" />
               Campaigns
@@ -380,7 +391,11 @@ export default function Marketing() {
           </TabsList>
 
           <TabsContent value="campaigns" className="mt-6">
-            <CampaignsList onCreateNew={() => setShowCampaignWizard(true)} />
+            <CampaignsList onCreateNew={() => {
+              if (checkPermission('marketing.campaigns', 'create campaigns')) {
+                setShowCampaignWizard(true);
+              }
+            }} />
           </TabsContent>
 
           <TabsContent value="analytics" className="mt-6">
@@ -389,8 +404,16 @@ export default function Marketing() {
 
           <TabsContent value="library" className="mt-6">
             <LibraryView 
-              onNewTemplate={() => setShowCreateTemplate(true)}
-              onNewSegment={() => setShowCreateSegment(true)}
+              onNewTemplate={() => {
+                if (checkPermission('marketing.templates', 'create templates')) {
+                  setShowCreateTemplate(true);
+                }
+              }}
+              onNewSegment={() => {
+                if (checkPermission('marketing.segments', 'create segments')) {
+                  setShowCreateSegment(true);
+                }
+              }}
             />
           </TabsContent>
         </Tabs>

@@ -2,7 +2,7 @@ import { api } from './api';
 
 export interface Task {
   id: number;
-  event_id: number;
+  event_id?: number | null;
   organizer_id: number;
   vendor_id?: number;
   quotation_id?: number;
@@ -11,6 +11,7 @@ export interface Task {
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   type: 'deliverable' | 'milestone' | 'review' | 'payment' | 'other';
+  task_category?: 'vendor_recruitment' | 'sponsor_followup' | 'sponsor_listing' | 'event_setup' | 'post_event' | 'other' | null;
   due_date?: string;
   completed_date?: string;
   notes?: string;
@@ -61,7 +62,7 @@ export interface Task {
 }
 
 export interface TaskFormData {
-  event_id: number;
+  event_id?: number | null;
   organizer_id?: number;
   vendor_id?: number;
   quotation_id?: number;
@@ -70,6 +71,7 @@ export interface TaskFormData {
   status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   type?: 'deliverable' | 'milestone' | 'review' | 'payment' | 'other';
+  task_category?: 'vendor_recruitment' | 'sponsor_followup' | 'sponsor_listing' | 'event_setup' | 'post_event' | 'other' | null;
   due_date?: string;
   completed_date?: string;
   notes?: string;
@@ -98,6 +100,16 @@ export interface TaskStatistics {
     payment: number;
     other: number;
   };
+  by_category?: {
+    vendor_recruitment: number;
+    sponsor_followup: number;
+    sponsor_listing: number;
+    event_setup: number;
+    post_event: number;
+    other: number;
+  };
+  operational_tasks?: number;
+  event_tasks?: number;
 }
 
 export interface TaskFilters {
@@ -106,6 +118,8 @@ export interface TaskFilters {
   status?: string;
   priority?: string;
   type?: string;
+  task_category?: string;
+  operational?: boolean;
   assigned_to?: number;
   overdue?: boolean;
   due_soon?: boolean;

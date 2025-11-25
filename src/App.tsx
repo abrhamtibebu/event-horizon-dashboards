@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { NotificationProvider } from './contexts/NotificationContext'
 import { Layout } from './components/Layout'
+import { Spinner } from './components/ui/spinner'
+import { ThemeTransition } from './components/ThemeTransition'
 import { useEffect } from 'react'
 import Events from './pages/Events'
 import EventDetails from './pages/EventDetails'
@@ -46,11 +48,14 @@ import BatchBadgePage from './pages/BatchBadgePage'
 import Guests from './pages/Guests'
 
 // Badge Designer - integrated into Event Horizon
-import { BadgeDesignerHome } from './pages/badge-designer/BadgeDesignerHome'
-import { TemplateListPage } from './pages/badge-designer/TemplateListPage'
-import { DesignerPage } from './pages/badge-designer/DesignerPage'
-import BadgeDesignerRedirect from './pages/BadgeDesignerRedirect'
+// Lazy load badge designer components for code splitting
+import { lazy, Suspense } from 'react'
+const BadgeDesignerHome = lazy(() => import('./pages/badge-designer/BadgeDesignerHome').then(m => ({ default: m.BadgeDesignerHome })))
+const TemplateListPage = lazy(() => import('./pages/badge-designer/TemplateListPage').then(m => ({ default: m.TemplateListPage })))
+const DesignerPage = lazy(() => import('./pages/badge-designer/DesignerPage').then(m => ({ default: m.DesignerPage })))
+const BadgeDesignerRedirect = lazy(() => import('./pages/BadgeDesignerRedirect').then(m => ({ default: m.default })))
 import Team from '@/pages/Team'
+import RoleManagement from '@/pages/RoleManagement'
 import UsherManagement from '@/pages/UsherManagement'
 import UsherEventManagement from '@/pages/UsherEventManagement'
 import UsherEvents from '@/pages/UsherEvents'
@@ -64,7 +69,6 @@ import EvellaAnalytics from './pages/EvellaAnalytics'
 import VendorManagement from './pages/VendorManagement'
 import SalespersonManagement from './pages/SalespersonManagement'
 import SalespersonRegistration from './pages/SalespersonRegistration'
-import VendorManagementRevamped from './pages/VendorManagementRevamped'
 import Tasks from './pages/Tasks'
 import Marketing from './pages/Marketing'
 import { SuspendedOrganizerBanner } from './components/SuspendedOrganizerBanner'
@@ -74,11 +78,12 @@ import UsherRegistrationSuccess from './pages/UsherRegistrationSuccess'
 import ShortLinkResolver from './pages/ShortLinkResolver'
 import ShortLinkManagement from './pages/ShortLinkManagement'
 import RegistrationSuccess from './pages/RegistrationSuccess'
-
-// Import API test utility for development
-if (import.meta.env.DEV) {
-  import('./utils/apiTest')
-}
+import SubscriptionPlans from './pages/SubscriptionPlans'
+import SubscriptionManagement from './pages/SubscriptionManagement'
+import SubscriptionPayment from './pages/SubscriptionPayment'
+import UsageDashboard from './pages/UsageDashboard'
+import AdminSubscriptionManagement from './pages/AdminSubscriptionManagement'
+import EventRegistrationResponses from './pages/EventRegistrationResponses'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -100,8 +105,7 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
     console.log('[ProtectedRoute] Showing loading spinner')
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2">Loading...</span>
+        <Spinner size="md" text="Loading..." />
       </div>
     )
   }
@@ -125,8 +129,7 @@ const UnauthenticatedRoute = ({ children }: { children: JSX.Element }) => {
     console.log('[UnauthenticatedRoute] Showing loading spinner')
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2">Loading...</span>
+        <Spinner size="md" text="Loading..." />
       </div>
     )
   }
@@ -148,8 +151,7 @@ const PublicRoute = ({ children }: { children: JSX.Element }) => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2">Loading...</span>
+        <Spinner size="md" text="Loading..." />
       </div>
     )
   }
@@ -189,6 +191,7 @@ const AppWithRealtime = () => {
   
   return (
     <>
+      <ThemeTransition />
       <Toaster />
       <Sonner />
       <BrowserRouter
@@ -246,6 +249,7 @@ const AppWithRealtime = () => {
             <Route path="events/create/free" element={<CreateFreeEvent />} />
             <Route path="events/:eventId" element={<EventDetails />} />
             <Route path="team" element={<Team />} />
+            <Route path="role-management" element={<RoleManagement />} />
             <Route path="users" element={<Users />} />
             <Route path="organizers" element={<Organizers />} />
             <Route path="organizers/add" element={<AddOrganizer />} />
@@ -274,10 +278,16 @@ const AppWithRealtime = () => {
             <Route path="usher/badge-locator" element={<UsherBadgeLocator />} />
             <Route path="usher/jobs" element={<UsherDashboard />} />
             <Route path="usher/jobs/:eventId" element={<UsherJobDetails />} />
-            <Route path="vendor-management" element={<VendorManagementRevamped />} />
+            <Route path="vendor-management" element={<VendorManagement />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="marketing" element={<Marketing />} />
             <Route path="salesperson-management" element={<SalespersonManagement />} />
+            <Route path="subscription" element={<SubscriptionManagement />} />
+            <Route path="subscription/plans" element={<SubscriptionPlans />} />
+            <Route path="subscription/payment" element={<SubscriptionPayment />} />
+            <Route path="subscription/usage" element={<UsageDashboard />} />
+            <Route path="admin/subscriptions" element={<AdminSubscriptionManagement />} />
+            <Route path="events/:eventId/registration-responses" element={<EventRegistrationResponses />} />
           </Route>
 
           {/* Standalone protected routes (without layout) */}
@@ -298,12 +308,14 @@ const AppWithRealtime = () => {
             }
           />
 
-          {/* Badge Designer routes */}
+          {/* Badge Designer routes - Lazy loaded */}
           <Route
             path="/badge-designer"
             element={
               <ProtectedRoute>
-                <BadgeDesignerHome />
+                <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Spinner size="md" text="Loading badge designer..." /></div>}>
+                  <BadgeDesignerHome />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -311,7 +323,9 @@ const AppWithRealtime = () => {
             path="/badge-designer/templates/:eventId"
             element={
               <ProtectedRoute>
-                <TemplateListPage />
+                <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Spinner size="md" text="Loading templates..." /></div>}>
+                  <TemplateListPage />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -319,7 +333,9 @@ const AppWithRealtime = () => {
             path="/badge-designer/designer/:eventId/:templateId"
             element={
               <ProtectedRoute>
-                <DesignerPage />
+                <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Spinner size="md" text="Loading designer..." /></div>}>
+                  <DesignerPage />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -329,7 +345,9 @@ const AppWithRealtime = () => {
             path="/apps/badge-designer"
             element={
               <ProtectedRoute>
-                <BadgeDesignerRedirect />
+                <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Spinner size="md" text="Loading..." /></div>}>
+                  <BadgeDesignerRedirect />
+                </Suspense>
               </ProtectedRoute>
             }
           />
@@ -337,7 +355,9 @@ const AppWithRealtime = () => {
             path="/events/:eventId/badge-design"
             element={
               <ProtectedRoute>
-                <BadgeDesignerRedirect />
+                <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Spinner size="md" text="Loading..." /></div>}>
+                  <BadgeDesignerRedirect />
+                </Suspense>
               </ProtectedRoute>
             }
           />

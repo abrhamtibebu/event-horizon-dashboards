@@ -23,6 +23,7 @@ import {
   QrCode,
   Mail,
 } from 'lucide-react'
+import Breadcrumbs from '@/components/Breadcrumbs'
 import { DashboardCard } from '@/components/DashboardCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -98,51 +99,51 @@ function SearchBarWithAutocomplete({ badges, onSelect, isSearching }: { badges: 
   return (
     <div className="relative w-full">
       <div className="relative">
-        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
       <Input
         placeholder="Search by name, QR code, registration ID, or company..."
         value={input}
         onChange={e => setInput(e.target.value)}
         onFocus={() => setShowDropdown(filtered.length > 0)}
         onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-          className="w-full h-12 pl-12 pr-12 text-base bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-500 focus:ring-blue-500 rounded-xl transition-all duration-200"
+          className="w-full h-12 pl-12 pr-12 text-base bg-muted border-border focus:bg-card focus:border-info focus:ring-info rounded-xl transition-all duration-200"
         />
         {isSearching && (
           <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-            <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
+            <RefreshCw className="w-5 h-5 text-info animate-spin" />
           </div>
         )}
         {input && !isSearching && (
           <button
             onClick={() => { setInput(''); setShowDropdown(false); }}
-            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
           >
             <X className="w-4 h-4" />
           </button>
         )}
       </div>
       {showDropdown && (
-        <div className="absolute z-20 w-full bg-white border border-gray-200 rounded-xl shadow-xl mt-2 max-h-80 overflow-auto">
+        <div className="absolute z-20 w-full bg-popover border border-border rounded-xl shadow-xl mt-2 max-h-80 overflow-auto">
           <div className="p-2">
-            <div className="text-xs text-gray-500 px-3 py-2 border-b border-gray-100">
+            <div className="text-xs text-muted-foreground px-3 py-2 border-b border-border">
               {filtered.length} result{filtered.length !== 1 ? 's' : ''} found
             </div>
           {filtered.map((badge, idx) => (
             <div
               key={badge.badgeId + idx}
-                className="px-3 py-3 hover:bg-blue-50 cursor-pointer rounded-lg transition-colors duration-150"
+                className="px-3 py-3 hover:bg-accent cursor-pointer rounded-lg transition-colors duration-150"
               onMouseDown={() => { onSelect(badge); setInput(''); setShowDropdown(false); }}
             >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900">{badge.name}</span>
+                      <span className="font-semibold text-card-foreground">{badge.name}</span>
                       <Badge variant="outline" className="text-xs">
                         {badge.badgeType}
                       </Badge>
                     </div>
-                    <div className="text-sm text-gray-600 mt-1">{badge.organization}</div>
-                    <div className="text-xs text-gray-400 mt-1">
+                    <div className="text-sm text-muted-foreground mt-1">{badge.organization}</div>
+                    <div className="text-xs text-muted-foreground/70 mt-1">
                       ID: {badge.registrationId} • QR: {badge.qrCode}
                     </div>
                   </div>
@@ -151,16 +152,16 @@ function SearchBarWithAutocomplete({ badges, onSelect, isSearching }: { badges: 
                       variant={badge.collected ? "default" : "secondary"}
                       className={`text-xs ${
                         badge.collected 
-                          ? 'bg-green-100 text-green-800' 
+                          ? 'bg-green-500/10 dark:bg-green-900/30 text-green-800 dark:text-green-300' 
                           : badge.status === 'missing' 
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-red-500/10 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                            : 'bg-muted text-muted-foreground'
                       }`}
                     >
                       {badge.collected ? 'Collected' : badge.status}
                     </Badge>
                     {badge.zone && badge.section && badge.tray && (
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-muted-foreground/70">
                         {badge.zone}-{badge.section}-{badge.tray}
                       </div>
                     )}
@@ -169,7 +170,7 @@ function SearchBarWithAutocomplete({ badges, onSelect, isSearching }: { badges: 
             </div>
           ))}
           {filtered.length === 0 && (
-              <div className="px-3 py-4 text-gray-500 text-sm text-center">
+              <div className="px-3 py-4 text-muted-foreground text-sm text-center">
                 No badges found matching your search
               </div>
           )}
@@ -195,21 +196,21 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
       case 'collected':
         return <CheckCircle className="inline w-5 h-5 text-green-600 mr-1" title="Collected" />;
       default:
-        return <Box className="inline w-5 h-5 text-gray-400 mr-1" title="Unknown status" />;
+        return <Box className="inline w-5 h-5 text-muted-foreground mr-1" title="Unknown status" />;
     }
   };
   // Permission check
   const canEdit = user && (user.role === 'admin' || user.role === 'supervisor');
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
+    <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+      <div className="bg-primary/5 px-6 py-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <BadgeCheck className="w-6 h-6 text-blue-600" />
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <BadgeCheck className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Badge Details</h3>
-            <p className="text-sm text-gray-600">Guest information and status</p>
+            <h3 className="text-lg font-semibold text-foreground">Badge Details</h3>
+            <p className="text-sm text-muted-foreground">Guest information and status</p>
           </div>
         </div>
       </div>
@@ -219,12 +220,12 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
           {/* Guest Information */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-start gap-4">
-              <div className="p-3 bg-gray-100 rounded-xl">
-                <Users className="w-6 h-6 text-gray-600" />
+              <div className="p-3 bg-muted rounded-xl">
+                <Users className="w-6 h-6 text-muted-foreground" />
               </div>
               <div className="flex-1">
-                <h4 className="text-xl font-bold text-gray-900">{badge.name}</h4>
-                <p className="text-gray-600">{badge.organization}</p>
+                <h4 className="text-xl font-bold text-card-foreground">{badge.name}</h4>
+                <p className="text-muted-foreground">{badge.organization}</p>
                 <div className="flex items-center gap-2 mt-2">
             <Badge className={getGuestTypeBadgeClasses(badge.guest_type)}>
               {badge.guest_type}
@@ -239,44 +240,44 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Hash className="w-4 h-4 text-blue-600" />
-          </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Registration ID</p>
-                    <p className="font-mono text-sm font-medium">{badge.registrationId}</p>
-          </div>
-        </div>
-                
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <QrCode className="w-4 h-4 text-green-600" />
+                  <div className="p-2 bg-info/10 rounded-lg">
+                    <Hash className="w-4 h-4 text-info" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">QR Code</p>
-                    <p className="font-mono text-sm font-medium">{badge.qrCode}</p>
+                    <p className="text-sm text-muted-foreground">Registration ID</p>
+                    <p className="font-mono text-sm font-medium text-foreground">{badge.registrationId}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-success/10 rounded-lg">
+                    <QrCode className="w-4 h-4 text-success" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">QR Code</p>
+                    <p className="font-mono text-sm font-medium text-foreground">{badge.qrCode}</p>
                   </div>
                 </div>
               </div>
               
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <Mail className="w-4 h-4 text-purple-600" />
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Mail className="w-4 h-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Email</p>
-                    <p className="text-sm font-medium">{badge.email}</p>
+                    <p className="text-sm text-muted-foreground">Email</p>
+                    <p className="text-sm font-medium text-foreground">{badge.email}</p>
                   </div>
                 </div>
                 
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <MapPin className="w-4 h-4 text-orange-600" />
+                  <div className="p-2 bg-warning/10 rounded-lg">
+                    <MapPin className="w-4 h-4 text-warning" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Location</p>
-                    <p className="text-sm font-medium">Zone {badge.zone}, Section {badge.section}, Tray {badge.tray}</p>
+                    <p className="text-sm text-muted-foreground">Location</p>
+                    <p className="text-sm font-medium text-foreground">Zone {badge.zone}, Section {badge.section}, Tray {badge.tray}</p>
                   </div>
                 </div>
               </div>
@@ -284,12 +285,12 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
             
             {badge.notes && (
               <div className="flex items-start gap-3">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <FileText className="w-4 h-4 text-yellow-600" />
+                <div className="p-2 bg-warning/10 rounded-lg">
+                  <FileText className="w-4 h-4 text-warning" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Notes</p>
-                  <p className="text-sm">{badge.notes}</p>
+                  <p className="text-sm text-muted-foreground">Notes</p>
+                  <p className="text-sm text-foreground">{badge.notes}</p>
                 </div>
               </div>
             )}
@@ -297,23 +298,23 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
           
           {/* Status & Actions */}
           <div className="space-y-4">
-            <div className="bg-gray-50 rounded-xl p-4">
-              <h5 className="font-semibold text-gray-900 mb-3">Status</h5>
+            <div className="bg-muted/50 rounded-xl p-4">
+              <h5 className="font-semibold text-card-foreground mb-3">Status</h5>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Print Status</span>
+                  <span className="text-sm text-muted-foreground">Print Status</span>
           <div className="flex items-center gap-2">
             {getStatusIcon(badge.status)}
                     <span className="text-sm font-medium capitalize">{badge.status}</span>
           </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Collected</span>
+                  <span className="text-sm text-muted-foreground">Collected</span>
           <div className="flex items-center gap-2">
                     {badge.collected ? (
                       <CheckCircle className="w-4 h-4 text-green-600" />
                     ) : (
-                      <XCircle className="w-4 h-4 text-gray-400" />
+                      <XCircle className="w-4 h-4 text-muted-foreground" />
                     )}
                     <span className="text-sm font-medium">
                       {badge.collected ? 'Yes' : 'No'}
@@ -324,12 +325,12 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
             </div>
             
             <div className="space-y-2">
-              <h5 className="font-semibold text-gray-900">Actions</h5>
+              <h5 className="font-semibold text-foreground">Actions</h5>
               {!badge.collected && (
                 <Button
-                  className="w-full bg-green-600 hover:bg-green-700"
-              onClick={() => onAction('mark-collected')}
-            >
+                  className="w-full bg-success hover:bg-success/90 text-success-foreground"
+                  onClick={() => onAction('mark-collected')}
+                >
                   <CheckCircle className="w-4 h-4 mr-2" />
                   Mark as Collected
                 </Button>
@@ -338,7 +339,7 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
               {badge.status !== 'reprint requested' && (
                 <Button
                   variant="outline"
-                  className="w-full border-yellow-200 text-yellow-700 hover:bg-yellow-50"
+                  className="w-full"
                   onClick={() => onAction('request-reprint')}
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
@@ -349,7 +350,7 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
               {badge.status !== 'missing' && (
                 <Button
                   variant="outline"
-                  className="w-full border-red-200 text-red-700 hover:bg-red-50"
+                  className="w-full border-destructive/20 text-destructive hover:bg-destructive/10"
                   onClick={() => onAction('mark-missing')}
                 >
                   <XCircle className="w-4 h-4 mr-2" />
@@ -359,13 +360,13 @@ function BadgeResultPanel({ badge, user, onAction }: { badge: BadgeData, user: a
               
               <Button
                 variant="outline"
-                className="w-full border-blue-200 text-blue-700 hover:bg-blue-50"
+                className="w-full"
                 onClick={() => onAction('print-badge')}
               >
                 <Printer className="w-4 h-4 mr-2" />
                 Print Badge
               </Button>
-          </div>
+            </div>
         </div>
       </div>
       </div>
@@ -429,7 +430,7 @@ function TrayLayoutView({ badges }: { badges: BadgeData[] }) {
       case 'reprint requested': return 'text-yellow-600';
       case 'missing': return 'text-red-500';
       case 'collected': return 'text-green-500';
-      default: return 'text-gray-500';
+      default: return 'text-muted-foreground';
     }
   };
 
@@ -445,31 +446,33 @@ function TrayLayoutView({ badges }: { badges: BadgeData[] }) {
   };
 
   if (badges.length === 0) {
-  return (
-    <DashboardCard title="Tray Layout" icon={<Box className="w-6 h-6 text-blue-500" />}>
-        <div className="text-center py-8 text-gray-500">
-          <Box className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-          <p>No badge location data available.</p>
-          <p className="text-sm">Upload a CSV file to organize badges by tray.</p>
-            </div>
-      </DashboardCard>
+    return (
+      <div className="bg-card rounded-xl border border-border p-12">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+            <Box className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <p className="text-foreground font-medium mb-1">No badge location data available.</p>
+          <p className="text-sm text-muted-foreground">Upload a CSV file to organize badges by tray.</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
+    <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+      <div className="bg-primary/5 px-6 py-4 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Box className="w-6 h-6 text-blue-600" />
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Box className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Tray Layout</h3>
-              <p className="text-sm text-gray-600">Organized by zones, sections, and trays</p>
+              <h3 className="text-lg font-semibold text-foreground">Tray Layout</h3>
+              <p className="text-sm text-muted-foreground">Organized by zones, sections, and trays</p>
             </div>
           </div>
-          <div className="text-sm text-gray-600 bg-white px-3 py-1 rounded-lg">
+          <div className="text-sm text-muted-foreground bg-muted px-3 py-1.5 rounded-lg">
             {trayList.length} trays • {badges.length} total badges
           </div>
         </div>
@@ -478,9 +481,9 @@ function TrayLayoutView({ badges }: { badges: BadgeData[] }) {
       <div className="p-6">
         <div className="mb-6 flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700">Filter by status:</span>
+            <span className="text-sm font-medium text-foreground">Filter by status:</span>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-48 bg-gray-50 border-gray-200">
+              <SelectTrigger className="w-48">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -495,73 +498,75 @@ function TrayLayoutView({ badges }: { badges: BadgeData[] }) {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {trayList.map(({ zone, section, tray, badges: trayBadges, collected, total, missing }) => {
-          const filteredBadges = filterStatus === 'all' 
-            ? trayBadges 
-            : trayBadges.filter(badge => badge.status === filterStatus || badge.collected === (filterStatus === 'collected'));
+          {trayList.map(({ zone, section, tray, badges: trayBadges, collected, total, missing }) => {
+            const filteredBadges = filterStatus === 'all' 
+              ? trayBadges 
+              : trayBadges.filter(badge => badge.status === filterStatus || badge.collected === (filterStatus === 'collected'));
 
-          if (filteredBadges.length === 0) return null;
+            if (filteredBadges.length === 0) return null;
 
-          return (
-            <div 
-              key={`${zone}-${section}-${tray}`} 
-              className={`bg-white rounded-xl p-4 shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200 cursor-pointer ${
-                selectedTray === `${zone}-${section}-${tray}` ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:border-blue-300'
-              }`}
-              onClick={() => setSelectedTray(selectedTray === `${zone}-${section}-${tray}` ? null : `${zone}-${section}-${tray}`)}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Box className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">
-                      Zone {zone} • Section {section}
+            return (
+              <div 
+                key={`${zone}-${section}-${tray}`} 
+                className={`bg-card rounded-xl p-4 shadow-sm border-2 transition-all duration-200 cursor-pointer ${
+                  selectedTray === `${zone}-${section}-${tray}` 
+                    ? 'ring-2 ring-primary border-primary' 
+                    : 'border-border dark:border-border/60 dark:bg-card/50 hover:border-primary/50 hover:shadow-md'
+                }`}
+                onClick={() => setSelectedTray(selectedTray === `${zone}-${section}-${tray}` ? null : `${zone}-${section}-${tray}`)}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Box className="w-4 h-4 text-primary" />
                     </div>
-                    <div className="text-sm text-gray-600">Tray {tray}</div>
+                    <div>
+                      <div className="font-semibold text-foreground">
+                        Zone {zone} • Section {section}
+                      </div>
+                      <div className="text-sm text-muted-foreground">Tray {tray}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="flex items-center gap-4 text-xs">
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 bg-success rounded-full"></div>
+                        <span className="text-success font-medium">{collected}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 bg-error rounded-full"></div>
+                        <span className="text-error font-medium">{missing}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
+                        <span className="text-muted-foreground font-medium">{total}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="flex items-center gap-4 text-xs">
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-green-600 font-medium">{collected}</span>
+                
+                <div className="space-y-2 max-h-40 overflow-y-auto scrollbar-hide">
+                  {filteredBadges.map((badge) => (
+                    <div 
+                      key={badge.badgeId} 
+                      className="flex items-center gap-3 text-sm p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex-shrink-0">
+                        {getStatusIcon(badge.status)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-foreground truncate">{badge.name}</div>
+                        <div className="text-xs text-muted-foreground truncate">{badge.organization}</div>
+                      </div>
+                      <Badge className={`text-xs ${getGuestTypeBadgeClasses(badge.guest_type)}`} variant="outline">
+                        {badge.guest_type}
+                      </Badge>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                      <span className="text-red-600 font-medium">{missing}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                      <span className="text-gray-600 font-medium">{total}</span>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
-              
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {filteredBadges.map((badge) => (
-                  <div 
-                    key={badge.badgeId} 
-                    className="flex items-center gap-3 text-sm p-2 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex-shrink-0">
-                      {getStatusIcon(badge.status)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-900 truncate">{badge.name}</div>
-                      <div className="text-xs text-gray-500 truncate">{badge.organization}</div>
-                    </div>
-                    <Badge className={`text-xs ${getGuestTypeBadgeClasses(badge.guest_type)}`}>
-                      {badge.guest_type}
-                    </Badge>
-          </div>
-        ))}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -572,24 +577,41 @@ function TrayLayoutView({ badges }: { badges: BadgeData[] }) {
 function HistoryLog({ history }: { history: BadgeData['printHistory'] }) {
   if (!history || history.length === 0) {
     return (
-      <DashboardCard title="Badge History" icon={<History className="w-6 h-6 text-gray-500" />}>
-        <div className="text-gray-400 italic">No history available.</div>
-      </DashboardCard>
+      <div className="bg-card rounded-xl border border-border p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <History className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">Badge History</h3>
+          </div>
+        </div>
+        <div className="text-muted-foreground italic text-center py-4">No history available.</div>
+      </div>
     );
   }
   return (
-    <DashboardCard title="Badge History" icon={<History className="w-6 h-6 text-gray-500" />}>
-      <ul className="divide-y divide-gray-100">
+    <div className="bg-card rounded-xl border border-border p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-2 bg-primary/10 rounded-lg">
+          <History className="w-6 h-6 text-primary" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">Badge History</h3>
+          <p className="text-sm text-muted-foreground">Print and status change history</p>
+        </div>
+      </div>
+      <ul className="divide-y divide-border">
         {history.map((entry, idx) => (
-          <li key={idx} className="py-2 flex items-center gap-4">
-            <span className="text-xs text-gray-500 w-32">{entry.timestamp}</span>
-            <span className="font-medium text-gray-800">{entry.status}</span>
-            <span className="text-gray-500 text-xs">by {entry.staff}</span>
-            {entry.note && <span className="text-blue-600 text-xs italic">{entry.note}</span>}
+          <li key={idx} className="py-3 flex items-center gap-4">
+            <span className="text-xs text-muted-foreground w-32">{entry.timestamp}</span>
+            <span className="font-medium text-foreground capitalize">{entry.status}</span>
+            <span className="text-muted-foreground text-xs">by {entry.staff}</span>
+            {entry.note && <span className="text-info text-xs italic">{entry.note}</span>}
           </li>
         ))}
       </ul>
-    </DashboardCard>
+    </div>
   );
 }
 
@@ -1070,51 +1092,57 @@ export default function LocateBadges() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* Header Section */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Development Mode Notice */}
-          {localStorage.getItem('mock_auth') === 'true' && (
-            <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex-shrink-0">
-                  <AlertCircle className="w-5 h-5 text-blue-600" />
-      </div>
-                <div>
-                  <span className="text-sm text-blue-800 font-semibold">Development Mode</span>
-                  <p className="text-sm text-blue-700 mt-1">
-                    You're currently using mock data for development. In production, this will connect to the live API.
-                  </p>
-                </div>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        {/* Breadcrumbs */}
+        <div className="mb-6">
+          <Breadcrumbs 
+            items={[
+              { label: 'Locate Badges', href: '/dashboard/locate-badges' }
+            ]}
+          />
+        </div>
+
+        {/* Development Mode Notice */}
+        {localStorage.getItem('mock_auth') === 'true' && (
+          <div className="mb-6 bg-info/10 border border-info/20 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0">
+                <AlertCircle className="w-5 h-5 text-info" />
+              </div>
+              <div>
+                <span className="text-sm text-info font-semibold">Development Mode</span>
+                <p className="text-sm text-muted-foreground mt-1">
+                  You're currently using mock data for development. In production, this will connect to the live API.
+                </p>
               </div>
             </div>
-          )}
-          
-          {/* Page Header */}
+          </div>
+        )}
+        
+        {/* Header Section */}
+        <div className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Search className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Badge Locator</h1>
-                  <p className="text-gray-600 mt-1">Find and manage guest badges with ease</p>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+                <Search className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-foreground">Badge Locator</h1>
+                <p className="text-muted-foreground">Find and manage guest badges with ease</p>
               </div>
             </div>
             
             {/* Event Selector */}
             <div className="lg:w-96">
-              <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
-                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <label className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
                     Select Event
                   </label>
                   {selectedEventId && (
-                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                    <Badge variant="outline" className="text-xs">
                       {data.length} badges
                     </Badge>
                   )}
@@ -1127,139 +1155,136 @@ export default function LocateBadges() {
                   }}
                   disabled={loadingEvents}
                 >
-                  <SelectTrigger className="w-full h-11 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-            <SelectValue placeholder={loadingEvents ? 'Loading events...' : 'Choose an event'} />
-          </SelectTrigger>
-          <SelectContent>
+                  <SelectTrigger className="w-full h-11">
+                    <SelectValue placeholder={loadingEvents ? 'Loading events...' : 'Choose an event'} />
+                  </SelectTrigger>
+                  <SelectContent>
                     {events.map((event: any, index: number) => (
                       <SelectItem key={`event-${event.id}-${index}`} value={event.id.toString()}>
                         <div className="flex flex-col">
                           <span className="font-medium">{event.name}</span>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-muted-foreground">
                             {new Date(event.start_date).toLocaleDateString()}
                           </span>
                         </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {eventError && (
-                  <div className="text-red-600 text-xs mt-2 flex items-center gap-1">
+                  <div className="text-destructive text-xs mt-2 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
                     {eventError}
-      </div>
+                  </div>
                 )}
                 {!selectedEventId && !loadingEvents && (
-                  <div className="text-amber-600 text-xs mt-2 flex items-center gap-1">
+                  <div className="text-warning text-xs mt-2 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
                     Please select an event to view badge locations
-        </div>
+                  </div>
                 )}
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search and Actions Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-6 mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div className="flex-1">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Search Badges</h2>
-              <p className="text-gray-600 mb-4">Search by name, QR code, registration ID, or company</p>
+              <h2 className="text-xl font-semibold text-foreground mb-2">Search Badges</h2>
+              <p className="text-muted-foreground mb-4">Search by name, QR code, registration ID, or company</p>
               <div className="max-w-2xl">
                 <SearchBarWithAutocomplete badges={filteredData} onSelect={setSelectedGuest} isSearching={isSearching} />
               </div>
             </div>
             
             {/* Organizer Actions */}
-          {user?.role === 'organizer' && (
+            {(user?.role === 'organizer' || user?.role === 'organizer_admin') && (
               <div className="flex flex-col gap-3">
-                <h3 className="text-sm font-semibold text-gray-700">Badge Management</h3>
+                <h3 className="text-sm font-semibold text-foreground">Badge Management</h3>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button
                     variant="outline"
-                    className="flex items-center gap-2 h-10 bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-                onClick={downloadSampleCsv}
-              >
+                    className="flex items-center gap-2 h-10"
+                    onClick={downloadSampleCsv}
+                  >
                     <Download className="w-4 h-4" />
                     Download Sample
                   </Button>
                   <Button
-                    className="flex items-center gap-2 h-10 bg-green-600 hover:bg-green-700"
-                onClick={() => fileInputRef.current?.click()}
-              >
+                    className="flex items-center gap-2 h-10 bg-primary hover:bg-primary/90"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
                     <Upload className="w-4 h-4" />
                     Upload CSV
                   </Button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept=".csv"
-                onChange={handleFileUpload}
-              />
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept=".csv"
+                    onChange={handleFileUpload}
+                  />
                 </div>
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
         {/* Statistics Dashboard */}
         {data.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 border border-blue-200">
+            <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-blue-700">Total Badges</p>
-                  <p className="text-3xl font-bold text-blue-900 mt-1">{data.length}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Total Badges</p>
+                  <p className="text-3xl font-bold text-foreground mt-1">{data.length}</p>
                 </div>
-                <div className="p-3 bg-blue-200 rounded-xl">
-                  <Users className="w-6 h-6 text-blue-700" />
+                <div className="p-3 bg-info/10 rounded-xl">
+                  <Users className="w-6 h-6 text-info" />
                 </div>
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6 border border-green-200">
+            <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-green-700">Collected</p>
-                  <p className="text-3xl font-bold text-green-900 mt-1">
+                  <p className="text-sm font-medium text-muted-foreground">Collected</p>
+                  <p className="text-3xl font-bold text-foreground mt-1">
                     {data.filter(b => b.collected).length}
                   </p>
                 </div>
-                <div className="p-3 bg-green-200 rounded-xl">
-                  <CheckCircle className="w-6 h-6 text-green-700" />
+                <div className="p-3 bg-success/10 rounded-xl">
+                  <CheckCircle className="w-6 h-6 text-success" />
                 </div>
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-6 border border-red-200">
+            <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-red-700">Missing</p>
-                  <p className="text-3xl font-bold text-red-900 mt-1">
+                  <p className="text-sm font-medium text-muted-foreground">Missing</p>
+                  <p className="text-3xl font-bold text-foreground mt-1">
                     {data.filter(b => b.status === 'missing').length}
                   </p>
                 </div>
-                <div className="p-3 bg-red-200 rounded-xl">
-                  <AlertCircle className="w-6 h-6 text-red-700" />
+                <div className="p-3 bg-error/10 rounded-xl">
+                  <AlertCircle className="w-6 h-6 text-error" />
                 </div>
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-2xl p-6 border border-yellow-200">
+            <div className="bg-card rounded-xl p-6 border border-border shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-yellow-700">Reprint Needed</p>
-                  <p className="text-3xl font-bold text-yellow-900 mt-1">
+                  <p className="text-sm font-medium text-muted-foreground">Reprint Needed</p>
+                  <p className="text-3xl font-bold text-foreground mt-1">
                     {data.filter(b => b.status === 'reprint requested').length}
                   </p>
                 </div>
-                <div className="p-3 bg-yellow-200 rounded-xl">
-                  <RefreshCw className="w-6 h-6 text-yellow-700" />
+                <div className="p-3 bg-warning/10 rounded-xl">
+                  <RefreshCw className="w-6 h-6 text-warning" />
                 </div>
               </div>
             </div>
@@ -1267,15 +1292,15 @@ export default function LocateBadges() {
         )}
 
         {/* Selected Badge Details */}
-      {selectedGuest && (
+        {selectedGuest && (
           <div className="space-y-6 mb-8">
-          <BadgeResultPanel badge={selectedGuest} user={user} onAction={handleBadgeAction} />
-          <HistoryLog history={selectedGuest.printHistory} />
+            <BadgeResultPanel badge={selectedGuest} user={user} onAction={handleBadgeAction} />
+            <HistoryLog history={selectedGuest.printHistory} />
           </div>
-      )}
+        )}
 
         {/* Tray Layout */}
-      <TrayLayoutView badges={data} />
+        <TrayLayoutView badges={data} />
       </div>
     </div>
   )

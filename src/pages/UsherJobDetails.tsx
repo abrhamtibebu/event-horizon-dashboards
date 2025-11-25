@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import Breadcrumbs from '@/components/Breadcrumbs';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import axios from 'axios';
 
@@ -56,6 +57,15 @@ export default function UsherJobDetails() {
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-6">
+      {/* Breadcrumbs */}
+      <Breadcrumbs 
+        items={[
+          { label: 'Usher Jobs', href: '/dashboard/usher-jobs' },
+          { label: event?.name || 'Job Details' }
+        ]}
+        className="mb-4"
+      />
+      
       <h1 className="text-2xl font-bold mb-2">Job Details for {event.name}</h1>
       <div className="bg-white rounded-xl shadow p-6 space-y-4">
         <div>
@@ -76,8 +86,8 @@ export default function UsherJobDetails() {
         </div>
         {event.accepted === 'pending' && (
           <div className="flex gap-2 mt-2">
-            <Button className="bg-green-600 text-white" disabled={actionLoading} onClick={handleAcceptJob}>Accept</Button>
-            <Button className="bg-red-600 text-white" disabled={actionLoading} onClick={() => setRejectDialogOpen(true)}>Reject</Button>
+            <Button className="bg-green-600 text-foreground" disabled={actionLoading} onClick={handleAcceptJob}>Accept</Button>
+            <Button className="bg-red-600 text-foreground" disabled={actionLoading} onClick={() => setRejectDialogOpen(true)}>Reject</Button>
           </div>
         )}
         {event.accepted === 'accepted' && (
@@ -107,7 +117,7 @@ export default function UsherJobDetails() {
           />
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectDialogOpen(false)} disabled={actionLoading}>Cancel</Button>
-            <Button onClick={handleRejectJob} disabled={actionLoading || !rejectReason.trim()} className="bg-red-600 text-white">
+            <Button onClick={handleRejectJob} disabled={actionLoading || !rejectReason.trim()} className="bg-red-600 text-foreground">
               {actionLoading ? 'Rejecting...' : 'Reject Job'}
             </Button>
           </DialogFooter>
