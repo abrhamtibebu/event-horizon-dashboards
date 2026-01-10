@@ -104,6 +104,8 @@ import { usePagination } from '@/hooks/usePagination'
 import EventSessions from '@/components/EventSessions'
 import { InvitationsTab } from '@/components/event-invitations/InvitationsTab'
 import { BulkBadgesTab } from '@/components/BulkBadgesTab'
+import FormsList from '@/components/forms/FormsList'
+import { FormAnalytics } from '@/components/forms/FormAnalytics'
 import { useAuth } from '@/hooks/use-auth'
 import { usePermissionCheck } from '@/hooks/use-permission-check'
 import { ProtectedButton } from '@/components/ProtectedButton'
@@ -130,7 +132,6 @@ import { UsherAssignmentDialog } from '@/components/UsherAssignmentDialog'
 import React from 'react'
 import BadgePrint from '@/components/Badge'
 import BadgeTest from '@/components/BadgeTest'
-import { ResponseViewer } from '@/components/registration/ResponseViewer'
 import { getOfficialBadgeTemplate, getBadgeTemplates } from '@/lib/badgeTemplates'
 import { BadgeTemplate } from '@/types/badge'
 import { DateRange } from 'react-date-range'
@@ -274,7 +275,6 @@ export default function EventDetails() {
   // Badge template state
   const [badgeTemplate, setBadgeTemplate] = useState<BadgeTemplate | null>(null)
   const [badgeTemplateLoading, setBadgeTemplateLoading] = useState(false)
-  // Legacy badge designer state removed - now using standalone app
 
   const { user } = useAuth()
   const { checkPermission } = usePermissionCheck()
@@ -284,8 +284,6 @@ export default function EventDetails() {
 
   const [addAttendeeDialogOpen, setAddAttendeeDialogOpen] = useState(false)
   const [createParticipantDialogOpen, setCreateParticipantDialogOpen] = useState(false)
-  const [responseViewerOpen, setResponseViewerOpen] = useState(false)
-  const [selectedAttendeeForResponses, setSelectedAttendeeForResponses] = useState<number | null>(null)
   const [participantCount, setParticipantCount] = useState(1)
   const [addAttendeeForm, setAddAttendeeForm] = useState<any>({
     first_name: '',
@@ -2618,16 +2616,6 @@ export default function EventDetails() {
                       Bulk Badges
                     </TabsTrigger>
                   )}
-                  {(user?.role === 'admin' || user?.role === 'superadmin') && (
-                    <TabsTrigger
-                      value="badge-designer"
-                      className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                        ${activeTab === 'badge-designer' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
-                      `}
-                    >
-                      Badge Designer
-                    </TabsTrigger>
-                  )}
                   <TabsTrigger
                     value="attendees"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
@@ -2660,6 +2648,17 @@ export default function EventDetails() {
                   >
                     Analytics
                   </TabsTrigger>
+                  {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin') && (
+                    <TabsTrigger
+                      value="forms"
+                      className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
+                        ${activeTab === 'forms' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
+                      `}
+                    >
+                      <FileText className="w-4 h-4 mr-1 inline" />
+                      Forms
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger
                     value="sessions"
                     className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
@@ -3481,13 +3480,6 @@ export default function EventDetails() {
                         </div>
                       </div>
                       <div className="flex gap-3">
-                        <Button 
-                          variant="outline" 
-                          onClick={() => navigate(`/badge-designer/templates/${eventId}`)}
-                          className="border-border text-foreground hover:bg-muted flex items-center gap-2"
-                        >
-                          <Palette className="w-4 h-4" /> Design Badge
-                        </Button>
                         {/* Legacy designer removed - now using standalone Fabric.js app */}
                         <Button 
                           variant="default" 
@@ -3996,12 +3988,9 @@ export default function EventDetails() {
                                     <Button 
                                       variant="ghost" 
                                       size="sm"
-                                      onClick={() => {
-                                        setSelectedAttendeeForResponses(attendee.id)
-                                        setResponseViewerOpen(true)
-                                      }}
                                       className="h-8 w-8 p-0 hover:bg-accent"
                                       title="View Custom Fields"
+                                      disabled
                                     >
                                       <FileText className="w-4 h-4" />
                                     </Button>
@@ -4996,8 +4985,41 @@ export default function EventDetails() {
                         </div>
                       </div>
                     )}
+
+                    {/* Form Analytics Section */}
+                    <div className="mt-12 space-y-8">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
+                          <FileText className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <h2 className="text-2xl font-bold text-foreground">Form Analytics</h2>
+                          <p className="text-muted-foreground">Registration form performance and submissions</p>
+                        </div>
+                      </div>
+
+                      {/* Form Analytics Content */}
+                      <FormAnalytics
+                        eventId={Number(eventId)}
+                        onExportCSV={(formId: number) => {
+                          // Handle CSV export for specific form
+                          console.log('Export CSV for form:', formId);
+                        }}
+                      />
+                    </div>
                   </div>
                 ) : null}
+              </div>
+            </TabsContent>
+            <TabsContent value="forms">
+              <div className="min-h-screen bg-background p-6">
+                <FormsList
+                  eventId={Number(eventId)}
+                  onCreateForm={() => {
+                    // TODO: Open form creation modal
+                    console.log('Create new form');
+                  }}
+                />
               </div>
             </TabsContent>
             <TabsContent value="sessions">
@@ -5021,28 +5043,6 @@ export default function EventDetails() {
                 guestTypes={guestTypes || []}
                 eventName={eventData?.name}
               />
-            </TabsContent>
-            )}
-            {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin') && (
-            <TabsContent value="badge-designer">
-                    <div className="flex flex-col items-center justify-center py-16 px-4">
-                      <div className="max-w-2xl text-center">
-                        <Palette className="w-16 h-16 mx-auto mb-6 text-primary" />
-                        <h2 className="text-2xl font-bold mb-4 text-foreground">Badge Designer</h2>
-                        <p className="text-muted-foreground mb-8">
-                          The Badge Designer is now a standalone application with enhanced features including 
-                          Fabric.js canvas editing, dynamic fields, QR codes, and more.
-                        </p>
-                        <Button 
-                          size="lg"
-                          onClick={() => navigate(`/badge-designer/templates/${eventId}`)}
-                          className="bg-brand-gradient text-foreground dark:text-primary-foreground"
-                        >
-                          <Palette className="w-5 h-5 mr-2" />
-                          Open Badge Designer
-                        </Button>
-                      </div>
-                    </div>
             </TabsContent>
             )}
         </Tabs>
@@ -5281,8 +5281,8 @@ export default function EventDetails() {
                     </div>
                   </div>
                   
-                  {/* Event Image Section */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                  {/* Event Image Section - Hidden */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hidden">
                     <div className="flex items-center gap-3 mb-6">
                       <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
                         <Image className="w-5 h-5 text-white" />
@@ -6757,15 +6757,6 @@ export default function EventDetails() {
           </DialogContent>
         </Dialog>
 
-        {/* Custom Field Responses Viewer */}
-        {selectedAttendeeForResponses && eventId && (
-          <ResponseViewer
-            attendeeId={selectedAttendeeForResponses}
-            eventId={Number(eventId)}
-            open={responseViewerOpen}
-            onOpenChange={setResponseViewerOpen}
-          />
-        )}
       </div>
     </>
   )

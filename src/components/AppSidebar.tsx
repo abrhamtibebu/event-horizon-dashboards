@@ -104,12 +104,6 @@ const navigationCategories = [
         icon: Ticket,
         roles: ['attendee'],
       },
-      {
-        title: 'Event Publication',
-        url: '/dashboard/event-publication',
-        icon: Globe,
-        roles: ['superadmin', 'admin'],
-      },
     ],
   },
   {
@@ -131,7 +125,7 @@ const navigationCategories = [
         title: 'Guests',
         url: '/dashboard/guests',
         icon: Users,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin'],
+        roles: ['organizer', 'organizer_admin'],
         permission: 'guests.manage',
       },
       {
@@ -214,13 +208,6 @@ const navigationCategories = [
         roles: ['admin', 'organizer', 'organizer_admin', 'usher'],
         permission: 'badges.locate',
       },
-      {
-        title: 'Badge Designer',
-        url: '/badge-designer',
-        icon: Palette,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin'],
-        permission: 'badges.design',
-      },
     ],
   },
   {
@@ -232,12 +219,6 @@ const navigationCategories = [
         icon: BarChart,
         roles: ['superadmin', 'organizer', 'organizer_admin'],
         permission: 'reports.view',
-      },
-      {
-        title: 'Evella Analytics',
-        url: '/dashboard/evella-analytics',
-        icon: TrendingUp,
-        roles: ['superadmin', 'admin'],
       },
     ],
   },
@@ -296,7 +277,12 @@ export function AppSidebar() {
     .map((category) => ({
       ...category,
       items: category.items.filter((item) => {
-        // System admins see everything
+        // Guests menu is only for organizers, not for admin/superadmin
+        if (item.title === 'Guests' && user && (user.role === 'admin' || user.role === 'superadmin')) {
+          return false
+        }
+
+        // System admins see everything (except Guests and Messages)
         if (user && (user.role === 'admin' || user.role === 'superadmin')) {
           return true
         }
@@ -336,7 +322,13 @@ export function AppSidebar() {
         return true
       }),
     }))
-    .filter((category) => category.items.length > 0)
+    .filter((category) => {
+      // Hide OPERATIONS section for admin and superadmin
+      if (category.label === 'OPERATIONS' && user && (user.role === 'admin' || user.role === 'superadmin')) {
+        return false
+      }
+      return category.items.length > 0
+    })
 
   // Fetch trash count for admin users
   useEffect(() => {
@@ -345,8 +337,12 @@ export function AppSidebar() {
         try {
           const response = await api.get('/trash')
           setTrashCount(response.data.total_items || 0)
-        } catch (error) {
-          console.error('Failed to fetch trash count:', error)
+        } catch (error: any) {
+          // Suppress 403 errors as they're expected for non-admin users
+          // Only log unexpected errors
+          if (error?.response?.status !== 403) {
+            console.error('Failed to fetch trash count:', error)
+          }
         }
       }
 
@@ -367,7 +363,7 @@ export function AppSidebar() {
             <div className="w-10 h-10 flex items-center justify-center">
               <img
                 src="/Validity_logo.png"
-                alt="VEMS Logo"
+                alt="Evella Logo"
                 className="w-10 h-10 object-contain"
               />
             </div>
@@ -383,7 +379,7 @@ export function AppSidebar() {
                   />
                 </div>
                 <div>
-                  <h2 className="font-bold text-sidebar-foreground text-lg">VEMS</h2>
+                  <h2 className="font-bold text-sidebar-foreground text-lg">Evella</h2>
                   <p className="text-xs text-sidebar-foreground/70 font-medium">
                     Event Management
                   </p>

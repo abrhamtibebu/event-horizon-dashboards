@@ -80,7 +80,7 @@ const Register = () => {
       
       toast({
         title: "Account created successfully!",
-        description: "Welcome to VEMS. You can now sign in to your account.",
+        description: "Welcome to Evella Admin. You can now sign in to your account.",
       });
       
       // Navigate to sign in page after successful registration
@@ -110,7 +110,7 @@ const Register = () => {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-gradient rounded-2xl shadow-lg mb-4 transform hover:scale-105 transition-transform duration-200">
             <Activity className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Join VEMS</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Join Evella Admin</h1>
           <p className="text-muted-foreground">Create your account to get started</p>
         </div>
 
@@ -296,7 +296,7 @@ const Register = () => {
 
         {/* Footer */}
         <div className="mt-8 text-center text-xs text-muted-foreground/70">
-          <p>© 2024 VEMS. All rights reserved.</p>
+          <p>© 2024 Evella Admin. All rights reserved.</p>
         </div>
       </div>
     </div>

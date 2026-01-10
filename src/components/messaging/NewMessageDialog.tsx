@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Search, Users, Calendar, X } from 'lucide-react'
+import React, { useState, useMemo } from 'react'
+import { Search, Users, Calendar, X, Shield, UserCog, UserCheck, Info } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog'
@@ -7,8 +7,10 @@ import { ScrollArea } from '../ui/scroll-area'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 import { Badge } from '../ui/badge'
 import { Separator } from '../ui/separator'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { getAllUsers, getMessagingContacts } from '../../lib/api'
 import { useQuery } from '@tanstack/react-query'
+import { useAuth } from '../../hooks/use-auth'
 import type { User, Event } from '../../types/message'
 
 interface NewMessageDialogProps {
@@ -28,6 +30,7 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedType, setSelectedType] = useState<'users' | 'events'>('users')
+  const { user: currentUser } = useAuth()
   
   const { data: usersData = [], isLoading } = useQuery({
     queryKey: ['messagingContacts'],
@@ -46,6 +49,74 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
     user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.email.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  // Helper function to check if value is in array (TypeScript safe)
+  const in_array = (value: string | undefined, array: string[]): boolean => {
+    return value ? array.includes(value) : false
+  }
+
+  // Group users by role/category
+  const groupedUsers = useMemo(() => {
+    const groups: Record<string, User[]> = {
+      admins: [],
+      organizers: [],
+      staff: [],
+      ushers: [],
+      others: [],
+    }
+
+    filteredUsers.forEach((user: User) => {
+      if (in_array(user.role, ['admin', 'superadmin'])) {
+        groups.admins.push(user)
+      } else if (in_array(user.role, ['organizer', 'organizer_admin'])) {
+        groups.organizers.push(user)
+      } else if (user.role === 'usher') {
+        groups.ushers.push(user)
+      } else if (user.organizer_id) {
+        groups.staff.push(user)
+      } else {
+        groups.others.push(user)
+      }
+    })
+
+    return groups
+  }, [filteredUsers])
+
+  // Get role badge variant and icon
+  const getRoleBadge = (role: string | undefined) => {
+    if (!role) return null
+    
+    const roleConfig: Record<string, { variant: 'default' | 'secondary' | 'outline' | 'destructive', icon: React.ReactNode, label: string }> = {
+      admin: { variant: 'default', icon: <Shield className="w-3 h-3" />, label: 'Admin' },
+      superadmin: { variant: 'default', icon: <Shield className="w-3 h-3" />, label: 'Super Admin' },
+      organizer: { variant: 'secondary', icon: <UserCog className="w-3 h-3" />, label: 'Organizer' },
+      organizer_admin: { variant: 'secondary', icon: <UserCog className="w-3 h-3" />, label: 'Organizer Admin' },
+      usher: { variant: 'outline', icon: <UserCheck className="w-3 h-3" />, label: 'Usher' },
+    }
+
+    const config = roleConfig[role] || { variant: 'outline' as const, icon: null, label: role }
+    return (
+      <Badge variant={config.variant} className="text-xs flex items-center gap-1">
+        {config.icon}
+        {config.label}
+      </Badge>
+    )
+  }
+
+  // Get messaging restrictions info based on current user role
+  const getMessagingInfo = () => {
+    if (!currentUser) return null
+    
+    const role = currentUser.role
+    if (in_array(role, ['admin', 'superadmin'])) {
+      return 'You can message organizers and their staff (except ushers)'
+    } else if (in_array(role, ['organizer', 'organizer_admin'])) {
+      return 'You can message admins and your staff (including ushers)'
+    } else if (role === 'usher') {
+      return 'You can message your organizer and event team members'
+    }
+    return null
+  }
 
   const filteredEvents = events.filter((event: Event) =>
     event.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -86,6 +157,23 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
           <DialogDescription>
             Choose a user or event to start a new conversation with.
           </DialogDescription>
+          {getMessagingInfo() && (
+            <div className="mt-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground cursor-help">
+                      <Info className="w-3 h-3" />
+                      <span>{getMessagingInfo()}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Messaging permissions are based on your role</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
         </DialogHeader>
         
         <div className="space-y-4">
@@ -145,8 +233,14 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
                     <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
                     <p>No users found</p>
                     <p className="text-sm">Try adjusting your search terms</p>
+                    {getMessagingInfo() && (
+                      <p className="text-xs mt-2 text-muted-foreground/70">
+                        {getMessagingInfo()}
+                      </p>
+                    )}
                   </div>
-                ) : (
+                ) : searchQuery ? (
+                  // Show flat list when searching
                   filteredUsers.map((user: User) => (
                     <div
                       key={user.id}
@@ -160,20 +254,201 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-foreground truncate">
-                          {user.name}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium text-foreground truncate">
+                            {user.name}
+                          </h3>
+                          {getRoleBadge(user.role)}
+                        </div>
                         <p className="text-sm text-muted-foreground truncate">
                           {user.email}
                         </p>
-                        {user.role && (
-                          <Badge variant="secondary" className="text-xs mt-1">
-                            {user.role}
-                          </Badge>
-                        )}
                       </div>
                     </div>
                   ))
+                ) : (
+                  // Show grouped list when not searching
+                  <div className="space-y-4">
+                    {groupedUsers.admins.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 px-2">
+                          <Shield className="w-4 h-4 text-muted-foreground" />
+                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            Administrators
+                          </h4>
+                        </div>
+                        {groupedUsers.admins.map((user: User) => (
+                          <div
+                            key={user.id}
+                            onClick={() => handleUserSelect(user)}
+                            className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                          >
+                            <Avatar className="w-10 h-10">
+                              <AvatarImage src={user.profile_image} />
+                              <AvatarFallback className="bg-muted text-muted-foreground">
+                                {getInitials(user.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-medium text-foreground truncate">
+                                  {user.name}
+                                </h3>
+                                {getRoleBadge(user.role)}
+                              </div>
+                              <p className="text-sm text-muted-foreground truncate">
+                                {user.email}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {groupedUsers.organizers.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 px-2">
+                          <UserCog className="w-4 h-4 text-muted-foreground" />
+                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            Organizers
+                          </h4>
+                        </div>
+                        {groupedUsers.organizers.map((user: User) => (
+                          <div
+                            key={user.id}
+                            onClick={() => handleUserSelect(user)}
+                            className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                          >
+                            <Avatar className="w-10 h-10">
+                              <AvatarImage src={user.profile_image} />
+                              <AvatarFallback className="bg-muted text-muted-foreground">
+                                {getInitials(user.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-medium text-foreground truncate">
+                                  {user.name}
+                                </h3>
+                                {getRoleBadge(user.role)}
+                              </div>
+                              <p className="text-sm text-muted-foreground truncate">
+                                {user.email}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {groupedUsers.staff.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 px-2">
+                          <Users className="w-4 h-4 text-muted-foreground" />
+                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            Staff
+                          </h4>
+                        </div>
+                        {groupedUsers.staff.map((user: User) => (
+                          <div
+                            key={user.id}
+                            onClick={() => handleUserSelect(user)}
+                            className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                          >
+                            <Avatar className="w-10 h-10">
+                              <AvatarImage src={user.profile_image} />
+                              <AvatarFallback className="bg-muted text-muted-foreground">
+                                {getInitials(user.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-medium text-foreground truncate">
+                                  {user.name}
+                                </h3>
+                                {getRoleBadge(user.role)}
+                              </div>
+                              <p className="text-sm text-muted-foreground truncate">
+                                {user.email}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {groupedUsers.ushers.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 px-2">
+                          <UserCheck className="w-4 h-4 text-muted-foreground" />
+                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            Ushers
+                          </h4>
+                        </div>
+                        {groupedUsers.ushers.map((user: User) => (
+                          <div
+                            key={user.id}
+                            onClick={() => handleUserSelect(user)}
+                            className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                          >
+                            <Avatar className="w-10 h-10">
+                              <AvatarImage src={user.profile_image} />
+                              <AvatarFallback className="bg-muted text-muted-foreground">
+                                {getInitials(user.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-medium text-foreground truncate">
+                                  {user.name}
+                                </h3>
+                                {getRoleBadge(user.role)}
+                              </div>
+                              <p className="text-sm text-muted-foreground truncate">
+                                {user.email}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {groupedUsers.others.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 px-2">
+                          <Users className="w-4 h-4 text-muted-foreground" />
+                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            Others
+                          </h4>
+                        </div>
+                        {groupedUsers.others.map((user: User) => (
+                          <div
+                            key={user.id}
+                            onClick={() => handleUserSelect(user)}
+                            className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                          >
+                            <Avatar className="w-10 h-10">
+                              <AvatarImage src={user.profile_image} />
+                              <AvatarFallback className="bg-muted text-muted-foreground">
+                                {getInitials(user.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-medium text-foreground truncate">
+                                  {user.name}
+                                </h3>
+                                {getRoleBadge(user.role)}
+                              </div>
+                              <p className="text-sm text-muted-foreground truncate">
+                                {user.email}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             ) : (

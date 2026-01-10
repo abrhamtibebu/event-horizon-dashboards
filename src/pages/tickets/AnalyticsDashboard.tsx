@@ -110,20 +110,20 @@ export default function AnalyticsDashboard() {
           {/* Key Revenue Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Total Revenue Card */}
-            <Card className="bg-success/10 border-success/30">
+            <Card className="bg-primary/10 dark:bg-primary/5 border-primary/30 dark:border-primary/20">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center text-success">
+                <CardTitle className="text-sm font-medium flex items-center text-primary">
                   <DollarSign className="w-4 h-4 mr-2" />
                   Total Revenue
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-success">
+                <div className="text-3xl font-bold text-primary">
                   ETB {analytics.total_revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </div>
                 <div className="flex items-center justify-between mt-3">
-                  <span className="text-sm text-success">Avg. ETB {analytics.average_ticket_price.toFixed(2)}</span>
-                  <span className="text-xs bg-success/10 text-success px-2 py-1 rounded-full">
+                  <span className="text-sm text-primary">Avg. ETB {analytics.average_ticket_price.toFixed(2)}</span>
+                  <span className="text-xs bg-primary/10 dark:bg-primary/20 text-primary px-2 py-1 rounded-full">
                     {analytics.total_tickets_sold} tickets
                   </span>
                 </div>
@@ -131,21 +131,21 @@ export default function AnalyticsDashboard() {
             </Card>
 
             {/* Attendance Metrics */}
-            <Card className="bg-info/10 border-info/30">
+            <Card className="bg-blue-500/10 dark:bg-blue-500/5 border-blue-500/30 dark:border-blue-500/20">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center text-info">
+                <CardTitle className="text-sm font-medium flex items-center text-blue-600 dark:text-blue-400">
                   <Users className="w-4 h-4 mr-2" />
                   Attendance
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-info">
+                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                   {analytics.tickets_by_status.used}
                 </div>
                 <div className="mt-3 space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-info">Attendance Rate</span>
-                    <span className="font-semibold text-info">{analytics.validation_rate.toFixed(1)}%</span>
+                    <span className="text-blue-600 dark:text-blue-400">Attendance Rate</span>
+                    <span className="font-semibold text-blue-600 dark:text-blue-400">{analytics.validation_rate.toFixed(1)}%</span>
                   </div>
                   <Progress value={analytics.validation_rate} className="h-2" />
                 </div>
@@ -223,13 +223,13 @@ export default function AnalyticsDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Success Rate</p>
-                    <p className="text-2xl font-bold mt-1 text-success">
-                      {analytics.total_tickets_sold > 0 
+                    <p className="text-2xl font-bold mt-1 text-green-600 dark:text-green-400">
+                      {analytics.total_tickets_sold > 0
                         ? ((analytics.tickets_by_status.confirmed / analytics.total_tickets_sold) * 100).toFixed(1)
                         : 0}%
                     </p>
                   </div>
-                  <CheckCircle className="w-8 h-8 text-success" />
+                  <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   {analytics.tickets_by_status.confirmed} confirmed
@@ -256,9 +256,9 @@ export default function AnalyticsDashboard() {
           </div>
 
           {/* Revenue Breakdown Section */}
-            <Card className="border-2 border-success/30">
+            <Card className="border-2 border-primary/30 dark:border-primary/20">
             <CardHeader>
-              <CardTitle className="flex items-center text-success">
+              <CardTitle className="flex items-center text-primary">
                 <DollarSign className="w-5 h-5 mr-2" />
                 Revenue Breakdown by Ticket Type
               </CardTitle>
@@ -275,12 +275,12 @@ export default function AnalyticsDashboard() {
                     : 0;
                   
                   return (
-                    <div key={type.ticket_type_id} className="p-4 border rounded-lg hover:shadow-md transition-shadow bg-gradient-to-r from-white to-gray-50">
+                    <div key={type.ticket_type_id} className="p-4 border border-border rounded-lg hover:shadow-md transition-all duration-200 bg-gradient-to-r from-card to-muted/30 dark:from-card dark:to-muted/10">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <h4 className="font-semibold text-lg">{type.ticket_type_name}</h4>
-                            <span className="text-2xl font-bold text-success">
+                            <h4 className="font-semibold text-lg text-foreground">{type.ticket_type_name}</h4>
+                            <span className="text-2xl font-bold text-primary">
                               ETB {type.revenue.toLocaleString()}
                             </span>
                           </div>
@@ -289,24 +289,24 @@ export default function AnalyticsDashboard() {
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="grid grid-cols-3 gap-4 mb-3">
                         <div>
                           <p className="text-xs text-muted-foreground">Tickets Sold</p>
-                          <p className="text-lg font-semibold">{type.tickets_sold}{type.quantity ? ` / ${type.quantity}` : ''}</p>
+                          <p className="text-lg font-semibold text-foreground">{type.tickets_sold}{type.quantity ? ` / ${type.quantity}` : ''}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Price per Ticket</p>
-                          <p className="text-lg font-semibold">
+                          <p className="text-lg font-semibold text-foreground">
                             ETB {type.tickets_sold > 0 ? (type.revenue / type.tickets_sold).toFixed(2) : '0.00'}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Remaining</p>
-                          <p className="text-lg font-semibold">{type.available !== null ? type.available : 'Unlimited'}</p>
+                          <p className="text-lg font-semibold text-foreground">{type.available !== null ? type.available : 'Unlimited'}</p>
                         </div>
                       </div>
-                      
+
                       {type.quantity > 0 && (
                         <div className="space-y-1">
                           <div className="flex items-center justify-between text-xs text-muted-foreground">

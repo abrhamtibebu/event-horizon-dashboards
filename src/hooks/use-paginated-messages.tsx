@@ -82,11 +82,18 @@ export const usePaginatedMessages = ({
     }
   }, [conversationId, currentUserId])
 
-  const normalizePayload = (payload: any) => ({
-    messages: payload?.data || [],
-    nextCursor: payload?.next_cursor || null,
-    hasMore: Boolean(payload?.has_more ?? payload?.next_cursor),
-  })
+  const normalizePayload = (payload: any) => {
+    // Handle different response structures
+    const messages = payload?.data || payload?.messages || payload || []
+    const nextCursor = payload?.next_cursor || payload?.nextCursor || null
+    const hasMore = Boolean(payload?.has_more ?? payload?.hasMore ?? payload?.next_cursor ?? payload?.nextCursor)
+    
+    return {
+      messages: Array.isArray(messages) ? messages : [],
+      nextCursor,
+      hasMore,
+    }
+  }
 
   const fetchConversationPage = useCallback(async (conversationKey: string, cursor?: string) => {
     const params: Record<string, any> = {
@@ -99,12 +106,26 @@ export const usePaginatedMessages = ({
     if (conversationKey.startsWith('event_')) {
       const eventId = conversationKey.split('_')[1]
       const response = await api.get(`/events/${eventId}/messages`, { params })
+      console.log(`[fetchConversationPage] Event messages response:`, response.data)
       return normalizePayload(response.data)
     }
 
     const userId = conversationKey.replace('direct_', '')
+    console.log(`[fetchConversationPage] Fetching direct messages for userId: ${userId}, conversationKey: ${conversationKey}`)
     const response = await api.get(`/messages/direct/${userId}`, { params })
-    return normalizePayload(response.data)
+    console.log(`[fetchConversationPage] Direct messages response for user ${userId}:`, {
+      status: response.status,
+      data: response.data,
+      dataType: typeof response.data,
+      hasData: !!response.data?.data,
+      dataLength: response.data?.data?.length,
+      messages: response.data?.data,
+      nextCursor: response.data?.next_cursor,
+      hasMore: response.data?.has_more
+    })
+    const normalized = normalizePayload(response.data)
+    console.log(`[fetchConversationPage] Normalized payload:`, normalized)
+    return normalized
   }, [pageSize])
 
   // Fetch messages query with polling fallback
@@ -119,9 +140,22 @@ export const usePaginatedMessages = ({
       try {
         const payload = await fetchConversationPage(conversationId)
         console.log(`[${timestamp}] [usePaginatedMessages] Received ${(payload?.messages || []).length} messages`)
+        console.log(`[${timestamp}] [usePaginatedMessages] Payload structure:`, {
+          hasMessages: !!payload?.messages,
+          messagesType: Array.isArray(payload?.messages) ? 'array' : typeof payload?.messages,
+          messagesLength: payload?.messages?.length,
+          nextCursor: payload?.nextCursor,
+          hasMore: payload?.hasMore,
+          fullPayload: payload
+        })
         return payload
-      } catch (error) {
+      } catch (error: any) {
         console.error(`[${timestamp}] [usePaginatedMessages] Failed to fetch messages:`, error)
+        console.error(`[${timestamp}] [usePaginatedMessages] Error details:`, {
+          message: error?.message,
+          response: error?.response?.data,
+          status: error?.response?.status
+        })
         return { messages: [], nextCursor: null, hasMore: false }
       }
     },

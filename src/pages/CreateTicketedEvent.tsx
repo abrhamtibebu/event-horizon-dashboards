@@ -1,30 +1,27 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import {
   Calendar,
   MapPin,
   Users,
-  Upload,
   X,
   Tag,
   FileText,
-  Image,
   Ticket,
+  Eye,
+  Lock,
 } from 'lucide-react'
-import { CustomFieldsManager } from '@/components/event-creation/CustomFieldsManager'
-import type { CustomField } from '@/types/customFields'
-import { createCustomField } from '@/lib/customFieldsApi'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { showSuccessToast, showErrorToast } from '@/components/ui/ModernToast'
 import api from '@/lib/api'
-import { DateRange } from 'react-date-range'
-import 'react-date-range/dist/styles.css'
-import 'react-date-range/dist/theme/default.css'
 import { useAuth } from '@/hooks/use-auth'
 import { useFeatureAccess } from '@/hooks/useFeatureAccess'
 import { UpgradePrompt } from '@/components/subscription/UpgradePrompt'
@@ -46,7 +43,6 @@ export default function CreateTicketedEvent() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { canUseTicketing, canCreateEvent } = useFeatureAccess()
-  const imageInputRef = useRef<HTMLInputElement>(null)
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
   const [upgradeMessage, setUpgradeMessage] = useState('')
   const [upgradeTitle, setUpgradeTitle] = useState('')
@@ -62,7 +58,7 @@ export default function CreateTicketedEvent() {
     organizer_id: '',
     requirements: '',
     agenda: '',
-    event_image: null as File | null,
+    visibility: 'public' as 'public' | 'private',
   })
 
   const [eventRange, setEventRange] = useState([{
@@ -76,6 +72,11 @@ export default function CreateTicketedEvent() {
     endDate: new Date(),
     key: 'selection',
   }])
+
+  // Single day event state
+  const [isSingleDayEvent, setIsSingleDayEvent] = useState(false)
+  const [selectedEventDate, setSelectedEventDate] = useState<Date | null>(null)
+
   const [loading, setLoading] = useState({
     eventTypes: true,
     eventCategories: true,
@@ -84,17 +85,51 @@ export default function CreateTicketedEvent() {
   const [eventTypes, setEventTypes] = useState([])
   const [eventCategories, setEventCategories] = useState([])
   const [organizers, setOrganizers] = useState([])
-  const [customFields, setCustomFields] = useState<CustomField[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Ticket Type Creation Dialog State
+  const [showTicketTypeDialog, setShowTicketTypeDialog] = useState(false)
+  const [createdEventId, setCreatedEventId] = useState<number | null>(null)
+  const [ticketTypes, setTicketTypes] = useState<any[]>([])
+  const [currentTicketType, setCurrentTicketType] = useState({
+    name: '',
+    description: '',
+    price: '',
+    quantity: '',
+    sales_end_date: null as Date | null,
+    benefits: [] as string[],
+    min_group_size: '',
+    max_group_size: '',
+  })
+  const [isAddingTicketType, setIsAddingTicketType] = useState(false)
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
 
   useEffect(() => {
     const fetchData = async (endpoint: string, setData: Function, loaderKey: string) => {
       try {
         setLoading(prev => ({ ...prev, [loaderKey]: true }))
         const response = await api.get(endpoint)
-        setData(response.data)
+        // Handle paginated or non-paginated response
+        let data = response.data
+        if (data?.data && Array.isArray(data.data)) {
+          data = data.data
+        } else if (!Array.isArray(data)) {
+          data = []
+        }
+        setData(data)
       } catch (err: any) {
         console.error(`Error fetching ${endpoint}:`, err)
+        // Ensure data is always an array on error
+        if (loaderKey === 'organizers') {
+          setOrganizers([])
+        } else if (loaderKey === 'eventTypes') {
+          setEventTypes([])
+        } else if (loaderKey === 'eventCategories') {
+          setEventCategories([])
+        }
       } finally {
         setLoading(prev => ({ ...prev, [loaderKey]: false }))
       }
@@ -103,27 +138,20 @@ export default function CreateTicketedEvent() {
     fetchData('/event-types', setEventTypes, 'eventTypes')
     fetchData('/event-categories', setEventCategories, 'eventCategories')
     
-    if (user?.role !== 'organizer') {
+    // Pre-select organizer for organizers and organizer_admins
+    if (user && (user.role === 'organizer' || user.role === 'organizer_admin') && user.organizer_id) {
+      setFormData(prev => ({ ...prev, organizer_id: String(user.organizer_id) }))
+    }
+    
+    if (user?.role !== 'organizer' && user?.role !== 'organizer_admin') {
       fetchData('/organizers', setOrganizers, 'organizers')
+    } else {
+      setLoading(prev => ({ ...prev, organizers: false }))
     }
-  }, [user?.role])
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
+  }, [user?.role, user?.organizer_id])
 
 
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        showErrorToast('Image size must be less than 2MB')
-        return
-      }
-      setFormData(prev => ({ ...prev, event_image: file }))
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -155,6 +183,34 @@ export default function CreateTicketedEvent() {
       return
     }
 
+    // For single day events, end date is automatically set, so only check for multi-day events
+    if (!isSingleDayEvent && !eventRange[0].endDate) {
+      showErrorToast('Please select an event end date.')
+      return
+    }
+
+    if (!regRange[0].endDate) {
+      showErrorToast('Please select a registration end date.')
+      return
+    }
+
+    // For multi-day events, end date must be after start date
+    // For single day events, start and end dates can be the same
+    if (!isSingleDayEvent && eventRange[0].startDate >= eventRange[0].endDate) {
+      showErrorToast('Event end date must be after start date.')
+      return
+    }
+
+    if (regRange[0].startDate >= regRange[0].endDate) {
+      showErrorToast('Registration end date must be after start date.')
+      return
+    }
+
+    if (regRange[0].endDate > eventRange[0].endDate) {
+      showErrorToast('Registration must end before or on the event end date.')
+      return
+    }
+
     setIsSubmitting(true)
     
     try {
@@ -166,52 +222,26 @@ export default function CreateTicketedEvent() {
         registration_end_date: regRange[0].endDate.toISOString(),
         location: formData.city && formData.venue ? `${formData.city}, ${formData.venue}` : formData.venue || formData.city || '',
         max_guests: parseInt(formData.max_guests, 10),
-        ...(user?.role !== 'organizer' && { organizer_id: formData.organizer_id }),
+        // Only include organizer_id if not an organizer or organizer_admin (backend sets it for them)
+        ...(user?.role !== 'organizer' && user?.role !== 'organizer_admin' && { organizer_id: formData.organizer_id }),
         event_type: 'ticketed',
       }
 
-      let payload: any
-      let headers = {}
-
-      if (formData.event_image) {
-        payload = new FormData()
-        Object.entries(processedFormData).forEach(([key, value]) => {
-          if (key === 'event_image' && value) {
-            payload.append('event_image', value)
-          } else {
-            payload.append(key, value as any)
-          }
-        })
-        headers = { 'Content-Type': 'multipart/form-data' }
-      } else {
-        // If no image is uploaded, add the default banner path
-        payload = {
-          ...processedFormData,
-          event_image: '/banner.png'
-        }
-      }
+      const payload = processedFormData
+      const headers = {}
 
       const response = await api.post('/events/ticketed/add', payload, { headers })
-      const eventId = response.data?.id || response.data?.data?.id
-      
-      // Save custom fields if any
-      if (eventId && customFields.length > 0) {
-        try {
-          for (const field of customFields) {
-            await createCustomField(eventId, {
-              ...field,
-              event_id: eventId,
-            })
-          }
-        } catch (error: any) {
-          console.error('Error saving custom fields:', error)
-          // Don't fail the entire creation if custom fields fail
-          showErrorToast('Event created but some custom fields could not be saved.')
-        }
+
+      // Store the created event ID and show ticket type dialog
+      const eventId = response.data.event?.id || response.data.data?.id || response.data.id
+      if (!eventId) {
+        console.error('Event creation response:', response.data)
+        showErrorToast('Event created but unable to retrieve event ID. Please refresh the page.')
+        return
       }
-      
-      showSuccessToast('Ticketed event created successfully!')
-      navigate('/dashboard/events')
+
+      setCreatedEventId(eventId)
+      setShowTicketTypeDialog(true)
     } catch (error: any) {
       showErrorToast(error.response?.data?.message || 'Failed to create ticketed event.')
     } finally {
@@ -219,8 +249,371 @@ export default function CreateTicketedEvent() {
     }
   }
 
+  // Handle ticket type creation
+  const handleAddTicketType = async () => {
+    if (!currentTicketType.name.trim() || !currentTicketType.price) {
+      showErrorToast('Please fill in ticket name and price.')
+      return
+    }
+
+    if (!createdEventId) {
+      showErrorToast('Event ID not found. Please try creating the event again.')
+      return
+    }
+
+    setIsAddingTicketType(true)
+    try {
+      const payload = {
+        name: currentTicketType.name,
+        description: currentTicketType.description,
+        price: parseFloat(currentTicketType.price),
+        quantity: currentTicketType.quantity ? parseInt(currentTicketType.quantity) : null,
+        sales_end_date: currentTicketType.sales_end_date?.toISOString(),
+        benefits: currentTicketType.benefits,
+        min_group_size: currentTicketType.min_group_size ? parseInt(currentTicketType.min_group_size) : null,
+        max_group_size: currentTicketType.max_group_size ? parseInt(currentTicketType.max_group_size) : null,
+      }
+
+      const response = await api.post(`/events/${createdEventId}/ticket-types`, payload)
+
+      setTicketTypes(prev => [...prev, response.data.data])
+      showSuccessToast('Ticket type added successfully!')
+
+      // Reset form
+      setCurrentTicketType({
+        name: '',
+        description: '',
+        price: '',
+        quantity: '',
+        sales_end_date: null,
+        benefits: [],
+        min_group_size: '',
+        max_group_size: '',
+      })
+    } catch (error: any) {
+      showErrorToast(error.response?.data?.message || 'Failed to add ticket type.')
+    } finally {
+      setIsAddingTicketType(false)
+    }
+  }
+
+  // Handle navigation to event details or ticket management
+  const handleContinueToEvent = () => {
+    if (createdEventId) {
+      navigate(`/dashboard/events/${createdEventId}`)
+    }
+  }
+
+  const handleGoToTicketManagement = () => {
+    navigate('/dashboard/ticket-management')
+  }
+
+  // Modern elegant date picker styles
+  const modernDatePickerStyles = `
+    /* Modern Date Picker Styles */
+    :root {
+      --dropdown-arrow: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='hsl(215.4%2016.3%2046.9%)' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    }
+
+    .dark {
+      --dropdown-arrow: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='hsl(217.2%2032.6%2017.5%)' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    }
+
+    .modern-date-picker {
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    .date-picker-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem;
+      background: linear-gradient(135deg, hsl(var(--primary) / 0.1), hsl(var(--primary) / 0.05));
+      border-bottom: 1px solid hsl(var(--border));
+    }
+
+    .date-picker-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: hsl(var(--foreground));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .date-picker-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .nav-btn {
+      width: 2.5rem;
+      height: 2.5rem;
+      border: none;
+      border-radius: 0.75rem;
+      background: hsl(var(--muted));
+      color: hsl(var(--foreground));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 3px hsl(var(--foreground) / 0.1);
+    }
+
+    .nav-btn:hover {
+      background: hsl(var(--accent));
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px hsl(var(--foreground) / 0.15);
+    }
+
+    .nav-btn:active {
+      transform: translateY(0);
+    }
+
+    .month-year-selector {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 1.5rem;
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+    }
+
+    .month-selector,
+    .year-selector {
+      padding: 0.625rem 0.875rem;
+      border: 1.5px solid hsl(var(--border));
+      border-radius: 0.625rem;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 1px 2px 0 hsl(var(--muted-foreground) / 0.05);
+      min-width: 120px;
+      appearance: none;
+      background-image: var(--dropdown-arrow);
+      background-position: right 0.5rem center;
+      background-repeat: no-repeat;
+      background-size: 1.5em 1.5em;
+      padding-right: 2.5rem;
+    }
+
+    .month-selector:focus,
+    .year-selector:focus {
+      outline: none;
+      border-color: hsl(var(--primary));
+      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+      background-color: hsl(var(--background));
+    }
+
+    .month-selector:hover,
+    .year-selector:hover {
+      border-color: hsl(var(--primary));
+      background-color: hsl(var(--accent));
+      box-shadow: 0 2px 4px 0 hsl(var(--muted-foreground) / 0.1);
+    }
+
+    .month-selector option,
+    .year-selector option {
+      background-color: hsl(var(--popover));
+      color: hsl(var(--popover-foreground));
+      padding: 0.5rem;
+    }
+
+    .weekdays-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      padding: 1rem 1.5rem 0.5rem;
+      gap: 0.25rem;
+    }
+
+    .weekday {
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: hsl(var(--muted-foreground));
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .days-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      padding: 0.5rem 1.5rem 1.5rem;
+      gap: 0.25rem;
+    }
+
+    .day-cell {
+      position: relative;
+      width: 2.75rem;
+      height: 2.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: hsl(var(--foreground));
+      user-select: none;
+    }
+
+    .day-cell:hover {
+      background: hsl(var(--accent));
+      transform: scale(1.05);
+    }
+
+    .day-cell.today {
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+      font-weight: 600;
+    }
+
+    .day-cell.today::after {
+      content: '';
+      position: absolute;
+      bottom: 0.25rem;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0.25rem;
+      height: 0.25rem;
+      border-radius: 50%;
+      background: hsl(var(--primary));
+    }
+
+    .day-cell.selected {
+      background: hsl(var(--primary));
+      color: hsl(var(--primary-foreground));
+      font-weight: 600;
+      box-shadow: 0 2px 8px hsl(var(--primary) / 0.3);
+    }
+
+    .day-cell.in-range {
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+    }
+
+    .day-cell.range-start,
+    .day-cell.range-end {
+      background: hsl(var(--primary));
+      color: hsl(var(--primary-foreground));
+      position: relative;
+    }
+
+    .day-cell.range-start::before,
+    .day-cell.range-end::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0.25rem;
+      height: 0.25rem;
+      border-radius: 50%;
+      background: hsl(var(--primary-foreground));
+    }
+
+    .day-cell.range-start::before {
+      left: 0.5rem;
+    }
+
+    .day-cell.range-end::before {
+      right: 0.5rem;
+    }
+
+    .day-cell.disabled {
+      color: hsl(var(--muted-foreground));
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .day-cell.disabled:hover {
+      background: transparent;
+      transform: none;
+    }
+
+    .day-cell.other-month {
+      color: hsl(var(--muted-foreground));
+      opacity: 0.6;
+    }
+
+    /* Quick actions */
+    .date-picker-actions {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid hsl(var(--border));
+      background: hsl(var(--muted) / 0.3);
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+
+    .action-btn {
+      padding: 0.5rem 1rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 0.5rem;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .action-btn:hover {
+      border-color: hsl(var(--primary));
+      background: hsl(var(--primary) / 0.05);
+      color: hsl(var(--primary));
+    }
+
+    .action-btn.today {
+      border-color: hsl(var(--primary));
+      background: hsl(var(--primary));
+      color: hsl(var(--primary-foreground));
+    }
+
+    /* Responsive design */
+    @media (max-width: 640px) {
+      .date-picker-header,
+      .month-year-selector,
+      .weekdays-grid,
+      .days-grid,
+      .date-picker-actions {
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+
+      .day-cell {
+        width: 2.5rem;
+        height: 2.5rem;
+        font-size: 0.8125rem;
+      }
+    }
+
+    /* Animation for range selection */
+    .range-transition {
+      animation: rangeSelect 0.3s ease-out;
+    }
+
+    @keyframes rangeSelect {
+      0% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.1);
+      }
+      100% {
+        transform: scale(1);
+      }
+    }
+  `
+
   return (
     <div className="min-h-screen bg-background">
+      <style>{modernDatePickerStyles}</style>
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Breadcrumbs */}
         <Breadcrumbs 
@@ -253,6 +646,7 @@ export default function CreateTicketedEvent() {
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Event Information */}
           <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <style>{modernDatePickerStyles}</style>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
                 <Ticket className="w-5 h-5 text-white" />
@@ -282,11 +676,12 @@ export default function CreateTicketedEvent() {
                 <Label htmlFor="organizer_id" className="flex items-center gap-2 text-foreground font-medium">
                   <Tag className="w-4 h-4 text-green-500" /> Organizer
                 </Label>
-                {user?.role === 'organizer' ? (
+                {(user?.role === 'organizer' || user?.role === 'organizer_admin') ? (
                   <Input
-                    value={user.organizer?.name || ''}
+                    value={user.organizer?.name || 'Loading organizer...'}
                     disabled
-                    className="mt-2 h-12 border-border bg-muted rounded-xl"
+                    className="mt-2 h-12 border-border bg-muted rounded-xl cursor-not-allowed"
+                    placeholder="Your organization"
                   />
                 ) : (
                   <Select
@@ -299,7 +694,7 @@ export default function CreateTicketedEvent() {
                       <SelectValue placeholder="Select an organizer" />
                     </SelectTrigger>
                     <SelectContent>
-                      {organizers.map((org: any) => (
+                      {Array.isArray(organizers) && organizers.map((org: any) => (
                         <SelectItem key={org.id} value={String(org.id)}>
                           {org.name}
                         </SelectItem>
@@ -421,98 +816,114 @@ export default function CreateTicketedEvent() {
             </div>
           </div>
 
-          {/* Event Image Upload */}
+          {/* Event Visibility */}
           <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                <Image className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Eye className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-card-foreground">Event Image</h3>
-                <p className="text-muted-foreground text-sm">Upload an image for your event (optional)</p>
+                <h3 className="text-xl font-bold text-foreground">
+                  Event Visibility
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  Control who can discover and register for your event
+                </p>
               </div>
             </div>
-            
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <Label htmlFor="event_image" className="flex items-center gap-2 text-foreground font-medium">
-                    <Upload className="w-4 h-4 text-purple-500" /> Event Image
-                  </Label>
-                  <div className="mt-2">
-                    <input
-                      ref={imageInputRef}
-                      type="file"
-                      id="event_image"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                    <div className="flex items-center gap-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => imageInputRef.current?.click()}
-                        className="flex items-center gap-2 border-2 border-dashed border-border hover:border-purple-500 hover:bg-purple-500/10 dark:hover:bg-purple-900/20 transition-all duration-200"
-                      >
-                        <Upload className="w-4 h-4" />
-                        Choose Image
-                      </Button>
-                      {formData.event_image && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setFormData(prev => ({ ...prev, event_image: null }))
-                            if (imageInputRef.current) {
-                              imageInputRef.current.value = ''
-                            }
-                          }}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <X className="w-4 h-4" />
-                          Remove
-                        </Button>
-                      )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Public Event Option */}
+              <label className="relative cursor-pointer group">
+                <input
+                  type="radio"
+                  name="visibility"
+                  value="public"
+                  checked={formData.visibility === 'public'}
+                  onChange={(e) => handleInputChange('visibility', e.target.value)}
+                  className="peer sr-only"
+                />
+                <div className="relative p-5 border-2 border-border rounded-2xl transition-all duration-300 group-hover:border-primary/50 peer-checked:border-primary peer-checked:bg-primary/5 dark:peer-checked:bg-primary/10">
+                  {/* Selected indicator */}
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center opacity-0 peer-checked:opacity-100 transition-opacity duration-300 shadow-lg">
+                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                  </div>
+
+                  <div className="flex items-start gap-4 mb-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+                      <Users className="w-5 h-5 text-white" />
                     </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Maximum file size: 2MB. Supported formats: JPG, PNG, GIF
-                    </p>
+                    <div className="flex-1">
+                      <h4 className="text-base font-bold text-foreground mb-1">Public Event</h4>
+                      <p className="text-muted-foreground text-sm">Discoverable by everyone</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Visible on Evella platform</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Paid ticket registration</span>
+                    </div>
                   </div>
                 </div>
-                
-                {/* Image Preview */}
-                <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center">
-                  {formData.event_image ? (
-                    <img
-                      src={URL.createObjectURL(formData.event_image)}
-                      alt="Event preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="text-center text-gray-400">
-                      <Image className="w-8 h-8 mx-auto mb-2" />
-                      <p className="text-xs">No image</p>
+              </label>
+
+              {/* Private Event Option */}
+              <label className="relative cursor-pointer group">
+                <input
+                  type="radio"
+                  name="visibility"
+                  value="private"
+                  checked={formData.visibility === 'private'}
+                  onChange={(e) => handleInputChange('visibility', e.target.value)}
+                  className="peer sr-only"
+                />
+                <div className="relative p-5 border-2 border-border rounded-2xl transition-all duration-300 group-hover:border-muted-foreground/50 peer-checked:border-muted-foreground peer-checked:bg-muted/5 dark:peer-checked:bg-muted/10">
+                  {/* Selected indicator */}
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-muted-foreground rounded-full flex items-center justify-center opacity-0 peer-checked:opacity-100 transition-opacity duration-300 shadow-lg">
+                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                  </div>
+
+                  <div className="flex items-start gap-4 mb-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+                      <Lock className="w-5 h-5 text-white" />
                     </div>
-                  )}
+                    <div className="flex-1">
+                      <h4 className="text-base font-bold text-foreground mb-1">Private Event</h4>
+                      <p className="text-muted-foreground text-sm">Invite-only access</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Hidden from public discovery</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Exclusive ticket access</span>
+                    </div>
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {/* Additional Info */}
+            <div className="mt-6 p-4 bg-muted/30 rounded-xl border border-border">
+              <div className="flex items-start gap-3">
+                <div className="text-info mt-0.5">ℹ️</div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-1">Visibility Settings</p>
+                  <p className="text-sm text-muted-foreground">
+                    Public events can be discovered on the Evella platform and have open ticket registration.
+                    Private events require direct invitations and are not visible in public searches.
+                  </p>
                 </div>
               </div>
-              
-              {!formData.event_image && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Image className="w-3 h-3 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-blue-900">Default Image</p>
-                      <p className="text-sm text-blue-700 mt-1">
-                        If no image is uploaded, the default banner image will be used for your event.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
@@ -533,24 +944,359 @@ export default function CreateTicketedEvent() {
                 <Label className="flex items-center gap-2 text-foreground font-medium mb-4">
                   <Calendar className="w-4 h-4 text-warning" /> Event Date Range
                 </Label>
-                <DateRange
-                  ranges={eventRange}
-                  onChange={(item) => setEventRange([item.selection])}
-                  minDate={new Date()}
-                  className="rounded-xl border border-border"
-                />
+
+                {/* Single Day Toggle */}
+                <div className="flex items-center gap-2 mb-3">
+                  <input
+                    type="checkbox"
+                    id="single-day-event-ticketed"
+                    checked={isSingleDayEvent}
+                    onChange={(e) => {
+                      setIsSingleDayEvent(e.target.checked)
+                      if (e.target.checked && selectedEventDate) {
+                        // For single day events, set both start and end to same date
+                        setEventRange([{
+                          ...eventRange[0],
+                          startDate: selectedEventDate,
+                          endDate: selectedEventDate
+                        }])
+                      }
+                    }}
+                    className="rounded border-gray-300"
+                  />
+                  <label htmlFor="single-day-event-ticketed" className="text-sm text-muted-foreground">
+                    Single day event
+                  </label>
+                </div>
+
+                <div className="modern-date-picker border border-border rounded-2xl overflow-hidden shadow-lg bg-card">
+                  <div className="date-picker-header">
+                    <div className="date-picker-title">
+                      <Calendar className="w-5 h-5" />
+                      Select Event Dates
+                    </div>
+                    <div className="date-picker-nav">
+                      <button type="button" className="nav-btn" onClick={() => {
+                        const newDate = new Date(eventRange[0].startDate);
+                        newDate.setMonth(newDate.getMonth() - 1);
+                        setEventRange([{
+                          ...eventRange[0],
+                          startDate: newDate
+                        }]);
+                      }}>
+                        ←
+                      </button>
+                      <button type="button" className="nav-btn" onClick={() => {
+                        const newDate = new Date(eventRange[0].startDate);
+                        newDate.setMonth(newDate.getMonth() + 1);
+                        setEventRange([{
+                          ...eventRange[0],
+                          startDate: newDate
+                        }]);
+                      }}>
+                        →
+                      </button>
+                    </div>
+                  </div>
+                  <div className="month-year-selector">
+                    <select
+                      className="month-selector"
+                      value={eventRange[0].startDate.getMonth()}
+                      onChange={(e) => {
+                        const newDate = new Date(eventRange[0].startDate);
+                        newDate.setMonth(parseInt(e.target.value));
+                        setEventRange([{
+                          ...eventRange[0],
+                          startDate: newDate
+                        }]);
+                      }}
+                    >
+                      {[
+                        'January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'
+                      ].map((month, index) => (
+                        <option key={month} value={index}>{month}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="year-selector"
+                      value={eventRange[0].startDate.getFullYear()}
+                      onChange={(e) => {
+                        const newDate = new Date(eventRange[0].startDate);
+                        newDate.setFullYear(parseInt(e.target.value));
+                        setEventRange([{
+                          ...eventRange[0],
+                          startDate: newDate
+                        }]);
+                      }}
+                    >
+                      {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="weekdays-grid">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                      <div key={day} className="weekday">{day}</div>
+                    ))}
+                  </div>
+                  <div className="days-grid">
+                    {Array.from({ length: 42 }, (_, index) => {
+                      const monthStart = new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth(), 1);
+                      const firstDay = monthStart.getDay();
+                      const day = index - firstDay + 1;
+                      const currentDate = new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth(), day);
+                      
+                      // Normalize dates to midnight for comparison
+                      const normalizeDate = (date: Date) => {
+                        const normalized = new Date(date);
+                        normalized.setHours(0, 0, 0, 0);
+                        return normalized;
+                      };
+                      
+                      const normalizedCurrent = normalizeDate(currentDate);
+                      const normalizedStart = eventRange[0].startDate ? normalizeDate(eventRange[0].startDate) : null;
+                      const normalizedEnd = eventRange[0].endDate ? normalizeDate(eventRange[0].endDate) : null;
+                      const normalizedToday = normalizeDate(new Date());
+
+                      const isCurrentMonth = currentDate.getMonth() === eventRange[0].startDate.getMonth();
+                      const isToday = normalizedCurrent.getTime() === normalizedToday.getTime();
+                      const isSelected = (normalizedStart && normalizedStart.getTime() === normalizedCurrent.getTime()) ||
+                                       (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
+                      const isInRange = normalizedStart && normalizedEnd &&
+                                      normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
+                      const isDisabled = normalizedCurrent < normalizedToday;
+
+                      return (
+                        <div
+                          key={index}
+                          className={`day-cell ${
+                            !isCurrentMonth ? 'other-month' :
+                            isDisabled ? 'disabled' :
+                            isSelected ? 'selected' :
+                            isInRange ? 'in-range' :
+                            isToday ? 'today' : ''
+                          }`}
+                          onClick={() => {
+                            if (isDisabled) return;
+                            const newRange = { ...eventRange[0] };
+                            // If both dates are set or neither is set, start a new selection
+                            if ((newRange.startDate && newRange.endDate) || (!newRange.startDate && !newRange.endDate)) {
+                              newRange.startDate = normalizeDate(currentDate);
+                              newRange.endDate = undefined;
+                            } else if (newRange.startDate && normalizedCurrent < normalizeDate(newRange.startDate)) {
+                              // If clicking before start date, make it the new start
+                              newRange.startDate = normalizeDate(currentDate);
+                              newRange.endDate = undefined;
+                            } else if (newRange.startDate) {
+                              // Set end date
+                              newRange.endDate = normalizeDate(currentDate);
+                            }
+                            setEventRange([newRange]);
+                          }}
+                        >
+                          {isCurrentMonth && day > 0 && day <= new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth() + 1, 0).getDate() ? day : ''}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="date-picker-actions">
+                    <button
+                      type="button"
+                      className="action-btn today"
+                      onClick={() => {
+                        const today = new Date();
+                        setEventRange([{
+                          startDate: today,
+                          endDate: today,
+                          key: 'selection'
+                        }]);
+                      }}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      className="action-btn"
+                      onClick={() => {
+                        setEventRange([{
+                          startDate: new Date(),
+                          endDate: undefined,
+                          key: 'selection'
+                        }]);
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
               </div>
               
               <div>
                 <Label className="flex items-center gap-2 text-foreground font-medium mb-4">
                   <Calendar className="w-4 h-4 text-success" /> Registration Period
                 </Label>
-                <DateRange
-                  ranges={regRange}
-                  onChange={(item) => setRegRange([item.selection])}
-                  minDate={new Date()}
-                  className="rounded-xl border border-border"
-                />
+                <div className="modern-date-picker border border-border rounded-2xl overflow-hidden shadow-lg bg-card">
+                  <div className="date-picker-header">
+                    <div className="date-picker-title">
+                      <Calendar className="w-5 h-5" />
+                      Select Registration Dates
+                    </div>
+                    <div className="date-picker-nav">
+                      <button type="button" className="nav-btn" onClick={() => {
+                        const newDate = new Date(regRange[0].startDate);
+                        newDate.setMonth(newDate.getMonth() - 1);
+                        setRegRange([{
+                          ...regRange[0],
+                          startDate: newDate
+                        }]);
+                      }}>
+                        ←
+                      </button>
+                      <button type="button" className="nav-btn" onClick={() => {
+                        const newDate = new Date(regRange[0].startDate);
+                        newDate.setMonth(newDate.getMonth() + 1);
+                        setRegRange([{
+                          ...regRange[0],
+                          startDate: newDate
+                        }]);
+                      }}>
+                        →
+                      </button>
+                    </div>
+                  </div>
+                  <div className="month-year-selector">
+                    <select
+                      className="month-selector"
+                      value={regRange[0].startDate.getMonth()}
+                      onChange={(e) => {
+                        const newDate = new Date(regRange[0].startDate);
+                        newDate.setMonth(parseInt(e.target.value));
+                        setRegRange([{
+                          ...regRange[0],
+                          startDate: newDate
+                        }]);
+                      }}
+                    >
+                      {[
+                        'January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'
+                      ].map((month, index) => (
+                        <option key={month} value={index}>{month}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="year-selector"
+                      value={regRange[0].startDate.getFullYear()}
+                      onChange={(e) => {
+                        const newDate = new Date(regRange[0].startDate);
+                        newDate.setFullYear(parseInt(e.target.value));
+                        setRegRange([{
+                          ...regRange[0],
+                          startDate: newDate
+                        }]);
+                      }}
+                    >
+                      {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="weekdays-grid">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                      <div key={day} className="weekday">{day}</div>
+                    ))}
+                  </div>
+                  <div className="days-grid">
+                    {Array.from({ length: 42 }, (_, index) => {
+                      const monthStart = new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth(), 1);
+                      const firstDay = monthStart.getDay();
+                      const day = index - firstDay + 1;
+                      const currentDate = new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth(), day);
+                      
+                      // Normalize dates to midnight for comparison
+                      const normalizeDate = (date: Date) => {
+                        const normalized = new Date(date);
+                        normalized.setHours(0, 0, 0, 0);
+                        return normalized;
+                      };
+                      
+                      const normalizedCurrent = normalizeDate(currentDate);
+                      const normalizedStart = regRange[0].startDate ? normalizeDate(regRange[0].startDate) : null;
+                      const normalizedEnd = regRange[0].endDate ? normalizeDate(regRange[0].endDate) : null;
+                      const normalizedToday = normalizeDate(new Date());
+
+                      const isCurrentMonth = currentDate.getMonth() === regRange[0].startDate.getMonth();
+                      const isToday = normalizedCurrent.getTime() === normalizedToday.getTime();
+                      const isSelected = (normalizedStart && normalizedStart.getTime() === normalizedCurrent.getTime()) ||
+                                       (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
+                      const isInRange = normalizedStart && normalizedEnd &&
+                                      normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
+                      const isDisabled = normalizedCurrent < normalizedToday;
+
+                      return (
+                        <div
+                          key={index}
+                          className={`day-cell ${
+                            !isCurrentMonth ? 'other-month' :
+                            isDisabled ? 'disabled' :
+                            isSelected ? 'selected' :
+                            isInRange ? 'in-range' :
+                            isToday ? 'today' : ''
+                          }`}
+                          onClick={() => {
+                            if (isDisabled) return;
+                            const newRange = { ...regRange[0] };
+                            // If both dates are set or neither is set, start a new selection
+                            if ((newRange.startDate && newRange.endDate) || (!newRange.startDate && !newRange.endDate)) {
+                              newRange.startDate = normalizeDate(currentDate);
+                              newRange.endDate = undefined;
+                            } else if (newRange.startDate && normalizedCurrent < normalizeDate(newRange.startDate)) {
+                              // If clicking before start date, make it the new start
+                              newRange.startDate = normalizeDate(currentDate);
+                              newRange.endDate = undefined;
+                            } else if (newRange.startDate) {
+                              // Set end date
+                              newRange.endDate = normalizeDate(currentDate);
+                            }
+                            setRegRange([newRange]);
+                          }}
+                        >
+                          {isCurrentMonth && day > 0 && day <= new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth() + 1, 0).getDate() ? day : ''}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="date-picker-actions">
+                    <button
+                      type="button"
+                      className="action-btn today"
+                      onClick={() => {
+                        const today = new Date();
+                        setRegRange([{
+                          startDate: today,
+                          endDate: today,
+                          key: 'selection'
+                        }]);
+                      }}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      className="action-btn"
+                      onClick={() => {
+                        setRegRange([{
+                          startDate: new Date(),
+                          endDate: undefined,
+                          key: 'selection'
+                        }]);
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -572,15 +1318,6 @@ export default function CreateTicketedEvent() {
                 </p>
               </div>
             </div>
-          </div>
-
-          {/* Custom Fields Section */}
-          <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-            <CustomFieldsManager
-              fields={customFields}
-              onChange={setCustomFields}
-              guestTypes={[]} // Ticketed events don't use guest types, but custom fields can still be added
-            />
           </div>
 
           {/* Action Buttons */}
@@ -616,6 +1353,177 @@ export default function CreateTicketedEvent() {
           title={upgradeTitle}
           message={upgradeMessage}
         />
+
+        {/* Ticket Type Creation Dialog */}
+        <Dialog open={showTicketTypeDialog} onOpenChange={setShowTicketTypeDialog}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                  <Ticket className="w-5 h-5 text-white" />
+                </div>
+                Add Ticket Types
+              </DialogTitle>
+              <DialogDescription>
+                Your ticketed event has been created successfully! Add ticket types to start selling tickets.
+                You can always add more ticket types later in Ticket Management.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+              {/* Success Message */}
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <div className="text-green-600 mt-0.5">✅</div>
+                  <div>
+                    <p className="text-sm font-medium text-green-800 dark:text-green-300">Event Created Successfully!</p>
+                    <p className="text-sm text-green-700 dark:text-green-400 mt-1">
+                      Your ticketed event has been created. Now let's add some ticket types to start accepting payments.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Current Ticket Types */}
+              {ticketTypes.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-foreground">Current Ticket Types</h4>
+                  <div className="space-y-2">
+                    {ticketTypes.map((ticketType, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
+                        <div>
+                          <p className="font-medium text-foreground">{ticketType.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            ETB {ticketType.price.toLocaleString()}
+                            {ticketType.quantity && ` • ${ticketType.quantity} available`}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">Active</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add Ticket Type Form */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-foreground">Add New Ticket Type</h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-name" className="text-sm font-medium">
+                      Ticket Name *
+                    </Label>
+                    <Input
+                      id="ticket-name"
+                      placeholder="e.g., Early Bird, VIP, General Admission"
+                      value={currentTicketType.name}
+                      onChange={(e) => setCurrentTicketType(prev => ({ ...prev, name: e.target.value }))}
+                      className="h-10"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-price" className="text-sm font-medium">
+                      Price (ETB) *
+                    </Label>
+                    <Input
+                      id="ticket-price"
+                      type="number"
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                      value={currentTicketType.price}
+                      onChange={(e) => setCurrentTicketType(prev => ({ ...prev, price: e.target.value }))}
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-quantity" className="text-sm font-medium">
+                      Quantity Available
+                    </Label>
+                    <Input
+                      id="ticket-quantity"
+                      type="number"
+                      placeholder="Unlimited"
+                      min="1"
+                      value={currentTicketType.quantity}
+                      onChange={(e) => setCurrentTicketType(prev => ({ ...prev, quantity: e.target.value }))}
+                      className="h-10"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sales-end-date" className="text-sm font-medium">
+                      Sales End Date
+                    </Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal h-10"
+                        >
+                          {currentTicketType.sales_end_date
+                            ? currentTicketType.sales_end_date.toLocaleDateString()
+                            : 'Select date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={currentTicketType.sales_end_date || undefined}
+                          onSelect={(date) => setCurrentTicketType(prev => ({ ...prev, sales_end_date: date || null }))}
+                          disabled={(date) => date < new Date()}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ticket-description" className="text-sm font-medium">
+                    Description
+                  </Label>
+                  <Textarea
+                    id="ticket-description"
+                    placeholder="Describe what's included with this ticket type..."
+                    value={currentTicketType.description}
+                    onChange={(e) => setCurrentTicketType(prev => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+
+                <Button
+                  onClick={handleAddTicketType}
+                  disabled={isAddingTicketType || !currentTicketType.name.trim() || !currentTicketType.price}
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                >
+                  {isAddingTicketType ? 'Adding...' : 'Add Ticket Type'}
+                </Button>
+              </div>
+            </div>
+
+            <DialogFooter className="flex-shrink-0 gap-2">
+              <Button
+                variant="outline"
+                onClick={handleContinueToEvent}
+                className="flex-1"
+              >
+                Skip for Now
+              </Button>
+              <Button
+                onClick={handleGoToTicketManagement}
+                className="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+              >
+                Manage Tickets
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

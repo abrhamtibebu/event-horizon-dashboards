@@ -1,8 +1,18 @@
 import axios from 'axios'
 
+  // Ensure baseURL always includes /api suffix
+  const getBaseURL = () => {
+    const envURL = import.meta.env.VITE_API_URL;
+    if (envURL) {
+      // If VITE_API_URL is provided, ensure it ends with /api
+      return envURL.endsWith('/api') ? envURL : `${envURL.replace(/\/$/, '')}/api`;
+    }
+    // Default to localhost for development
+    return 'http://localhost:8000/api';
+  };
+
   const api = axios.create({
-    // baseURL: import.meta.env.VITE_API_URL || 'https://api.validity.et/api',
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+    baseURL: getBaseURL(),
     timeout: 60000, // 60 seconds timeout for long-running operations like campaign sending
     headers: {
       'Content-Type': 'application/json',
@@ -107,6 +117,7 @@ api.interceptors.request.use(
                             config.url?.startsWith('/invitation/track') ||
                             config.url?.includes('/register') ||
                             config.url?.includes('/guest-types') ||
+                            config.url?.startsWith('/forms/') || // Public form access
                             config.url === '/login' ||
                             config.url === '/register' ||
                             config.url === '/forgot-password' ||

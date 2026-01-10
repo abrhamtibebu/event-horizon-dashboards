@@ -7,19 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle, Building, UserCog } from 'lucide-react';
 import { PublicTicketSelector } from '@/components/public/PublicTicketSelector';
 import { PublicPaymentSelector } from '@/components/public/PublicPaymentSelector';
 import { PublicTicketDisplay } from '@/components/public/PublicTicketDisplay';
 import { PaymentProcessingModal } from '@/components/payments/PaymentProcessingModal';
+import DynamicFormRenderer from '@/components/public/DynamicFormRenderer';
 import { usePublicEventTickets, useInitiateGuestPayment } from '@/lib/api/publicTickets';
 import { useAuth } from '@/hooks/use-auth';
 import type { PaymentMethod, PaymentStatus } from '@/types/tickets';
 import type { PublicTicketType } from '@/types/publicTickets';
 import { SpinnerInline } from '@/components/ui/spinner';
-import { CustomFieldsRenderer } from '@/components/registration/CustomFieldsRenderer';
-import { getPublicEventCustomFields } from '@/lib/customFieldsApi';
-import type { CustomField, CustomFieldResponseFormData } from '@/types/customFields';
 
 export default function PublicEventRegister() {
   const { eventUuid } = useParams();
@@ -42,6 +40,7 @@ export default function PublicEventRegister() {
     dietary: '',
     agree: false,
     newsletter: false,
+    age: '',
   });
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -55,7 +54,11 @@ export default function PublicEventRegister() {
     email: 'idle',
     phone: 'idle'
   });
+  const [useCustomForm, setUseCustomForm] = useState(false);
+  const [selectedGuestTypeId, setSelectedGuestTypeId] = useState<number | null>(null);
+  const [customFormParticipantType, setCustomFormParticipantType] = useState<string>('attendee'); // Deprecated - kept for backward compatibility
   const [existingGuestInfo, setExistingGuestInfo] = useState<any>(null);
+  const [guestTypes, setGuestTypes] = useState<any[]>([]);
   
   // Ticketing state
   const { isAuthenticated } = useAuth();
@@ -77,10 +80,6 @@ export default function PublicEventRegister() {
     phone: '',
   });
 
-  // Custom fields state
-  const [customFields, setCustomFields] = useState<CustomField[]>([]);
-  const [customFieldResponses, setCustomFieldResponses] = useState<Record<number, CustomFieldResponseFormData>>({});
-  const [customFieldErrors, setCustomFieldErrors] = useState<Record<number, string>>({});
 
   // Check if event is ticketed
   const isTicketedEvent = event?.event_type === 'ticketed';
@@ -196,6 +195,10 @@ export default function PublicEventRegister() {
         const eventData = res.data?.data || res.data;
         console.log('[PublicEventRegister] Event data received:', eventData);
         setEvent(eventData);
+        // Set guest types from event data
+        if (eventData?.guestTypes) {
+          setGuestTypes(Array.isArray(eventData.guestTypes) ? eventData.guestTypes : []);
+        }
       })
       .catch(err => {
         console.error('[PublicEventRegister] Error fetching event:', err);
@@ -225,19 +228,6 @@ export default function PublicEventRegister() {
     });
   }, [event]);
 
-  // Fetch custom fields when event and guest type are available
-  useEffect(() => {
-    if (!event?.uuid || !visitorGuestTypeId) return;
-    
-    getPublicEventCustomFields(event.uuid, Number(visitorGuestTypeId), 'registration')
-      .then(fields => {
-        setCustomFields(fields);
-      })
-      .catch(err => {
-        console.error('Error fetching custom fields:', err);
-        setCustomFields([]);
-      });
-  }, [event?.uuid, visitorGuestTypeId]);
 
   const checkExistingGuest = async (email: string, phone: string) => {
     if (!event?.uuid || (!email && !phone)) return;
@@ -387,35 +377,12 @@ export default function PublicEventRegister() {
       return;
     }
 
-    // Validate custom fields
-    const customFieldErrors: Record<number, string> = {};
-    customFields.forEach(field => {
-      const response = customFieldResponses[field.id!];
-      if (field.is_required) {
-        if (field.field_type === 'file') {
-          if (!response?.file) {
-            customFieldErrors[field.id!] = `${field.field_label} is required`;
-          }
-        } else {
-          if (!response?.value || response.value.trim() === '') {
-            customFieldErrors[field.id!] = `${field.field_label} is required`;
-          }
-        }
-      }
-    });
-
-    if (Object.keys(customFieldErrors).length > 0) {
-      setCustomFieldErrors(customFieldErrors);
-      toast.error('Please fill in all required custom fields');
-      return;
-    }
-
     setSubmitting(true);
     try {
-      // Check if we have file uploads
-      const hasFileUploads = Object.values(customFieldResponses).some(r => r.file);
+      // Check if we need FormData (for future file uploads)
+      const needsFormData = false;
       
-      if (hasFileUploads) {
+      if (needsFormData) {
         // Use FormData for file uploads
         const formData = new FormData();
         formData.append('name', form.name);
@@ -425,20 +392,9 @@ export default function PublicEventRegister() {
         formData.append('job_title', form.job_title || '');
         formData.append('gender', form.gender || '');
         formData.append('country', form.country || '');
-        formData.append('guest_type_id', visitorGuestTypeId);
+        formData.append('guest_type_id', (selectedGuestTypeId || visitorGuestTypeId)?.toString() || '');
         if (referralCode) formData.append('referral_code', referralCode);
         if (invitationCode) formData.append('invitation_code', invitationCode);
-        
-        // Add custom field responses
-        Object.values(customFieldResponses).forEach((response, index) => {
-          formData.append(`custom_field_responses[${index}][field_id]`, response.field_id.toString());
-          if (response.value) {
-            formData.append(`custom_field_responses[${index}][value]`, response.value);
-          }
-          if (response.file) {
-            formData.append(`custom_field_responses[${index}][file]`, response.file);
-          }
-        });
 
         const response = await api.post(`/public/events/${event.uuid}/register`, formData, {
           headers: {
@@ -476,18 +432,10 @@ export default function PublicEventRegister() {
       // No file uploads, use regular JSON
       const registrationData: any = {
         ...form,
-        guest_type_id: visitorGuestTypeId,
+        guest_type_id: selectedGuestTypeId || visitorGuestTypeId,
         referral_code: referralCode,
         invitation_code: invitationCode,
       };
-
-      // Add custom field responses
-      if (Object.keys(customFieldResponses).length > 0) {
-        registrationData.custom_field_responses = Object.values(customFieldResponses).map(response => ({
-          field_id: response.field_id,
-          value: response.value || '',
-        }));
-      }
 
       const response = await api.post(`/public/events/${event.uuid}/register`, registrationData);
       
@@ -909,9 +857,30 @@ export default function PublicEventRegister() {
 
           {/* Right Column - Ticketing or Registration Form */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 lg:p-8">
-              {/* Ticketed Event Flow */}
-              {isTicketedEvent && purchaseStep === 'tickets' && (
+            {/* Custom Form Renderer */}
+            {useCustomForm && !isTicketedEvent && selectedGuestTypeId && (
+              <DynamicFormRenderer
+                eventId={Number(event?.id)}
+                guestTypeId={selectedGuestTypeId}
+                participantType={customFormParticipantType} // Deprecated - kept for backward compatibility
+                onSuccess={(result) => {
+                  setSuccess(true);
+                  toast.success('Registration successful! Check your email for confirmation and your e-badge.');
+                }}
+                onError={(error) => {
+                  toast.error(error);
+                }}
+                onFallback={() => {
+                  setUseCustomForm(false);
+                }}
+              />
+            )}
+
+            {/* Default Registration Form or Ticketed Event Flow */}
+            {(!useCustomForm || isTicketedEvent) && (
+              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 lg:p-8">
+                {/* Ticketed Event Flow */}
+                {isTicketedEvent && purchaseStep === 'tickets' && (
                 <>
                   <div className="mb-6">
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Purchase Tickets</h2>
@@ -960,6 +929,59 @@ export default function PublicEventRegister() {
               {/* Free Event Registration Form */}
               {!isTicketedEvent && (
                 <>
+                  {/* Guest Type Selection */}
+                  {guestTypes.length > 0 && (
+                  <div className="mb-6">
+                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                      I am registering as:
+                    </Label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {guestTypes.map((guestType) => {
+                        return (
+                          <button
+                              key={guestType.id}
+                            type="button"
+                            onClick={async () => {
+                                setSelectedGuestTypeId(guestType.id);
+
+                                // Check if there's a custom form for this guest type
+                              try {
+                                  const formResponse = await api.get(`/events/${event.id}/forms/by-guest-type/${guestType.id}`);
+                                  const form = formResponse.data;
+
+                                  if (form && form.status === 'active' && (!form.expires_at || new Date(form.expires_at) > new Date())) {
+                                  setUseCustomForm(true);
+                                } else {
+                                  setUseCustomForm(false);
+                                }
+                                } catch (error: any) {
+                                  // If form not found (404), use default form
+                                  if (error?.response?.status === 404) {
+                                    setUseCustomForm(false);
+                                  } else {
+                                console.error('Error checking for custom forms:', error);
+                                setUseCustomForm(false);
+                                  }
+                              }
+                            }}
+                            className={`p-3 border rounded-lg text-center hover:border-yellow-500 hover:bg-yellow-50 transition-colors ${
+                                selectedGuestTypeId === guestType.id
+                                ? 'border-yellow-500 bg-yellow-50'
+                                : 'border-gray-200'
+                            }`}
+                          >
+                              <Users className="w-5 h-5 mx-auto mb-1 text-gray-600" />
+                              <span className="text-sm font-medium text-gray-700">{guestType.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                        Selecting your guest type will customize the registration form for your needs.
+                    </p>
+                  </div>
+                  )}
+
                   {/* Form Header */}
                   <div className="mb-6">
                     <div className="flex items-center gap-3 mb-2">
@@ -1193,31 +1215,6 @@ export default function PublicEventRegister() {
                   </div>
                 </div>
 
-                {/* Custom Fields */}
-                {customFields.length > 0 && (
-                  <div className="mt-6 pt-6 border-t">
-                    <CustomFieldsRenderer
-                      fields={customFields}
-                      values={customFieldResponses}
-                      onChange={(fieldId, value) => {
-                        setCustomFieldResponses(prev => ({
-                          ...prev,
-                          [fieldId]: value,
-                        }))
-                        // Clear error when user starts typing
-                        if (customFieldErrors[fieldId]) {
-                          setCustomFieldErrors(prev => {
-                            const newErrors = { ...prev }
-                            delete newErrors[fieldId]
-                            return newErrors
-                          })
-                        }
-                      }}
-                      errors={customFieldErrors}
-                    />
-                  </div>
-                )}
-
                 {/* Submit Button */}
                 <Button
                   type="submit"
@@ -1237,7 +1234,8 @@ export default function PublicEventRegister() {
               </form>
               </>
               )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

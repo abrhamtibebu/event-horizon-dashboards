@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,7 @@ import api from '@/lib/api';
 import type { TicketType } from '@/types';
 
 export default function OrganizerTicketsPage() {
+  const navigate = useNavigate();
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -32,14 +34,14 @@ export default function OrganizerTicketsPage() {
 
   const queryClient = useQueryClient();
 
-  // Fetch organizer's ticketed events only
+  // Fetch organizer's ticketed events (all statuses including draft)
   const { data: events, isLoading: eventsLoading } = useQuery({
     queryKey: ['organizer-ticketed-events'],
     queryFn: async () => {
       const response = await api.get('/events', {
         params: {
           event_type: 'ticketed',
-          status: 'active', // Only show active events
+          // No status filter - fetch all ticketed events including draft
         }
       });
       return response.data;
@@ -128,7 +130,7 @@ export default function OrganizerTicketsPage() {
         <CardHeader>
           <CardTitle>Select Event</CardTitle>
           <CardDescription>
-            Choose an event to manage its tickets (showing active ticketed events only)
+            Choose an event to manage its tickets (including draft and active events)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -139,14 +141,9 @@ export default function OrganizerTicketsPage() {
           ) : (() => {
               // Handle both array and paginated response structures
               const eventsList = Array.isArray(events) ? events : events?.data || [];
-              
-              // Filter for ticketed events using the event_type_column field (the actual DB column value)
-              const filteredEvents = eventsList.filter((e: any) => {
-                const eventType = e.event_type_column || e.event_type;
-                // Handle both cases: string value or object (relationship)
-                const eventTypeValue = typeof eventType === 'string' ? eventType : 'free';
-                return eventTypeValue === 'ticketed' && e.status === 'active';
-              });
+
+              // Filter for ticketed events (API already filters by event_type and status)
+              const filteredEvents = eventsList;
               
               return filteredEvents.length > 0 ? (
                 <Select
@@ -157,11 +154,36 @@ export default function OrganizerTicketsPage() {
                     <SelectValue placeholder="Select an event" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredEvents.map((event: any) => (
-                      <SelectItem key={event.id} value={event.id.toString()}>
-                        {event.name} {event.event_type && `(${event.event_type})`}
-                      </SelectItem>
-                    ))}
+                    {filteredEvents.map((event: any) => {
+                      const status = event.status || event.status_column || 'draft'
+                      const getStatusColor = (status: string) => {
+                        switch (status) {
+                          case 'active':
+                            return 'text-green-600 dark:text-green-400'
+                          case 'draft':
+                            return 'text-yellow-600 dark:text-yellow-400'
+                          case 'completed':
+                            return 'text-blue-600 dark:text-blue-400'
+                          case 'cancelled':
+                            return 'text-red-600 dark:text-red-400'
+                          default:
+                            return 'text-muted-foreground'
+                        }
+                      }
+                      const getStatusLabel = (status: string) => {
+                        return status.charAt(0).toUpperCase() + status.slice(1)
+                      }
+                      return (
+                        <SelectItem key={event.id} value={event.id.toString()}>
+                          <span className="flex items-center justify-between w-full">
+                            <span>{event.name}</span>
+                            <span className={`ml-2 text-xs font-medium ${getStatusColor(status)}`}>
+                              {getStatusLabel(status)}
+                            </span>
+                          </span>
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
               ) : (
@@ -169,10 +191,10 @@ export default function OrganizerTicketsPage() {
               <Ticket className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
               <h3 className="text-lg font-semibold text-foreground mb-2">No Ticketed Events Found</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                You don't have any active ticketed events yet. Create a ticketed event first to manage tickets.
+                You don't have any ticketed events yet. Create a ticketed event first to manage tickets.
               </p>
               <Button 
-                onClick={() => window.location.href = '/dashboard/events/create-ticketed'}
+                onClick={() => navigate('/dashboard/events/create/ticketed')}
                 variant="outline"
               >
                 Create Ticketed Event
@@ -270,9 +292,9 @@ export default function OrganizerTicketsPage() {
                       : 'Try adjusting your filters'}
                   </p>
                   {ticketTypes?.length === 0 && (
-                    <Button onClick={handleCreateTicket} className="mt-4">
+                    <Button onClick={() => navigate('/dashboard/events/create/ticketed')} className="mt-4">
                       <Plus className="w-4 h-4 mr-2" />
-                      Create Ticket Type
+                      Create Ticketed Event
                     </Button>
                   )}
                 </div>

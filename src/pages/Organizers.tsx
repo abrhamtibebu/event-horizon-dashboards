@@ -174,18 +174,21 @@ export default function Organizers() {
   useEffect(() => {
     if (!loading && organizers.length > 0) {
       organizers.forEach((org) => {
-        api.get(`/organizers/${org.id}/contacts`).then((res) => {
-          setContactsMap((prev) => ({ ...prev, [org.id]: res.data }))
-        })
-        // Fetch events count for each organizer
-        api.get(`/admin/organizers/${org.id}/events`).then((res) => {
-          setEventsCountMap((prev) => ({ ...prev, [org.id]: Array.isArray(res.data) ? res.data.length : 0 }))
-        }).catch(() => {
-          setEventsCountMap((prev) => ({ ...prev, [org.id]: 0 }))
-        })
+        // Frontend role check (defense in depth - backend protection is mandatory)
+        if (canManageOrganizers) {
+          api.get(`/organizers/${org.id}/contacts`).then((res) => {
+            setContactsMap((prev) => ({ ...prev, [org.id]: res.data }))
+          })
+          // Fetch events count for each organizer (admin only)
+          api.get(`/admin/organizers/${org.id}/events`).then((res) => {
+            setEventsCountMap((prev) => ({ ...prev, [org.id]: Array.isArray(res.data) ? res.data.length : 0 }))
+          }).catch(() => {
+            setEventsCountMap((prev) => ({ ...prev, [org.id]: 0 }))
+          })
+        }
       })
     }
-  }, [loading, organizers])
+  }, [loading, organizers, canManageOrganizers])
 
   const getStatusColor = (status: string) => {
     switch (status) {

@@ -135,7 +135,7 @@ export default function Profile() {
               </Avatar>
               <label
                 htmlFor="profile-image-upload"
-                className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hidden"
               >
                 {isUploadingImage ? (
                   <SpinnerInline size="md" />
@@ -150,6 +150,7 @@ export default function Profile() {
                 onChange={handleImageUpload}
                 className="hidden"
                 disabled={isUploadingImage}
+                style={{display: 'none'}}
               />
             </div>
 

@@ -85,7 +85,8 @@ export default function OrganizerProfile() {
         )
         setAuditLogs(logsRes.data.data || [])
 
-        if (user?.role === 'admin') {
+        // Frontend role check (defense in depth - backend protection is mandatory)
+        if (user && ['admin', 'superadmin'].includes(user.role)) {
           const eventsRes = await api.get(
             `/admin/organizers/${organizerId}/events`
           )
@@ -150,10 +151,21 @@ export default function OrganizerProfile() {
   const handleCreateFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      setCreateForm((prev: any) => ({ ...prev, event_image: file }))
-      const reader = new FileReader()
-      reader.onloadend = () => setCreateImagePreview(reader.result as string)
-      reader.readAsDataURL(file)
+      // Frontend validation (UX only - backend validation is mandatory)
+      import('@/lib/fileValidation').then(({ validateImageFile }) => {
+        const validation = validateImageFile(file)
+        
+        if (!validation.valid) {
+          toast.error(validation.message)
+          e.target.value = '' // Clear the input
+          return
+        }
+        
+        setCreateForm((prev: any) => ({ ...prev, event_image: file }))
+        const reader = new FileReader()
+        reader.onloadend = () => setCreateImagePreview(reader.result as string)
+        reader.readAsDataURL(file)
+      })
     }
   }
 
@@ -601,13 +613,14 @@ export default function OrganizerProfile() {
                     required
                   />
                   <div>
-                    <Label htmlFor="create_event_image">Event Image</Label>
+                    <Label htmlFor="create_event_image" className="hidden">Event Image</Label>
                     <Input
                       id="create_event_image"
                       type="file"
                       onChange={handleCreateFile}
                       ref={createImageInputRef}
-                      className="mt-1"
+                      className="mt-1 hidden"
+                      style={{display: 'none'}}
                     />
                     {createImagePreview && (
                       <div className="mt-2 relative inline-block">

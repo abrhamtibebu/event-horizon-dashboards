@@ -391,8 +391,7 @@ export default function RegistrationSuccess() {
         {/* Info Box */}
         <div className="mt-8 bg-blue-500/10 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg p-4 text-center">
           <p className="text-blue-800 dark:text-blue-300 text-sm">
-            <strong>E-Badge Sent!</strong> Your digital visitor badge has been sent to your email. 
-            You can also download it above for easy access during the event.
+            <strong>E-Badge Ready!</strong> Download your digital visitor badge above for easy access during the event.
           </p>
         </div>
 

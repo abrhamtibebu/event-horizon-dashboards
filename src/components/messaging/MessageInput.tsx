@@ -249,9 +249,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       if (onMessageSent) {
         onMessageSent(response.data)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to send message:', error)
-      showError('Message not sent', 'Something went wrong while sending. Please try again.')
+      
+      // Handle authorization errors (403)
+      if (error?.response?.status === 403) {
+        const errorMessage = error?.response?.data?.error || 'You are not authorized to message this user'
+        showError('Message Not Allowed', errorMessage)
+      } else {
+        showError('Message not sent', 'Something went wrong while sending. Please try again.')
+      }
       // The optimistic message will show as failed
       // The parent component should handle retry logic
     }

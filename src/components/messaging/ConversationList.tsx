@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { Search, MessageCircle, Users, Calendar, Filter, MoreVertical, Archive, Star, Settings } from 'lucide-react'
+import { Search, MessageCircle, Users, Calendar, Filter, MoreVertical, Archive, Star, Settings, Shield, UserCog, UserCheck } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
@@ -100,6 +100,27 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       .join('')
       .toUpperCase()
       .slice(0, 2)
+  }
+
+  // Get role badge for user
+  const getRoleBadge = (role: string | undefined) => {
+    if (!role) return null
+    
+    const roleConfig: Record<string, { variant: 'default' | 'secondary' | 'outline' | 'destructive', icon: React.ReactNode, label: string }> = {
+      admin: { variant: 'default', icon: <Shield className="w-2.5 h-2.5" />, label: 'Admin' },
+      superadmin: { variant: 'default', icon: <Shield className="w-2.5 h-2.5" />, label: 'Super Admin' },
+      organizer: { variant: 'secondary', icon: <UserCog className="w-2.5 h-2.5" />, label: 'Organizer' },
+      organizer_admin: { variant: 'secondary', icon: <UserCog className="w-2.5 h-2.5" />, label: 'Org Admin' },
+      usher: { variant: 'outline', icon: <UserCheck className="w-2.5 h-2.5" />, label: 'Usher' },
+    }
+
+    const config = roleConfig[role] || { variant: 'outline' as const, icon: null, label: role }
+    return (
+      <Badge variant={config.variant} className="text-[10px] px-1.5 py-0.5 flex items-center gap-1 h-4">
+        {config.icon}
+        {config.label}
+      </Badge>
+    )
   }
 
   if (isLoading) {
@@ -290,13 +311,21 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                 
                 <div className="flex-1 ml-4 min-w-0">
                   <div className="flex items-center justify-between mb-1.5">
-                    <h3 className={`truncate text-sm ${
-                      conversation.unreadCount > 0 
-                        ? 'font-bold text-foreground' 
-                        : 'font-semibold text-foreground'
-                    }`}>
-                      {conversation.name}
-                    </h3>
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <h3 className={`truncate text-sm ${
+                        conversation.unreadCount > 0 
+                          ? 'font-bold text-foreground' 
+                          : 'font-semibold text-foreground'
+                      }`}>
+                        {conversation.name}
+                      </h3>
+                      {/* Role badge for direct messages */}
+                      {conversation.type === 'direct' && conversation.participants[0]?.role && (
+                        <div className="flex-shrink-0">
+                          {getRoleBadge(conversation.participants[0].role)}
+                        </div>
+                      )}
+                    </div>
                     <div className="flex items-center space-x-2 ml-2 flex-shrink-0">
                       {conversation.lastMessage && (
                         <span className="text-xs font-medium text-muted-foreground">

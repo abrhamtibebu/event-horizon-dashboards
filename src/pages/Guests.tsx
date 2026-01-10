@@ -59,8 +59,8 @@ export default function Guests() {
   const { user } = useAuth();
   const { checkPermission } = usePermissionCheck();
   
-  // Check if user is admin or organizer (not usher)
-  const isAdminOrOrganizer = user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin';
+  // Check if user is organizer (guests list is only for organizers)
+  const isAdminOrOrganizer = user?.role === 'organizer' || user?.role === 'organizer_admin';
   
   // Pagination hook - only for admin and organizer
   const {
@@ -195,10 +195,13 @@ export default function Guests() {
       }
     };
 
+    // Only organizers can access guests list
     if (user?.role === 'organizer' || user?.role === 'organizer_admin') {
       fetchGuestsForOrganizer();
     } else {
-      fetchGuestsAndEventsForAdmin();
+      // Redirect or show error for non-organizers
+      setError('Access denied: Only organizers can view guests list.');
+      setLoading(false);
     }
   }, [user]);
 

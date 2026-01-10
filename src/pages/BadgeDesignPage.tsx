@@ -12,10 +12,8 @@ import {
   Settings,
   Palette
 } from 'lucide-react';
-import SimpleBadgeDesigner from '@/components/SimpleBadgeDesigner';
 import BadgeTemplateManager from '@/components/BadgeTemplateManager';
 import SimpleBadge from '@/components/SimpleBadge';
-import { BadgeElement } from '@/components/SimpleBadgeDesigner';
 import { Attendee } from '@/types/attendee';
 import api from '@/lib/api';
 
@@ -191,20 +189,6 @@ const BadgeDesignPage: React.FC = () => {
 
           <TabsContent value="design" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Badge Designer */}
-              <div className="lg:col-span-3">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Palette className="w-5 h-5" />
-                      Badge Designer
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <SimpleBadgeDesigner />
-                  </CardContent>
-                </Card>
-              </div>
 
               {/* Quick Actions */}
               <div className="space-y-4">

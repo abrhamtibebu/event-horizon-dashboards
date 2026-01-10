@@ -1,11 +1,13 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { InvitationGenerator } from './InvitationGenerator';
 import { SocialShareButtons } from './SocialShareButtons';
 import { InvitationAnalytics } from './InvitationAnalytics';
 import { InvitationsList } from './InvitationsList';
 import { useAuth } from '@/hooks/use-auth';
 import { Card } from '@/components/ui/card';
-import { AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AlertCircle, ExternalLink, Sparkles } from 'lucide-react';
 
 interface InvitationsTabProps {
   eventId: number;
@@ -23,6 +25,7 @@ export function InvitationsTab({
   isOrganizer
 }: InvitationsTabProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [currentInvitation, setCurrentInvitation] = useState<{
     code: string;
     url: string;
@@ -50,6 +53,32 @@ export function InvitationsTab({
           </div>
         </div>
       </Card>
+
+      {/* Custom Registration Button for Event ID 33 */}
+      {eventId === 33 && (
+        <Card className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 dark:from-blue-950/20 dark:to-indigo-950/20 dark:border-blue-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-blue-900 dark:text-blue-100">Custom Registration Form</h4>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  Access the specialized registration form for this event with enhanced fields and document uploads
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => navigate(`/event/custom-register/${eventId}`)}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white flex items-center gap-2"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open Custom Registration
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Generator and Share Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

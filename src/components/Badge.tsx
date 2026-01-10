@@ -4,7 +4,7 @@ import { Attendee } from '@/types/attendee';
 import { BadgeTemplate } from '@/types/badge';
 import { calculateNameFontSize, calculateCompanyFontSize, calculateJobTitleFontSize } from '@/lib/nameSizing';
 import SimpleBadge from './SimpleBadge';
-import { BadgeElement } from './SimpleBadgeDesigner';
+import { BadgeElement } from './SimpleBadge';
 
 interface BadgeProps {
   attendee: Attendee;

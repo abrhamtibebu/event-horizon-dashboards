@@ -135,6 +135,19 @@ export default function Users() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [statusLoading, setStatusLoading] = useState<string | null>(null)
   const { user: currentUser } = useAuth()
+
+  // Helper to check if a user is super admin
+  const isSuperAdmin = (u: any) => u.role === 'superadmin';
+  // Helper to check if a user is admin (not super admin)
+  const isAdmin = (u: any) => u.role === 'admin' && u.id !== 1
+  // Helper to check if current user is super admin
+  const isCurrentSuperAdmin = currentUser && currentUser.role === 'superadmin';
+  // Helper to check if current user is admin
+  const isCurrentAdmin = currentUser?.role === 'admin'
+  const canManageUsers = isCurrentSuperAdmin || isCurrentAdmin;
+  
+  // State for superadmin creation permission (fetched from backend)
+  const [canCreateSuperAdmin, setCanCreateSuperAdmin] = useState(false);
   const [showAddPassword, setShowAddPassword] = useState(false)
   const [showAddPasswordConfirm, setShowAddPasswordConfirm] = useState(false)
   const [searchParams] = useSearchParams()
@@ -153,6 +166,26 @@ export default function Users() {
       setAddOpen(true)
     }
   }, [searchParams])
+
+  // Fetch permission to create superadmin from backend
+  useEffect(() => {
+    const fetchCanCreateSuperAdmin = async () => {
+      if (!isCurrentSuperAdmin) {
+        setCanCreateSuperAdmin(false)
+        return
+      }
+      
+      try {
+        const res = await api.get('/permissions/can-create-superadmin')
+        setCanCreateSuperAdmin(res.data.can_create || false)
+      } catch (err) {
+        console.error('Error fetching superadmin creation permission:', err)
+        setCanCreateSuperAdmin(false)
+      }
+    }
+    
+    fetchCanCreateSuperAdmin()
+  }, [isCurrentSuperAdmin])
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -180,20 +213,29 @@ export default function Users() {
         const res = await api.get(`/users?${params.toString()}`)
         
         // Handle paginated response
-        if (res.data.data) {
+        if (res.data.data && Array.isArray(res.data.data)) {
           setUsers(res.data.data)
           setTotalPages(res.data.last_page || 1)
           setTotalRecords(res.data.total || 0)
-        } else {
+        } else if (Array.isArray(res.data)) {
           // Fallback for non-paginated response
           setUsers(res.data)
           setTotalPages(1)
           setTotalRecords(res.data.length || 0)
+        } else {
+          // Safety fallback - ensure users is always an array
+          setUsers([])
+          setTotalPages(1)
+          setTotalRecords(0)
         }
       } catch (err: any) {
         setError(
           'Failed to fetch users. This feature may not be implemented in the backend.'
         )
+        // Ensure users is always an array even on error
+        setUsers([])
+        setTotalPages(1)
+        setTotalRecords(0)
       } finally {
         setLoading(false)
       }
@@ -248,19 +290,22 @@ export default function Users() {
   };
 
   // Since we're now using server-side pagination, we don't need client-side filtering
-  const filteredUsers = users;
+  // Ensure users is always an array
+  const usersArray = Array.isArray(users) ? users : [];
+  const filteredUsers = usersArray;
 
   const userStats = {
-    total: users.length,
-    superadmins: users.filter((u) => u.role === 'superadmin').length,
-    admins: users.filter((u) => u.role === 'admin').length,
-    organizerAdmins: users.filter((u) => u.role === 'organizer_admin').length,
-    organizers: users.filter((u) => u.role === 'organizer').length,
-    ushers: users.filter((u) => u.role === 'usher').length,
-    active: users.filter((u) => u.status === 'active').length,
-    inactive: users.filter((u) => u.status === 'inactive').length,
-    suspended: users.filter((u) => u.status === 'suspended').length,
-
+    total: usersArray.length,
+    superadmins: usersArray.filter((u) => u.role === 'superadmin').length,
+    admins: usersArray.filter((u) => u.role === 'admin').length,
+    organizerAdmins: usersArray.filter((u) => u.role === 'organizer_admin').length,
+    organizers: usersArray.filter((u) => u.role === 'organizer').length,
+    ushers: usersArray.filter((u) => u.role === 'usher').length,
+    sales: usersArray.filter((u) => u.role === 'sales').length,
+    attendees: usersArray.filter((u) => u.role === 'attendee').length,
+    active: usersArray.filter((u) => u.status === 'active').length,
+    inactive: usersArray.filter((u) => u.status === 'inactive').length,
+    suspended: usersArray.filter((u) => u.status === 'suspended').length,
   }
 
   const handleAddChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -291,9 +336,25 @@ export default function Users() {
         role: addForm.role,
         phone: addForm.phone || '',
         bio: addForm.bio || '',
-        payment_methods: [{
+      }
+      
+      // Payment methods required for sales role, optional for others
+      if (addForm.role === 'sales') {
+        formData.payment_methods = [{
           method: 'telebirr',
-          account_number: '0000000000'
+          account_number: addForm.phone || '0000000000'
+        }]
+      } else if (addForm.role === 'attendee' && addForm.phone) {
+        // For attendee, provide default payment method using phone
+        formData.payment_methods = [{
+          method: 'telebirr',
+          account_number: addForm.phone
+        }]
+      } else if (addForm.role !== 'attendee' && addForm.role !== 'sales') {
+        // For other roles, provide default payment method
+        formData.payment_methods = [{
+          method: 'telebirr',
+          account_number: addForm.phone || '0000000000'
         }]
       }
       
@@ -311,7 +372,9 @@ export default function Users() {
       // Refresh users
       setLoading(true)
       const res = await api.get('/users')
-      setUsers(res.data)
+      // Handle paginated or non-paginated response
+      const usersData = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : [])
+      setUsers(usersData)
       setLoading(false)
       toast.success('User added successfully!')
     } catch (err: any) {
@@ -352,7 +415,9 @@ export default function Users() {
       setEditForm(null)
       setLoading(true)
       const res = await api.get('/users')
-      setUsers(res.data)
+      // Handle paginated or non-paginated response
+      const usersData = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : [])
+      setUsers(usersData)
       setLoading(false)
       toast.success('User updated successfully!')
     } catch (err: any) {
@@ -371,7 +436,9 @@ export default function Users() {
       setDeleteUserId(null)
       setLoading(true)
       const res = await api.get('/users')
-      setUsers(res.data)
+      // Handle paginated or non-paginated response
+      const usersData = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : [])
+      setUsers(usersData)
       setLoading(false)
       toast.success('User moved to trash!')
     } catch (err) {
@@ -387,7 +454,9 @@ export default function Users() {
       await api.patch(`/users/${user.id}/status`, { status })
       setLoading(true)
       const res = await api.get('/users')
-      setUsers(res.data)
+      // Handle paginated or non-paginated response
+      const usersData = Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : [])
+      setUsers(usersData)
       setLoading(false)
       toast.success(`User status updated to ${status}`)
     } catch (err: any) {
@@ -398,15 +467,7 @@ export default function Users() {
     }
   }
 
-  // Helper to check if a user is super admin
-  const isSuperAdmin = (u: any) => u.role === 'superadmin';
-  // Helper to check if a user is admin (not super admin)
-  const isAdmin = (u: any) => u.role === 'admin' && u.id !== 1
-  // Helper to check if current user is super admin
-  const isCurrentSuperAdmin = currentUser && currentUser.role === 'superadmin';
-  // Helper to check if current user is admin
-  const isCurrentAdmin = currentUser?.role === 'admin'
-  const canManageUsers = isCurrentSuperAdmin || isCurrentAdmin;
+
 
   const handleResetPassword = async () => {
     if (!resetUserId) return
@@ -582,10 +643,15 @@ export default function Users() {
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
+                        {canCreateSuperAdmin && (
+                          <SelectItem value="superadmin">Super Admin</SelectItem>
+                        )}
                         <SelectItem value="admin">Admin</SelectItem>
                         <SelectItem value="organizer_admin">Organizer Admin</SelectItem>
                         <SelectItem value="organizer">Organizer</SelectItem>
                         <SelectItem value="usher">Usher</SelectItem>
+                        <SelectItem value="sales">Sales</SelectItem>
+                        <SelectItem value="attendee">Attendee</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -632,15 +698,17 @@ export default function Users() {
           <div className="flex flex-wrap items-center gap-3">
             <Select value={roleFilter} onValueChange={handleRoleFilterChange}>
               <SelectTrigger className="w-[140px] bg-background border-border">
-                <SelectValue placeholder="All Staff" />
+                <SelectValue placeholder="All Users" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Staff</SelectItem>
+                <SelectItem value="all">All Users</SelectItem>
                 <SelectItem value="superadmin">Super Admin</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="organizer_admin">Organizer Admin</SelectItem>
                 <SelectItem value="organizer">Organizer</SelectItem>
                 <SelectItem value="usher">Usher</SelectItem>
+                <SelectItem value="sales">Sales</SelectItem>
+                <SelectItem value="attendee">Attendee</SelectItem>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
@@ -952,10 +1020,15 @@ export default function Users() {
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
+                      {canCreateSuperAdmin && (
+                        <SelectItem value="superadmin">Super Admin</SelectItem>
+                      )}
                       <SelectItem value="admin">Admin</SelectItem>
                       <SelectItem value="organizer_admin">Organizer Admin</SelectItem>
                       <SelectItem value="organizer">Organizer</SelectItem>
                       <SelectItem value="usher">Usher</SelectItem>
+                      <SelectItem value="sales">Sales</SelectItem>
+                      <SelectItem value="attendee">Attendee</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1107,7 +1180,11 @@ export default function Users() {
             <DialogHeader>
               <DialogTitle className="text-xl font-bold">User Details</DialogTitle>
             </DialogHeader>
-            {viewUser && (
+            {viewUser && (() => {
+              const showActions = canManageUsers && (isCurrentSuperAdmin || !isSuperAdmin(viewUser))
+              const canEditViewUser = showActions && (isCurrentSuperAdmin || (!isAdmin(viewUser) && !isSuperAdmin(viewUser)))
+              
+              return (
               <div className="space-y-4">
                 <div className="flex items-center gap-4 pb-4 border-b">
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center font-semibold text-foreground text-xl">
@@ -1161,7 +1238,7 @@ export default function Users() {
                     <p className="text-sm font-medium mt-1">{viewUser.bio}</p>
                   </div>
                 )}
-                {canEdit && (
+                {canEditViewUser && (
                   <div className="flex gap-2 pt-4 border-t">
                     <Button
                       variant="outline"
@@ -1191,7 +1268,8 @@ export default function Users() {
                   </div>
                 )}
               </div>
-            )}
+              )
+            })()}
           </DialogContent>
         </Dialog>
       </div>

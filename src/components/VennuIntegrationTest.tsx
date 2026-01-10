@@ -37,9 +37,9 @@ export default function VennuIntegrationTest() {
         description: 'Testing Vennu API endpoint'
       },
       {
-        name: 'VEMS Backend Connection',
+        name: 'Evella Admin Backend Connection',
         url: 'https://api.validity.et/api/public/events',
-        description: 'Testing VEMS backend public events endpoint'
+        description: 'Testing Evella Admin backend public events endpoint'
       }
     ]
 
@@ -239,7 +239,7 @@ export default function VennuIntegrationTest() {
               className="flex items-center gap-2"
             >
               <ExternalLink className="w-4 h-4" />
-              VEMS Public API
+              Evella Public API
             </Button>
           </div>
         </div>
@@ -251,7 +251,7 @@ export default function VennuIntegrationTest() {
             <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
               <CheckCircle className="w-5 h-5 text-green-500" />
               <div>
-                <p className="font-medium text-green-800">VEMS Backend</p>
+                <p className="font-medium text-green-800">Evella Backend</p>
                 <p className="text-sm text-green-600">Events with approved status are automatically published</p>
               </div>
             </div>
@@ -259,7 +259,7 @@ export default function VennuIntegrationTest() {
               <Globe className="w-5 h-5 text-blue-500" />
               <div>
                 <p className="font-medium text-blue-800">Vennu Platform</p>
-                <p className="text-sm text-blue-600">Fetches approved events from VEMS backend</p>
+                <p className="text-sm text-blue-600">Fetches approved events from Evella backend</p>
               </div>
             </div>
           </div>

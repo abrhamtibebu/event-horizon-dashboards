@@ -201,7 +201,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
 
       {/* Messages - Scrollable area with constrained height */}
       <div className="flex-1 min-h-0 relative">
-        {allMessages.length === 0 && !isLoading ? (
+        {allMessages.length === 0 && !isLoading && optimisticMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-8">
             <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6 shadow-md">
               <span className="text-4xl">💬</span>

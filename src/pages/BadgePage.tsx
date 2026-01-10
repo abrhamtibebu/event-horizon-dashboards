@@ -9,7 +9,6 @@ import { Attendee } from '@/types/attendee';
 import { v4 as uuidv4 } from 'uuid';
 import { getBadgeTemplates, getOfficialBadgeTemplate } from '@/lib/badgeTemplates';
 import { calculateNameFontSize, calculateCompanyFontSize, calculateJobTitleFontSize } from '@/lib/nameSizing';
-import { convertBadgeDesignerToLegacy } from '@/lib/badge-designer/utils/templateConverter';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -97,10 +96,8 @@ const BadgePage = () => {
     getOfficialBadgeTemplate(Number(eventId))
       .then(res => {
         if (res.data) {
-          // Convert new badge designer format to legacy format
-          const convertedTemplate = convertBadgeDesignerToLegacy(res.data);
           console.log('Using default badge template:', res.data.name, 'is_default:', res.data.is_default);
-          setTemplate(convertedTemplate);
+          setTemplate(res.data);
         } else {
           // No default template found
           setTemplate(createDefaultTemplate());
@@ -112,8 +109,7 @@ const BadgePage = () => {
         getBadgeTemplates(Number(eventId))
           .then(res => {
             if (Array.isArray(res.data) && res.data.length > 0) {
-              const convertedTemplate = convertBadgeDesignerToLegacy(res.data[0]);
-              setTemplate(convertedTemplate);
+              setTemplate(res.data[0]);
             } else {
               setTemplate(createDefaultTemplate());
               setTemplateError('No badge templates found. Using default template.');
@@ -124,8 +120,7 @@ const BadgePage = () => {
             const saved = localStorage.getItem(`badge_templates_${eventId}`);
             if (saved) {
               const templates = JSON.parse(saved);
-              const convertedTemplate = convertBadgeDesignerToLegacy(templates[0]);
-              setTemplate(convertedTemplate);
+              setTemplate(templates[0]);
             } else {
               setTemplate(createDefaultTemplate());
               setTemplateError('Failed to load badge template from backend and local storage. Using default.');

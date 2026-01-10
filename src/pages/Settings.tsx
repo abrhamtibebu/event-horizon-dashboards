@@ -18,7 +18,7 @@ export default function Settings() {
   const { user } = useAuth()
   const { showSuccess, showError } = useModernAlerts()
   const { theme, setTheme } = useTheme()
-  
+
   // Password Change State
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
@@ -64,12 +64,12 @@ export default function Settings() {
 
     setIsChangingPassword(true)
     try {
-      await api.post('/user/change-password', {
+      await api.put('/user/password', {
         current_password: passwordData.current_password,
         new_password: passwordData.new_password,
         new_password_confirmation: passwordData.confirm_password,
       })
-      
+
       showSuccess('Password changed successfully!')
       setPasswordData({
         current_password: '',
@@ -77,7 +77,7 @@ export default function Settings() {
         confirm_password: '',
       })
     } catch (error: any) {
-      showError(error.response?.data?.message || 'Failed to change password')
+      showError(error.response?.data?.error || error.response?.data?.message || 'Failed to change password')
     } finally {
       setIsChangingPassword(false)
     }
@@ -86,7 +86,7 @@ export default function Settings() {
   const handleNotificationChange = async (key: keyof typeof notifications, value: boolean) => {
     const newNotifications = { ...notifications, [key]: value }
     setNotifications(newNotifications)
-    
+
     try {
       await api.put('/user/notification-preferences', newNotifications)
       showSuccess('Notification preferences updated!')
@@ -100,7 +100,7 @@ export default function Settings() {
   const handlePreferenceChange = async (key: keyof typeof preferences, value: string) => {
     const newPreferences = { ...preferences, [key]: value }
     setPreferences(newPreferences)
-    
+
     try {
       await api.put('/user/preferences', newPreferences)
       showSuccess('Preferences updated!')
@@ -119,13 +119,13 @@ export default function Settings() {
   return (
     <div className="container mx-auto p-6 max-w-4xl">
       {/* Breadcrumbs */}
-      <Breadcrumbs 
+      <Breadcrumbs
         items={[
           { label: 'Settings', href: '/dashboard/settings' }
         ]}
         className="mb-4"
       />
-      
+
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">Settings</h1>
@@ -208,8 +208,8 @@ export default function Settings() {
             </div>
           </div>
 
-          <Button 
-            onClick={handlePasswordChange} 
+          <Button
+            onClick={handlePasswordChange}
             disabled={isChangingPassword}
             className="bg-brand-gradient"
           >

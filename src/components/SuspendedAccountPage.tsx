@@ -70,7 +70,7 @@ export function SuspendedAccountPage({ children, fallback }: SuspendedAccountPag
               <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-sm">V</span>
               </div>
-              <span className="font-semibold text-gray-900">VEMS - Event Management</span>
+              <span className="font-semibold text-gray-900">Evella Admin - Event Management</span>
             </div>
             <Badge variant="destructive" className="px-3 py-1">
               Account Suspended

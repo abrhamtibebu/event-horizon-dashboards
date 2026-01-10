@@ -106,7 +106,6 @@ const permissionLabels: Record<string, string> = {
   
   // Badges
   'badges.view': 'View Badges',
-  'badges.design': 'Design Badges',
   'badges.locate': 'Locate Badges',
   'badges.manage': 'Manage Badges',
   

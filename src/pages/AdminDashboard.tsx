@@ -54,8 +54,6 @@ export default function AdminDashboard() {
   const [reportLoading, setReportLoading] = useState(true)
   const [reportError, setReportError] = useState<string | null>(null)
 
-  const [pendingEvents, setPendingEvents] = useState<any[]>([])
-  const [pendingEventsLoading, setPendingEventsLoading] = useState(true)
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -81,45 +79,10 @@ export default function AdminDashboard() {
       }
     }
     
-    const fetchPendingEvents = async () => {
-      try {
-        setPendingEventsLoading(true)
-        const response = await api.get('/events')
-        // Handle paginated response structure
-        const eventsData = response.data.data || response.data || []
-        const events = Array.isArray(eventsData) ? eventsData : []
-        const pending = events.filter((event: any) => 
-          event.advertisement_status === 'pending'
-        )
-        setPendingEvents(pending.slice(0, 3)) // Show only first 3 pending events
-      } catch (error) {
-        console.error('Failed to fetch pending events:', error)
-        setPendingEvents([])
-      } finally {
-        setPendingEventsLoading(false)
-      }
-    }
-    
     fetchDashboardData()
     fetchTrashCount()
-    fetchPendingEvents()
   }, [])
 
-  const updateAdvertisementStatus = async (eventId: number, status: string) => {
-    try {
-      await api.put(`/events/${eventId}/advertisement-status`, {
-        advertisement_status: status
-      })
-      
-      // Update local state
-      setPendingEvents(prev => prev.filter(event => event.id !== eventId))
-      
-      // Show success message
-      console.log(`Event ${eventId} ${status} successfully`)
-    } catch (error) {
-      console.error('Failed to update advertisement status:', error)
-    }
-  }
 
   // Fetch organizers
   useEffect(() => {
@@ -770,69 +733,30 @@ export default function AdminDashboard() {
           </Button>
       </div>
 
-          {/* Pending Event Publications */}
-          <div className="bg-card/80 backdrop-blur-md rounded-2xl shadow-xl border border-orange-200 dark:border-orange-700/50 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-lg font-semibold text-card-foreground">Pending Event Publications</h3>
-                <p className="text-sm text-muted-foreground">Events waiting for Evella platform approval</p>
-              </div>
-              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-                <Globe className="w-4 h-4 text-foreground dark:text-white" />
-              </div>
-            </div>
-            <div className="space-y-3">
-              {pendingEventsLoading ? (
-                <div className="text-center py-4">
-                  <SpinnerInline />
-                </div>
-              ) : pendingEvents.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground">
-                  <Globe className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                  <p>No pending events for publication</p>
-                </div>
-              ) : (
-                pendingEvents.map((event: any) => (
-                  <div key={event.id} className="flex items-center justify-between p-3 rounded-lg bg-orange-50 border border-orange-200">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-card-foreground">{event.name}</h4>
-                      <p className="text-sm text-muted-foreground">by {event.organizer?.name}</p>
-                      <p className="text-xs text-muted-foreground/70">
-                        {format(new Date(event.start_date), 'MMM dd, yyyy')} • {event.location}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => updateAdvertisementStatus(event.id, 'approved')}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => updateAdvertisementStatus(event.id, 'rejected')}
-                        className="border-red-300 text-red-700 hover:bg-red-50"
-                      >
-                        Reject
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            {pendingEvents.length > 0 && (
-              <Button variant="outline" size="sm" className="w-full mt-4" asChild>
-                <Link to="/dashboard/event-publication">
-                  View All Events
-                </Link>
-              </Button>
-            )}
-          </div>
 
           {/* Recent Activity */}
           <RecentActivity limit={6} />
+          
+          {/* Quick Actions */}
+          <Card className="p-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-primary" />
+                Quick Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Link
+                  to="/dashboard/messages"
+                  className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-xl border border-border transition-all duration-200"
+                >
+                  <MessageSquare className="w-8 h-8 mx-auto mb-2 text-primary" />
+                  <span className="font-medium text-card-foreground">Messages</span>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

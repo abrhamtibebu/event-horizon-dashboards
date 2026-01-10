@@ -455,45 +455,65 @@ export default function Messages() {
         key={conversation.id}
         onClick={() => handleSelectConversation(conversation.id)}
         className={cn(
-          'w-full rounded-2xl border px-4 py-3 text-left transition-all focus:outline-none',
+          'group w-full rounded-2xl border px-4 py-3 text-left transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-slate-900',
           isActive
-            ? 'border-primary/60 bg-primary/10 text-white shadow-lg'
-            : 'border-white/5 bg-white/5 text-white/80 hover:border-white/20 hover:bg-white/10'
+            ? 'border-primary/60 bg-gradient-to-r from-primary/20 to-primary/10 text-white shadow-xl shadow-primary/20 scale-[1.02]'
+            : 'border-white/10 bg-gradient-to-r from-white/5 to-white/5 text-white/80 hover:border-white/30 hover:bg-gradient-to-r hover:from-white/10 hover:to-white/15 hover:scale-[1.01] hover:shadow-lg'
         )}
+        aria-label={`Open conversation with ${conversation.name}`}
+        role="button"
+        tabIndex={0}
       >
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <Avatar className="h-11 w-11 border border-white/20">
-              <AvatarImage src={conversation.avatar} />
-              <AvatarFallback className="bg-white/10 text-sm font-semibold text-white">
+          <div className="relative group/avatar">
+            <Avatar className="h-12 w-12 border-2 border-white/30 shadow-lg ring-1 ring-white/10 transition-all duration-300 group-hover/avatar:scale-110 group-hover/avatar:shadow-xl">
+              <AvatarImage src={conversation.avatar} className="transition-all duration-300" />
+              <AvatarFallback className="bg-gradient-to-br from-white/20 to-white/10 text-sm font-semibold text-white transition-all duration-300">
                 {getInitials(conversation.name || 'C')}
               </AvatarFallback>
             </Avatar>
+            {/* Enhanced online status indicator */}
             {conversation.type === 'direct' && participant && (
               <span
                 className={cn(
-                  'absolute -right-0 -bottom-0 h-3 w-3 rounded-full border-2 border-slate-900',
-                  isDirectOnline ? 'bg-emerald-400' : 'bg-slate-500'
+                  'absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-3 border-slate-900 shadow-lg ring-2 ring-white/10 transition-all duration-300',
+                  isDirectOnline ? 'bg-emerald-400 animate-pulse shadow-emerald-400/50' : 'bg-slate-500'
                 )}
               />
+            )}
+            {/* Event indicator */}
+            {conversation.type === 'event' && (
+              <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-info flex items-center justify-center shadow-lg ring-2 ring-white/10">
+                <Calendar className="h-3 w-3 text-info-foreground" />
+              </div>
             )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <p className="truncate text-sm font-semibold">{conversation.name}</p>
+              <p className={cn(
+                "truncate text-sm font-semibold transition-all duration-200",
+                isActive ? "text-white" : "text-white/90 group-hover:text-white"
+              )}>
+                {conversation.name}
+              </p>
               {conversation.lastMessage?.created_at && (
-                <span className="text-xs text-white/60">
+                <span className="text-xs text-white/60 transition-all duration-200 group-hover:text-white/80">
                   {formatLastActivity(conversation.lastMessage.created_at)}
                 </span>
               )}
             </div>
-            <p className="mt-1 line-clamp-1 text-sm text-white/70">
+            <p className="mt-1 line-clamp-1 text-sm text-white/70 transition-all duration-200 group-hover:text-white/80">
               {conversation.lastMessage?.content || 'No messages yet'}
             </p>
-            <div className="mt-2 flex items-center justify-between text-xs text-white/50">
-              <span className="truncate">{presenceText}</span>
+            <div className="mt-2 flex items-center justify-between text-xs text-white/50 transition-all duration-200 group-hover:text-white/70">
+              <span className="truncate flex items-center gap-1">
+                {conversation.type === 'direct' && (
+                  <span className={`inline-block w-2 h-2 rounded-full ${isDirectOnline ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                )}
+                {presenceText}
+              </span>
               {conversation.unreadCount > 0 && (
-                <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[11px] font-semibold text-primary-foreground">
+                <span className="rounded-full bg-gradient-to-r from-primary to-info px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in zoom-in-50 duration-200">
                   {conversation.unreadCount}
                 </span>
               )}
@@ -571,31 +591,39 @@ export default function Messages() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-slate-950 text-white">
-      <MessagingHeader
-        user={user}
-        unreadCount={unreadCount}
-        isSidebarOpen={showSidebar}
-        isInspectorOpen={isInspectorOpen}
-        onToggleSidebar={() => setShowSidebar(prev => !prev)}
-        onToggleInspector={() => setIsInspectorOpen(prev => !prev)}
-        onOpenSearch={() => setIsGlobalSearchOpen(true)}
-        onOpenNotifications={() => setIsNotificationSettingsOpen(true)}
-        newMessageButton={
-          <ProtectedButton
-            permission="messages.send"
-            onClick={handleStartNewConversation}
-            className="bg-white text-slate-900 hover:bg-white/90"
-            size="sm"
-            actionName="send new messages"
-          >
-            <MessageCircle className="mr-2 h-4 w-4" />
-            Compose
-          </ProtectedButton>
-        }
-      />
+    <div
+      className="flex h-screen flex-col bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white overflow-hidden"
+      role="application"
+      aria-label="Messaging Application"
+    >
+      {/* Enhanced Messaging Header with better spacing and animations */}
+      <div className="animate-in slide-in-from-top-2 duration-300">
+        <MessagingHeader
+          user={user}
+          unreadCount={unreadCount}
+          isSidebarOpen={showSidebar}
+          isInspectorOpen={isInspectorOpen}
+          onToggleSidebar={() => setShowSidebar(prev => !prev)}
+          onToggleInspector={() => setIsInspectorOpen(prev => !prev)}
+          onOpenSearch={() => setIsGlobalSearchOpen(true)}
+          onOpenNotifications={() => setIsNotificationSettingsOpen(true)}
+          newMessageButton={
+            <ProtectedButton
+              permission="messages.send"
+              onClick={handleStartNewConversation}
+              className="bg-gradient-to-r from-white to-gray-50 text-slate-900 hover:from-gray-50 hover:to-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+              size="sm"
+              actionName="send new messages"
+            >
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Compose
+            </ProtectedButton>
+          }
+        />
+      </div>
 
-      <div className="relative flex flex-1 overflow-hidden bg-slate-900/40">
+      {/* Enhanced main content area with improved glassmorphism */}
+      <div className="relative flex flex-1 overflow-hidden bg-gradient-to-br from-slate-900/30 via-slate-800/20 to-slate-900/40 backdrop-blur-sm">
         {showSidebar && (
           <div
             className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm md:hidden"
@@ -603,58 +631,94 @@ export default function Messages() {
           />
         )}
 
+        {/* Enhanced Mobile Sidebar with smooth animations */}
         <aside
           className={cn(
-            'fixed inset-y-0 left-0 z-40 w-80 transform border-r border-white/10 bg-slate-900/95 shadow-2xl transition-transform md:hidden',
-            showSidebar ? 'translate-x-0' : '-translate-x-full'
+            'fixed inset-y-0 left-0 z-40 w-80 transform border-r border-white/20 bg-gradient-to-b from-slate-900/95 to-slate-800/95 shadow-2xl backdrop-blur-xl transition-all duration-300 ease-out md:hidden',
+            showSidebar ? 'translate-x-0 opacity-100 scale-100' : '-translate-x-full opacity-0 scale-95'
           )}
+          style={{
+            backdropFilter: 'blur(20px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(180%)'
+          }}
         >
-          {renderSidebarContent()}
+          <div className="animate-in slide-in-from-left-4 duration-200 delay-100">
+            {renderSidebarContent()}
+          </div>
         </aside>
 
-        <div className="hidden h-full w-[320px] flex-col border-r border-white/10 bg-slate-900/80 backdrop-blur md:flex">
-          {renderSidebarContent()}
+        {/* Enhanced Desktop Sidebar with glassmorphism */}
+        <div className="hidden h-full w-[320px] flex-col border-r border-white/20 bg-gradient-to-b from-slate-900/90 to-slate-800/85 backdrop-blur-xl md:flex shadow-2xl"
+             style={{
+               backdropFilter: 'blur(24px) saturate(180%)',
+               WebkitBackdropFilter: 'blur(24px) saturate(180%)'
+             }}>
+          <div className="animate-in slide-in-from-left-2 duration-300">
+            {renderSidebarContent()}
+          </div>
         </div>
 
-        <main className="flex flex-1 flex-col bg-background/80 text-foreground shadow-inner">
+        {/* Enhanced Main Content Area with improved glassmorphism */}
+        <main className="flex flex-1 flex-col bg-gradient-to-br from-background/90 via-background/80 to-background/70 text-foreground shadow-2xl backdrop-blur-sm border-l border-white/5"
+              style={{
+                backdropFilter: 'blur(16px) saturate(160%)',
+                WebkitBackdropFilter: 'blur(16px) saturate(160%)'
+              }}>
           {selectedConversationId ? (
             <>
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-4 lg:px-8">
+              {/* Enhanced Conversation Header with better spacing and animations */}
+              <div className="flex items-center justify-between border-b border-white/20 px-4 py-4 lg:px-8 bg-gradient-to-r from-white/5 via-white/5 to-transparent backdrop-blur-sm animate-in slide-in-from-top-1 duration-200">
                 <div className="flex flex-1 items-center gap-4">
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={handleBackToConversations}
-                    className="rounded-full border border-white/10 bg-white/10 text-white hover:bg-white/20 md:hidden"
+                    className="rounded-full border border-white/20 bg-white/10 text-white hover:bg-white/20 hover:scale-105 transition-all duration-200 md:hidden shadow-lg"
+                    aria-label="Back to conversations"
                   >
                     <Menu className="h-5 w-5" />
                   </Button>
-                  <Avatar className="h-11 w-11 border border-white/20">
-                    <AvatarImage src={getConversationAvatar() || undefined} />
-                    <AvatarFallback className="bg-white/10 text-sm font-semibold text-white">
-                      {getInitials(getConversationTitle())}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0">
-                    <h2 className="truncate text-base font-semibold">{getConversationTitle()}</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedConversation?.type === 'direct'
-                        ? onlineStatus?.is_online
-                          ? 'Online'
-                          : onlineStatus?.last_seen_text || 'Offline'
-                        : selectedEvent?.title
-                        ? `Event · ${selectedEvent.title}`
-                        : getConversationSubtitle()}
+                  <div className="relative">
+                    <Avatar className="h-12 w-12 border-2 border-white/30 shadow-xl ring-2 ring-white/10">
+                      <AvatarImage src={getConversationAvatar() || undefined} />
+                      <AvatarFallback className="bg-gradient-to-br from-white/20 to-white/10 text-sm font-semibold text-white">
+                        {getInitials(getConversationTitle())}
+                      </AvatarFallback>
+                    </Avatar>
+                    {/* Online status indicator with animation */}
+                    {selectedConversation?.type === 'direct' && (
+                      <div className={`absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-3 border-slate-900 shadow-lg transition-all duration-300 ${
+                        onlineStatus?.is_online ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                      }`} />
+                    )}
+                  </div>
+                  <div className="min-w-0 animate-in slide-in-from-left-2 duration-200 delay-100">
+                    <h2 className="truncate text-lg font-semibold text-white">{getConversationTitle()}</h2>
+                    <p className="text-sm text-white/70 flex items-center gap-2">
+                      {selectedConversation?.type === 'direct' ? (
+                        <>
+                          <span className={`inline-block w-2 h-2 rounded-full ${onlineStatus?.is_online ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                          {onlineStatus?.is_online ? 'Online' : onlineStatus?.last_seen_text || 'Offline'}
+                        </>
+                      ) : selectedEvent?.title ? (
+                        <>
+                          <Calendar className="w-3 h-3" />
+                          Event · {selectedEvent.title}
+                        </>
+                      ) : (
+                        getConversationSubtitle()
+                      )}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 animate-in slide-in-from-right-2 duration-200 delay-100">
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => setIsConversationSearchOpen(prev => !prev)}
-                    className="rounded-full border border-white/10 bg-white/5 text-white hover:bg-white/15"
+                    className="rounded-full border border-white/20 bg-white/5 text-white hover:bg-white/15 hover:scale-105 transition-all duration-200 shadow-lg"
                     title="Search in conversation"
+                    aria-label="Search in conversation"
                   >
                     <Search className="h-5 w-5" />
                   </Button>
@@ -663,18 +727,24 @@ export default function Messages() {
                     size="icon"
                     onClick={() => setIsInspectorOpen(prev => !prev)}
                     className={cn(
-                      'rounded-full border border-white/10 bg-white/5 text-white hover:bg-white/15',
-                      isInspectorOpen && 'bg-white/20'
+                      'rounded-full border border-white/20 bg-white/5 text-white hover:bg-white/15 hover:scale-105 transition-all duration-200 shadow-lg',
+                      isInspectorOpen && 'bg-white/20 shadow-xl'
                     )}
                     title="Toggle command drawer"
+                    aria-label="Toggle command drawer"
                   >
                     <Info className="h-5 w-5" />
                   </Button>
                 </div>
               </div>
 
+              {/* Enhanced Conversation Search with glassmorphism */}
               {isConversationSearchOpen && selectedConversationId && (
-                <div className="border-b border-white/10 bg-card/40 px-4 py-4 lg:px-8">
+                <div className="border-b border-white/20 bg-gradient-to-r from-white/5 via-white/5 to-transparent px-4 py-4 lg:px-8 backdrop-blur-sm animate-in slide-in-from-top-1 duration-200"
+                     style={{
+                       backdropFilter: 'blur(12px) saturate(150%)',
+                       WebkitBackdropFilter: 'blur(12px) saturate(150%)'
+                     }}>
                   <ConversationSearch
                     conversationId={selectedConversationId}
                     conversationName={getConversationTitle()}
@@ -694,7 +764,12 @@ export default function Messages() {
                 />
               </div>
 
-              <div className="border-t border-white/10 bg-card/40 px-4 py-4 lg:px-8">
+              {/* Enhanced Message Input Area with glassmorphism */}
+              <div className="border-t border-white/20 bg-gradient-to-t from-white/5 via-white/5 to-transparent px-4 py-4 lg:px-8 backdrop-blur-sm animate-in slide-in-from-bottom-1 duration-200"
+                   style={{
+                     backdropFilter: 'blur(12px) saturate(150%)',
+                     WebkitBackdropFilter: 'blur(12px) saturate(150%)'
+                   }}>
                 <MessageInput
                   conversationId={selectedConversationId}
                   recipientId={selectedUser?.id}
@@ -707,28 +782,43 @@ export default function Messages() {
               </div>
             </>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-              <div className="mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-white/5 ring-1 ring-white/10">
-                <MessageCircle className="h-12 w-12 text-primary" />
+            /* Enhanced Empty State with modern design and animations */
+            <div className="flex flex-1 flex-col items-center justify-center px-6 text-center animate-in fade-in-0 duration-500">
+              <div className="relative mb-8">
+                <div className="flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-white/10 via-white/5 to-transparent ring-2 ring-white/20 shadow-2xl backdrop-blur-sm animate-in zoom-in-50 duration-700 delay-200">
+                  <MessageCircle className="h-14 w-14 text-primary drop-shadow-lg" />
+                </div>
+                {/* Floating animation elements */}
+                <div className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-primary/20 animate-bounce delay-300"></div>
+                <div className="absolute -bottom-1 -left-3 h-4 w-4 rounded-full bg-info/30 animate-bounce delay-500"></div>
               </div>
-              <h2 className="text-3xl font-semibold text-white">Welcome to Messaging</h2>
-              <p className="mt-3 max-w-md text-base text-white/70">
-                Select a conversation from the rail or start a new thread to collaborate with your
-                team.
+              <h2 className="text-4xl font-bold text-white mb-4 animate-in slide-in-from-bottom-4 duration-500 delay-100">
+                Welcome to Messaging
+              </h2>
+              <p className="mt-3 max-w-md text-lg text-white/70 leading-relaxed animate-in slide-in-from-bottom-2 duration-500 delay-200">
+                Select a conversation from the sidebar or start a new thread to collaborate with your team.
               </p>
-              <Button
-                onClick={handleStartNewConversation}
-                className="mt-6 bg-brand-gradient px-6 py-3 font-semibold text-white shadow-lg"
-              >
-                <MessageCircle className="mr-2 h-5 w-5" />
-                Start New Conversation
-              </Button>
+              <div className="mt-8 animate-in slide-in-from-bottom-2 duration-500 delay-300">
+                <Button
+                  onClick={handleStartNewConversation}
+                  className="bg-gradient-to-r from-primary via-primary to-info hover:from-primary/90 hover:via-primary/90 hover:to-info/90 px-8 py-4 font-semibold text-white shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300 rounded-xl"
+                  size="lg"
+                >
+                  <MessageCircle className="mr-3 h-6 w-6" />
+                  Start New Conversation
+                </Button>
+              </div>
             </div>
           )}
         </main>
 
+        {/* Enhanced Inspector Panel with modern glassmorphism */}
         {isInspectorOpen && selectedConversationId && (
-          <aside className="hidden w-[360px] flex-col border-l border-white/10 bg-card/80 text-foreground backdrop-blur xl:flex">
+          <aside className="hidden w-[360px] flex-col border-l border-white/20 bg-gradient-to-b from-card/90 to-card/70 text-foreground backdrop-blur-xl xl:flex shadow-2xl animate-in slide-in-from-right-2 duration-300"
+                 style={{
+                   backdropFilter: 'blur(20px) saturate(170%)',
+                   WebkitBackdropFilter: 'blur(20px) saturate(170%)'
+                 }}>
             {threadMessage ? (
               <MessageThreadPanel
                 parentMessage={threadMessage}

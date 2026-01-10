@@ -217,7 +217,7 @@ export default function AddOrganizer() {
                   className="mt-1"
                 />
               </div>
-              <div className="md:col-span-2">
+              <div className="md:col-span-2 hidden">
                 <Label
                   htmlFor="logo"
                   className="flex items-center gap-2 text-gray-700"

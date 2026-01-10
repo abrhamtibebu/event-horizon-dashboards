@@ -48,7 +48,7 @@ export default function TermsOfService() {
 
           <div className="prose prose-gray max-w-none">
             <p className="text-lg text-muted-foreground leading-relaxed mb-8">
-              Welcome to VEMS (Validity Event Management System). These Terms of Service govern your use of our event management platform and services. By accessing or using our services, you agree to be bound by these terms.
+              Welcome to Evella Admin (Validity Event Management System). These Terms of Service govern your use of our event management platform and services. By accessing or using our services, you agree to be bound by these terms.
             </p>
 
             {/* Introduction */}
@@ -61,7 +61,7 @@ export default function TermsOfService() {
               </div>
               <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
                 <p className="text-blue-800">
-                  These Terms of Service ("Terms") govern your use of VEMS (Validity Event Management System) ("Service"), operated by Validity Inc. ("Company", "we", "us", or "our"). By accessing or using our Service, you agree to be bound by these Terms and our Privacy Policy.
+                  These Terms of Service ("Terms") govern your use of Evella Admin (Validity Event Management System) ("Service"), operated by Validity Inc. ("Company", "we", "us", or "our"). By accessing or using our Service, you agree to be bound by these Terms and our Privacy Policy.
                 </p>
               </div>
             </div>

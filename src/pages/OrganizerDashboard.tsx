@@ -1394,6 +1394,13 @@ export default function OrganizerDashboard() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Link
+                to="/dashboard/messages"
+                className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-xl border border-border transition-all duration-200"
+              >
+                <MessageSquare className="w-8 h-8 mx-auto mb-2 text-primary" />
+                <span className="font-medium text-card-foreground">Messages</span>
+              </Link>
+              <Link
                 to="/dashboard/locate-badges"
                 className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-xl border border-border transition-all duration-200"
               >
@@ -1504,8 +1511,8 @@ export default function OrganizerDashboard() {
 
       {/* Detailed Event Performance Chart Modal */}
       <Dialog open={showDetailedChart} onOpenChange={setShowDetailedChart}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
-          <DialogHeader>
+        <DialogContent className="max-w-6xl h-[95vh] flex flex-col overflow-hidden">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <CalendarIcon2 className="w-5 h-5" />
               Detailed Event Performance Analysis
@@ -1514,10 +1521,10 @@ export default function OrganizerDashboard() {
               Comprehensive view of registrations and attendance trends with interactive zoom capabilities
             </DialogDescription>
           </DialogHeader>
-          
-          <div className="space-y-6">
+
+          <div className="flex-1 overflow-y-auto space-y-6 modern-scrollbar">
             {/* Zoom Controls */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-foreground">Time Range:</span>
                 <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
@@ -1547,20 +1554,20 @@ export default function OrganizerDashboard() {
                   </Button>
                 </div>
               </div>
-              
+
               <div className="text-sm text-muted-foreground">
                 Showing {currentChartData.length} data points
               </div>
             </div>
 
             {/* Detailed Chart */}
-            <div className="w-full h-[500px]">
+            <div className="w-full h-[400px] flex-shrink-0">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={currentChartData}>
                   {(() => {
                     const styles = getChartStyles();
                     const chartColors = getChartColors();
-                    
+
                     return (
                       <>
                         <defs>
@@ -1574,26 +1581,26 @@ export default function OrganizerDashboard() {
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
-                        <XAxis 
-                          dataKey="month" 
+                        <XAxis
+                          dataKey="month"
                           stroke={styles.axisStroke}
-                          fontSize={14}
+                          fontSize={12}
                           tickLine={false}
                           axisLine={false}
                         />
-                        <YAxis 
+                        <YAxis
                           stroke={styles.axisStroke}
-                          fontSize={14}
+                          fontSize={12}
                           tickLine={false}
                           axisLine={false}
                         />
-                        <RechartsTooltip 
+                        <RechartsTooltip
                           contentStyle={{
                             backgroundColor: styles.tooltipBg,
                             border: `1px solid ${styles.tooltipBorder}`,
-                            borderRadius: '12px',
+                            borderRadius: '8px',
                             boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-                            padding: '12px',
+                            padding: '8px',
                             color: styles.tooltipText,
                           }}
                           labelStyle={{
@@ -1601,23 +1608,23 @@ export default function OrganizerDashboard() {
                             color: styles.tooltipText,
                           }}
                         />
-                        <Area 
-                          type="monotone" 
-                          dataKey="registrations" 
-                          stackId="1" 
-                          stroke={chartColors.info} 
-                          strokeWidth={3}
-                          fill="url(#detailedRegistrationGradient)" 
-                          name="Registrations" 
+                        <Area
+                          type="monotone"
+                          dataKey="registrations"
+                          stackId="1"
+                          stroke={chartColors.info}
+                          strokeWidth={2}
+                          fill="url(#detailedRegistrationGradient)"
+                          name="Registrations"
                         />
-                        <Area 
-                          type="monotone" 
-                          dataKey="attendance" 
-                          stackId="2" 
-                          stroke={chartColors.success} 
-                          strokeWidth={3}
-                          fill="url(#detailedAttendanceGradient)" 
-                          name="Attendance" 
+                        <Area
+                          type="monotone"
+                          dataKey="attendance"
+                          stackId="2"
+                          stroke={chartColors.success}
+                          strokeWidth={2}
+                          fill="url(#detailedAttendanceGradient)"
+                          name="Attendance"
                         />
                       </>
                     );
@@ -1627,26 +1634,42 @@ export default function OrganizerDashboard() {
             </div>
 
             {/* Detailed Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               <div className="bg-info/10 rounded-xl p-4 border border-info/30">
                 <div className="text-sm font-medium text-info">Total Registrations</div>
-                <div className="text-2xl font-bold text-foreground">
+                <div className="text-xl font-bold text-foreground">
                   {currentChartData.reduce((sum, item) => sum + (item.registrations || 0), 0)}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">All time periods</div>
               </div>
-              
+
               <div className="bg-success/10 rounded-xl p-4 border border-success/30">
                 <div className="text-sm font-medium text-success">Total Attendance</div>
-                <div className="text-2xl font-bold text-foreground">
+                <div className="text-xl font-bold text-foreground">
                   {currentChartData.reduce((sum, item) => sum + (item.attendance || 0), 0)}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">All time periods</div>
               </div>
-              
+
+              <div className="bg-primary/10 rounded-xl p-4 border border-primary/30">
+                <div className="text-sm font-medium text-primary">Total Events</div>
+                <div className="text-xl font-bold text-foreground">
+                  {currentChartData.reduce((sum, item) => sum + (item.total_events || 0), 0)}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">All time periods</div>
+              </div>
+
+              <div className="bg-green-500/10 rounded-xl p-4 border border-green-500/30">
+                <div className="text-sm font-medium text-green-600">Total Revenue</div>
+                <div className="text-xl font-bold text-foreground">
+                  ${currentChartData.reduce((sum, item) => sum + (item.revenue || 0), 0).toLocaleString()}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">From ticket sales</div>
+              </div>
+
               <div className="bg-primary/10 rounded-xl p-4 border border-primary/30">
                 <div className="text-sm font-medium text-primary">Avg. Attendance Rate</div>
-                <div className="text-2xl font-bold text-foreground">
+                <div className="text-xl font-bold text-foreground">
                   {(() => {
                     const totalReg = currentChartData.reduce((sum, item) => sum + (item.registrations || 0), 0);
                     const totalAtt = currentChartData.reduce((sum, item) => sum + (item.attendance || 0), 0);
@@ -1655,21 +1678,18 @@ export default function OrganizerDashboard() {
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">Attendance/Registration</div>
               </div>
-              
+
               <div className="bg-warning/10 rounded-xl p-4 border border-warning/30">
-                <div className="text-sm font-medium text-warning">Peak Month</div>
-                <div className="text-lg font-bold text-foreground">
+                <div className="text-sm font-medium text-warning">Avg. No-Show Rate</div>
+                <div className="text-xl font-bold text-foreground">
                   {(() => {
-                    if (!currentChartData || currentChartData.length === 0) {
-                      return 'N/A';
-                    }
-                    const peakMonth = currentChartData.reduce((max, item) => 
-                      (item.registrations || 0) > (max.registrations || 0) ? item : max
-                    );
-                    return peakMonth?.month || 'N/A';
-                  })()}
+                    const totalReg = currentChartData.reduce((sum, item) => sum + (item.registrations || 0), 0);
+                    const totalAtt = currentChartData.reduce((sum, item) => sum + (item.attendance || 0), 0);
+                    const noShow = totalReg - totalAtt;
+                    return totalReg > 0 ? Math.round((noShow / totalReg) * 100) : 0;
+                  })()}%
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">Highest registrations</div>
+                <div className="text-xs text-muted-foreground mt-1">No-shows/Registrations</div>
               </div>
             </div>
 
@@ -1681,36 +1701,53 @@ export default function OrganizerDashboard() {
                   <TableHeader>
                     <TableRow className="bg-card">
                       <TableHead className="font-semibold text-foreground">Month</TableHead>
+                      <TableHead className="font-semibold text-foreground">Events</TableHead>
                       <TableHead className="font-semibold text-foreground">Registrations</TableHead>
                       <TableHead className="font-semibold text-foreground">Attendance</TableHead>
                       <TableHead className="font-semibold text-foreground">Attendance Rate</TableHead>
+                      <TableHead className="font-semibold text-foreground">No-Show Rate</TableHead>
+                      <TableHead className="font-semibold text-foreground">Revenue</TableHead>
                       <TableHead className="font-semibold text-foreground">Trend</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {currentChartData.map((item, index) => {
                       const attendanceRate = item.registrations > 0 ? Math.round((item.attendance / item.registrations) * 100) : 0;
+                      const noShowRate = item.no_show_rate || (item.registrations > 0 ? Math.round(((item.registrations - item.attendance) / item.registrations) * 100) : 0);
                       const prevItem = index > 0 ? currentChartData[index - 1] : null;
-                      const trend = prevItem ? 
-                        (item.registrations > prevItem.registrations ? '↗️' : 
+                      const trend = prevItem ?
+                        (item.registrations > prevItem.registrations ? '↗️' :
                          item.registrations < prevItem.registrations ? '↘️' : '→') : '→';
-                      
+
                       return (
                         <TableRow key={item.month} className="hover:bg-muted/50">
                           <TableCell className="font-medium text-foreground">{item.month}</TableCell>
+                          <TableCell className="text-primary font-semibold">{item.total_events || 0}</TableCell>
                           <TableCell className="text-info font-semibold">{item.registrations}</TableCell>
                           <TableCell className="text-success font-semibold">{item.attendance}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <div className="text-sm font-semibold text-foreground">{attendanceRate}%</div>
-                              <div className="w-16 bg-muted rounded-full h-2">
-                                <div 
-                                  className="bg-success h-2 rounded-full" 
+                              <div className="w-12 bg-muted rounded-full h-2">
+                                <div
+                                  className="bg-success h-2 rounded-full"
                                   style={{ width: `${attendanceRate}%` }}
                                 ></div>
                               </div>
                             </div>
                           </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="text-sm font-semibold text-warning">{noShowRate}%</div>
+                              <div className="w-12 bg-muted rounded-full h-2">
+                                <div
+                                  className="bg-warning h-2 rounded-full"
+                                  style={{ width: `${noShowRate}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-green-600 font-semibold">${(item.revenue || 0).toLocaleString()}</TableCell>
                           <TableCell className="text-lg">{trend}</TableCell>
                         </TableRow>
                       );
@@ -1750,7 +1787,7 @@ export default function OrganizerDashboard() {
                     <select
                       value={selectedTask.status}
                       onChange={(e) => handleUpdateTaskStatus(selectedTask.id, e.target.value as any)}
-                      className="px-3 py-1.5 text-sm border border-border rounded-md bg-background text-foreground"
+                      className="dialog-select px-3 py-1.5 text-sm border rounded-md"
                     >
                       <option value="pending">Pending</option>
                       <option value="in_progress">In Progress</option>

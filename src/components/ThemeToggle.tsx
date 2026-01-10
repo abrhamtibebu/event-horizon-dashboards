@@ -27,7 +27,8 @@ export function ThemeToggle() {
 
   // Determine if dark mode is active
   // Use resolvedTheme to handle system theme properly - it returns 'light' or 'dark' even when theme is 'system'
-  const isDark = mounted && resolvedTheme === 'dark'
+  // Always provide a boolean value to avoid controlled/uncontrolled warning
+  const isDark = mounted ? resolvedTheme === 'dark' : false
 
   const handleToggle = useCallback((checked: boolean) => {
     // Get click position relative to viewport
@@ -50,7 +51,7 @@ export function ThemeToggle() {
     return (
       <div className="flex items-center gap-2">
         <Sun className="h-4 w-4 text-muted-foreground" />
-        <Switch disabled className="opacity-50" />
+        <Switch disabled checked={false} className="opacity-50" />
         <Moon className="h-4 w-4 text-muted-foreground" />
       </div>
     )

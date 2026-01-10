@@ -14,7 +14,7 @@ import {
   Download,
   Upload
 } from 'lucide-react';
-import { BadgeElement } from './SimpleBadgeDesigner';
+import { BadgeElement } from './SimpleBadge';
 import SimpleBadge from './SimpleBadge';
 import { Attendee } from '@/types/attendee';
 

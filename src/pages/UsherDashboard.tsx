@@ -13,6 +13,7 @@ import {
   Filter,
   RefreshCw,
   MessageCircle,
+  MessageSquare,
 } from 'lucide-react'
 import { MetricCard } from '@/components/MetricCard'
 import { DashboardCard } from '@/components/DashboardCard'
@@ -558,6 +559,13 @@ export default function UsherDashboard() {
       {/* Quick Actions */}
       <DashboardCard title="Quick Actions">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+          <Link
+            to="/dashboard/messages"
+            className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg"
+          >
+            <MessageSquare className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+            <span className="font-medium">Messages</span>
+          </Link>
           <Link
             to="/dashboard/locate-badges"
             className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg"

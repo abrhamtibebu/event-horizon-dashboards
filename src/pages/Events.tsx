@@ -44,6 +44,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import Pagination from '@/components/Pagination'
 import { Spinner } from '@/components/ui/spinner'
 import { usePagination } from '@/hooks/usePagination'
+import { Star, StarOff } from 'lucide-react'
 
 export default function Events() {
   const [events, setEvents] = useState<any[]>([])
@@ -53,10 +54,27 @@ export default function Events() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [pricingFilter, setPricingFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [eventCounts, setEventCounts] = useState({
+    ticketed: 0,
+    free: 0,
+    total: 0
+  })
 
   const { user } = useAuth()
   const { hasPermission } = usePermissionCheck()
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Toggle featured status for admin
+  const toggleFeatured = async (eventId: number, currentStatus: boolean) => {
+    try {
+      await api.put(`/events/${eventId}/toggle-featured`)
+      // Refresh events list
+      window.location.reload()
+    } catch (error: any) {
+      console.error('Failed to toggle featured status:', error)
+      // Show error toast if available
+    }
+  }
   
   // Pagination hook
   const {
@@ -73,6 +91,69 @@ export default function Events() {
   
   // Debug logging
   console.log('Events component rendered, user:', user?.id)
+
+  // Fetch event counts for statistics
+  useEffect(() => {
+    const fetchEventCounts = async () => {
+      if (!user) return
+      
+      try {
+        // Fetch all events without pagination to get accurate counts
+        const res = await api.get('/events', {
+          params: {
+            per_page: 1000, // Large number to get all events
+          }
+        })
+        
+        // Handle both paginated and non-paginated responses
+        let allEvents: any[] = []
+        if (res.data.data) {
+          // Paginated response - get all pages if needed
+          allEvents = res.data.data
+          // If there are more pages, we might need to fetch them, but for now use what we have
+          // For organizers, backend returns all events in one response, so this should work
+        } else if (Array.isArray(res.data)) {
+          // Non-paginated response (organizers)
+          allEvents = res.data
+        } else {
+          allEvents = []
+        }
+        
+        // Count events by type - handle both event_type_column and event_type
+        const ticketedCount = allEvents.filter((e: any) => {
+          const eventType = e.event_type_column || e.event_type
+          // Handle both string and object (relationship) cases
+          const eventTypeValue = typeof eventType === 'string' ? eventType : (eventType?.name || 'free')
+          return eventTypeValue === 'ticketed'
+        }).length
+        
+        const freeCount = allEvents.filter((e: any) => {
+          const eventType = e.event_type_column || e.event_type
+          // Handle both string and object (relationship) cases
+          const eventTypeValue = typeof eventType === 'string' ? eventType : (eventType?.name || 'free')
+          return eventTypeValue === 'free'
+        }).length
+        
+        setEventCounts({
+          ticketed: ticketedCount,
+          free: freeCount,
+          total: allEvents.length
+        })
+      } catch (err: any) {
+        console.error('Failed to fetch event counts:', err)
+        // Set default counts on error
+        setEventCounts({
+          ticketed: 0,
+          free: 0,
+          total: 0
+        })
+      }
+    }
+    
+    if (user) {
+      fetchEventCounts()
+    }
+  }, [user?.id])
 
   useEffect(() => {
     console.log('Events useEffect triggered, user?.id:', user?.id)
@@ -292,7 +373,7 @@ export default function Events() {
                   <div>
                     <p className="text-sm text-info font-medium">Ticketed Events</p>
                     <p className="text-xl font-bold text-card-foreground">
-                      {events.filter(e => e.event_type === 'ticketed').length}
+                      {eventCounts.ticketed}
                     </p>
                   </div>
                 </div>
@@ -305,7 +386,7 @@ export default function Events() {
                   <div>
                     <p className="text-sm text-success font-medium">Free Events</p>
                     <p className="text-xl font-bold text-card-foreground">
-                      {events.filter(e => e.event_type === 'free').length}
+                      {eventCounts.free}
                     </p>
                   </div>
                 </div>
@@ -318,7 +399,7 @@ export default function Events() {
                   <div>
                     <p className="text-sm text-info font-medium">Total Events</p>
                     <p className="text-xl font-bold text-card-foreground">
-                      {events.length}
+                      {eventCounts.total}
                     </p>
                   </div>
                 </div>
@@ -353,6 +434,92 @@ export default function Events() {
           {/* Events Grid or List */}
           {!loading && !error && (
             <div className="mt-6">
+              {/* Admin Table View */}
+              {(user?.role === 'admin' || user?.role === 'superadmin') && (
+                <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="font-semibold text-foreground">Event Name</TableHead>
+                        <TableHead className="font-semibold text-foreground">Organizer</TableHead>
+                        <TableHead className="font-semibold text-foreground">Type</TableHead>
+                        <TableHead className="font-semibold text-foreground">Visibility</TableHead>
+                        <TableHead className="font-semibold text-foreground">Status</TableHead>
+                        <TableHead className="font-semibold text-foreground">Attendees</TableHead>
+                        <TableHead className="font-semibold text-foreground">Featured</TableHead>
+                        <TableHead className="font-semibold text-foreground">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredEvents.map((event) => (
+                        <TableRow key={event.id} className="hover:bg-muted/30 transition-colors">
+                          <TableCell className="font-medium text-foreground">
+                            <div>
+                              <div className="font-semibold">{event.name}</div>
+                              <div className="text-sm text-muted-foreground line-clamp-1">{event.description}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {event.organizer?.name || 'Unknown'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={`${event.event_type === 'ticketed' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'} text-xs font-medium`}>
+                              {event.event_type === 'ticketed' ? '🎫 Ticketed' : '🎉 Free'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={`${event.visibility === 'public' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'} text-xs font-medium`}>
+                              {event.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={`${getStatusColor(event.status)} text-xs font-medium`}>
+                              {event.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {event.attendee_count || 0}/{event.max_guests || 500}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleFeatured(event.id, event.is_featured)}
+                              disabled={event.visibility !== 'public' || event.advertisement_status !== 'approved'}
+                              className={`p-2 ${event.is_featured ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-500'}`}
+                              title={
+                                event.visibility !== 'public' || event.advertisement_status !== 'approved'
+                                  ? 'Event must be public and approved to be featured'
+                                  : event.is_featured
+                                    ? 'Remove from featured'
+                                    : 'Mark as featured'
+                              }
+                            >
+                              {event.is_featured ? (
+                                <Star className="w-5 h-5 fill-current" />
+                              ) : (
+                                <StarOff className="w-5 h-5" />
+                              )}
+                            </Button>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Link to={`/dashboard/events/${event.id}`}>
+                                <Button variant="outline" size="sm">
+                                  <Eye className="w-4 h-4 mr-1" />
+                                  View
+                                </Button>
+                              </Link>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* Organizer/Usher Grid View */}
               {(user?.role === 'organizer' || user?.role === 'organizer_admin' || user?.role === 'usher') ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredEvents.map((event) => {
@@ -471,302 +638,7 @@ export default function Events() {
                     )
                   })}
                 </div>
-              ) : (
-                <>
-                  {/* Table for desktop */}
-                  <div className="hidden lg:block bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
-                    <div className="p-6 border-b border-border">
-                      <h3 className="text-lg font-semibold text-card-foreground">All Events Overview</h3>
-                      <p className="text-sm text-muted-foreground mt-1">Comprehensive view of all events in the system</p>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <Table className="min-w-full">
-                        <TableHeader>
-                          <TableRow className="bg-muted">
-                            <TableHead className="font-semibold text-foreground text-sm py-4">Name</TableHead>
-                            <TableHead className="font-semibold text-foreground text-sm py-4">Type</TableHead>
-                            <TableHead className="font-semibold text-foreground text-sm py-4">Category</TableHead>
-                            <TableHead className="font-semibold text-foreground text-sm py-4">Pricing</TableHead>
-                            <TableHead className="font-semibold text-foreground text-sm py-4">Organizer</TableHead>
-                            <TableHead className="font-semibold text-foreground text-sm py-4">Status</TableHead>
-                            <TableHead className="font-semibold text-foreground text-sm py-4">Date</TableHead>
-                            <TableHead className="font-semibold text-foreground text-sm py-4">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredEvents.map((event) => (
-                            <TableRow
-                              key={event.id}
-                              className="hover:bg-accent transition-colors group border-b border-border"
-                            >
-                              <TableCell className="font-medium text-card-foreground py-4 group-hover:text-primary transition-colors">
-                                {event.name}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground py-4">
-                                {event.event_type === 'ticketed' ? (
-                                  <Badge className="bg-purple-100 text-purple-800 text-xs font-medium">
-                                    🎫 Ticketed
-                                  </Badge>
-                                ) : event.event_type === 'free' ? (
-                                  <Badge className="bg-green-100 text-green-800 text-xs font-medium">
-                                    🎉 Free
-                                  </Badge>
-                                ) : (
-                                  '-'
-                                )}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground py-4">
-                                {event.event_category?.name || '-'}
-                              </TableCell>
-                              <TableCell className="py-4">
-                                <div className="flex flex-col gap-1">
-                                  {event.event_type === 'ticketed' ? (
-                                    <>
-                                      <Badge className="bg-purple-100 text-purple-800 text-xs font-medium">
-                                        🎫 Ticketed Event
-                                      </Badge>
-                                      {event.pricing_info?.formatted_price ? (
-                                        <span className="text-xs text-purple-700 font-medium">
-                                          {event.pricing_info.formatted_price}
-                                        </span>
-                                      ) : event.ticket_types && event.ticket_types.length > 0 ? (
-                                        <span className="text-xs text-purple-700 font-medium">
-                                          From ETB {Math.min(...event.ticket_types.map((t: any) => t.price)).toLocaleString()}
-                                        </span>
-                                      ) : (
-                                        <span className="text-xs text-purple-700 font-medium">
-                                          Pricing TBD
-                                        </span>
-                                      )}
-                                      {event.ticket_types && event.ticket_types.length > 0 && (
-                                        <span className="text-xs text-purple-600">
-                                          {event.ticket_types.length} ticket type{event.ticket_types.length > 1 ? 's' : ''}
-                                        </span>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Badge className="bg-green-100 text-green-800 text-xs font-medium">
-                                        🎉 Free Event
-                                      </Badge>
-                                      {event.pricing_info?.guest_types && event.pricing_info.guest_types.length > 0 ? (
-                                        <span className="text-xs text-green-700">
-                                          {event.pricing_info.guest_types.slice(0, 2).join(', ')}
-                                          {event.pricing_info.guest_types.length > 2 && '...'}
-                                        </span>
-                                      ) : event.guest_types && event.guest_types.length > 0 ? (
-                                        <span className="text-xs text-green-700">
-                                          {event.guest_types.slice(0, 2).join(', ')}
-                                          {event.guest_types.length > 2 && '...'}
-                                        </span>
-                                      ) : (
-                                        <span className="text-xs text-green-700">
-                                          Open to all
-                                        </span>
-                                      )}
-                                      {event.guest_types && event.guest_types.length > 0 && (
-                                        <span className="text-xs text-green-600">
-                                          {event.guest_types.length} guest type{event.guest_types.length > 1 ? 's' : ''}
-                                        </span>
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-muted-foreground py-4">{event.organizer?.name || '-'}</TableCell>
-                              <TableCell className="py-4">
-                                <Badge className={`${getStatusColor(event.status)} text-xs font-medium`}>
-                                  {event.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-muted-foreground py-4">
-                                {event.date} {event.time}
-                              </TableCell>
-                              <TableCell className="py-4">
-                                <Link to={`/dashboard/events/${event.id}`}>
-                                  <Button size="sm" variant="outline" className="bg-card border-border hover:bg-accent">
-                                    <Eye className="w-4 h-4 mr-2" /> View Details
-                                  </Button>
-                                </Link>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                  {/* Card view for mobile/tablet */}
-                  <div className="lg:hidden space-y-4">
-                    {filteredEvents.map((event) => {
-                      return (
-                        <div key={event.id} className="bg-card rounded-2xl shadow-sm border border-border p-6">
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex-1">
-                              <h3 className="font-bold text-card-foreground text-lg mb-1">{event.name}</h3>
-                              <p className="text-sm text-muted-foreground line-clamp-2">{event.description}</p>
-                            </div>
-                            <div className="flex flex-col gap-2 ml-3">
-                              {event.event_type === 'ticketed' ? (
-                                <Badge className="bg-purple-100 text-purple-800 text-xs font-medium">
-                                  🎫 Ticketed
-                                </Badge>
-                              ) : event.event_type === 'free' ? (
-                                <Badge className="bg-green-100 text-green-800 text-xs font-medium">
-                                  🎉 Free
-                                </Badge>
-                              ) : null}
-                              <Badge className={`${getStatusColor(event.status)} text-xs font-medium`}>
-                                {event.status}
-                              </Badge>
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-3 mb-4">
-                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                              <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <Calendar className="w-3 h-3 text-blue-600" />
-                              </div>
-                              <span>{event.date} {event.time}</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                              <div className="w-6 h-6 bg-green-100 rounded-lg flex items-center justify-center">
-                                <MapPin className="w-3 h-3 text-green-600" />
-                              </div>
-                              <span>{event.location || 'Convention Center'}</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                              <div className="w-6 h-6 bg-purple-100 rounded-lg flex items-center justify-center">
-                                <Users className="w-3 h-3 text-purple-600" />
-                              </div>
-                              <span>{event.attendee_count || 0}/{event.max_guests || 500} Attendees</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                              <span className="font-medium">Type:</span>
-                              {event.event_type === 'ticketed' ? (
-                                <Badge className="bg-purple-100 text-purple-800 text-xs font-medium">
-                                  🎫 Ticketed
-                                </Badge>
-                              ) : event.event_type === 'free' ? (
-                                <Badge className="bg-green-100 text-green-800 text-xs font-medium">
-                                  🎉 Free
-                                </Badge>
-                              ) : (
-                                <span>-</span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                              <span className="font-medium">Category:</span>
-                              <span>{event.event_category?.name || '-'}</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                              <span className="font-medium">Pricing:</span>
-                              <div className="flex flex-col gap-1">
-                                {event.event_type === 'ticketed' ? (
-                                  <>
-                                    <Badge className="bg-purple-100 text-purple-800 text-xs font-medium">
-                                      🎫 Ticketed Event
-                                    </Badge>
-                                    {event.pricing_info?.formatted_price ? (
-                                      <span className="text-xs text-purple-700 font-medium">
-                                        {event.pricing_info.formatted_price}
-                                      </span>
-                                    ) : event.ticket_types && event.ticket_types.length > 0 ? (
-                                      <span className="text-xs text-purple-700 font-medium">
-                                        From ETB {Math.min(...event.ticket_types.map((t: any) => t.price)).toLocaleString()}
-                                      </span>
-                                    ) : (
-                                      <span className="text-xs text-purple-700 font-medium">
-                                        Pricing TBD
-                                      </span>
-                                    )}
-                                    {event.ticket_types && event.ticket_types.length > 0 && (
-                                      <span className="text-xs text-purple-600">
-                                        {event.ticket_types.length} ticket type{event.ticket_types.length > 1 ? 's' : ''}
-                                      </span>
-                                    )}
-                                  </>
-                                ) : (
-                                  <>
-                                    <Badge className="bg-green-100 text-green-800 text-xs font-medium">
-                                      🎉 Free Event
-                                    </Badge>
-                                    {event.pricing_info?.guest_types && event.pricing_info.guest_types.length > 0 ? (
-                                      <span className="text-xs text-green-700">
-                                        {event.pricing_info.guest_types.slice(0, 2).join(', ')}
-                                        {event.pricing_info.guest_types.length > 2 && '...'}
-                                      </span>
-                                    ) : event.guest_types && event.guest_types.length > 0 ? (
-                                      <span className="text-xs text-green-700">
-                                        {event.guest_types.slice(0, 2).join(', ')}
-                                        {event.guest_types.length > 2 && '...'}
-                                      </span>
-                                    ) : (
-                                      <span className="text-xs text-green-700">
-                                        Open to all
-                                      </span>
-                                    )}
-                                    {event.guest_types && event.guest_types.length > 0 && (
-                                      <span className="text-xs text-green-600">
-                                        {event.guest_types.length} guest type{event.guest_types.length > 1 ? 's' : ''}
-                                      </span>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                              <span className="font-medium">Organizer:</span>
-                              <span>{event.organizer?.name || '-'}</span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex gap-3">
-                            <Link to={`/dashboard/events/${event.id}`} className="flex-1">
-                              <Button variant="outline" className="w-full bg-white border-gray-200 hover:bg-gray-50">
-                                <Eye className="w-4 h-4 mr-2" /> View Details
-                              </Button>
-                            </Link>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Pagination Component */}
-          {!loading && !error && filteredEvents.length > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalRecords={totalRecords}
-              perPage={perPage}
-              onPageChange={handlePageChange}
-              onPerPageChange={handlePerPageChange}
-            />
-          )}
-
-          {!loading && !error && filteredEvents.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="w-20 h-20 bg-[hsl(var(--primary))]/10 rounded-full flex items-center justify-center mb-6">
-                <Calendar className="w-10 h-10 text-primary" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                No events found
-              </h3>
-              <p className="text-gray-600 text-center max-w-md mb-6">
-                Try adjusting your search or filter criteria to find the events you're looking for.
-              </p>
-              {user?.role !== 'usher' && (
-                <Link to="/dashboard/events/create">
-                  <Button className="bg-brand-gradient bg-brand-gradient-hover text-foreground shadow-lg">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Your First Event
-                  </Button>
-                </Link>
-              )}
+              ) : null}
             </div>
           )}
         </TabsContent>

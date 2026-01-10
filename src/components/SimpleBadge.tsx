@@ -1,7 +1,24 @@
 import React from 'react';
 import QRCode from 'react-qr-code';
 import { Attendee } from '@/types/attendee';
-import { BadgeElement } from './SimpleBadgeDesigner';
+
+// BadgeElement type definition (legacy support)
+export interface BadgeElement {
+  id: string;
+  type: 'text' | 'image' | 'qr' | 'shape';
+  content?: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  fontSize?: number;
+  fontFamily?: string;
+  color?: string;
+  fontWeight?: string;
+  textAlign?: string;
+  src?: string;
+  rotation?: number;
+}
 
 interface SimpleBadgeProps {
   attendee: Attendee;

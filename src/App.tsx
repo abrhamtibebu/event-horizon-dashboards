@@ -17,7 +17,7 @@ import EventTypeSelection from './pages/EventTypeSelection'
 import Users from './pages/Users'
 import Organizers from './pages/Organizers'
 import AddOrganizer from './pages/AddOrganizer'
-import Messages from './pages/Messages'
+import Messages from './pages/MessagesSimple'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Profile from './pages/Profile'
@@ -47,13 +47,6 @@ import BadgePage from './pages/BadgePage'
 import BatchBadgePage from './pages/BatchBadgePage'
 import Guests from './pages/Guests'
 
-// Badge Designer - integrated into Event Horizon
-// Lazy load badge designer components for code splitting
-import { lazy, Suspense } from 'react'
-const BadgeDesignerHome = lazy(() => import('./pages/badge-designer/BadgeDesignerHome').then(m => ({ default: m.BadgeDesignerHome })))
-const TemplateListPage = lazy(() => import('./pages/badge-designer/TemplateListPage').then(m => ({ default: m.TemplateListPage })))
-const DesignerPage = lazy(() => import('./pages/badge-designer/DesignerPage').then(m => ({ default: m.DesignerPage })))
-const BadgeDesignerRedirect = lazy(() => import('./pages/BadgeDesignerRedirect').then(m => ({ default: m.default })))
 import Team from '@/pages/Team'
 import RoleManagement from '@/pages/RoleManagement'
 import UsherManagement from '@/pages/UsherManagement'
@@ -61,11 +54,12 @@ import UsherEventManagement from '@/pages/UsherEventManagement'
 import UsherEvents from '@/pages/UsherEvents'
 import UsherBadgeLocator from '@/pages/UsherBadgeLocator'
 import PublicEventRegister from './pages/PublicEventRegister'
+import CustomEventRegistration from './pages/CustomEventRegistration'
+import CustomRegistrationSuccess from './pages/CustomRegistrationSuccess'
+import PublicFormRegistration from './pages/PublicFormRegistration'
 
 import UsherJobDetails from './pages/UsherJobDetails'
 import UsherDashboard from './pages/UsherDashboard'
-import EventPublication from './pages/EventPublication'
-import EvellaAnalytics from './pages/EvellaAnalytics'
 import VendorManagement from './pages/VendorManagement'
 import SalespersonManagement from './pages/SalespersonManagement'
 import SalespersonRegistration from './pages/SalespersonRegistration'
@@ -83,7 +77,6 @@ import SubscriptionManagement from './pages/SubscriptionManagement'
 import SubscriptionPayment from './pages/SubscriptionPayment'
 import UsageDashboard from './pages/UsageDashboard'
 import AdminSubscriptionManagement from './pages/AdminSubscriptionManagement'
-import EventRegistrationResponses from './pages/EventRegistrationResponses'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -213,6 +206,10 @@ const AppWithRealtime = () => {
           
           {/* Event public registration routes */}
           <Route path="/event/register/:eventUuid" element={<PublicRoute><PublicEventRegister /></PublicRoute>} />
+          <Route path="/event/custom-register/:eventId" element={<PublicRoute><CustomEventRegistration /></PublicRoute>} />
+          <Route path="/event/custom-register/:eventId/success" element={<PublicRoute><CustomRegistrationSuccess /></PublicRoute>} />
+          <Route path="/form/register/:formId" element={<PublicRoute><PublicFormRegistration /></PublicRoute>} />
+          <Route path="/form/register/:formId/success" element={<PublicRoute><RegistrationSuccess /></PublicRoute>} />
           <Route path="/registration/success" element={<PublicRoute><RegistrationSuccess /></PublicRoute>} />
           <Route path="/usher/register" element={<PublicRoute><UsherRegister /></PublicRoute>} />
           <Route path="/usher/register/success" element={<PublicRoute><UsherRegistrationSuccess /></PublicRoute>} />
@@ -261,8 +258,6 @@ const AppWithRealtime = () => {
             <Route path="settings" element={<Settings />} />
             <Route path="audit-logs" element={<AuditLogs />} />
             <Route path="trash" element={<Trash />} />
-            <Route path="event-publication" element={<EventPublication />} />
-            <Route path="evella-analytics" element={<EvellaAnalytics />} />
             <Route path="check-in" element={<CheckIn />} />
             <Route path="tickets" element={<MyTicketsPage />} />
             <Route path="tickets/purchase/:eventId" element={<TicketPurchasePage />} />
@@ -287,7 +282,6 @@ const AppWithRealtime = () => {
             <Route path="subscription/payment" element={<SubscriptionPayment />} />
             <Route path="subscription/usage" element={<UsageDashboard />} />
             <Route path="admin/subscriptions" element={<AdminSubscriptionManagement />} />
-            <Route path="events/:eventId/registration-responses" element={<EventRegistrationResponses />} />
           </Route>
 
           {/* Standalone protected routes (without layout) */}
@@ -308,59 +302,6 @@ const AppWithRealtime = () => {
             }
           />
 
-          {/* Badge Designer routes - Lazy loaded */}
-          <Route
-            path="/badge-designer"
-            element={
-              <ProtectedRoute>
-                <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Spinner size="md" text="Loading badge designer..." /></div>}>
-                  <BadgeDesignerHome />
-                </Suspense>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/badge-designer/templates/:eventId"
-            element={
-              <ProtectedRoute>
-                <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Spinner size="md" text="Loading templates..." /></div>}>
-                  <TemplateListPage />
-                </Suspense>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/badge-designer/designer/:eventId/:templateId"
-            element={
-              <ProtectedRoute>
-                <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Spinner size="md" text="Loading designer..." /></div>}>
-                  <DesignerPage />
-                </Suspense>
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Legacy redirects */}
-          <Route
-            path="/apps/badge-designer"
-            element={
-              <ProtectedRoute>
-                <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Spinner size="md" text="Loading..." /></div>}>
-                  <BadgeDesignerRedirect />
-                </Suspense>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/events/:eventId/badge-design"
-            element={
-              <ProtectedRoute>
-                <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Spinner size="md" text="Loading..." /></div>}>
-                  <BadgeDesignerRedirect />
-                </Suspense>
-              </ProtectedRoute>
-            }
-          />
 
           {/* 404 route */}
           <Route path="*" element={<NotFound />} />

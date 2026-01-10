@@ -48,7 +48,7 @@ export default function PrivacyPolicy() {
 
           <div className="prose prose-gray max-w-none">
             <p className="text-lg text-muted-foreground leading-relaxed mb-8">
-              At VEMS (Validity Event Management System), we are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our event management platform.
+              At Evella Admin (Validity Event Management System), we are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our event management platform.
             </p>
 
             {/* Information We Collect */}
@@ -186,7 +186,7 @@ export default function PrivacyPolicy() {
             <div className="bg-green-50 rounded-lg p-6 border border-green-200">
               <h2 className="text-2xl font-bold text-green-900 mb-4">Your Acceptance</h2>
               <p className="text-green-800">
-                By using VEMS (Validity Event Management System), you acknowledge that you have read and understood this Privacy Policy and agree to the collection, use, and disclosure of your information as described herein.
+                By using Evella Admin (Validity Event Management System), you acknowledge that you have read and understood this Privacy Policy and agree to the collection, use, and disclosure of your information as described herein.
               </p>
             </div>
           </div>

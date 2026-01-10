@@ -1,15 +1,13 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Calendar,
   MapPin,
   Users,
-  Upload,
   Save,
   X,
   Tag,
   FileText,
-  Image,
   Ticket,
   Star,
   Crown,
@@ -83,12 +81,13 @@ function filterValidOptions<T extends { id?: any }>(arr: T[]) {
 export default function CreateEvent() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const imageInputRef = useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     start_date: null as Date | null,
     end_date: null as Date | null,
+    start_time: '09:00', // Default start time
+    end_time: '17:00',   // Default end time
     city: '',
     venue: '',
     max_guests: '',
@@ -98,13 +97,12 @@ export default function CreateEvent() {
     event_category_id: '', // Remove default '1'
     organizer_id: '', // Remove default '1'
     status: 'draft',
-    event_image: null as File | null,
     requirements: '',
     agenda: '',
     guest_types: '',
     event_type: 'free' as 'free' | 'ticketed', // Add event type selection
+    visibility: 'public' as 'public' | 'private', // Add visibility selection
   })
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showEventRange, setShowEventRange] = useState(false)
   const [showRegRange, setShowRegRange] = useState(false)
@@ -124,6 +122,10 @@ export default function CreateEvent() {
       key: 'selection',
     },
   ])
+
+  // For enhanced date selection
+  const [selectedEventDate, setSelectedEventDate] = useState<Date | null>(null)
+  const [isSingleDayEvent, setIsSingleDayEvent] = useState(false)
 
   const [organizers, setOrganizers] = useState<any[]>([])
   const [loading, setLoading] = useState({
@@ -157,7 +159,7 @@ export default function CreateEvent() {
   const [selectedGuestTypes, setSelectedGuestTypes] = useState<string[]>([]);
 
   useEffect(() => {
-    if (user && user.role === 'organizer' && user.organizer_id) {
+    if (user && (user.role === 'organizer' || user.role === 'organizer_admin') && user.organizer_id) {
       handleInputChange('organizer_id', String(user.organizer_id))
     }
 
@@ -182,7 +184,7 @@ export default function CreateEvent() {
       }
     }
 
-    if (user?.role !== 'organizer') {
+    if (user?.role !== 'organizer' && user?.role !== 'organizer_admin') {
       fetchData('/organizers', setOrganizers, 'organizers', 'organizers')
     } else {
       setLoading((prev) => ({ ...prev, organizers: false }))
@@ -201,23 +203,6 @@ export default function CreateEvent() {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setFormData((prev) => ({ ...prev, event_image: file }))
-      const reader = new FileReader()
-      reader.onloadend = () => setImagePreview(reader.result as string)
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const handleRemoveImage = () => {
-    setFormData((prev) => ({ ...prev, event_image: null }))
-    setImagePreview(null)
-    if (imageInputRef.current) {
-      imageInputRef.current.value = ''
-    }
-  }
 
   // Ticket type management functions
   const addTicketType = (option: typeof ticketTypeOptions[0]) => {
@@ -269,11 +254,23 @@ export default function CreateEvent() {
       'name', 'start_date', 'end_date', 'city', 'venue', 'max_guests',
       'registration_start_date', 'registration_end_date', 'event_type_id', 'event_category_id'
     ];
+
+    // For single day events, end_date is automatically set to start_date
+    if (isSingleDayEvent) {
+      requiredFields.splice(requiredFields.indexOf('end_date'), 1); // Remove end_date from required for single day events
+    }
+
     for (const field of requiredFields) {
       if (!formData[field] || (typeof formData[field] === 'string' && formData[field].trim() === '')) {
         toast.error(`Please fill in the required field: ${field.replace(/_/g, ' ')}`);
         return;
       }
+    }
+
+    // Additional validation for single day events
+    if (isSingleDayEvent && !selectedEventDate) {
+      toast.error('Please select an event date for the single day event.');
+      return;
     }
     // Validate max_guests is a positive integer
     if (isNaN(Number(formData.max_guests)) || parseInt(formData.max_guests, 10) < 1) {
@@ -308,36 +305,77 @@ export default function CreateEvent() {
       let payload
       let headers = {}
       // Convert date objects to ISO strings for API
+      // For single day events, combine date and time into ISO strings
+      let startDateTime, endDateTime;
+      if (isSingleDayEvent && selectedEventDate) {
+        // Create Date objects with selected date and times
+        startDateTime = new Date(selectedEventDate);
+        const [startHours, startMinutes] = formData.start_time.split(':').map(Number);
+        startDateTime.setHours(startHours, startMinutes, 0, 0);
+
+        endDateTime = new Date(selectedEventDate);
+        const [endHours, endMinutes] = formData.end_time.split(':').map(Number);
+        endDateTime.setHours(endHours, endMinutes, 0, 0);
+      } else {
+        // For multi-day events, use the date range
+        startDateTime = eventRange[0].startDate;
+        endDateTime = eventRange[0].endDate;
+      }
+
       const processedFormData = {
         ...formData,
-        start_date: eventRange[0].startDate.toISOString(),
-        end_date: eventRange[0].endDate.toISOString(),
+        start_date: startDateTime.toISOString(),
+        end_date: endDateTime.toISOString(),
         registration_start_date: regRange[0].startDate.toISOString(),
         registration_end_date: regRange[0].endDate.toISOString(),
         // Combine city and venue into location for backend
         location: `${formData.city}, ${formData.venue}`,
         // Ensure max_guests is sent as an integer
         max_guests: parseInt(formData.max_guests, 10),
-        // Only include organizer_id if not an organizer (backend sets it for organizers)
-        ...(user?.role !== 'organizer' && { organizer_id: formData.organizer_id }),
+        // Only include organizer_id if not an organizer or organizer_admin (backend sets it for them)
+        ...(user?.role !== 'organizer' && user?.role !== 'organizer_admin' && { organizer_id: formData.organizer_id }),
         ticket_types: formData.event_type === 'ticketed' ? ticketTypes : [],
         guest_types: formData.event_type === 'free'
           ? selectedGuestTypes
           : ticketTypes.map((t) => t.name), // <-- send ticket type names as guest_types for ticketed events
       }
-      if (formData.event_image) {
+      // Handle FormData for guest_types and ticket_types arrays
+      if (formData.event_type === 'free' && selectedGuestTypes.length > 0) {
         payload = new FormData()
         Object.entries(processedFormData).forEach(([key, value]) => {
-          if (key === 'event_image' && value) {
-            payload.append('event_image', value)
-          } else if (key === 'guest_types') {
+          if (key === 'guest_types') {
             (Array.isArray(value) ? value : [value]).forEach((type: string) =>
               payload.append('guest_types[]', type)
             )
           } else if (key === 'ticket_types') {
             if (Array.isArray(value)) {
               value.forEach((ticketType: any) => {
-                // Send each field separately for FormData
+                Object.keys(ticketType).forEach(field => {
+                  payload.append(`ticket_types[${ticketTypes.indexOf(ticketType)}][${field}]`, ticketType[field] || '')
+                })
+              })
+            }
+          } else if (key === 'guest_types_custom') {
+            if (Array.isArray(value)) {
+              value.forEach((guestType: any) =>
+                payload.append('guest_types_custom[]', JSON.stringify(guestType))
+              )
+            }
+          } else {
+            payload.append(key, value as any)
+          }
+        })
+        headers = { 'Content-Type': 'multipart/form-data' }
+      } else if (formData.event_type === 'ticketed' && ticketTypes.length > 0) {
+        payload = new FormData()
+        Object.entries(processedFormData).forEach(([key, value]) => {
+          if (key === 'guest_types') {
+            (Array.isArray(value) ? value : [value]).forEach((type: string) =>
+              payload.append('guest_types[]', type)
+            )
+          } else if (key === 'ticket_types') {
+            if (Array.isArray(value)) {
+              value.forEach((ticketType: any) => {
                 Object.keys(ticketType).forEach(field => {
                   payload.append(`ticket_types[${ticketTypes.indexOf(ticketType)}][${field}]`, ticketType[field] || '')
                 })
@@ -524,6 +562,125 @@ export default function CreateEvent() {
             </div>
           </div>
 
+          {/* Event Visibility */}
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Eye className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-foreground">
+                  Event Visibility
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  Control who can discover and register for your event
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Public Event Option */}
+              <label className="relative cursor-pointer group">
+                <input
+                  type="radio"
+                  name="visibility"
+                  value="public"
+                  checked={formData.visibility === 'public'}
+                  onChange={(e) => handleInputChange('visibility', e.target.value)}
+                  className="peer sr-only"
+                />
+                <div className="relative p-6 border-2 border-border rounded-2xl transition-all duration-300 group-hover:border-primary/50 peer-checked:border-primary peer-checked:bg-primary/5 dark:peer-checked:bg-primary/10">
+                  {/* Selected indicator */}
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center opacity-0 peer-checked:opacity-100 transition-opacity duration-300 shadow-lg">
+                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                  </div>
+
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+                      <Users className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-foreground mb-1">Public Event</h4>
+                      <p className="text-muted-foreground text-sm">Discoverable by everyone</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Visible on Evella platform</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Can be featured by admins</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Open registration for all users</span>
+                    </div>
+                  </div>
+                </div>
+              </label>
+
+              {/* Private Event Option */}
+              <label className="relative cursor-pointer group">
+                <input
+                  type="radio"
+                  name="visibility"
+                  value="private"
+                  checked={formData.visibility === 'private'}
+                  onChange={(e) => handleInputChange('visibility', e.target.value)}
+                  className="peer sr-only"
+                />
+                <div className="relative p-6 border-2 border-border rounded-2xl transition-all duration-300 group-hover:border-muted-foreground/50 peer-checked:border-muted-foreground peer-checked:bg-muted/5 dark:peer-checked:bg-muted/10">
+                  {/* Selected indicator */}
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-muted-foreground rounded-full flex items-center justify-center opacity-0 peer-checked:opacity-100 transition-opacity duration-300 shadow-lg">
+                    <div className="w-2 h-2 bg-white rounded-full"></div>
+                  </div>
+
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+                      <Lock className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-foreground mb-1">Private Event</h4>
+                      <p className="text-muted-foreground text-sm">Invite-only access</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Hidden from public discovery</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Internal registration only</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Cannot be featured publicly</span>
+                    </div>
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {/* Additional Info */}
+            <div className="mt-6 p-4 bg-muted/30 rounded-xl border border-border">
+              <div className="flex items-start gap-3">
+                <div className="text-info mt-0.5">ℹ️</div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-1">Visibility Settings</p>
+                  <p className="text-sm text-muted-foreground">
+                    Public events can be discovered on the Evella platform and may be featured by administrators.
+                    Private events are only accessible through direct invitations and are not visible in public searches.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Event Information */}
           <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center gap-3 mb-6">
@@ -559,9 +716,10 @@ export default function CreateEvent() {
                 </Label>
                 {(user?.role === 'organizer' || user?.role === 'organizer_admin') ? (
                   <Input
-                    value={user.organizer?.name || ''}
+                    value={user.organizer?.name || 'Loading organizer...'}
                     disabled
-                    className="mt-2 h-12 border-border bg-muted rounded-xl"
+                    className="mt-2 h-12 border-border bg-muted rounded-xl cursor-not-allowed"
+                    placeholder="Your organization"
                   />
                 ) : (
                   <Select
@@ -752,57 +910,6 @@ export default function CreateEvent() {
               </div>
             </div>
           </div>
-              {/* <div className="md:col-span-2">
-                <Label
-                  htmlFor="event_image"
-                  className="flex items-center gap-2 text-gray-700"
-                >
-                  {' '}
-                  <Image className="w-4 h-4" /> Event Image{' '}
-                </Label>
-                <div className="flex items-center gap-3 mt-1">
-                  <input
-                    type="file"
-                    id="event_image"
-                    ref={imageInputRef}
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  <label htmlFor="event_image" className="inline-block">
-                    <span className="inline-block px-4 py-2 bg-blue-50 text-blue-700 font-medium rounded cursor-pointer border border-blue-200 hover:bg-blue-100 transition">
-                      Choose File
-                    </span>
-                  </label>
-                  <span className="text-gray-600 text-sm">
-                    {formData.event_image
-                      ? formData.event_image.name
-                      : 'No file chosen'}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-400 mt-1">
-                  Upload your event banner (PNG, JPG, SVG)
-                </p>
-                {imagePreview && (
-                  <div className="mt-2 relative inline-block">
-                  <img
-                    src={imagePreview}
-                    alt="Event image preview"
-                    className="h-24 rounded shadow border"
-                  />
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    className="absolute -top-2 -right-2 rounded-full h-6 w-6"
-                    onClick={handleRemoveImage}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  </div>
-                )}
-
-              </div>
             </div>
           </div>
 
@@ -822,103 +929,308 @@ export default function CreateEvent() {
               </div>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Event Date Range Picker */}
+              {/* Event Date & Time Picker */}
               <div>
                 <Label className="flex items-center gap-2 text-foreground">
-                  <Calendar className="w-4 h-4" /> Event Date Range
+                  <Calendar className="w-4 h-4" /> Event Date & Time
                 </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full mt-1 mb-2 rounded-xl shadow"
-                    >
-                      {formData.start_date && formData.end_date
-                        ? `${eventRange[0].startDate.toLocaleDateString()} - ${eventRange[0].endDate.toLocaleDateString()}`
-                        : 'Select event date range'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
-                    <div className="flex flex-col gap-4">
-                      <div className="flex gap-4">
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Start Date</div>
+
+                {/* Single Day Toggle */}
+                <div className="flex items-center gap-2 mt-2 mb-3">
+                  <input
+                    type="checkbox"
+                    id="single-day-event"
+                    checked={isSingleDayEvent}
+                    onChange={(e) => {
+                      setIsSingleDayEvent(e.target.checked)
+                      if (e.target.checked && selectedEventDate) {
+                        // For single day events, set both start and end to same date
+                        setFormData((prev) => ({
+                          ...prev,
+                          start_date: selectedEventDate,
+                          end_date: selectedEventDate
+                        }))
+                        setEventRange([{
+                          ...eventRange[0],
+                          startDate: selectedEventDate,
+                          endDate: selectedEventDate
+                        }])
+                      }
+                    }}
+                    className="rounded border-gray-300"
+                  />
+                  <label htmlFor="single-day-event" className="text-sm text-muted-foreground">
+                    Single day event
+                  </label>
+                </div>
+
+                {isSingleDayEvent ? (
+                  /* Single Day Event Picker */
+                  <div className="space-y-3">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full rounded-xl shadow"
+                        >
+                          {selectedEventDate
+                            ? selectedEventDate.toLocaleDateString()
+                            : 'Select event date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
+                        <div className="flex flex-col gap-4">
                           <ShadCalendar
                             mode="single"
-                            selected={eventRange[0].startDate}
+                            selected={selectedEventDate || undefined}
                             onSelect={(date) => {
-                              setEventRange([{ ...eventRange[0], startDate: date || new Date(), endDate: eventRange[0].endDate }])
-                              setFormData((prev) => ({ ...prev, start_date: date }))
+                              if (date) {
+                                setSelectedEventDate(date)
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  start_date: date,
+                                  end_date: date
+                                }))
+                                setEventRange([{
+                                  ...eventRange[0],
+                                  startDate: date,
+                                  endDate: date
+                                }])
+                              }
                             }}
                             className="rounded-xl border"
+                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                           />
+                          {/* Time Pickers for Single Day */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Start Time</Label>
+                              <Input
+                                type="time"
+                                value={formData.start_time}
+                                onChange={(e) => setFormData((prev) => ({ ...prev, start_time: e.target.value }))}
+                                className="mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground">End Time</Label>
+                              <Input
+                                type="time"
+                                value={formData.end_time}
+                                onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
+                                className="mt-1"
+                              />
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">End Date</div>
-                          <ShadCalendar
-                            mode="single"
-                            selected={eventRange[0].endDate}
-                            onSelect={(date) => {
-                              setEventRange([{ ...eventRange[0], endDate: date || new Date(), startDate: eventRange[0].startDate }])
-                              setFormData((prev) => ({ ...prev, end_date: date }))
-                            }}
-                            className="rounded-xl border"
-                          />
+                      </PopoverContent>
+                    </Popover>
+
+                    {selectedEventDate && (
+                      <div className="text-sm text-muted-foreground">
+                        {selectedEventDate.toLocaleDateString()} from {formData.start_time} to {formData.end_time}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Multi-Day Event Picker */
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full rounded-xl shadow"
+                      >
+                        {formData.start_date && formData.end_date
+                          ? `${eventRange[0].startDate.toLocaleDateString()} - ${eventRange[0].endDate.toLocaleDateString()}`
+                          : 'Select event date range'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
+                      <div className="flex flex-col gap-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">Start Date & Time</div>
+                            <ShadCalendar
+                              mode="single"
+                              selected={eventRange[0].startDate}
+                              onSelect={(date) => {
+                                setEventRange([{ ...eventRange[0], startDate: date || new Date(), endDate: eventRange[0].endDate }])
+                                setFormData((prev) => ({ ...prev, start_date: date }))
+                              }}
+                              className="rounded-xl border mb-2"
+                              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                            />
+                            <Input
+                              type="time"
+                              value={formData.start_time}
+                              onChange={(e) => setFormData((prev) => ({ ...prev, start_time: e.target.value }))}
+                              className="text-xs"
+                            />
+                          </div>
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">End Date & Time</div>
+                            <ShadCalendar
+                              mode="single"
+                              selected={eventRange[0].endDate}
+                              onSelect={(date) => {
+                                setEventRange([{ ...eventRange[0], endDate: date || new Date(), startDate: eventRange[0].startDate }])
+                                setFormData((prev) => ({ ...prev, end_date: date }))
+                              }}
+                              className="rounded-xl border mb-2"
+                              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                            />
+                            <Input
+                              type="time"
+                              value={formData.end_time}
+                              onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
+                              className="text-xs"
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
               {/* Registration Date Range Picker */}
               <div>
                 <Label className="flex items-center gap-2 text-foreground">
-                  <Calendar className="w-4 h-4" /> Registration Date Range
+                  <Calendar className="w-4 h-4" /> Registration Period
                 </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full mt-1 mb-2 rounded-xl shadow"
-                    >
-                      {formData.registration_start_date && formData.registration_end_date
-                        ? `${regRange[0].startDate.toLocaleDateString()} - ${regRange[0].endDate.toLocaleDateString()}`
-                        : 'Select registration date range'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
-                    <div className="flex flex-col gap-4">
-                      <div className="flex gap-4">
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">Start Date</div>
-                          <ShadCalendar
-                            mode="single"
-                            selected={regRange[0].startDate}
-                            onSelect={(date) => {
-                              setRegRange([{ ...regRange[0], startDate: date || new Date(), endDate: regRange[0].endDate }])
-                              setFormData((prev) => ({ ...prev, registration_start_date: date }))
-                            }}
-                            className="rounded-xl border"
-                          />
+                <div className="mt-1 mb-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full rounded-xl shadow"
+                      >
+                        {formData.registration_start_date && formData.registration_end_date
+                          ? `${regRange[0].startDate.toLocaleDateString()} - ${regRange[0].endDate.toLocaleDateString()}`
+                          : 'Select registration date range'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
+                      <div className="flex flex-col gap-4">
+                        {/* Info about date restrictions */}
+                        <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg">
+                          Registration dates must be between today and the event start date (inclusive).
                         </div>
-                        <div>
-                          <div className="text-xs text-muted-foreground mb-1">End Date</div>
-                          <ShadCalendar
-                            mode="single"
-                            selected={regRange[0].endDate}
-                            onSelect={(date) => {
-                              setRegRange([{ ...regRange[0], endDate: date || new Date(), startDate: regRange[0].startDate }])
-                              setFormData((prev) => ({ ...prev, registration_end_date: date }))
-                            }}
-                            className="rounded-xl border"
-                          />
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">Start Date</div>
+                            <ShadCalendar
+                              mode="single"
+                              selected={regRange[0].startDate}
+                              onSelect={(date) => {
+                                if (date) {
+                                  // Validate date is not before today
+                                  const today = new Date()
+                                  today.setHours(0, 0, 0, 0)
+
+                                  if (date < today) {
+                                    toast.error('Registration start date cannot be before today')
+                                    return
+                                  }
+
+                                  // Validate date is not after event start date
+                                  if (formData.start_date && date > formData.start_date) {
+                                    toast.error('Registration start date cannot be after event start date')
+                                    return
+                                  }
+
+                                  setRegRange([{ ...regRange[0], startDate: date, endDate: regRange[0].endDate }])
+                                  setFormData((prev) => ({ ...prev, registration_start_date: date }))
+                                }
+                              }}
+                              className="rounded-xl border"
+                              disabled={(date) => {
+                                const today = new Date()
+                                today.setHours(0, 0, 0, 0)
+                                const eventStart = formData.start_date
+
+                                // Disable dates before today
+                                if (date < today) return true
+
+                                // Disable dates after event start date (if set)
+                                if (eventStart && date > eventStart) return true
+
+                                return false
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">End Date</div>
+                            <ShadCalendar
+                              mode="single"
+                              selected={regRange[0].endDate}
+                              onSelect={(date) => {
+                                if (date) {
+                                  // Validate date is not before today
+                                  const today = new Date()
+                                  today.setHours(0, 0, 0, 0)
+
+                                  if (date < today) {
+                                    toast.error('Registration end date cannot be before today')
+                                    return
+                                  }
+
+                                  // Validate date is not after event start date
+                                  if (formData.start_date && date > formData.start_date) {
+                                    toast.error('Registration end date cannot be after event start date')
+                                    return
+                                  }
+
+                                  // Validate end date is not before start date
+                                  if (date < regRange[0].startDate) {
+                                    toast.error('Registration end date cannot be before start date')
+                                    return
+                                  }
+
+                                  setRegRange([{ ...regRange[0], endDate: date, startDate: regRange[0].startDate }])
+                                  setFormData((prev) => ({ ...prev, registration_end_date: date }))
+                                }
+                              }}
+                              className="rounded-xl border"
+                              disabled={(date) => {
+                                const today = new Date()
+                                today.setHours(0, 0, 0, 0)
+                                const eventStart = formData.start_date
+                                const regStart = regRange[0].startDate
+
+                                // Disable dates before today
+                                if (date < today) return true
+
+                                // Disable dates before registration start date
+                                if (regStart && date < regStart) return true
+
+                                // Disable dates after event start date (if set)
+                                if (eventStart && date > eventStart) return true
+
+                                return false
+                              }}
+                            />
+                          </div>
                         </div>
+
+                        {/* Show selected range info */}
+                        {formData.registration_start_date && formData.registration_end_date && (
+                          <div className="text-xs text-center text-muted-foreground bg-muted/30 p-2 rounded-lg">
+                            Selected: {regRange[0].startDate.toLocaleDateString()} to {regRange[0].endDate.toLocaleDateString()}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Additional validation info */}
+                <div className="text-xs text-muted-foreground">
+                  Registration must open on or after today and close on or before the event starts.
+                </div>
               </div>
             </div>
           </div>
@@ -1176,17 +1488,17 @@ export default function CreateEvent() {
                 isSubmitting ||
                 loading.eventTypes ||
                 loading.eventCategories ||
-                (user?.role !== 'organizer' && loading.organizers) ||
+                ((user?.role !== 'organizer' && user?.role !== 'organizer_admin') && loading.organizers) ||
                 !formData.name.trim() ||
                 !formData.city.trim() ||
                 !formData.venue.trim() ||
                 !formData.max_guests.trim() ||
                 !formData.event_type_id ||
                 !formData.event_category_id ||
-                (user?.role !== 'organizer' && !formData.organizer_id) ||
+                ((user?.role !== 'organizer' && user?.role !== 'organizer_admin') && !formData.organizer_id) ||
                 !filterValidOptions(eventTypes).some(et => String(et.id) === formData.event_type_id) ||
                 !filterValidOptions(eventCategories).some(ec => String(ec.id) === formData.event_category_id) ||
-                (user?.role !== 'organizer' && !filterValidOptions(organizers).some(org => String(org.id) === formData.organizer_id)) ||
+                ((user?.role !== 'organizer' && user?.role !== 'organizer_admin') && !filterValidOptions(organizers).some(org => String(org.id) === formData.organizer_id)) ||
                 (formData.event_type === 'free' && selectedGuestTypes.length === 0) ||
                 (formData.event_type === 'ticketed' && ticketTypes.length === 0)
               }
