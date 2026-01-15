@@ -209,7 +209,7 @@ export const formSubmissionApi = {
 
   // Get submission statistics
   getSubmissionStatistics: async (formId: number): Promise<SubmissionStatistics> => {
-    const response = await api.get(`/forms/${formId}/submissions/statistics`);
+    const response = await api.get(`/forms/${formId}/submission-statistics`);
     return response.data;
   },
 

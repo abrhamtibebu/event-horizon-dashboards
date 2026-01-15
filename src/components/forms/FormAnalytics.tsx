@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart3,
@@ -11,13 +11,15 @@ import {
   Target,
   Calendar,
   PieChart as PieChartIcon,
-  Download
+  Download,
+  Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   LineChart,
   Line,
@@ -36,6 +38,7 @@ import {
 } from 'recharts';
 
 import { formApi, formSubmissionApi } from '@/lib/api/forms';
+import { GoogleFormsStyleAnalytics } from './GoogleFormsStyleAnalytics';
 import type { SubmissionStatistics, FormStatistics } from '@/types/forms';
 
 interface FormAnalyticsProps {
@@ -49,6 +52,8 @@ export const FormAnalytics: React.FC<FormAnalyticsProps> = ({
   eventId,
   onExportCSV
 }) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'responses'>('overview');
+
   // Fetch all forms for the event
   const {
     data: forms,
@@ -193,35 +198,48 @@ export const FormAnalytics: React.FC<FormAnalyticsProps> = ({
 
   return (
     <div className="space-y-8">
-      {/* Overall Analytics Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Badge variant="outline" className="flex items-center gap-2">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'responses')}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4" />
-            Live Data
-          </Badge>
-          <div className="text-sm text-muted-foreground">
-            {aggregatedStats.total_forms} form{aggregatedStats.total_forms !== 1 ? 's' : ''} • {aggregatedStats.total_submissions} total submissions
+            Analytics Overview
+          </TabsTrigger>
+          <TabsTrigger value="responses" className="flex items-center gap-2">
+            <Eye className="w-4 h-4" />
+            Form Responses
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-8">
+          {/* Overall Analytics Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Badge variant="outline" className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Live Data
+              </Badge>
+              <div className="text-sm text-muted-foreground">
+                {aggregatedStats.total_forms} form{aggregatedStats.total_forms !== 1 ? 's' : ''} • {aggregatedStats.total_submissions} total submissions
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // Export all form data as CSV
+                  forms.forEach(form => {
+                    if (onExportCSV) {
+                      onExportCSV(form.id);
+                    }
+                  });
+                }}
+                className="flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Export All CSV
+              </Button>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              // Export all form data as CSV
-              forms.forEach(form => {
-                if (onExportCSV) {
-                  onExportCSV(form.id);
-                }
-              });
-            }}
-            className="flex items-center gap-2"
-          >
-            <Download className="w-4 h-4" />
-            Export All CSV
-          </Button>
-        </div>
-      </div>
 
       {/* Overall Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -501,6 +519,12 @@ export const FormAnalytics: React.FC<FormAnalyticsProps> = ({
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="responses">
+          <GoogleFormsStyleAnalytics eventId={eventId} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

@@ -82,10 +82,10 @@
 @layer base {
   :root {
     /* Brand semantic tokens (HSL only) */
-    --color-primary: 41 100% 61%; /* Honey Yellow #fbb339 */
-    --color-primary-hover: 42 62% 41%; /* Darkened Honey #d6982d */
-    --color-warning: 54 94% 51%; /* Safety Yellow #f3d70e */
-    --color-minion: 50 88% 66%; /* Minion Yellow #f5e35e */
+    --color-primary: 5 85% 55%; /* Evella Orange #ff6f3c */
+    --color-primary-hover: 5 85% 45%; /* Darkened Evella Orange #e55a2b */
+    --color-warning: 25 95% 60%; /* Bright Orange for warnings #ff8c42 */
+    --color-minion: 15 90% 65%; /* Bright Orange variation #ff9f5a */
     --color-success: 134 28% 72%; /* Eton Blue #a4cea4 */
     --color-info: 195 67% 29%; /* Blue Sapphire #19647e */
     --color-error: 0 61% 56%; /* Red #d34b4b */
@@ -139,8 +139,8 @@
     /* Chart colors for light theme */
     --chart-1: 195 67% 29%; /* Blue Sapphire */
     --chart-2: 134 28% 72%; /* Eton Blue */
-    --chart-3: 41 100% 61%; /* Honey Yellow */
-    --chart-4: 54 94% 51%; /* Safety Yellow */
+    --chart-3: 5 85% 55%; /* Evella Orange */
+    --chart-4: 25 90% 60%; /* Orange variation */
     --chart-5: 0 61% 56%; /* Red */
     --chart-line: 194 67% 29%; /* Line chart color #18637b */
     --chart-grid: 214.3 31.8% 91.4%; /* Border color for grids */
@@ -192,8 +192,8 @@
     /* Chart colors for dark theme - brighter for visibility */
     --chart-1: 195 67% 45%; /* Brighter Blue Sapphire */
     --chart-2: 134 28% 65%; /* Brighter Eton Blue */
-    --chart-3: 41 100% 65%; /* Brighter Honey Yellow */
-    --chart-4: 54 94% 60%; /* Brighter Safety Yellow */
+    --chart-3: 5 85% 60%; /* Brighter Evella Orange */
+    --chart-4: 25 90% 65%; /* Brighter Orange variation */
     --chart-5: 0 61% 65%; /* Brighter Red */
     --chart-line: 132 29% 65%; /* Line chart color #8dbf98 for dark mode */
     --chart-grid: 221 26% 18%; /* Border color for grids */

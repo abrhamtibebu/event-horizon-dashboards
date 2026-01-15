@@ -362,7 +362,7 @@ export function AppSidebar() {
             /* Collapsed: Just logo centered */
             <div className="w-10 h-10 flex items-center justify-center">
               <img
-                src="/Validity_logo.png"
+                src="/evella-logo.png"
                 alt="Evella Logo"
                 className="w-10 h-10 object-contain"
               />
@@ -373,8 +373,8 @@ export function AppSidebar() {
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 flex items-center justify-center">
                   <img
-                    src="/Validity_logo.png"
-                    alt="VEMS Logo"
+                    src="/evella-logo.png"
+                    alt="Evella Logo"
                     className="w-10 h-10 object-contain"
                   />
                 </div>

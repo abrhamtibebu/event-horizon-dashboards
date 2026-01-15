@@ -59,9 +59,9 @@ export default {
 				info: 'hsl(var(--color-info))',
 				error: 'hsl(var(--color-error))',
 				/* Named brand colors for convenience */
-				'honey-yellow': 'hsl(var(--color-primary))',
-				'safety-yellow': 'hsl(var(--color-warning))',
-				'minion-yellow': 'hsl(var(--color-minion))',
+				'evella-orange': 'hsl(var(--color-primary))',
+				'safety-orange': 'hsl(var(--color-warning))',
+				'light-orange': 'hsl(var(--color-minion))',
 				'rich-black': 'hsl(var(--color-rich-black))',
 				'eton-blue': 'hsl(var(--color-success))',
 				'blue-sapphire': 'hsl(var(--color-info))',

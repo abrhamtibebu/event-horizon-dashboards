@@ -190,8 +190,8 @@ export default function RegistrationSuccess() {
               {/* Top Bar with Logo */}
               <div className="w-full flex justify-between items-center px-6 pt-6">
                 <img
-                  src="/Validity_logo_2.png"
-                  alt="Validity Logo"
+                  src="/evella-logo.png"
+                  alt="Evella Logo"
                   className="w-30 h-12 object-contain"
                 />
                 <span className="inline-flex items-center justify-center bg-yellow-500/90 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm h-8">

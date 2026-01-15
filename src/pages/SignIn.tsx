@@ -1,14 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/use-auth'
@@ -23,6 +15,8 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { SpinnerInline } from '@/components/ui/spinner'
+import { motion } from 'framer-motion'
+import { Turnstile } from '@marsidev/react-turnstile'
 
 export default function SignIn() {
   const [email, setEmail] = useState('')
@@ -35,6 +29,7 @@ export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const { login } = useAuth()
   const navigate = useNavigate()
 
@@ -43,15 +38,17 @@ export default function SignIn() {
     setError(null)
     setIsLoading(true)
 
+    if (!captchaToken) {
+      setError({ message: 'Please complete the captcha verification.' })
+      setIsLoading(false)
+      return
+    }
+
     try {
-      await login({ email, password }, rememberMe)
+      await login({ email, password, captchaToken }, rememberMe)
       navigate('/dashboard')
     } catch (err: any) {
       console.error('[SignIn] Login error details:', err)
-      console.error('[SignIn] Error response:', err.response?.data)
-      console.error('[SignIn] Error status:', err.response?.status)
-      console.error('[SignIn] Request payload:', { email, password: password ? '***' : 'empty' })
-      console.error('[SignIn] Full error object:', JSON.stringify(err.response?.data, null, 2))
 
       // Handle network errors (backend not reachable)
       if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
@@ -65,7 +62,6 @@ export default function SignIn() {
         const errors = responseData?.errors
 
         if (errors) {
-          // Format validation errors
           const errorMessages = Object.values(errors).flat() as string[]
           setError({ message: errorMessages.join(', ') || 'Please check your input fields.' })
         } else if (responseData?.message) {
@@ -95,237 +91,222 @@ export default function SignIn() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Glassy background elements - Dark mode compatible */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Enhanced glassy orbs with more blur */}
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-primary/10 to-info/10 dark:from-primary/20 dark:to-info/20 rounded-full blur-3xl backdrop-blur-sm"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-info/10 to-primary/10 dark:from-info/20 dark:to-primary/20 rounded-full blur-3xl backdrop-blur-sm"></div>
-
-        {/* Additional glassy elements */}
-        <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-white/10 dark:bg-white/5 rounded-full blur-2xl backdrop-blur-md"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-40 h-40 bg-white/5 dark:bg-white/3 rounded-full blur-2xl backdrop-blur-md"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-r from-primary/5 to-info/5 dark:from-primary/10 dark:to-info/10 rounded-full blur-3xl backdrop-blur-sm"></div>
+    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden bg-background transition-colors duration-500">
+      {/* Dynamic Background with Animated Brand Blobs */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <motion.div
+          animate={{ scale: [1, 1.2, 1], x: [0, 50, 0], y: [0, 30, 0] }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute -top-[20%] -left-[10%] w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px]"
+        />
+        <motion.div
+          animate={{ scale: [1, 1.1, 1], x: [0, -30, 0], y: [0, -50, 0] }}
+          transition={{ duration: 15, repeat: Infinity, ease: "linear", delay: 2 }}
+          className="absolute top-[20%] right-[0%] w-[600px] h-[600px] bg-info/20 rounded-full blur-[100px]"
+        />
+        <motion.div
+          animate={{ scale: [1, 1.3, 1], x: [0, 40, 0], y: [0, 40, 0] }}
+          transition={{ duration: 18, repeat: Infinity, ease: "linear", delay: 5 }}
+          className="absolute -bottom-[20%] left-[20%] w-[700px] h-[700px] bg-warning/10 rounded-full blur-[120px]"
+        />
       </div>
 
-      <div className="relative w-full max-w-md z-10">
-        {/* Clean Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 mb-6">
-            <img
-              src="/Validity_logo.png"
-              alt="Evella Admin Logo"
-              className="w-24 h-24 object-contain"
-            />
-          </div>
+      <div className="relative z-10 w-full max-w-md px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl overflow-hidden"
+        >
+          {/* Header Section */}
+          <div className="pt-8 pb-6 px-8 text-center border-b border-border/50 bg-gradient-to-b from-card to-transparent">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="inline-flex items-center justify-center mb-6 relative"
+            >
+              <div className="absolute inset-0 bg-gradient-to-tr from-primary/30 to-info/30 blur-xl rounded-full" />
+              <img
+                src="/evella-logo.png"
+                alt="Evella Admin Logo"
+                className="w-16 h-16 object-contain relative z-10 drop-shadow-md"
+              />
+            </motion.div>
 
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold text-foreground">
-              Welcome Back To Evella Admin
+            <h1 className="text-2xl font-bold text-foreground tracking-tight mb-2">
+              Welcome Back
             </h1>
-            <p className="text-muted-foreground text-lg font-medium"></p>
-            <p className="text-muted-foreground text-sm">Validity Event Management System</p>
+            <p className="text-muted-foreground text-sm">
+              Sign in to manage your events
+            </p>
           </div>
-        </div>
 
-        {/* Clean Card */}
-        <Card className="shadow-2xl border bg-card/80 backdrop-blur-xl relative overflow-hidden">
-          <div className="relative">
-            <CardHeader className="space-y-2 text-center pb-6">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <div className="w-8 h-8 bg-brand-gradient rounded-lg flex items-center justify-center">
-                  <Shield className="w-4 h-4 text-white" />
+          <div className="p-8">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Email Field */}
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pl-1">
+                  Email Address
+                </Label>
+                <div className="relative group">
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="name@example.com"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                    className="bg-background/50 border-input text-foreground placeholder:text-muted-foreground/60 pl-10 h-11 focus-visible:ring-ring focus-visible:border-ring transition-all rounded-xl"
+                  />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 </div>
-                <CardTitle className="text-2xl font-bold text-card-foreground">
-                  Sign In
-                </CardTitle>
               </div>
-              <CardDescription className="text-muted-foreground">
-                Enter your credentials to access your dashboard
-              </CardDescription>
-            </CardHeader>
 
-            <form onSubmit={handleSubmit}>
-              <CardContent className="space-y-6">
-                {/* Email Field */}
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="email"
-                    className="text-sm font-semibold text-foreground flex items-center gap-2"
-                  >
-                    <Mail className="w-4 h-4 text-primary" />
-                    Email Address
-                  </Label>
-                  <div className="relative">
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email address"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={isLoading}
-                      className={`pl-10 transition-all duration-200 focus:ring-2 focus:ring-info/20 ${error ? 'border-red-500 focus:ring-red-500/20' : ''
-                        }`}
-                    />
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  </div>
-                </div>
-
-                {/* Password Field */}
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="password"
-                    className="text-sm font-semibold text-foreground flex items-center gap-2"
-                  >
-                    <Lock className="w-4 h-4 text-primary" />
+              {/* Password Field */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pl-1">
                     Password
                   </Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Enter your password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={isLoading}
-                      className={`pl-10 pr-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 ${error ? 'border-red-500 focus:ring-red-500/20' : ''
-                        }`}
-                    />
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors duration-200"
-                      disabled={isLoading}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Error Message */}
-                {error && (
-                  <div className="flex flex-col gap-2 p-4 bg-destructive/5 border border-destructive/20 rounded-lg animate-in fade-in slide-in-from-top-2">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-                      <div className="space-y-1">
-                        <p className="text-destructive font-medium text-sm">{error.message}</p>
-                        {error.remainingAttempts !== undefined && (
-                          <p className="text-destructive/80 text-xs">
-                            Remaining attempts: <span className="font-bold">{error.remainingAttempts}</span>
-                          </p>
-                        )}
-                        {error.warning && (
-                          <p className="text-warning/90 text-xs flex items-center gap-1 mt-1">
-                            <Shield className="w-3 h-3" />
-                            {error.warning}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Remember Me & Forgot Password */}
-                <div className="flex items-center justify-between text-sm">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <div className="relative">
-                      <input
-                        type="checkbox"
-                        className="sr-only"
-                        disabled={isLoading}
-                        checked={rememberMe}
-                        onChange={(e) => setRememberMe(e.target.checked)}
-                      />
-                      <div className={`w-4 h-4 border-2 rounded transition-all duration-200 flex items-center justify-center ${rememberMe
-                          ? 'bg-brand-gradient border-transparent'
-                          : 'border-border'
-                        }`}>
-                        {rememberMe && <CheckCircle className="w-3 h-3 text-white" />}
-                      </div>
-                    </div>
-                    <span className="text-muted-foreground">Remember me</span>
-                  </label>
                   <Link
                     to="/forgot-password"
-                    className="text-primary hover:text-primary/80 font-medium transition-colors duration-200 hover:underline"
+                    className="text-xs text-primary hover:text-primary/80 transition-colors hover:underline"
                   >
                     Forgot password?
                   </Link>
                 </div>
-              </CardContent>
-
-              <CardFooter className="flex flex-col space-y-4 pt-6">
-                <Button
-                  type="submit"
-                  className="w-full bg-brand-gradient text-foreground font-semibold py-2.5 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <SpinnerInline />
-                      <span>Signing in...</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-2">
-                      <span>Sign In</span>
-                      <ArrowRight className="h-4 w-4" />
-                    </div>
-                  )}
-                </Button>
-
-                {/* Development Mode Button */}
-                {import.meta.env.DEV && (
-                  <Button
+                <div className="relative group">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
+                    className="bg-background/50 border-input text-foreground placeholder:text-muted-foreground/60 pl-10 pr-10 h-11 focus-visible:ring-ring focus-visible:border-ring transition-all rounded-xl"
+                  />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                  <button
                     type="button"
-                    variant="outline"
-                    className="w-full border-dashed border-border text-muted-foreground hover:border-border hover:text-foreground"
-                    onClick={() => {
-                      // Clear any logout flags and enable mock mode
-                      sessionStorage.removeItem('just_logged_out')
-                      localStorage.setItem('mock_auth', 'true')
-                      localStorage.setItem('jwt', 'dev-token')
-                      localStorage.setItem('user_role', 'organizer')
-                      localStorage.setItem('user_id', '6')
-                      localStorage.setItem('organizer_id', '1')
-                      window.location.href = '/dashboard'
-                    }}
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <Shield className="w-4 h-4 mr-2" />
-                    Enter Development Mode
-                  </Button>
-                )}
-              </CardFooter>
-            </form>
-          </div>
-        </Card>
+                    {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              </div>
 
-        {/* Clean Footer */}
-        <div className="mt-8 text-center space-y-4">
-          <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
-            <Link
-              to="/privacy"
-              className="hover:text-foreground transition-colors duration-200 hover:underline"
-            >
-              Privacy Policy
-            </Link>
-            <div className="w-1 h-1 bg-muted-foreground/30 rounded-full"></div>
-            <Link
-              to="/terms"
-              className="hover:text-foreground transition-colors duration-200 hover:underline"
-            >
-              Terms of Service
-            </Link>
+              {/* Error Display */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 flex gap-3 items-start"
+                >
+                  <AlertCircle className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-sm text-destructive font-medium leading-tight">{error.message}</p>
+                    {error.remainingAttempts !== undefined && (
+                      <p className="text-xs text-destructive/80">
+                        Remaining attempts: <span className="font-bold">{error.remainingAttempts}</span>
+                      </p>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Remember Me */}
+              <div className="flex items-center space-x-2">
+                <div className="relative flex items-center">
+                  <input
+                    type="checkbox"
+                    id="remember"
+                    className="peer sr-only"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  <div className="h-4 w-4 rounded border border-input bg-background peer-checked:bg-primary peer-checked:border-primary transition-all flex items-center justify-center cursor-pointer">
+                    <CheckCircle className={`w-3 h-3 text-primary-foreground ${rememberMe ? 'opacity-100 scale-100' : 'opacity-0 scale-50'} transition-all`} />
+                  </div>
+                  <label htmlFor="remember" className="ml-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground select-none">
+                    Remember for 30 days
+                  </label>
+                </div>
+              </div>
+
+              {/* Turnstile Captcha */}
+              <div className="flex justify-center w-full overflow-hidden">
+                <Turnstile
+                  siteKey="0x4AAAAAACModrHHLD3RUANr"
+                  onSuccess={(token) => setCaptchaToken(token)}
+                  onError={() => setError({ message: 'Captcha error. Please try again.' })}
+                  options={{
+                    theme: 'auto',
+                  }}
+                />
+              </div>
+
+              {/* Submit Button */}
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-brand-gradient text-white font-semibold py-6 rounded-xl shadow-lg shadow-primary/20 transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <SpinnerInline className="text-white" />
+                    <span>Signing in...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span>Sign In to Dashboard</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </div>
+                )}
+              </Button>
+            </form>
+
+            {/* Dev Mode Shortcut */}
+            {import.meta.env.DEV && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1 }}
+                className="mt-6 pt-6 border-t border-border/50"
+              >
+                <Button
+                  variant="ghost"
+                  className="w-full text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 uppercase tracking-wider"
+                  onClick={() => {
+                    sessionStorage.removeItem('just_logged_out')
+                    localStorage.setItem('mock_auth', 'true')
+                    localStorage.setItem('jwt', 'dev-token')
+                    localStorage.setItem('user_role', 'organizer')
+                    localStorage.setItem('user_id', '6')
+                    localStorage.setItem('organizer_id', '1')
+                    window.location.href = '/dashboard'
+                  }}
+                >
+                  <Shield className="w-3 h-3 mr-2" />
+                  Enter Development Mode
+                </Button>
+              </motion.div>
+            )}
           </div>
-          <p className="text-xs text-muted-foreground/60">
-            © 2025 Evella Admin. All rights reserved.
-          </p>
+
+          {/* Footer */}
+          <div className="bg-muted/30 p-4 text-center text-xs text-muted-foreground backdrop-blur-md">
+            <p>Protected by reCAPTCHA and subject to the Privacy Policy and Terms of Service.</p>
+          </div>
+        </motion.div>
+
+        {/* Links */}
+        <div className="mt-8 text-center flex justify-center gap-6 text-sm text-muted-foreground">
+          <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+          <Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
         </div>
       </div>
     </div>

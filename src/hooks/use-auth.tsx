@@ -32,7 +32,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   user: User | null
   login: (
-    credentials: { email: string; password: string },
+    credentials: { email: string; password: string; captchaToken: string },
     remember?: boolean
   ) => Promise<void>
   logout: () => Promise<void>
@@ -85,7 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Store new token
         const storage = localStorage.getItem('jwt') ? localStorage : sessionStorage
         storage.setItem('jwt', newToken)
-        
+
         // Store token expiration timestamp
         if (expires_in) {
           const expiresAt = Date.now() + expires_in * 1000
@@ -121,7 +121,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('[Auth] Checking authentication status...')
       let token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
       console.log('[Auth] Token found:', !!token)
-      
+
       if (token) {
         // Check if token is valid format (not a mock token)
         if (token === 'dev-token' || token.length < 20) {
@@ -136,7 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setIsLoading(false)
           return
         }
-        
+
         // Check if refresh period has expired
         if (isRefreshPeriodExpired(token)) {
           console.log('[Auth] Refresh period expired on init')
@@ -196,18 +196,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   const login = async (
-    credentials: { email: string; password: string },
+    credentials: { email: string; password: string; captchaToken: string },
     remember = false
   ) => {
     try {
       // Login endpoint doesn't require API key, so we don't send it
-      const res = await api.post('/login', credentials)
+      const res = await api.post('/login', {
+        email: credentials.email,
+        password: credentials.password,
+        captcha_token: credentials.captchaToken,
+      })
       const { token, user, expires_in } = res.data
-      
+
       // Store token based on remember preference
       const storage = remember ? localStorage : sessionStorage
       storage.setItem('jwt', token)
-      
+
       // Store token expiration timestamp
       if (expires_in) {
         const expiresAt = Date.now() + expires_in * 1000
@@ -216,9 +220,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Store token creation time for refresh period tracking
       storage.setItem('token_created_at', Date.now().toString())
-      
+
       localStorage.removeItem('mock_auth')
-      
+
       setUser(user)
 
       // Set up proactive token refresh after login
