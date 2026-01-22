@@ -152,12 +152,14 @@ export function BadgeAssignmentDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <QrCode className="h-5 w-5" />
+        <DialogHeader className="pb-4 border-b border-border/50">
+          <DialogTitle className="text-xl font-semibold flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-50 dark:bg-blue-950/20 rounded-xl flex items-center justify-center border-2 border-blue-200 dark:border-blue-800">
+              <QrCode className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
             Assign Badge to Guest
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm text-muted-foreground mt-2">
             Scan the badge QR code using a 2D scanner, then fill in the guest information.
           </DialogDescription>
         </DialogHeader>
@@ -287,17 +289,19 @@ export function BadgeAssignmentDialog({
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-3 pt-6 border-t border-border/50">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              className="w-full sm:w-auto order-2 sm:order-1"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={assigning || !badgeCode || !firstName || !lastName}
+              className="w-full sm:w-auto order-1 sm:order-2"
             >
               {assigning ? (
                 <>

@@ -5,6 +5,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -225,14 +226,14 @@ export function CreateReferralCampaignDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3 text-2xl">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-              <Target className="w-4 h-4 text-white" />
+        <DialogHeader className="pb-4 border-b border-border/50">
+          <DialogTitle className="text-xl font-semibold flex items-center gap-3">
+            <div className="w-10 h-10 bg-purple-50 dark:bg-purple-950/20 rounded-xl flex items-center justify-center border-2 border-purple-200 dark:border-purple-800">
+              <Target className="w-5 h-5 text-purple-600 dark:text-purple-400" />
             </div>
             Create Referral Campaign
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm text-muted-foreground mt-2">
             Set up a new referral campaign to track and reward vendor referrals for event registrations.
           </DialogDescription>
         </DialogHeader>
@@ -617,18 +618,19 @@ export function CreateReferralCampaignDialog({
             </Card>
 
             {/* Form Actions */}
-            <div className="flex justify-end space-x-3 pt-6 border-t">
+            <DialogFooter className="flex-col sm:flex-row gap-3 pt-6 border-t border-border/50">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
+                className="w-full sm:w-auto order-2 sm:order-1"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={isSubmitting || !formData.campaign_name || !formData.event_id}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                className="w-full sm:w-auto order-1 sm:order-2 bg-purple-600 hover:bg-purple-700 text-white"
               >
                 {isSubmitting ? (
                   <span className="flex items-center">
@@ -642,7 +644,7 @@ export function CreateReferralCampaignDialog({
                   </span>
                 )}
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         )}
       </DialogContent>

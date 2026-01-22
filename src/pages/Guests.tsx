@@ -53,15 +53,15 @@ export default function Guests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  
+
   // Modern alerts system
   const { showSuccess, showError, showInfo } = useModernAlerts();
   const { user } = useAuth();
   const { checkPermission } = usePermissionCheck();
-  
+
   // Check if user is organizer (guests list is only for organizers)
   const isAdminOrOrganizer = user?.role === 'organizer' || user?.role === 'organizer_admin';
-  
+
   // Pagination hook - only for admin and organizer
   const {
     currentPage,
@@ -245,11 +245,11 @@ export default function Guests() {
   const filteredGuests = guests.filter(guest => {
     // Apply search filter
     if (filter && !guest.name?.toLowerCase().includes(filter.toLowerCase()) &&
-        !guest.email?.toLowerCase().includes(filter.toLowerCase()) &&
-        !guest.company?.toLowerCase().includes(filter.toLowerCase())) {
+      !guest.email?.toLowerCase().includes(filter.toLowerCase()) &&
+      !guest.company?.toLowerCase().includes(filter.toLowerCase())) {
       return false;
     }
-    
+
     // Apply event filter
     if (eventFilter !== 'all') {
       const guestEventNames = guestEvents[guest.id] || [];
@@ -257,46 +257,46 @@ export default function Guests() {
         return false;
       }
     }
-    
+
     // Apply job title filter
     if (jobTitleFilter !== 'all' && guest.jobtitle !== jobTitleFilter) {
       return false;
     }
-    
+
     // Apply company filter
     if (companyFilter !== 'all' && guest.company !== companyFilter) {
       return false;
     }
-    
+
     // Apply country filter
     if (countryFilter !== 'all' && guest.country !== countryFilter) {
       return false;
     }
-    
+
     // Apply gender filter
     if (genderFilter !== 'all' && guest.gender !== genderFilter) {
       return false;
     }
-    
+
     // Apply guest type filter
     if (guestTypeFilter !== 'all' && guest.guest_type?.name !== guestTypeFilter) {
       return false;
     }
-    
+
     return true;
   });
-  
+
   // Calculate pagination for filtered results
   const totalFiltered = filteredGuests.length;
   const totalPagesForFiltered = Math.ceil(totalFiltered / perPage);
-  
+
   // Update pagination totals based on filtered results
   useEffect(() => {
     if (isAdminOrOrganizer) {
       const calculatedTotalPages = Math.ceil(totalFiltered / perPage) || 1;
       setTotalPages(calculatedTotalPages);
       setTotalRecords(totalFiltered);
-      
+
       // Reset to page 1 if current page is beyond total pages
       if (currentPage > calculatedTotalPages && calculatedTotalPages > 0) {
         handlePageChange(1);
@@ -304,7 +304,7 @@ export default function Guests() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalFiltered, perPage, isAdminOrOrganizer, currentPage]);
-  
+
   // Apply pagination - only show 15 records per page for admin/organizer
   const paginatedGuests = isAdminOrOrganizer
     ? filteredGuests.slice((currentPage - 1) * perPage, currentPage * perPage)
@@ -387,7 +387,7 @@ export default function Guests() {
     if (!checkPermission('guests.export', 'export guests')) {
       return;
     }
-    
+
     if (filteredGuests.length === 0) {
       showError('Export Failed', 'No guests to export.');
       return;
@@ -434,7 +434,7 @@ export default function Guests() {
   return (
     <div className="min-h-screen bg-background p-6">
       {/* Breadcrumbs */}
-      <Breadcrumbs 
+      <Breadcrumbs
         items={[
           { label: 'Manage Guests', href: '/dashboard/guests' },
           { label: 'Guests List' }
@@ -461,10 +461,6 @@ export default function Guests() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button className="bg-success hover:bg-success/90 text-white">
-              <UsersIcon className="w-4 h-4 mr-2" />
-              + Add New Guest
-            </Button>
             <Button variant="ghost" size="icon" className="hover:bg-accent">
               <MoreVertical className="w-5 h-5" />
             </Button>
@@ -563,7 +559,7 @@ export default function Guests() {
               <Filter className="w-4 h-4 text-white" />
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Event Filter */}
             <div>
@@ -700,8 +696,8 @@ export default function Guests() {
           </div>
           <div className="text-lg font-medium text-foreground mb-2">Failed to load guests</div>
           <div className="text-muted-foreground mb-6">{error}</div>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => window.location.reload()}
             className="flex items-center gap-2"
           >
@@ -725,11 +721,11 @@ export default function Guests() {
                     />
                   </TableHead>
                   <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Name of Guest</TableHead>
-                  <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Source</TableHead>
-                  <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Date</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Company</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Title</TableHead>
                   <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Email</TableHead>
                   <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Phone Number</TableHead>
-                  <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Status</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase py-4 text-right">Source</TableHead>
                   <TableHead className="font-semibold text-foreground text-xs uppercase py-4 w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -742,7 +738,7 @@ export default function Guests() {
                     'pending': 'bg-warning/10 text-warning border-warning/30',
                     'active': 'bg-success/10 text-success border-success/30',
                   };
-                  
+
                   return (
                     <TableRow
                       key={guest.id}
@@ -762,19 +758,15 @@ export default function Guests() {
                           </div>
                           <div>
                             <div className="font-semibold text-foreground">{guest.name}</div>
-                            <div className="text-xs text-muted-foreground">{guest.guest_type?.name || 'Regular'}</div>
+                            <div className="text-xs text-muted-foreground">{guest.guest_type?.name || 'Guest'}</div>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell className="py-4">
-                        <div className="text-sm text-foreground">
-                          {(guestEvents[guest.id] || []).length > 0 ? (guestEvents[guest.id] || [])[0] : 'Direct'}
-                        </div>
+                        <div className="text-sm font-medium text-foreground">{guest.company || '-'}</div>
                       </TableCell>
                       <TableCell className="py-4">
-                        <div className="text-sm text-foreground">
-                          {guest.created_at ? new Date(guest.created_at).toLocaleDateString('en-GB') : '-'}
-                        </div>
+                        <div className="text-sm text-foreground">{guest.jobtitle || '-'}</div>
                       </TableCell>
                       <TableCell className="py-4">
                         <div className="text-sm text-foreground">{guest.email}</div>
@@ -782,10 +774,10 @@ export default function Guests() {
                       <TableCell className="py-4">
                         <div className="text-sm text-foreground">{guest.phone || '-'}</div>
                       </TableCell>
-                      <TableCell className="py-4">
-                        <Badge className={`${statusColors[guestStatus as keyof typeof statusColors] || 'bg-muted text-muted-foreground'} text-xs px-3 py-1 rounded-full border`}>
-                          {guest.checked_in ? 'Checked In' : 'Pending'}
-                        </Badge>
+                      <TableCell className="py-4 text-right">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          {(guestEvents[guest.id] || []).length > 0 ? (guestEvents[guest.id] || [])[0] : 'Direct'}
+                        </div>
                       </TableCell>
                       <TableCell className="py-4">
                         <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-accent">
@@ -823,22 +815,22 @@ export default function Guests() {
             {guests.length === 0 ? 'No guests found' : 'No guests match your filters'}
           </h3>
           <p className="text-muted-foreground text-center max-w-md mb-6">
-            {guests.length === 0 
+            {guests.length === 0
               ? 'No guest accounts exist in the system yet.'
               : 'Try adjusting your search criteria or filters to find the guests you\'re looking for.'
             }
           </p>
           <div className="flex gap-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setFilter('')}
               className="bg-white border-gray-200 shadow-sm hover:bg-gray-50"
             >
               Clear Search
             </Button>
             {guests.length > 0 && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={clearAllFilters}
                 className="bg-white border-gray-200 shadow-sm hover:bg-gray-50"
               >

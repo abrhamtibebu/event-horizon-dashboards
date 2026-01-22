@@ -48,7 +48,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onUnpin,
 }) => {
   const [showReactions, setShowReactions] = useState(false)
-  
+
   const { confirmDelete } = useModernAlerts()
   const isOwnMessage = message.sender_id === currentUserId
   const isPinned = message.is_pinned || false
@@ -147,129 +147,136 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       )}
 
       {/* Message Content */}
-      <div className={`flex flex-col ${isOwnMessage ? 'items-end max-w-[480px]' : 'items-start flex-1'}`}>
+      <div className={`flex flex-col ${isOwnMessage ? 'items-end max-w-[85%] ml-auto' : 'items-start max-w-[85%] mr-auto'}`}>
         {/* Sender name for others */}
-        {!isOwnMessage && (
-          <span className="text-sm font-bold text-foreground mb-1 px-1">
+        {!isOwnMessage && isGroup && (
+          <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 mb-1 px-1">
             {message.sender.name}
           </span>
         )}
-        
+
         {/* Message bubble */}
         <div className="relative group w-full">
           <div
-            className={`
-              relative shadow-sm message-bubble
-              ${isOwnMessage 
-                ? 'bg-primary text-primary-foreground rounded-[20px]'
-                : 'bg-card border border-border text-card-foreground rounded-[20px]'
-              }
-              hover:shadow transition-all duration-150
-            `}
-            style={{ maxWidth: isOwnMessage ? '480px' : 'none', wordBreak: 'break-word' }}
+            className={cn(
+              "relative shadow-sm transition-all duration-200",
+              isOwnMessage
+                ? 'bg-primary text-white rounded-[20px] rounded-tr-[4px] shadow-primary/10'
+                : 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-gray-900 dark:text-gray-100 rounded-[20px] rounded-tl-[4px]'
+            )}
+            style={{ wordBreak: 'break-word' }}
           >
-            {/* Teams-style Quoted Message (if replying) */}
+            {/* Quoted Message (if replying) */}
             {message.parentMessage && (
-              <div className={`px-3 pt-3 pb-2 border-l-4 ${
-                isOwnMessage 
-                  ? 'bg-primary/20 border-primary-foreground/50' 
-                  : 'bg-muted/50 border-border'
-              } rounded-t-2xl`}>
-                <div className="flex items-start space-x-2">
-                  <Reply className={`w-3 h-3 mt-0.5 flex-shrink-0 ${
-                    isOwnMessage ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                  }`} />
+              <div className={cn(
+                "mx-1 mt-1 px-3 py-2 border-l-3 rounded-xl mb-1",
+                isOwnMessage
+                  ? 'bg-black/10 border-white/30'
+                  : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'
+              )}>
+                <div className="flex items-start gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-semibold mb-0.5 ${
-                      isOwnMessage ? 'text-primary-foreground/90' : 'text-foreground'
-                    }`}>
+                    <p className={cn(
+                      "text-[10px] font-bold mb-0.5",
+                      isOwnMessage ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
+                    )}>
                       {message.parentMessage.sender.name}
                     </p>
-                    <p className={`text-xs truncate ${
-                      isOwnMessage ? 'text-primary-foreground/80' : 'text-muted-foreground'
-                    }`}>
-                      {(message.parentMessage.file_path || message.parentMessage.file_url) && !message.parentMessage.content 
-                        ? `📎 ${message.parentMessage.file_name || 'Attachment'}` 
+                    <p className={cn(
+                      "text-[11px] truncate",
+                      isOwnMessage ? 'text-white/70' : 'text-gray-600 dark:text-gray-300'
+                    )}>
+                      {(message.parentMessage.file_path || message.parentMessage.file_url) && !message.parentMessage.content
+                        ? `📎 Attachment`
                         : message.parentMessage.content}
                     </p>
                   </div>
                 </div>
               </div>
             )}
-            
+
             {/* Message content */}
-            <div className={`px-4 py-3 break-words overflow-wrap-anywhere ${
-              message.parentMessage ? 'pt-2' : ''
-            }`}>
+            <div className={cn(
+              "px-4 py-2.5",
+              message.parentMessage ? 'pt-1' : ''
+            )}>
               <MessageContent content={message.content} />
             </div>
 
             {/* File attachment */}
             {(message.file_path || message.file_url) && (
-              <div className={message.parentMessage ? '' : 'px-4'}>
-                {renderFileAttachment()}
+              <div className="px-1 pb-1">
+                <div className="rounded-xl overflow-hidden">
+                  {renderFileAttachment()}
+                </div>
               </div>
             )}
 
-            {/* Timestamp and status */}
-            <div className="flex items-center space-x-2 px-4 pb-3">
-              <span className={`text-xs ${isOwnMessage ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+            {/* Timestamp and status indicator */}
+            <div className={cn(
+              "flex items-center gap-1.5 px-4 pb-2 justify-end",
+              isOwnMessage ? "text-white/60" : "text-gray-400 dark:text-gray-500"
+            )}>
+              <span className="text-[10px] font-medium">
                 {formatMessageTime(message.created_at)}
               </span>
               {isOwnMessage && (
-                <ReadReceipts 
-                  message={message} 
-                  currentUserId={currentUserId} 
+                <ReadReceipts
+                  message={message}
+                  currentUserId={currentUserId}
                   isGroup={isGroup}
                 />
               )}
             </div>
 
-            {/* Message actions (reply, delete) */}
-            <div className={`absolute top-1/2 -translate-y-1/2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ${isOwnMessage ? '-left-16 flex-row-reverse' : '-right-16'}`}>
+            {/* Message actions (reply, delete) - Floating over the bubble */}
+            <div className={cn(
+              "absolute top-0 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1 z-10",
+              isOwnMessage ? "right-full mr-2" : "left-full ml-2"
+            )}>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => onReply(message)}
-                className={`w-8 h-8 p-0 ${isOwnMessage ? 'text-primary-foreground/80 hover:bg-primary/40' : 'text-muted-foreground hover:bg-accent'}`}
+                className="h-8 w-8 rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-500"
                 title="Reply"
               >
-                <Reply className="w-4 h-4" />
+                <Reply className="w-3.5 h-3.5" />
               </Button>
-              {isOwnMessage && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`w-8 h-8 p-0 ${isOwnMessage ? 'text-primary-foreground/80 hover:bg-primary/40' : 'text-muted-foreground hover:bg-accent'}`}
-                      title="More options"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align={isOwnMessage ? 'end' : 'start'} className="w-40">
-                    {isPinned ? (
-                      <DropdownMenuItem onClick={() => onUnpin?.(message.id)}>
-                        <PinOff className="mr-2 h-4 w-4" />
-                        Unpin
-                      </DropdownMenuItem>
-                    ) : (
-                      <DropdownMenuItem onClick={() => onPin?.(message.id)}>
-                        <Pin className="mr-2 h-4 w-4" />
-                        Pin message
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={handleDeleteMessage} className="text-destructive">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-500"
+                    title="More"
+                  >
+                    <MoreVertical className="w-3.5 h-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align={isOwnMessage ? 'end' : 'start'} className="w-40 rounded-xl shadow-xl border-gray-100 dark:border-gray-800">
+                  {isPinned ? (
+                    <DropdownMenuItem onClick={() => onUnpin?.(message.id)}>
+                      <PinOff className="mr-2 h-4 w-4" />
+                      Unpin
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onClick={() => onPin?.(message.id)}>
+                      <Pin className="mr-2 h-4 w-4" />
+                      Pin message
+                    </DropdownMenuItem>
+                  )}
+                  {isOwnMessage && (
+                    <DropdownMenuItem onClick={handleDeleteMessage} className="text-red-500 focus:text-red-500">
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete
                     </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
-          
+
           {/* Pinned indicator */}
           {isPinned && (
             <div className={`flex items-center space-x-1 mt-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>

@@ -16,12 +16,24 @@ interface TaskFiltersProps {
   onFiltersChange: (filters: TaskFiltersType) => void
   events: Array<{ id: number; title: string }>
   teamMembers: Array<{ id: number; name: string }>
+  departments?: string[]
+  eventPhases?: string[]
 }
 
-export function TaskFilters({ filters, onFiltersChange, events, teamMembers }: TaskFiltersProps) {
+export function TaskFilters({ 
+  filters, 
+  onFiltersChange, 
+  events, 
+  teamMembers,
+  departments = ['HR', 'Marketing', 'Finance', 'Operations', 'IT', 'Sales', 'Procurement', 'Logistics', 'Other'],
+  eventPhases = ['Planning', 'Pre-Event', 'Setup', 'Execution', 'Post-Event', 'Wrap-up']
+}: TaskFiltersProps) {
   const updateFilter = (key: keyof TaskFiltersType, value: any) => {
     onFiltersChange({ ...filters, [key]: value })
   }
+  
+  const isEventScope = filters.scope_type === 'event'
+  const isGeneralScope = filters.scope_type === 'general'
 
   return (
     <Card>
@@ -41,6 +53,32 @@ export function TaskFilters({ filters, onFiltersChange, events, teamMembers }: T
           </div>
 
           <div className="space-y-2">
+            <Label>Scope Type</Label>
+            <Select
+              value={filters.scope_type || 'all'}
+              onValueChange={(value) => {
+                updateFilter('scope_type', value === 'all' ? undefined : value)
+                // Reset scope-specific filters when scope changes
+                if (value === 'all' || value === 'general') {
+                  updateFilter('event_phase', undefined)
+                }
+                if (value === 'all' || value === 'event') {
+                  updateFilter('department', undefined)
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tasks</SelectItem>
+                <SelectItem value="event">Event Tasks</SelectItem>
+                <SelectItem value="general">General Tasks</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
             <Label>Status</Label>
             <Select
               value={filters.status || 'all'}
@@ -53,6 +91,7 @@ export function TaskFilters({ filters, onFiltersChange, events, teamMembers }: T
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="waiting">Waiting</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
@@ -74,6 +113,7 @@ export function TaskFilters({ filters, onFiltersChange, events, teamMembers }: T
                 <SelectItem value="medium">Medium</SelectItem>
                 <SelectItem value="high">High</SelectItem>
                 <SelectItem value="urgent">Urgent</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -117,25 +157,73 @@ export function TaskFilters({ filters, onFiltersChange, events, teamMembers }: T
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Event</Label>
-            <Select
-              value={filters.event_id || 'all'}
-              onValueChange={(value) => updateFilter('event_id', value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Events</SelectItem>
-                {events.map((event) => (
-                  <SelectItem key={event.id} value={event.id.toString()}>
-                    {event.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Event-specific filters */}
+          {(isEventScope || !filters.scope_type) && (
+            <>
+              <div className="space-y-2">
+                <Label>Event</Label>
+                <Select
+                  value={filters.event_id || 'all'}
+                  onValueChange={(value) => updateFilter('event_id', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Events</SelectItem>
+                    {events.map((event) => (
+                      <SelectItem key={event.id} value={event.id.toString()}>
+                        {event.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Event Phase</Label>
+                <Select
+                  value={filters.event_phase || 'all'}
+                  onValueChange={(value) => updateFilter('event_phase', value === 'all' ? undefined : value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Phases</SelectItem>
+                    {eventPhases.map((phase) => (
+                      <SelectItem key={phase} value={phase}>
+                        {phase}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
+
+          {/* General task-specific filters */}
+          {(isGeneralScope || !filters.scope_type) && (
+            <div className="space-y-2">
+              <Label>Department</Label>
+              <Select
+                value={filters.department || 'all'}
+                onValueChange={(value) => updateFilter('department', value === 'all' ? undefined : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Task Category</Label>
@@ -192,6 +280,8 @@ export function TaskFilters({ filters, onFiltersChange, events, teamMembers }: T
                 <SelectItem value="none">None</SelectItem>
                 <SelectItem value="assigned_user">Assigned User</SelectItem>
                 <SelectItem value="event">Event</SelectItem>
+                <SelectItem value="department">Department</SelectItem>
+                <SelectItem value="scope_type">Scope Type</SelectItem>
                 <SelectItem value="task_category">Task Category</SelectItem>
                 <SelectItem value="priority">Priority</SelectItem>
               </SelectContent>

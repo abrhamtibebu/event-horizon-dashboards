@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { format, parseISO, isPast, isToday, addDays } from 'date-fns'
-import { Calendar, User, Flag, AlertCircle, Clock } from 'lucide-react'
+import { Calendar, User, Flag, AlertCircle, Clock, Briefcase, Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface TaskCardProps {
@@ -56,14 +56,36 @@ export function TaskCard({ task, onClick, onStatusChange, isSelected, onSelect, 
     }
   }
 
+  // Determine scope type
+  const scopeType = task.scope_type || (task.type === 'event_task' || task.type === 'usher_task' ? 'event' : 'general')
+  const isEventTask = scopeType === 'event'
+  const isGeneralTask = scopeType === 'general'
+
+  const getScopeBadge = () => {
+    if (isEventTask) {
+      return {
+        label: 'Event Task',
+        color: 'bg-orange-50 dark:bg-orange-950/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+        icon: Calendar
+      }
+    } else {
+      return {
+        label: 'General Task',
+        color: 'bg-slate-50 dark:bg-slate-900/50 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+        icon: Briefcase
+      }
+    }
+  }
+
   const getTypeBadge = (type: string) => {
     switch (type) {
       case 'event_task':
-        return { label: 'Event', color: 'bg-info/10 text-info' }
+        return { label: 'Event', color: 'bg-orange-50 dark:bg-orange-950/20 text-orange-700 dark:text-orange-300' }
       case 'usher_task':
-        return { label: 'Usher', color: 'bg-primary/10 text-primary' }
+        return { label: 'Usher', color: 'bg-orange-50 dark:bg-orange-950/20 text-orange-700 dark:text-orange-300' }
       case 'operational_task':
-        return { label: 'Operational', color: 'bg-warning/10 text-warning' }
+      case 'general_task':
+        return { label: 'General', color: 'bg-slate-50 dark:bg-slate-900/50 text-slate-700 dark:text-slate-300' }
       default:
         return { label: 'Task', color: 'bg-muted text-muted-foreground' }
     }
@@ -79,13 +101,17 @@ export function TaskCard({ task, onClick, onStatusChange, isSelected, onSelect, 
   }
 
   const typeBadge = getTypeBadge(task.type)
+  const scopeBadge = getScopeBadge()
+  const ScopeIcon = scopeBadge.icon
 
   return (
     <div
       className={cn(
-        'group relative bg-card border border-border rounded-lg p-3 cursor-pointer transition-all hover:shadow-md hover:border-primary/50',
+        'group relative bg-card border rounded-lg p-3 cursor-pointer transition-all hover:shadow-md',
         isSelected && 'ring-2 ring-primary ring-offset-2',
-        isOverdue && 'border-error/50 bg-error/5'
+        isOverdue && 'border-error/50 bg-error/5',
+        isEventTask && 'border-l-4 border-l-orange-500 hover:border-orange-600',
+        isGeneralTask && 'border-l-4 border-l-slate-400 hover:border-slate-500'
       )}
       onClick={onClick}
     >
@@ -109,10 +135,17 @@ export function TaskCard({ task, onClick, onStatusChange, isSelected, onSelect, 
         </div>
       )}
 
-      {/* Task Type - Prominently displayed at top */}
-      <div className="mb-2">
-        <Badge variant="outline" className={cn('text-xs font-medium', typeBadge.color)}>
-          {typeBadge.label} Task
+      {/* Scope Type Badge - Prominently displayed at top */}
+      <div className="mb-2 flex items-center gap-2">
+        <Badge 
+          variant="outline" 
+          className={cn(
+            'text-xs font-semibold px-2.5 py-0.5 flex items-center gap-1.5 border-2',
+            scopeBadge.color
+          )}
+        >
+          <ScopeIcon className="w-3 h-3" />
+          {scopeBadge.label}
         </Badge>
       </div>
 
@@ -129,17 +162,27 @@ export function TaskCard({ task, onClick, onStatusChange, isSelected, onSelect, 
         </div>
       </div>
 
-      {/* Event Information - Always displayed */}
+      {/* Event/Department Information - Always displayed */}
       <div className="mb-2">
-        {task.event ? (
-          <div className="flex items-center gap-1.5 text-xs text-foreground bg-muted/30 rounded px-2 py-1">
-            <Calendar className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+        {isEventTask && task.event ? (
+          <div className="flex items-center gap-1.5 text-xs text-foreground bg-orange-50 dark:bg-orange-950/20 rounded px-2 py-1 border border-orange-200 dark:border-orange-800">
+            <Calendar className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
             <span className="truncate font-medium">{task.event.title}</span>
+            {task.event_phase && (
+              <Badge variant="outline" className="ml-auto text-[10px] px-1.5 py-0 border-orange-300 dark:border-orange-700 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">
+                {task.event_phase}
+              </Badge>
+            )}
           </div>
-        ) : task.type === 'operational_task' ? (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/30 rounded px-2 py-1">
-            <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>Operational Task (No Event)</span>
+        ) : isGeneralTask && task.department ? (
+          <div className="flex items-center gap-1.5 text-xs text-foreground bg-slate-50 dark:bg-slate-900/50 rounded px-2 py-1 border border-slate-200 dark:border-slate-700">
+            <Building2 className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400 flex-shrink-0" />
+            <span className="truncate font-medium">{task.department}</span>
+            {task.task_category && (
+              <Badge variant="outline" className="ml-auto text-[10px] px-1.5 py-0 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                {task.task_category.replace(/_/g, ' ')}
+              </Badge>
+            )}
           </div>
         ) : null}
       </div>
@@ -194,6 +237,7 @@ export function TaskCard({ task, onClick, onStatusChange, isSelected, onSelect, 
               <SelectContent>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="waiting">Waiting</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
@@ -206,9 +250,9 @@ export function TaskCard({ task, onClick, onStatusChange, isSelected, onSelect, 
         )}
         <Badge className={cn('text-xs', getPriorityColor(task.priority))}>
           <Flag className="w-3 h-3 mr-1" />
-          {task.priority}
+          {task.priority === 'critical' ? 'Critical' : task.priority}
         </Badge>
-        {task.task_category && (
+        {task.task_category && !isGeneralTask && (
           <Badge variant="outline" className="text-xs bg-muted/50 text-muted-foreground">
             {task.task_category.replace(/_/g, ' ')}
           </Badge>

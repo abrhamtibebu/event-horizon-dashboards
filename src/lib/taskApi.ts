@@ -1,4 +1,5 @@
 import { api } from './api';
+import { TaskTemplate, TaskAutomationRule } from '@/types/tasks';
 
 export interface Task {
   id: number;
@@ -9,7 +10,7 @@ export interface Task {
   title: string;
   description?: string;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  priority: 'low' | 'medium' | 'high' | 'urgent' | 'critical';
   type: 'deliverable' | 'milestone' | 'review' | 'payment' | 'other';
   task_category?: 'vendor_recruitment' | 'sponsor_followup' | 'sponsor_listing' | 'event_setup' | 'post_event' | 'other' | null;
   due_date?: string;
@@ -22,7 +23,7 @@ export interface Task {
   created_at: string;
   updated_at: string;
   deleted_at?: string;
-  
+
   // Relations
   event?: {
     id: number;
@@ -69,7 +70,7 @@ export interface TaskFormData {
   title: string;
   description?: string;
   status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  priority?: 'low' | 'medium' | 'high' | 'urgent' | 'critical';
   type?: 'deliverable' | 'milestone' | 'review' | 'payment' | 'other';
   task_category?: 'vendor_recruitment' | 'sponsor_followup' | 'sponsor_listing' | 'event_setup' | 'post_event' | 'other' | null;
   due_date?: string;
@@ -143,7 +144,7 @@ class TaskApiService {
 
   async getTasks(filters: TaskFilters = {}): Promise<{ data: Task[]; meta: any }> {
     const params = new URLSearchParams();
-    
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         params.append(key, value.toString());
@@ -195,15 +196,147 @@ class TaskApiService {
 
   async getTaskStatistics(filters: { event_id?: number } = {}): Promise<TaskStatistics> {
     const params = new URLSearchParams();
-    
+
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.append(key, value.toString());
+      }
+    });
+
+    try {
+      const response = await api.get(`${this.baseUrl}/statistics?${params.toString()}`);
+      return response.data.data;
+    } catch (error) {
+      console.warn('Task statistics API unavailable, using offline data:', error);
+      return this.getTaskStatisticsOffline(filters);
+    }
+  }
+
+  // Task Conversion
+  async convertTask(taskId: number, targetEventId: number, eventPhase?: string): Promise<Task> {
+    try {
+      const response = await api.post(`${this.baseUrl}/${taskId}/convert`, {
+        event_id: targetEventId,
+        event_phase: eventPhase
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error converting task:', error);
+      throw error;
+    }
+  }
+
+  // Multi-Event Linking
+  async linkTaskToEvents(taskId: number, eventIds: number[]): Promise<Task> {
+    try {
+      const response = await api.post(`${this.baseUrl}/${taskId}/link-events`, {
+        event_ids: eventIds
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error('Error linking task to events:', error);
+      throw error;
+    }
+  }
+
+  // Task Templates
+  async getTemplates(category?: 'event' | 'general' | 'department'): Promise<TaskTemplate[]> {
+    try {
+      const params = category ? `?category=${category}` : '';
+      const response = await api.get(`${this.baseUrl}/templates${params}`);
+      return response.data.data || [];
+    } catch (error) {
+      console.warn('Templates API unavailable, returning empty array:', error);
+      return [];
+    }
+  }
+
+  async createTemplate(templateData: Omit<TaskTemplate, 'id' | 'created_at' | 'updated_at' | 'created_by'>): Promise<TaskTemplate> {
+    try {
+      const response = await api.post(`${this.baseUrl}/templates`, templateData);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error creating template:', error);
+      throw error;
+    }
+  }
+
+  async applyTemplate(templateId: number, eventId?: number, customizations?: Record<string, any>): Promise<Task[]> {
+    try {
+      const response = await api.post(`${this.baseUrl}/templates/${templateId}/apply`, {
+        event_id: eventId,
+        customizations
+      });
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error applying template:', error);
+      throw error;
+    }
+  }
+
+  // Automation Rules
+  async getAutomationRules(): Promise<TaskAutomationRule[]> {
+    try {
+      const response = await api.get(`${this.baseUrl}/automation-rules`);
+      return response.data.data || [];
+    } catch (error) {
+      console.warn('Automation rules API unavailable, returning empty array:', error);
+      return [];
+    }
+  }
+
+  async createAutomationRule(ruleData: Omit<TaskAutomationRule, 'id' | 'created_at' | 'updated_at' | 'created_by'>): Promise<TaskAutomationRule> {
+    try {
+      const response = await api.post(`${this.baseUrl}/automation-rules`, ruleData);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error creating automation rule:', error);
+      throw error;
+    }
+  }
+
+  async updateAutomationRule(ruleId: number, ruleData: Partial<TaskAutomationRule>): Promise<TaskAutomationRule> {
+    try {
+      const response = await api.put(`${this.baseUrl}/automation-rules/${ruleId}`, ruleData);
+      return response.data.data;
+    } catch (error) {
+      console.error('Error updating automation rule:', error);
+      throw error;
+    }
+  }
+
+  async deleteAutomationRule(ruleId: number): Promise<void> {
+    try {
+      await api.delete(`${this.baseUrl}/automation-rules/${ruleId}`);
+    } catch (error) {
+      console.error('Error deleting automation rule:', error);
+      throw error;
+    }
+  }
+
+  // Enhanced Statistics
+  async getEnhancedStatistics(filters: {
+    event_id?: number;
+    scope_type?: 'event' | 'general';
+    department?: string;
+    start_date?: string;
+    end_date?: string;
+  } = {}): Promise<TaskStatistics> {
+    const params = new URLSearchParams();
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         params.append(key, value.toString());
       }
     });
 
-    const response = await api.get(`${this.baseUrl}/statistics?${params.toString()}`);
-    return response.data.data;
+    try {
+      const response = await api.get(`${this.baseUrl}/statistics/enhanced?${params.toString()}`);
+      return response.data.data;
+    } catch (error) {
+      console.warn('Enhanced statistics API unavailable, using basic statistics:', error);
+      return this.getTaskStatistics(filters);
+    }
   }
 
   // Mock data for offline functionality
@@ -361,7 +494,7 @@ class TaskApiService {
     filteredTasks.sort((a, b) => {
       const aValue = a[sortBy as keyof Task];
       const bValue = b[sortBy as keyof Task];
-      
+
       if (sortOrder === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {

@@ -3,30 +3,60 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Modern Scrollbar Styles */
-.modern-scrollbar {
+/* Global Modern Scrollbar Styles - Theme Aware */
+* {
   scrollbar-width: thin;
-  scrollbar-color: hsl(var(--muted)) transparent;
+  scrollbar-color: hsl(var(--primary) / 0.3) transparent;
 }
 
-.modern-scrollbar::-webkit-scrollbar {
-  width: 8px;
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
 }
 
-.modern-scrollbar::-webkit-scrollbar-track {
+*::-webkit-scrollbar-track {
   background: transparent;
+  border-radius: 10px;
 }
 
-.modern-scrollbar::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted));
-  border-radius: 4px;
-  border: 1px solid transparent;
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.3);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.5);
   background-clip: padding-box;
 }
 
-.modern-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
+*::-webkit-scrollbar-thumb:active {
+  background: hsl(var(--primary) / 0.7);
   background-clip: padding-box;
+}
+
+/* Dark mode adjustments */
+.dark * {
+  scrollbar-color: hsl(var(--primary) / 0.4) transparent;
+}
+
+.dark *::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.4);
+}
+
+.dark *::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.6);
+}
+
+.dark *::-webkit-scrollbar-thumb:active {
+  background: hsl(var(--primary) / 0.8);
+}
+
+/* Horizontal scrollbar corner */
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Dark Mode Dropdown Styles */
@@ -82,20 +112,30 @@
 @layer base {
   :root {
     /* Brand semantic tokens (HSL only) */
-    --color-primary: 5 85% 55%; /* Evella Orange #ff6f3c */
-    --color-primary-hover: 5 85% 45%; /* Darkened Evella Orange #e55a2b */
-    --color-warning: 25 95% 60%; /* Bright Orange for warnings #ff8c42 */
-    --color-minion: 15 90% 65%; /* Bright Orange variation #ff9f5a */
-    --color-success: 134 28% 72%; /* Eton Blue #a4cea4 */
-    --color-info: 195 67% 29%; /* Blue Sapphire #19647e */
-    --color-error: 0 61% 56%; /* Red #d34b4b */
-    --color-rich-black: 200 100% 2%; /* Rich Black #040707 */
+    --color-primary: 22 90% 50%;
+    /* Modern Vibrant Orange */
+    --color-primary-hover: 22 90% 40%;
+    /* Deeper Orange for hover */
+    --color-warning: 35 95% 55%;
+    /* Golden Orange for warnings */
+    --color-minion: 42 100% 62%;
+    /* Saffron/Amber variation */
+    --color-success: 142.1 76.2% 36.3%;
+    /* Emerald Green for success */
+    --color-info: 25 85% 45%;
+    /* Rust Orange for info */
+    --color-error: 0 84% 60%;
+    /* Modern Rose/Red */
+    --color-rich-black: 222 47% 11%;
+    /* Deep Navy Base */
     --color-eton-blue: var(--color-success);
     --color-blue-sapphire: var(--color-info);
 
     /* Base & text */
-    --background: 0 0% 100%; /* White */
-    --foreground: 200 100% 2%; /* Rich Black #040707 */
+    --background: 0 0% 100%;
+    /* White */
+    --foreground: 200 100% 2%;
+    /* Rich Black #040707 */
 
     /* Surfaces / borders */
     --card: 0 0% 100%;
@@ -122,7 +162,8 @@
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: var(--color-warning); /* focus ring uses Safety Yellow */
+    --ring: var(--color-warning);
+    /* focus ring uses Safety Yellow */
 
     --radius: 0.5rem;
 
@@ -137,23 +178,34 @@
     --sidebar-ring: var(--ring);
 
     /* Chart colors for light theme */
-    --chart-1: 195 67% 29%; /* Blue Sapphire */
-    --chart-2: 134 28% 72%; /* Eton Blue */
-    --chart-3: 5 85% 55%; /* Evella Orange */
-    --chart-4: 25 90% 60%; /* Orange variation */
-    --chart-5: 0 61% 56%; /* Red */
-    --chart-line: 194 67% 29%; /* Line chart color #18637b */
-    --chart-grid: 214.3 31.8% 91.4%; /* Border color for grids */
-    --chart-axis: 215.4 16.3% 46.9%; /* Muted foreground for axes */
+    --chart-1: 199 89% 48%;
+    /* Azure Blue */
+    --chart-2: 142 45% 44%;
+    /* Emerald Green */
+    --chart-3: 22 90% 50%;
+    /* Vibrant Orange */
+    --chart-4: 35 95% 55%;
+    /* Golden Orange */
+    --chart-5: 0 84% 60%;
+    /* Rose Red */
+    --chart-line: 194 67% 29%;
+    /* Line chart color #18637b */
+    --chart-grid: 214.3 31.8% 91.4%;
+    /* Border color for grids */
+    --chart-axis: 215.4 16.3% 46.9%;
+    /* Muted foreground for axes */
   }
 
   .dark {
     /* Base Colors - Deep Navy base for modern dark mode */
-    --background: 222 44% 10%; /* ~ #0f1729 */
-    --foreground: 210 40% 98%; /* off-white */
+    --background: 222 44% 10%;
+    /* ~ #0f1729 */
+    --foreground: 210 40% 98%;
+    /* off-white */
 
     /* Surfaces */
-    --card: 221 26% 19%; /* ~ #242c3f */
+    --card: 221 26% 19%;
+    /* ~ #242c3f */
     --card-foreground: var(--foreground);
     --popover: 221 26% 19%;
     --popover-foreground: var(--foreground);
@@ -190,14 +242,22 @@
     --sidebar-ring: var(--ring);
 
     /* Chart colors for dark theme - brighter for visibility */
-    --chart-1: 195 67% 45%; /* Brighter Blue Sapphire */
-    --chart-2: 134 28% 65%; /* Brighter Eton Blue */
-    --chart-3: 5 85% 60%; /* Brighter Evella Orange */
-    --chart-4: 25 90% 65%; /* Brighter Orange variation */
-    --chart-5: 0 61% 65%; /* Brighter Red */
-    --chart-line: 132 29% 65%; /* Line chart color #8dbf98 for dark mode */
-    --chart-grid: 221 26% 18%; /* Border color for grids */
-    --chart-axis: 215 16% 70%; /* Muted foreground for axes */
+    --chart-1: 195 67% 45%;
+    /* Brighter Blue Sapphire */
+    --chart-2: 134 28% 65%;
+    /* Brighter Eton Blue */
+    --chart-3: 5 85% 60%;
+    /* Brighter Evella Orange */
+    --chart-4: 25 90% 65%;
+    /* Brighter Orange variation */
+    --chart-5: 0 61% 65%;
+    /* Brighter Red */
+    --chart-line: 132 29% 65%;
+    /* Line chart color #8dbf98 for dark mode */
+    --chart-grid: 221 26% 18%;
+    /* Border color for grids */
+    --chart-axis: 215 16% 70%;
+    /* Muted foreground for axes */
   }
 }
 
@@ -209,8 +269,8 @@
   body {
     @apply bg-background text-foreground;
     /* Smooth theme transitions */
-    transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
-                color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+      color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   /* Smooth transitions for theme-dependent elements */
@@ -228,8 +288,8 @@
   nav,
   main {
     transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-                border-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-                color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      border-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+      color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   /* Disable transitions during theme change animation to avoid conflicts */
@@ -238,11 +298,17 @@
   }
 }
 
-  /* Custom animations for the sign-in page and registration forms */
+/* Custom animations for the sign-in page and registration forms */
 @layer utilities {
+
   /* Brand gradient utilities */
-  .bg-brand-gradient { @apply bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--color-warning))]; }
-  .bg-brand-gradient-hover { @apply hover:from-[hsl(var(--color-primary-hover))] hover:to-[hsl(var(--color-warning))]; }
+  .bg-brand-gradient {
+    @apply bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--color-warning))];
+  }
+
+  .bg-brand-gradient-hover {
+    @apply hover:from-[hsl(var(--color-primary-hover))] hover:to-[hsl(var(--color-warning))];
+  }
 
   .animate-fade-in {
     animation: fadeIn 0.8s ease-out forwards;
@@ -273,6 +339,7 @@
       opacity: 0;
       transform: translateY(20px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -284,6 +351,7 @@
       opacity: 0;
       transform: scale(0.95);
     }
+
     to {
       opacity: 1;
       transform: scale(1);
@@ -295,6 +363,7 @@
       opacity: 0;
       transform: translateY(40px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -306,6 +375,7 @@
       opacity: 0;
       transform: translateX(-30px);
     }
+
     to {
       opacity: 1;
       transform: translateX(0);
@@ -313,9 +383,12 @@
   }
 
   @keyframes float {
-    0%, 100% {
+
+    0%,
+    100% {
       transform: translateY(0px);
     }
+
     50% {
       transform: translateY(-10px);
     }
@@ -325,6 +398,7 @@
     from {
       box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
     }
+
     to {
       box-shadow: 0 0 30px hsl(var(--primary) / 0.6);
     }
@@ -628,9 +702,12 @@
   }
 
   @keyframes badgePulse {
-    0%, 100% {
+
+    0%,
+    100% {
       opacity: 1;
     }
+
     50% {
       opacity: 0.8;
     }
@@ -726,12 +803,15 @@
 
   /* Hide scrollbar utility */
   .scrollbar-hide {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
   }
 
   .scrollbar-hide::-webkit-scrollbar {
-    display: none;  /* Chrome, Safari and Opera */
+    display: none;
+    /* Chrome, Safari and Opera */
   }
 
   /* Extra small screen breakpoint utility */
@@ -739,6 +819,7 @@
     .xs\:block {
       display: block;
     }
+
     .xs\:hidden {
       display: none;
     }

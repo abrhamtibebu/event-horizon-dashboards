@@ -89,18 +89,18 @@ export default function AddOrganizer() {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto p-0 animate-fade-in relative">
         {/* Breadcrumbs */}
         <div className="px-8 pt-6 pb-2">
-          <Breadcrumbs 
+          <Breadcrumbs
             items={[
               { label: 'Organizers', href: '/dashboard/organizers' },
               { label: 'Add Organizer' }
             ]}
           />
         </div>
-        
+
         {/* Header */}
         <div className="flex items-center justify-between px-8 pt-2 pb-2 border-b">
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-2 rounded-xl">
+            <div className="bg-brand-gradient p-2 rounded-xl">
               <Building2 className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -124,7 +124,7 @@ export default function AddOrganizer() {
           {/* Vendor Information */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <Building2 className="w-5 h-5 text-blue-500" />
+              <Building2 className="w-5 h-5 text-primary" />
               <h3 className="font-semibold text-lg text-gray-900">
                 Vendor Information
               </h3>
@@ -234,7 +234,7 @@ export default function AddOrganizer() {
                     className="hidden"
                   />
                   <label htmlFor="logo" className="inline-block">
-                    <span className="inline-block px-4 py-2 bg-blue-50 text-blue-700 font-medium rounded cursor-pointer border border-blue-200 hover:bg-blue-100 transition">
+                    <span className="inline-block px-4 py-2 bg-primary/10 text-primary font-medium rounded cursor-pointer border border-primary/20 hover:bg-primary/20 transition">
                       Choose File
                     </span>
                   </label>
@@ -279,7 +279,7 @@ export default function AddOrganizer() {
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold px-6 py-2 rounded-lg shadow"
+              className="bg-brand-gradient bg-brand-gradient-hover text-white font-semibold px-6 py-2 rounded-lg shadow"
             >
               {isSubmitting ? (
                 <span className="flex items-center">

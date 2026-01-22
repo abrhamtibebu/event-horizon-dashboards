@@ -47,7 +47,7 @@ export const useWebSocketMessages = ({
         })
         const messages = Array.isArray(response.data.data) ? response.data.data : []
         // Sort by created_at ascending
-        return messages.sort((a: Message, b: Message) => 
+        return messages.sort((a: Message, b: Message) =>
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         )
       } else if (convId.startsWith('event_')) {
@@ -57,7 +57,7 @@ export const useWebSocketMessages = ({
         })
         const messages = Array.isArray(response.data.data) ? response.data.data : []
         // Sort by created_at ascending
-        return messages.sort((a: Message, b: Message) => 
+        return messages.sort((a: Message, b: Message) =>
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         )
       }
@@ -98,10 +98,10 @@ export const useWebSocketMessages = ({
       try {
         // Load conversations list
         const convResponse = await api.get('/messages/conversations')
-        const convs = Array.isArray(convResponse.data) 
-          ? convResponse.data 
-          : Array.isArray(convResponse.data?.data) 
-            ? convResponse.data.data 
+        const convs = Array.isArray(convResponse.data)
+          ? convResponse.data
+          : Array.isArray(convResponse.data?.data)
+            ? convResponse.data.data
             : []
 
         // Store conversations
@@ -137,11 +137,11 @@ export const useWebSocketMessages = ({
       // Add message to store (avoid duplicates)
       const existingMessages = messageStore.get(convId) || []
       const messageExists = existingMessages.some(m => m.id === message.id)
-      
+
       if (!messageExists) {
         const updatedMessages = [...existingMessages, message]
         // Sort by created_at ascending
-        updatedMessages.sort((a, b) => 
+        updatedMessages.sort((a, b) =>
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         )
         messageStore.set(convId, updatedMessages)
@@ -233,11 +233,11 @@ export const useWebSocketMessages = ({
   const markAsRead = useCallback(async (convId: string) => {
     try {
       if (convId.startsWith('direct_')) {
-        const userId = convId.replace('direct_', '')
-        await api.post(`/messages/direct/${userId}/read`)
+        const otherUserId = convId.replace('direct_', '')
+        await api.post('/messages/conversation/read', { other_user_id: otherUserId })
       } else if (convId.startsWith('event_')) {
         const eventId = convId.replace('event_', '')
-        await api.post(`/events/${eventId}/messages/read`)
+        await api.post('/messages/conversation/read', { event_id: eventId })
       }
 
       // Update local state

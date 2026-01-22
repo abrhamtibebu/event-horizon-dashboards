@@ -39,38 +39,38 @@ export function ConfirmationDialog({
     switch (variant) {
       case 'danger':
         return {
-          icon: <Trash2 className="h-6 w-6 text-red-600" />,
+          icon: <Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" />,
           confirmButton: 'bg-red-600 hover:bg-red-700 text-white',
-          iconBg: 'bg-red-50',
-          borderColor: 'border-red-200',
+          iconBg: 'bg-red-50 dark:bg-red-950/20',
+          borderColor: 'border-red-200 dark:border-red-800',
         };
       case 'warning':
         return {
-          icon: <AlertTriangle className="h-6 w-6 text-yellow-600" />,
-          confirmButton: 'bg-yellow-600 hover:bg-yellow-700 text-white',
-          iconBg: 'bg-yellow-50',
-          borderColor: 'border-yellow-200',
+          icon: <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />,
+          confirmButton: 'bg-amber-600 hover:bg-amber-700 text-white',
+          iconBg: 'bg-amber-50 dark:bg-amber-950/20',
+          borderColor: 'border-amber-200 dark:border-amber-800',
         };
       case 'info':
         return {
-          icon: <Info className="h-6 w-6 text-blue-600" />,
+          icon: <Info className="h-6 w-6 text-blue-600 dark:text-blue-400" />,
           confirmButton: 'bg-blue-600 hover:bg-blue-700 text-white',
-          iconBg: 'bg-blue-50',
-          borderColor: 'border-blue-200',
+          iconBg: 'bg-blue-50 dark:bg-blue-950/20',
+          borderColor: 'border-blue-200 dark:border-blue-800',
         };
       case 'success':
         return {
-          icon: <CheckCircle className="h-6 w-6 text-green-600" />,
+          icon: <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />,
           confirmButton: 'bg-green-600 hover:bg-green-700 text-white',
-          iconBg: 'bg-green-50',
-          borderColor: 'border-green-200',
+          iconBg: 'bg-green-50 dark:bg-green-950/20',
+          borderColor: 'border-green-200 dark:border-green-800',
         };
       default:
         return {
-          icon: <AlertCircle className="h-6 w-6 text-gray-600" />,
-          confirmButton: 'bg-gray-600 hover:bg-gray-700 text-white',
-          iconBg: 'bg-gray-50',
-          borderColor: 'border-gray-200',
+          icon: <AlertCircle className="h-6 w-6 text-muted-foreground" />,
+          confirmButton: 'bg-primary hover:bg-primary/90 text-primary-foreground',
+          iconBg: 'bg-muted',
+          borderColor: 'border-border',
         };
     }
   };
@@ -81,21 +81,21 @@ export function ConfirmationDialog({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader className="text-center">
+        <DialogHeader className="text-center pb-4 border-b border-border/50">
           <div className={`mx-auto flex h-12 w-12 items-center justify-center rounded-full ${styles.iconBg} ${styles.borderColor} border-2 mb-4`}>
             {displayIcon}
           </div>
-          <DialogTitle className="text-xl font-semibold text-gray-900">
+          <DialogTitle className="text-xl font-semibold">
             {title}
           </DialogTitle>
           {description && (
-            <DialogDescription className="text-gray-600 mt-2">
+            <DialogDescription className="text-sm text-muted-foreground mt-2">
               {description}
             </DialogDescription>
           )}
         </DialogHeader>
         
-        <DialogFooter className="flex-col sm:flex-row gap-3 mt-6">
+        <DialogFooter className="flex-col sm:flex-row gap-3 pt-6 border-t border-border/50">
           <Button
             variant="outline"
             onClick={onClose}

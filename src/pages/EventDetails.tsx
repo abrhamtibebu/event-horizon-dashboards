@@ -3,6 +3,7 @@ import { useParams, Link, Navigate, useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import {
   Calendar,
+  CalendarDays,
   Users,
   MapPin,
   Clock,
@@ -30,6 +31,7 @@ import {
   Shield,
   Award,
   Tag,
+  Info,
   X,
   Pencil,
   Trash2,
@@ -52,6 +54,11 @@ import {
   Palette,
   RotateCcw,
   MoreVertical,
+  Ticket,
+  PartyPopper,
+  CheckCircle2,
+  FileEdit,
+  Layers,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -162,49 +169,49 @@ export default function EventDetails() {
   // Function to get color coding for tasks based on task type
   const getTaskColor = (task: string) => {
     const taskLower = task.toLowerCase().trim()
-    
+
     // Check-in related tasks
     if (taskLower.includes('check-in') || taskLower.includes('checkin') || taskLower.includes('registration')) {
       return 'bg-info/10 dark:bg-info/20 text-info dark:text-info border-info/30'
     }
-    
+
     // Security related tasks
     if (taskLower.includes('security') || taskLower.includes('guard') || taskLower.includes('safety')) {
       return 'bg-error/10 dark:bg-error/20 text-error dark:text-error border-error/30'
     }
-    
+
     // Guest assistance tasks
     if (taskLower.includes('guest') || taskLower.includes('assistance') || taskLower.includes('help') || taskLower.includes('support')) {
       return 'bg-success/10 dark:bg-success/20 text-success dark:text-success border-success/30'
     }
-    
+
     // Crowd control tasks
     if (taskLower.includes('crowd') || taskLower.includes('control') || taskLower.includes('manage')) {
       return 'bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary border-primary/30'
     }
-    
+
     // Communication tasks
     if (taskLower.includes('communication') || taskLower.includes('announcement') || taskLower.includes('coordination')) {
       return 'bg-warning/10 dark:bg-warning/20 text-warning dark:text-warning border-warning/30'
     }
-    
+
     // Technical tasks
     if (taskLower.includes('technical') || taskLower.includes('equipment') || taskLower.includes('setup') || taskLower.includes('audio') || taskLower.includes('video')) {
       return 'bg-info/10 dark:bg-info/20 text-info dark:text-info border-info/30'
     }
-    
+
     // Emergency tasks
     if (taskLower.includes('emergency') || taskLower.includes('first aid') || taskLower.includes('medical')) {
       return 'bg-error/10 dark:bg-error/20 text-error dark:text-error border-error/30'
     }
-    
+
     // Default color for other tasks
     return 'bg-muted text-muted-foreground border-border'
   }
   const [searchTerm, setSearchTerm] = useState('')
   const [guestTypeFilter, setGuestTypeFilter] = useState('all')
   const [checkedInFilter, setCheckedInFilter] = useState('all')
-  
+
   // Pagination hook for attendees
   const {
     currentPage,
@@ -217,10 +224,10 @@ export default function EventDetails() {
     handlePerPageChange,
     resetPagination
   } = usePagination({ defaultPerPage: 15, searchParamPrefix: 'attendees' });
-  
+
   // Modern alerts system
   const { confirmAction } = useModernAlerts();
-  
+
   const [isAssignUsherDialogOpen, setIsAssignUsherDialogOpen] = useState(false)
   const [isNewConversationDialogOpen, setIsNewConversationDialogOpen] =
     useState(false)
@@ -277,9 +284,12 @@ export default function EventDetails() {
   const [badgeTemplateLoading, setBadgeTemplateLoading] = useState(false)
 
   const { user } = useAuth()
-  const { checkPermission } = usePermissionCheck()
-  // Check if user is admin or organizer (not usher)
-  const isAdminOrOrganizer = user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin'
+  const { hasPermission, hasRole } = usePermissionCheck()
+
+  // Check if user has management permissions
+  const canManageEvent = hasPermission('events.manage')
+  const canDeleteEvent = hasPermission('events.manage') // Or more specific if needed
+  const isAdminOrOrganizer = canManageEvent
   const [isUsherAssigned, setIsUsherAssigned] = useState(false)
 
   const [addAttendeeDialogOpen, setAddAttendeeDialogOpen] = useState(false)
@@ -314,7 +324,7 @@ export default function EventDetails() {
   const [shareAnalytics, setShareAnalytics] = useState<any>(null)
   const [shareAnalyticsLoading, setShareAnalyticsLoading] = useState(false)
   const [shareAnalyticsError, setShareAnalyticsError] = useState<string | null>(null)
-  
+
   // Session guests state
   const [selectedSession, setSelectedSession] = useState<any>(null)
   const [sessionGuests, setSessionGuests] = useState<any[]>([])
@@ -386,18 +396,19 @@ export default function EventDetails() {
     api
       .get(`/events/${Number(eventId)}`)
       .then((res) => {
-        const eventData = res.data
+        const data = res.data
+        // Decode HTML entities in names
+        if (data.name) data.name = data.name.replace(/&amp;/g, '&')
+        if (data.organizer?.name) data.organizer.name = data.organizer.name.replace(/&amp;/g, '&')
+
         console.log('Event data fetched:', {
-          id: eventData.id,
-          name: eventData.name,
-          event_type: eventData.event_type,
-          guestTypes: eventData.guestTypes,
-          ticketTypes: eventData.ticketTypes,
-          guestTypesLength: eventData.guestTypes?.length,
-          ticketTypesLength: eventData.ticketTypes?.length
+          id: data.id,
+          name: data.name,
+          event_type: data.event_type,
+          guestTypes: data.guestTypes,
+          ticketTypes: data.ticketTypes,
         })
-        console.log('Full event data:', eventData)
-        setEventData(eventData)
+        setEventData(data)
       })
       .catch((err) => setEventError('Failed to fetch event details.'))
       .finally(() => setEventLoading(false))
@@ -408,33 +419,33 @@ export default function EventDetails() {
     if (!eventId) return
     setAttendeesLoading(true)
     setAttendeesError(null)
-    
+
     // Build query parameters for filtering
     const params = new URLSearchParams();
-    
+
     // Only add pagination params for admin and organizer
     if (isAdminOrOrganizer) {
       params.append('page', currentPage.toString());
       params.append('per_page', perPage.toString());
     }
-    
+
     if (searchTerm) {
       params.append('search', searchTerm);
     }
-    
+
     if (guestTypeFilter !== 'all') {
       params.append('guest_type', guestTypeFilter);
     }
-    
+
     if (checkedInFilter !== 'all') {
       params.append('checked_in', checkedInFilter === 'checked-in' ? 'true' : 'false');
     }
-    
+
     api
       .get(`/events/${Number(eventId)}/attendees?${params.toString()}`)
       .then((res) => {
         console.log('Attendees response:', res.data)
-        
+
         // Handle paginated response (only for admin/organizer)
         if (isAdminOrOrganizer && res.data.data) {
           setAttendees(res.data.data)
@@ -447,7 +458,7 @@ export default function EventDetails() {
           setTotalPages(1)
           setTotalRecords(attendeesData.length || 0)
         }
-        
+
         // Log first attendee structure for debugging
         const attendeesData = res.data.data || res.data || []
         if (attendeesData.length > 0) {
@@ -473,13 +484,13 @@ export default function EventDetails() {
   // Set guest types and ticket types from event data
   useEffect(() => {
     if (!eventData) return
-    
+
     console.log('Setting types from event data:', {
       event_type: eventData.event_type,
       guestTypes: eventData.guestTypes,
       ticketTypes: eventData.ticketTypes
     })
-    
+
     if (eventData.event_type === 'ticketed') {
       // Use ticket types from event data
       const ticketTypesData = Array.isArray(eventData.ticketTypes) ? eventData.ticketTypes : []
@@ -534,12 +545,12 @@ export default function EventDetails() {
   useEffect(() => {
     if (!eventId || activeTab !== 'analytics') return
     setSessionCheckInLoading(true)
-    
+
     // First fetch all sessions for the event
     api.get(`/events/${Number(eventId)}/sessions`)
       .then(async (sessionsRes) => {
         const sessions = sessionsRes.data.data || []
-        
+
         // Fetch attendance data for each session
         const sessionCheckInPromises = sessions.map(async (session: any) => {
           try {
@@ -547,7 +558,7 @@ export default function EventDetails() {
             const attendances = attendanceRes.data.data || []
             const checkedInCount = attendances.filter((att: any) => att.checked_in).length
             const totalAttendances = attendances.length
-            
+
             return {
               session_id: session.session_id,
               session_name: session.session_name,
@@ -576,7 +587,7 @@ export default function EventDetails() {
             }
           }
         })
-        
+
         const sessionData = await Promise.all(sessionCheckInPromises)
         setSessionCheckInData(sessionData)
       })
@@ -725,7 +736,7 @@ export default function EventDetails() {
       .finally(() => setTeamLoading(false))
   }, [user?.organizer_id])
 
- 
+
 
   // Handle search and filter changes with pagination reset
   const handleSearchChange = (value: string) => {
@@ -768,7 +779,7 @@ export default function EventDetails() {
           guestTypeName = String(guestType);
         }
       }
-      
+
       return {
         'Attendee ID': attendee.id,
         'Name': attendee.guest?.name || 'N/A',
@@ -779,7 +790,7 @@ export default function EventDetails() {
         'Gender': attendee.guest?.gender || 'N/A',
         'Country': attendee.guest?.country || 'N/A',
         'Guest Type': guestTypeName,
-        'Registration Date': attendee.created_at 
+        'Registration Date': attendee.created_at
           ? format(parseISO(attendee.created_at), 'MMM d, yyyy, h:mm a')
           : 'N/A',
         'Checked In': attendee.checked_in ? 'Yes' : 'No',
@@ -851,12 +862,12 @@ export default function EventDetails() {
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [400, 400] });
         for (let i = 0; i < badgeElements.length; i++) {
           const el = badgeElements[i] as HTMLElement;
-          const canvas = await html2canvas(el, { 
-          scale: 1.5,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#ffffff'
-        });
+          const canvas = await html2canvas(el, {
+            scale: 1.5,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff'
+          });
           const imgData = canvas.toDataURL('image/jpeg', 0.9); // JPEG for smaller file size
           if (i > 0) pdf.addPage([400, 400], 'portrait');
           pdf.addImage(imgData, 'JPEG', 0, 0, 400, 400);
@@ -918,10 +929,10 @@ export default function EventDetails() {
     // Prefer real event guest types for a valid sample
     const typeNames: string[] = Array.isArray(guestTypes)
       ? guestTypes.map((gt: any) =>
-          typeof gt === 'object' && gt !== null
-            ? String(gt.name ?? gt.title ?? '').trim()
-            : String(gt ?? '').trim()
-        ).filter((n: string) => !!n)
+        typeof gt === 'object' && gt !== null
+          ? String(gt.name ?? gt.title ?? '').trim()
+          : String(gt ?? '').trim()
+      ).filter((n: string) => !!n)
       : []
     const t1 = typeNames[0] || 'Regular'
     const t2 = typeNames[1] || t1 || 'VIP'
@@ -972,7 +983,7 @@ export default function EventDetails() {
       skipEmptyLines: true,
       complete: async (results) => {
         console.log('CSV parsing results:', results)
-        
+
         // Check if we have any data
         if (!results.data || results.data.length === 0) {
           toast.error('CSV file is empty or contains no valid data.')
@@ -999,7 +1010,7 @@ export default function EventDetails() {
         const guestTypeMap = new Map(
           guestTypes.map((gt) => [gt.name.toLowerCase(), gt.id])
         )
-        
+
         console.log('Available guest types:', guestTypes)
         console.log('Guest type map:', guestTypeMap)
 
@@ -1007,9 +1018,9 @@ export default function EventDetails() {
           // Normalize the guest_type_name to lowercase for matching
           const guestTypeName = row.guest_type_name?.toLowerCase()
           const guestTypeId = guestTypeMap.get(guestTypeName)
-          
+
           console.log(`Row ${index + 1}: guest_type_name="${row.guest_type_name}" -> guestTypeId=${guestTypeId}`)
-          
+
           return {
             name: row.name?.trim(),
             email: row.email?.trim(),
@@ -1089,7 +1100,7 @@ export default function EventDetails() {
     const regEndDate = eventData.registration_end_date ? new Date(eventData.registration_end_date) : new Date()
     setEditEventRange([{ startDate, endDate, key: 'selection' }])
     setEditRegRange([{ startDate: regStartDate, endDate: regEndDate, key: 'selection' }])
-    
+
     // Handle guest_types properly - extract names from objects if they are objects
     let guestTypes: string[] = []
     if (Array.isArray(eventData.guest_types)) {
@@ -1109,7 +1120,7 @@ export default function EventDetails() {
       // Handle comma-separated string
       guestTypes = eventData.guest_types.split(',').map((s: string) => s.trim()).filter(Boolean)
     }
-    
+
     setEditForm({
       ...eventDataForEdit,
       guest_types: guestTypes,
@@ -1129,15 +1140,15 @@ export default function EventDetails() {
     setSelectedSession(session)
     setSessionGuestsDialogOpen(true)
     setSessionGuestsLoading(true)
-    
+
     try {
       // Fetch session attendees (checked-in guests)
       const response = await api.get(`/sessions/${session.session_id}/attendances`)
       const attendances = response.data.data || []
-      
+
       // Filter only checked-in attendees
       const checkedInAttendances = attendances.filter((attendance: any) => attendance.checked_in)
-      
+
       // Extract guest information
       const guests = checkedInAttendances.map((attendance: any) => ({
         id: attendance.attendee?.id,
@@ -1152,7 +1163,7 @@ export default function EventDetails() {
         check_in_time: attendance.check_in_time,
         session_name: session.session_name
       }))
-      
+
       setSessionGuests(guests)
     } catch (error) {
       console.error('Error fetching session guests:', error)
@@ -1192,7 +1203,7 @@ export default function EventDetails() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    
+
     toast.success('Session guests exported successfully')
   }
 
@@ -1344,7 +1355,7 @@ export default function EventDetails() {
               return status < 500; // Don't throw on client errors
             }
           })
-          
+
           if (response.status === 201 || response.status === 200) {
             const newAttendee = response.data
             createdParticipants.push(newAttendee)
@@ -1437,7 +1448,7 @@ export default function EventDetails() {
         // This is an attendee (has guest property)
         await api.delete(`/events/${Number(eventId)}/attendees/${removeMember.id}`)
         toast.success('Attendee removed from event!')
-        
+
         // Refresh attendees list
         const res = await api.get(`/events/${Number(eventId)}/attendees`)
         setAttendees(res.data || [])
@@ -1446,7 +1457,7 @@ export default function EventDetails() {
         if (removeMember.is_primary_contact) {
           // Count primary contacts for this organizer
           const primaryContactCount = teamMembers.filter((m: any) => m.is_primary_contact).length
-          
+
           if (primaryContactCount <= 1) {
             toast.error('Cannot remove the only primary contact. Please assign another primary contact first.')
             setRemoveDialogOpen(false)
@@ -1454,7 +1465,7 @@ export default function EventDetails() {
             setRemoveLoading(false)
             return
           }
-          
+
           // Show confirmation for removing primary contact
           const confirmed = await confirmAction(
             'Remove Primary Contact',
@@ -1465,7 +1476,7 @@ export default function EventDetails() {
               // Continue with removal logic
             }
           );
-          
+
           if (!confirmed) {
             setRemoveDialogOpen(false)
             setRemoveMember(null)
@@ -1473,22 +1484,22 @@ export default function EventDetails() {
             return
           }
         }
-        
+
         await api.delete(
           `/organizers/${user.organizer_id}/contacts/${removeMember.id}`
         )
         toast.success(removeMember.is_primary_contact ? 'Primary contact removed!' : 'Team member removed!')
-        
+
         // Refresh team list
         const res = await api.get(`/organizers/${user.organizer_id}/contacts`)
         setTeamMembers(res.data)
       }
-      
+
       setRemoveDialogOpen(false)
       setRemoveMember(null)
     } catch (err: any) {
-      const errorMessage = removeMember.guest 
-        ? 'Failed to remove attendee' 
+      const errorMessage = removeMember.guest
+        ? 'Failed to remove attendee'
         : 'Failed to remove team member'
       toast.error(err.response?.data?.error || errorMessage)
     } finally {
@@ -1559,14 +1570,14 @@ export default function EventDetails() {
   const handleEditAttendee = async (attendeeId: number, updatedData: any) => {
     try {
       const response = await api.put(`/events/${Number(eventId)}/attendees/${attendeeId}`, updatedData)
-      
+
       // Update the attendee in the local state
-      setAttendees(prev => prev.map(attendee => 
-        attendee.id === attendeeId 
+      setAttendees(prev => prev.map(attendee =>
+        attendee.id === attendeeId
           ? { ...attendee, ...response.data }
           : attendee
       ))
-      
+
       toast.success('Attendee updated successfully!')
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to update attendee.')
@@ -1611,7 +1622,7 @@ export default function EventDetails() {
         guest_type_id: editAttendeeForm.guest_type_id,
         ticket_type_id: editAttendeeForm.ticket_type_id,
       }
-      
+
       await handleEditAttendee(editAttendeeForm.id, updatedData)
       setEditAttendeeDialogOpen(false)
       setEditAttendeeForm(null)
@@ -1748,7 +1759,7 @@ export default function EventDetails() {
           const cleanup = () => {
             if (iframe.parentNode) document.body.removeChild(iframe);
             URL.revokeObjectURL(blobUrl);
-        setSinglePrintAttendee(null);
+            setSinglePrintAttendee(null);
             document.removeEventListener('visibilitychange', handleVisibility);
           };
           const handleVisibility = () => {
@@ -1825,7 +1836,7 @@ export default function EventDetails() {
 
   const handleStatusChange = async (newStatus: string) => {
     if (!eventId) return;
-    
+
     // Check permission for status changes (especially publish)
     if (newStatus === 'active' && !checkPermission('events.publish', 'publish events')) {
       return
@@ -1833,7 +1844,7 @@ export default function EventDetails() {
     if (!checkPermission('events.edit', 'change event status')) {
       return
     }
-    
+
     setStatusLoading(true);
     setStatusError(null);
     try {
@@ -1920,12 +1931,12 @@ export default function EventDetails() {
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [400, 400] }); // UNIFIED: Same dimensions as single badge
         for (let i = 0; i < badgeElements.length; i++) {
           const el = badgeElements[i] as HTMLElement;
-          const canvas = await html2canvas(el, { 
-          scale: 1.5,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#ffffff'
-        });
+          const canvas = await html2canvas(el, {
+            scale: 1.5,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff'
+          });
           const imgData = canvas.toDataURL('image/jpeg', 0.9); // JPEG for smaller file size
           if (i > 0) pdf.addPage([400, 400], 'portrait'); // UNIFIED: Same dimensions as single badge
           pdf.addImage(imgData, 'PNG', 0, 0, 400, 400); // UNIFIED: Same dimensions as single badge
@@ -1951,7 +1962,7 @@ export default function EventDetails() {
               document.body.removeChild(iframe);
               URL.revokeObjectURL(blobUrl);
             }, 1000);
-          setPrinting(false);
+            setPrinting(false);
           }
         };
       }
@@ -1978,7 +1989,7 @@ export default function EventDetails() {
           guestTypeName = String(guestType);
         }
       }
-      
+
       return {
         'Attendee ID': attendee.id,
         'Name': attendee.guest?.name || 'N/A',
@@ -1989,7 +2000,7 @@ export default function EventDetails() {
         'Gender': attendee.guest?.gender || 'N/A',
         'Country': attendee.guest?.country || 'N/A',
         'Guest Type': guestTypeName,
-        'Registration Date': attendee.created_at 
+        'Registration Date': attendee.created_at
           ? format(parseISO(attendee.created_at), 'MMM d, yyyy, h:mm a')
           : 'N/A',
         'Checked In': attendee.checked_in ? 'Yes' : 'No',
@@ -2055,17 +2066,17 @@ export default function EventDetails() {
           }
         `}</style>
         <div id="print-area">
-        {printing && selectedAttendees.size > 0 ? (
-          attendees
-            .filter(attendee => selectedAttendees.has(attendee.id))
-            .map(attendee => (
-              <div key={attendee.id} className="printable-badge-batch">
-                <BadgePrint attendee={attendee} />
-              </div>
-            ))
-        ) : (
-          <div>No badges selected for printing.</div>
-        )}
+          {printing && selectedAttendees.size > 0 ? (
+            attendees
+              .filter(attendee => selectedAttendees.has(attendee.id))
+              .map(attendee => (
+                <div key={attendee.id} className="printable-badge-batch">
+                  <BadgePrint attendee={attendee} />
+                </div>
+              ))
+          ) : (
+            <div>No badges selected for printing.</div>
+          )}
         </div>
       </div>
       <div className="space-y-6">
@@ -2103,1292 +2114,610 @@ export default function EventDetails() {
         ) : (
           <>
             {/* Fancy Hero Banner */}
-      <div className="relative w-full h-72 rounded-2xl overflow-hidden mb-8 shadow-lg">
-              {eventData.event_image && (
-                <img
-                  src={getImageUrl(eventData.event_image)}
-            alt={eventData.name}
-            className="object-cover w-full h-full"
-          />
-        )}
-              {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--color-rich-black))]/70 via-[hsl(var(--color-rich-black))]/40 to-transparent" />
-              {/* Event Info */}
-        <div className="absolute left-0 top-0 w-full h-full flex flex-col justify-end p-8">
-          <div className="flex items-center gap-4 mb-2">
-                  <Link
-                    to="/dashboard/events"
-                    className="text-yellow-400 hover:text-yellow-300 text-base font-semibold flex items-center gap-1 bg-card/10 dark:bg-card/20 px-3 py-1 rounded-full backdrop-blur-sm shadow"
-                  >
-              <span className="text-lg">←</span> Back to Events
-            </Link>
-          </div>
-                <h1 className="text-4xl md:text-5xl font-extrabold text-white drop-shadow-lg mb-2">{eventData.name}</h1>
-                <div className="mb-3">
-                  <Badge 
-                    variant="secondary" 
-                    className={`text-sm font-semibold px-3 py-1 ${
-                      eventData?.event_type === 'ticketed' 
-                        ? 'bg-purple-600 text-white border-purple-500' 
-                        : 'bg-green-600 text-white border-green-500'
-                    }`}
-                  >
-                    {eventData?.event_type === 'ticketed' ? '🎫 Ticketed Event' : '🎉 Free Event'}
-                  </Badge>
-                </div>
-          <div className="flex flex-wrap items-center gap-4 text-white/90 text-lg font-medium">
-            <span className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-yellow-300" />
-                    {eventData.start_date && format(parseISO(eventData.start_date), 'MMM d, yyyy, h:mm a')}
-                    {eventData.end_date && (
-                      <>
-                        <span className="mx-1">-</span>
-                        {format(parseISO(eventData.end_date), 'MMM d, yyyy, h:mm a')}
-                      </>
-                    )}
-            </span>
-            <span className="flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-pink-300" />
-                    {eventData.location}
-            </span>
-            <span className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-green-300" />
-              {attendees.length} Registered
-            </span>
-            <span className="flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-blue-200" />
-                    Organized by <span className="font-bold text-yellow-200 ml-1">{user?.organizer?.name || eventData.organizer?.name}</span>
-            </span>
-          </div>
-        </div>
-      </div>
-
-            {/* Event Image */}
-            {eventData.event_image && (
-              <div className="w-full h-64 rounded-lg overflow-hidden mb-4 bg-gradient-to-r from-[hsl(var(--primary))]/10 to-[hsl(var(--color-warning))]/10 flex items-center justify-center">
+            {/* Fancy Hero Banner */}
+            {/* Simplified Hero Header */}
+            <div className="relative w-full h-[300px] rounded-3xl overflow-hidden mb-8 shadow-lg border border-border">
+              {eventData.event_image ? (
                 <img
                   src={getImageUrl(eventData.event_image)}
                   alt={eventData.name}
-                  className="object-cover w-full h-full"
+                  className="object-cover w-full h-full transition-transform duration-700"
                 />
-      </div>
-            )}
+              ) : (
+                <div className="w-full h-full bg-muted flex items-center justify-center">
+                  <Image className="w-16 h-16 text-muted-foreground/20" />
+                </div>
+              )}
 
-            {/* Header */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
+              {/* Gradient Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+
+              {/* Event Info */}
+              <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-10">
+                <div className="flex items-center gap-3 mb-4">
                   <Link
                     to="/dashboard/events"
-                    className="text-yellow-500 hover:text-yellow-600 text-sm"
+                    className="flex items-center gap-2 px-4 py-2 bg-background/80 backdrop-blur-sm hover:bg-background rounded-xl border border-border text-foreground text-xs font-semibold transition-all"
                   >
-              
+                    <span>←</span>
+                    Back
                   </Link>
-                </div>
-                <h1 className="text-3xl font-bold text-foreground">{eventData.name}</h1>
-                <p className="text-muted-foreground mt-1">
-                  Organized by{' '}
-                  <span className="font-semibold text-info">
-                    {user?.organizer?.name || eventData.organizer?.name}
-                  </span>
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2 items-center">
-                {/* Status Change Dropdown for Organizer/Admin */}
-                {/* {(user?.role === 'admin' || user?.role === 'superadmin' || (user?.role === 'organizer' && user?.organizer_id === eventData.organizer_id)) && (
-                  <div className="flex items-center gap-2">
-                    <Select
-                      value={eventData.status}
-                      onValueChange={handleStatusChange}
-                      disabled={statusLoading}
-                    >
-                      <SelectTrigger className="w-36">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {statusOptions.map(opt => (
-                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {statusLoading && <SpinnerInline size="sm" />}
-                    {statusError && <span className="text-error text-xs ml-2">{statusError}</span>}
+                  <div className="px-4 py-2 bg-primary/10 backdrop-blur-sm rounded-xl border border-primary/20 text-primary text-[10px] font-bold uppercase tracking-wider">
+                    {eventData?.event_type === 'ticketed' ? 'Ticketed' : 'Free Event'}
                   </div>
-                )} */}
-                {user?.role !== 'usher' && (
-                  <>
-                {/* <Button variant="outline" onClick={exportCSV}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export CSV
-                </Button> */}
-                <Dialog>
-                  <DialogTrigger asChild>
-                    {/* <Button variant="outline">
-                      <QrCode className="w-4 h-4 mr-2" />
-                      Public Registration
-                </Button> */}
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle className="flex items-center gap-2">
-                        <QrCode className="w-5 h-5 text-info" />
-                        Public Registration Link
-                      </DialogTitle>
-                      <DialogDescription>
-                        Share this registration link with potential attendees. The link allows public registration for this event.
-                      </DialogDescription>
-                    </DialogHeader>
-                    {eventData?.status?.toLowerCase().trim() === 'active' && eventData?.uuid ? (
-                      <div className="space-y-6">
-                        {/* Registration Link Section */}
-                        <div className="bg-info/5 rounded-lg p-4 border border-info/30">
-                          <h3 className="text-sm font-semibold text-card-foreground mb-3 flex items-center gap-2">
-                            <ExternalLink className="w-4 h-4" />
-                            Registration Link
-                          </h3>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={`${window.location.origin}/event/register/${eventData.uuid}`}
-                              readOnly
-                              className="text-sm bg-card border-info/40 focus:border-info"
-                              onClick={e => (e.target as HTMLInputElement).select()}
-                            />
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                navigator.clipboard.writeText(`${window.location.origin}event/register/${eventData.uuid}`)
-                                toast.success('Registration link copied to clipboard!')
-                              }}
-                              variant="outline"
-                              className="bg-card hover:bg-accent border-info/40 text-info"
-                            >
-                              Copy
-                            </Button>
-                          </div>
-                        </div>
+                </div>
 
-                        {/* QR Code Section */}
-                        <div className="bg-gradient-to-r from-success/10 to-success/20 rounded-lg p-4 border border-success/30">
-                          <h3 className="text-sm font-semibold text-success dark:text-success mb-3 flex items-center gap-2">
-                            <QrCode className="w-4 h-4" />
-                            QR Code
-                          </h3>
-                          <div className="flex items-center gap-4">
-                            <div className="bg-background p-3 rounded-lg border border-success/30">
-                              <img 
-                                id="public-registration-qr"
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`} 
-                                alt="QR Code for registration" 
-                                className="w-24 h-24" 
-                              />
-                            </div>
-                            <div className="flex flex-col gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  const link = document.createElement('a')
-                                  link.href = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`
-                                  link.download = `registration-qr-${eventData.name.replace(/[^a-zA-Z0-9]/g, '-')}.png`
-                                  link.click()
-                                  toast.success('QR code downloaded!')
-                                }}
-                                className="bg-background hover:bg-success/10 border-success/50 text-success dark:text-success"
-                              >
-                                Download QR
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(`${window.location.origin}/event/register/${eventData.uuid}`)
-                                  toast.success('Link copied! Scan the QR code or share the link.')
-                                }}
-                                className="bg-background hover:bg-success/10 border-success/50 text-success dark:text-success"
-                              >
-                                Copy Link
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
+                <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4 leading-tight tracking-tight">
+                  {eventData.name?.replace(/&amp;/g, '&')}
+                </h1>
 
-                        {/* Quick Share Section */}
-                        <div className="bg-info/5 rounded-lg p-4 border border-info/30">
-                          <h3 className="text-sm font-semibold text-card-foreground mb-3 flex items-center gap-2">
-                            <Share2 className="w-4 h-4" />
-                            Quick Share
-                          </h3>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info"
-                              onClick={async () => {
-                                await trackShareAction('facebook')
-                                window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&quote=${encodeURIComponent('Register for ' + eventData.name)}`, '_blank')
-                              }}
-                            >
-                              <Facebook className="w-4 h-4 mr-1" />
-                              Facebook
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info"
-                              onClick={async () => {
-                                await trackShareAction('twitter')
-                                window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&text=${encodeURIComponent('Register for ' + eventData.name)}&hashtags=event,registration`, '_blank')
-                              }}
-                            >
-                              <Twitter className="w-4 h-4 mr-1" />
-                              Twitter
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-background hover:bg-success/10 border-success/50 text-success dark:text-success"
-                              onClick={async () => {
-                                await trackShareAction('whatsapp')
-                                window.open(`https://wa.me/?text=${encodeURIComponent('Register for ' + eventData.name + ': ' + window.location.origin + '/event/register/' + eventData.uuid)}`, '_blank')
-                              }}
-                            >
-                              <MessageCircle className="w-4 h-4 mr-1" />
-                              WhatsApp
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-background hover:bg-error/10 border-error/50 text-error dark:text-error"
-                              onClick={async () => {
-                                await trackShareAction('email')
-                                const emailBody = `Hi,\n\nYou're invited to register for: ${eventData.name}\n\nRegistration Link: ${window.location.origin}/event/register/${eventData.uuid}\n\nBest regards`
-                                window.open(`mailto:?subject=${encodeURIComponent('Registration Invitation: ' + eventData.name)}&body=${encodeURIComponent(emailBody)}`)
-                              }}
-                            >
-                              <Mail className="w-4 h-4 mr-1" />
-                              Email
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info"
-                              onClick={async () => {
-                                await trackShareAction('linkedin')
-                                window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}`, '_blank')
-                              }}
-                            >
-                              <Linkedin className="w-4 h-4 mr-1" />
-                              LinkedIn
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-background hover:bg-muted border-border text-muted-foreground"
-                              onClick={async () => {
-                                await trackShareAction('copy_text')
-                                const text = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
-                                navigator.clipboard.writeText(text)
-                                toast.success('Registration message copied to clipboard!')
-                              }}
-                            >
-                              <Copy className="w-4 h-4 mr-1" />
-                              Copy Text
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-background hover:bg-warning/10 border-warning/50 text-warning dark:text-warning"
-                              onClick={async () => {
-                                await trackShareAction('sms')
-                                const smsText = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
-                                window.open(`sms:?body=${encodeURIComponent(smsText)}`)
-                              }}
-                            >
-                              <MessageSquare className="w-4 h-4 mr-1" />
-                              SMS
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info"
-                              onClick={async () => {
-                                await trackShareAction('telegram')
-                                const telegramText = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
-                                window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + '/event/register/' + eventData.uuid)}&text=${encodeURIComponent('Register for ' + eventData.name)}`)
-                              }}
-                            >
-                              <Send className="w-4 h-4 mr-1" />
-                              Telegram
-                            </Button>
-                          </div>
-                        </div>
+                <div className="flex flex-wrap items-center gap-6 text-muted-foreground text-sm font-medium">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-primary" />
+                    <span>{eventData.start_date && format(parseISO(eventData.start_date), 'MMM d, h:mm a')}</span>
+                  </div>
 
-                        {/* Embeddable Section */}
-                        <div className="bg-gradient-to-r from-warning/10 to-primary/10 rounded-lg p-4 border border-warning/30">
-                          <h3 className="text-sm font-semibold text-warning dark:text-warning mb-3 flex items-center gap-2">
-                            <Code className="w-4 h-4" />
-                            Embed on Website
-                          </h3>
-                          <div className="space-y-3">
-                            <div>
-                              <label className="text-xs font-medium text-foreground mb-1 block">HTML Embed Code:</label>
-                              <Input
-                                value={`<iframe src='${window.location.origin}/event/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`}
-                                readOnly
-                                className="text-xs bg-background font-mono border-warning/30"
-                                onClick={e => (e.target as HTMLInputElement).select()}
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-foreground mb-1 block">Direct Link:</label>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-primary" />
+                    <span className="truncate max-w-[200px]">{eventData.location}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <span>{attendees.length} Registered</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-primary" />
+                    <span className="font-semibold">{user?.organizer?.name || eventData.organizer?.name}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+            {/* Premium Dashboard Container */}
+            {/* Simple Dashboard Container */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
+              <div className="flex flex-col gap-6 bg-card rounded-2xl p-6 border border-border shadow-sm">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                  <TabsList className="bg-transparent border-b border-border w-full justify-start p-0 h-auto gap-8 rounded-none">
+                    {user?.role === 'usher' ? (
+                      <>
+                        <TabsTrigger
+                          value="attendees"
+                          className="px-0 py-3 text-sm font-semibold transition-all border-b-2 border-transparent rounded-none bg-transparent shadow-none data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground hover:text-foreground"
+                        >
+                          Attendees
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="badges"
+                          className="px-0 py-3 text-sm font-semibold transition-all border-b-2 border-transparent rounded-none bg-transparent shadow-none data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground hover:text-foreground"
+                        >
+                          Badges
+                        </TabsTrigger>
+                      </>
+                    ) : (
+                      <div className="flex flex-wrap gap-x-6">
+                        {['Details', 'Attendees', 'Ushers', 'Badges', 'Bulk Badges', 'Team', 'Forms', 'Sessions', 'Invitations', 'Analytics'].map((tab) => {
+                          const val = tab.toLowerCase().replace(/ /g, '-');
+                          // Filter tabs based on role permissions
+                          if (val === 'bulk-badges' || val === 'forms' || val === 'ushers' || val === 'analytics' || val === 'invitations' || val === 'team') {
+                            if (!canManageEvent) return null;
+                          }
+                          return (
+                            <TabsTrigger
+                              key={val}
+                              value={val}
+                              className="px-0 py-3 text-sm font-semibold transition-all border-b-2 border-transparent rounded-none bg-transparent shadow-none data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground hover:text-foreground"
+                            >
+                              {tab}
+                            </TabsTrigger>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </TabsList>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 px-2">
+                  {canManageEvent && (
+                    <Button
+                      onClick={openEditDialog}
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-10 px-6 shadow-sm transition-all"
+                    >
+                      <Pencil className="w-3.5 h-3.5 mr-2" />
+                      Edit Event
+                    </Button>
+                  )}
+
+                  {canManageEvent && (
+                    <div className="flex items-center gap-2 bg-muted/50 rounded-xl border border-border px-1">
+                      <Select value={eventData.status} onValueChange={handleStatusChange} disabled={statusLoading}>
+                        <SelectTrigger className="w-32 bg-transparent border-0 focus:ring-0 text-foreground font-semibold h-10 text-xs uppercase tracking-wider">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-popover border-border text-popover-foreground rounded-xl">
+                          {statusOptions.map(opt => (
+                            <SelectItem key={opt.value} value={opt.value} className="focus:bg-accent focus:text-accent-foreground rounded-lg font-medium">{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <Button variant="outline" onClick={exportCSV} className="bg-background border-border text-foreground font-semibold rounded-xl h-10 px-5 hover:bg-muted transition-all">
+                    <Download className="w-3.5 h-3.5 mr-2 text-primary" />
+                    Export
+                  </Button>
+
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="bg-background border-border text-foreground font-semibold rounded-xl h-10 px-5 hover:bg-muted transition-all">
+                        <QrCode className="w-3.5 h-3.5 mr-2 text-primary" />
+                        Registration
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-xl bg-popover border-border text-popover-foreground rounded-2xl p-6 shadow-xl">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+                          <QrCode className="w-5 h-5 text-primary" />
+                          Registration Access
+                        </DialogTitle>
+                        <DialogDescription className="text-muted-foreground">
+                          Share this link to allow guests to register for your event.
+                        </DialogDescription>
+                      </DialogHeader>
+
+                      {eventData?.status?.toLowerCase().trim() === 'active' && eventData?.uuid ? (
+                        <div className="space-y-6 mt-4">
+                          <div className="bg-muted/50 rounded-xl p-4 border border-border">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Registration URL</label>
+                            <div className="flex gap-2">
                               <Input
                                 value={`${window.location.origin}/event/register/${eventData.uuid}`}
                                 readOnly
-                                className="text-xs bg-background font-mono border-warning/30"
-                                onClick={e => (e.target as HTMLInputElement).select()}
+                                className="bg-background border-border text-foreground h-10 text-sm"
+                              />
+                              <Button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(`${window.location.origin}/event/register/${eventData.uuid}`);
+                                  toast.success('URL Copied');
+                                }}
+                                className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg px-4"
+                              >
+                                Copy
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-6 bg-muted/30 rounded-xl p-4 border border-border">
+                            <div className="bg-white p-2 rounded-lg shrink-0">
+                              <img
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=0&color=000&bgcolor=fff`}
+                                className="w-24 h-24"
+                                alt="Access QR"
                               />
                             </div>
-                            <div className="flex gap-2">
+                            <div className="space-y-2">
+                              <h4 className="font-semibold text-base">QR Access</h4>
+                              <p className="text-muted-foreground text-xs">Scan to quickly access the registration page.</p>
                               <Button
+                                variant="link"
                                 size="sm"
-                                variant="outline"
-                                onClick={async () => {
-                                  await trackShareAction('embed')
-                                  const embedCode = `<iframe src='${window.location.origin}/event/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`
-                                  navigator.clipboard.writeText(embedCode)
-                                  toast.success('Embed code copied to clipboard!')
+                                onClick={() => {
+                                  const link = document.createElement('a');
+                                  link.href = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=10&color=000&bgcolor=fff`;
+                                  link.download = `qr-${eventData.uuid}.png`;
+                                  link.click();
                                 }}
-                                className="bg-background hover:bg-warning/10 border-warning/50 text-warning dark:text-warning"
+                                className="h-auto p-0 text-primary font-bold"
                               >
-                                Copy Embed Code
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={async () => {
-                                  await trackShareAction('link')
-                                  const link = `${window.location.origin}/event/register/${eventData.uuid}`
-                                  navigator.clipboard.writeText(link)
-                                  toast.success('Direct link copied to clipboard!')
-                                }}
-                                className="bg-background hover:bg-warning/10 border-warning/50 text-warning dark:text-warning"
-                              >
-                                Copy Direct Link
+                                Download Asset
                               </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              💡 <strong>Tip:</strong> Copy the HTML code and paste it into your website to embed the registration form directly.
-                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-4 gap-3">
+                            {[
+                              { icon: Facebook, label: 'FB', platform: 'facebook' },
+                              { icon: Twitter, label: 'X', platform: 'twitter' },
+                              { icon: MessageCircle, label: 'WA', platform: 'whatsapp' },
+                              { icon: Mail, label: 'Email', platform: 'email' }
+                            ].map((s) => (
+                              <Button
+                                key={s.label}
+                                variant="outline"
+                                onClick={async () => {
+                                  await trackShare(eventData.uuid, s.platform as any);
+                                  toast.info(`Sharing via ${s.platform}`);
+                                }}
+                                className="flex flex-col gap-1.5 h-16 bg-background border-border hover:bg-muted"
+                              >
+                                <s.icon className="w-4 h-4" />
+                                <span className="text-[10px] font-bold">{s.label}</span>
+                              </Button>
+                            ))}
                           </div>
                         </div>
+                      ) : (
+                        <div className="py-12 text-center space-y-3">
+                          <XCircle className="w-12 h-12 text-muted-foreground mx-auto" />
+                          <h3 className="text-lg font-bold">Registration Inactive</h3>
+                          <p className="text-muted-foreground text-sm">Publish your event to enable registrations.</p>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
 
-
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <XCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-foreground mb-2">Event Not Active</h3>
-                        <p className="text-sm text-muted-foreground mb-4">The event must be active to share the public registration link.</p>
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            // Close dialog and navigate to edit event
-                            // You can implement this based on your needs
-                          }}
-                        >
-                          Activate Event
+                  {canManageEvent && (
+                    <UsherAssignmentDialog
+                      open={isAssignUsherDialogOpen}
+                      onOpenChange={setIsAssignUsherDialogOpen}
+                      eventId={eventData.id}
+                      eventName={eventData?.name || ''}
+                      trigger={
+                        <Button variant="outline" className="bg-background border-border text-foreground font-semibold rounded-xl h-10 px-5 hover:bg-muted transition-all">
+                          <UserPlus className="w-3.5 h-3.5 mr-2 text-primary" />
+                          Ushers
                         </Button>
-                      </div>
-                    )}
-                  </DialogContent>
-                </Dialog>
-                {/* <Button variant="outline" onClick={generateReport}>
-                  <BarChart3 className="w-4 h-4 mr-2" />
-                  Generate Report
-                </Button> */}
-                  </>
-                )}
-                {user?.role === 'usher' && (
-                <Button
-                    variant="outline"
-                    onClick={() => setActiveTab('attendees')}
-                    className="bg-gradient-to-r from-green-600 to-blue-600 text-white hover:from-green-700 hover:to-blue-700"
-                >
-                    <UserCheck className="w-4 h-4 mr-2" />
-                    Manage Attendees
-                </Button>
-                )}
-                {/* Event Delete/Trash Actions */}
-                {(user?.role === 'admin' || ((user?.role === 'organizer' || user?.role === 'organizer_admin') && eventData.organizer_id === user.organizer_id)) && (
-                  <div className="flex gap-2 mt-2">
-                    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                      <AlertDialogTrigger asChild>
-                        {/* <Button variant="destructive">Move to Trash</Button> */}
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Move Event to Trash</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to move this event to trash? You can restore it later from the Trash page.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleDeleteEvent} disabled={deleteLoading} className="bg-error text-error-foreground">
-                            {deleteLoading ? 'Deleting...' : 'Move to Trash'}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                    {user?.role === 'admin' && (
-                      <AlertDialog open={forceDeleteDialogOpen} onOpenChange={setForceDeleteDialogOpen}>
+                      }
+                    />
+                  )}
+
+                  {canManageEvent && (
+                    <div className="ml-auto">
+                      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                         <AlertDialogTrigger asChild>
-                          <Button variant="destructive">Delete Permanently</Button>
+                          <Button variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10 font-semibold rounded-xl h-10 px-5 transition-all">
+                            <Trash2 className="w-3.5 h-3.5 mr-2" />
+                            Delete Event
+                          </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent>
+                        <AlertDialogContent className="bg-popover border-border text-popover-foreground rounded-2xl p-6">
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Permanently Delete Event</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This action cannot be undone. Are you sure you want to permanently delete this event?
+                            <AlertDialogTitle className="text-xl font-bold">Move to Trash</AlertDialogTitle>
+                            <AlertDialogDescription className="text-muted-foreground">
+                              Moving <span className="text-foreground font-bold">{eventData.name}</span> to trash. You can restore it later from your profile/dashboard.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleForceDeleteEvent} disabled={deleteLoading} className="bg-error text-error-foreground hover:bg-error/90">
-                              {deleteLoading ? 'Deleting...' : 'Delete Permanently'}
+                          <AlertDialogFooter className="mt-6">
+                            <AlertDialogCancel className="bg-background border-border text-foreground hover:bg-muted rounded-lg h-10 px-6">Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDeleteEvent} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-lg h-10 px-6 font-bold">
+                              Delete
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+                    </div>
+                  )}
+                </div>
 
-            {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList>
-              {user?.role === 'usher' ? (
-                <>
-                  <TabsTrigger
-                    value="attendees"
-                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'attendees' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
-                    `}
-                  >
-                    Attendees
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="badges"
-                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'badges' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
-                    `}
-                  >
-                    Badges
-                  </TabsTrigger>
-                </>
-              ) : (
-                <>
-                  <TabsTrigger
-                    value="details"
-                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'details' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
-                    `}
-                  >
-                    Details
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="badges"
-                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'badges' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
-                    `}
-                  >
-                    Badges
-                  </TabsTrigger>
-                  {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin') && (
-                    <TabsTrigger
-                      value="bulk-badges"
-                      className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                        ${activeTab === 'bulk-badges' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
-                      `}
-                    >
-                      Bulk Badges
-                    </TabsTrigger>
-                  )}
-                  <TabsTrigger
-                    value="attendees"
-                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'attendees' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
-                    `}
-                  >
-                    Attendees
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="ushers"
-                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'ushers' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
-                    `}
-                  >
-                    Ushers & Tasks
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="team"
-                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'team' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
-                    `}
-                  >
-                    Team
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="analytics"
-                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'analytics' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
-                    `}
-                  >
-                    Analytics
-                  </TabsTrigger>
-                  {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin') && (
-                    <TabsTrigger
-                      value="forms"
-                      className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                        ${activeTab === 'forms' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
-                      `}
-                    >
-                      <FileText className="w-4 h-4 mr-1 inline" />
-                      Forms
-                    </TabsTrigger>
-                  )}
-                  <TabsTrigger
-                    value="sessions"
-                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'sessions' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
-                    `}
-                  >
-                    Sessions
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="invitations"
-                    className={`px-4 py-2 text-base font-medium transition-all duration-150 border-b-2 border-transparent rounded-none bg-transparent shadow-none
-                      ${activeTab === 'invitations' ? 'border-primary text-primary dark:text-primary-foreground font-semibold' : 'text-muted-foreground hover:text-primary hover:border-primary/50'}
-                    `}
-                  >
-                    <Share2 className="w-4 h-4 mr-1 inline" />
-                    Invitations
-                  </TabsTrigger>
-                </>
-              )}
-          </TabsList>
-            <TabsContent value="details">
-              <div className="space-y-8">
-                {/* Actions Row - moved to top right */}
-                <div className="flex flex-wrap gap-4 mb-8 justify-end">
-                  {(user?.role === 'admin' || user?.role === 'superadmin' || ((user?.role === 'organizer' || user?.role === 'organizer_admin') && (user?.organizer_id === (eventData as any)?.organizer_id || user?.organizer_id === (eventData as any)?.organizer?.id))) && (
-                    <>
-                      <ProtectedButton
-                        permission="events.edit"
-                        onClick={openEditDialog}
-                        className="bg-brand-gradient text-foreground dark:text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200"
-                        actionName="edit events"
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit Event
-                      </ProtectedButton>
-                      <div className="flex items-center gap-2">
-                        <Select
-                          value={eventData.status}
-                          onValueChange={handleStatusChange}
-                          disabled={statusLoading}
-                        >
-                          <SelectTrigger className="w-36">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statusOptions.map(opt => (
-                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {statusLoading && <SpinnerInline size="sm" />}
-                        {statusError && <span className="text-error dark:text-error text-xs ml-2">{statusError}</span>}
+                <TabsContent value="details" className="mt-0 outline-none">
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                    {/* Simple Overview Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Event Type Card */}
+                      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm group hover:border-primary/20 transition-all">
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className={`p-3 rounded-xl bg-primary/10 text-primary`}>
+                            {eventData?.event_type === 'ticketed' ? <Ticket className="w-6 h-6" /> : <PartyPopper className="w-6 h-6" />}
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Architecture</p>
+                            <p className={`text-lg font-bold text-foreground`}>
+                              {eventData?.event_type === 'ticketed' ? 'Ticketed' : 'Free'}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {eventData?.event_type === 'ticketed' ? `${ticketTypes.length} Tiers` : `${guestTypes.length} Categories`}
+                        </p>
                       </div>
-                    </>
-                  )}
-                  {(user?.role === 'admin' || user?.role === 'superadmin') && (
-                    <Button 
-                      onClick={openEditDialog}
-                      className="bg-brand-gradient text-foreground dark:text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200"
-                    >
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit Event
-                    </Button>
-                  )}
-                  {user?.role !== 'usher' && (
-                    <>
-                      <Button variant="outline" onClick={exportCSV}>
-                        <Download className="w-4 h-4 mr-2" />
-                        Export CSV
-                      </Button>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline">
-                            <QrCode className="w-4 h-4 mr-2" />
-                            Public Registration
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                              <QrCode className="w-5 h-5 text-primary" />
-                              Public Registration Link
-                            </DialogTitle>
-                            <DialogDescription className="text-sm">
-                              Share this registration link with potential attendees. The link allows public registration for this event.
-                            </DialogDescription>
-                          </DialogHeader>
-                          {eventData?.status?.toLowerCase().trim() === 'active' && eventData?.uuid ? (
-                            <div className="space-y-4 sm:space-y-6">
-                              {/* Registration Link Section */}
-                              <div className="bg-gradient-to-r from-info/10 to-primary/10 rounded-lg p-3 sm:p-4 border border-info/30">
-                                <h3 className="text-sm font-semibold text-info dark:text-info mb-3 flex items-center gap-2">
-                                  <ExternalLink className="w-4 h-4" />
-                                  Registration Link
-                                </h3>
-                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                  <Input
-                                    value={`${window.location.origin}/event/register/${eventData.uuid}`}
-                                    readOnly
-                                    className="text-xs sm:text-sm bg-background border-info/50 focus:border-primary flex-1"
-                                    onClick={e => (e.target as HTMLInputElement).select()}
-                                  />
-                                  <Button
-                                    size="sm"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(`${window.location.origin}/event/register/${eventData.uuid}`)
-                                      toast.success('Registration link copied to clipboard!')
-                                    }}
-                                    variant="outline"
-                                    className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info whitespace-nowrap"
-                                  >
-                                    Copy
-                                  </Button>
+
+                      {/* Status Card */}
+                      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm group hover:border-primary/20 transition-all">
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className={`p-3 rounded-xl ${eventData?.status === 'active' ? 'bg-emerald-500/10 text-emerald-500' :
+                            eventData?.status === 'draft' ? 'bg-amber-500/10 text-amber-500' :
+                              'bg-destructive/10 text-destructive'
+                            }`}>
+                            {eventData?.status === 'active' ? <CheckCircle2 className="w-6 h-6" /> :
+                              eventData?.status === 'draft' ? <FileEdit className="w-6 h-6" /> :
+                                <XCircle className="w-6 h-6" />}
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Lifecycle</p>
+                            <p className="text-lg font-bold text-foreground capitalize">{eventData?.status || 'Active'}</p>
+                          </div>
+                        </div>
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {eventData?.status === 'active' ? 'Public' : 'Internal'}
+                        </p>
+                      </div>
+
+                      {/* Registration Card */}
+                      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm group hover:border-primary/20 transition-all">
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className={`p-3 rounded-xl bg-primary/10 text-primary`}>
+                            <Users className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Engagements</p>
+                            <p className="text-lg font-bold text-foreground">
+                              {attendees.length} Registered
+                            </p>
+                          </div>
+                        </div>
+                        <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-primary h-full transition-all duration-500"
+                            style={{ width: eventData?.max_guests ? `${Math.min((attendees.length / eventData.max_guests) * 100, 100)}%` : '100%' }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Capacity Card */}
+                      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm group hover:border-primary/20 transition-all">
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className={`p-3 rounded-xl bg-primary/10 text-primary`}>
+                            <Layers className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Capacity</p>
+                            <p className="text-lg font-bold text-foreground">
+                              {eventData?.max_guests ? `${eventData.max_guests}` : 'Unlimited'}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {eventData?.max_guests
+                            ? `${Math.max(eventData.max_guests - attendees.length, 0)} Left`
+                            : 'Stable'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Event Details Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      {/* Main Event Information */}
+                      <div className="lg:col-span-2 space-y-6">
+                        {/* Event Description */}
+                        <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                              <FileText className="w-5 h-5" />
+                            </div>
+                            <h3 className="text-xl font-bold text-foreground">Event Description</h3>
+                          </div>
+                          <div className="prose prose-gray max-w-none">
+                            <p className="text-foreground leading-relaxed whitespace-pre-line">
+                              {eventData?.description || 'No description provided for this event.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Event Type Details */}
+                        <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 rounded-full bg-primary/20 text-primary dark:text-primary flex items-center justify-center">
+                              {eventData?.event_type === 'ticketed' ? '🎫' : '🎉'}
+                            </div>
+                            <h3 className="text-xl font-bold text-foreground">
+                              {eventData?.event_type === 'ticketed' ? 'Ticket Information' : 'Guest Type Information'}
+                            </h3>
+                          </div>
+
+                          {eventData?.event_type === 'ticketed' ? (
+                            <div className="space-y-4">
+                              {ticketTypes.length > 0 ? (
+                                ticketTypes.map((ticket: any, index: number) => {
+                                  const ticketName = ticket?.name || 'Unknown Ticket';
+                                  const ticketPrice = ticket?.price ? parseFloat(ticket.price).toLocaleString() : '0';
+                                  const ticketQuantity = ticket?.quantity || 'Unlimited';
+                                  const ticketDescription = ticket?.description || '';
+
+                                  return (
+                                    <div key={index} className="bg-gradient-to-r from-primary/10 to-warning/10 border border-primary/30 rounded-xl p-6">
+                                      <div className="flex items-start justify-between mb-3">
+                                        <div>
+                                          <h4 className="font-bold text-primary dark:text-primary text-lg">{ticketName}</h4>
+                                          {ticketDescription && (
+                                            <p className="text-primary/80 dark:text-primary/70 text-sm mt-1">{ticketDescription}</p>
+                                          )}
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-2xl font-bold text-primary dark:text-primary">ETB {ticketPrice}</div>
+                                          <div className="text-sm text-primary/80 dark:text-primary/70">
+                                            {ticketQuantity === 'Unlimited' ? 'Unlimited' : `${ticketQuantity} available`}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2 text-xs text-primary/80 dark:text-primary/70">
+                                        <span>🎫</span>
+                                        <span>Ticket Type</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                <div className="text-center py-8 text-muted-foreground">
+                                  <div className="text-4xl mb-2">🎫</div>
+                                  <p>No ticket types defined for this event</p>
                                 </div>
-                              </div>
-
-                              {/* QR Code Section */}
-                              <div className="bg-gradient-to-r from-success/10 to-success/20 rounded-lg p-3 sm:p-4 border border-success/30">
-                                <h3 className="text-sm font-semibold text-success dark:text-success mb-3 flex items-center gap-2">
-                                  <QrCode className="w-4 h-4" />
-                                  QR Code
-                                </h3>
-                                <div className="flex flex-col sm:flex-row items-center gap-4">
-                                  <div className="bg-background p-2 sm:p-3 rounded-lg border border-success/50">
-                                    <img 
-                                      id="public-registration-qr"
-                                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`} 
-                                      alt="QR Code for registration" 
-                                      className="w-20 h-20 sm:w-24 sm:h-24" 
-                                    />
-                                  </div>
-                                  <div className="flex flex-row sm:flex-col gap-2 w-full sm:w-auto">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => {
-                                        const link = document.createElement('a')
-                                        link.href = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`
-                                        link.download = `registration-qr-${eventData.name.replace(/[^a-zA-Z0-9]/g, '-')}.png`
-                                        link.click()
-                                        toast.success('QR code downloaded!')
-                                      }}
-                                      className="bg-background hover:bg-success/10 border-success/50 text-success dark:text-success flex-1 sm:flex-none"
-                                    >
-                                      Download QR
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(`${window.location.origin}/event/register/${eventData.uuid}`)
-                                        toast.success('Link copied! Scan the QR code or share the link.')
-                                      }}
-                                      className="bg-background hover:bg-success/10 border-success/50 text-success dark:text-success flex-1 sm:flex-none"
-                                    >
-                                      Copy Link
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Quick Share Section */}
-                              <div className="bg-gradient-to-r from-primary/10 to-warning/10 rounded-lg p-3 sm:p-4 border border-primary/30">
-                                <h3 className="text-sm font-semibold text-primary dark:text-primary mb-3 flex items-center gap-2">
-                                  <Share2 className="w-4 h-4" />
-                                  Quick Share
-                                </h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info text-xs sm:text-sm"
-                                    onClick={async () => {
-                                      await trackShareAction('facebook')
-                                      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&quote=${encodeURIComponent('Register for ' + eventData.name)}`, '_blank')
-                                    }}
-                                  >
-                                    <Facebook className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                    <span className="hidden sm:inline">Facebook</span>
-                                    <span className="sm:hidden">FB</span>
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info text-xs sm:text-sm"
-                                    onClick={async () => {
-                                      await trackShareAction('twitter')
-                                      window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&text=${encodeURIComponent('Register for ' + eventData.name)}&hashtags=event,registration`, '_blank')
-                                    }}
-                                  >
-                                    <Twitter className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                    <span className="hidden sm:inline">Twitter</span>
-                                    <span className="sm:hidden">X</span>
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="bg-background hover:bg-success/10 border-success/50 text-success dark:text-success text-xs sm:text-sm"
-                                    onClick={async () => {
-                                      await trackShareAction('whatsapp')
-                                      window.open(`https://wa.me/?text=${encodeURIComponent('Register for ' + eventData.name + ': ' + window.location.origin + '/event/register/' + eventData.uuid)}`, '_blank')
-                                    }}
-                                  >
-                                    <MessageCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                    <span className="hidden sm:inline">WhatsApp</span>
-                                    <span className="sm:hidden">WA</span>
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="bg-background hover:bg-error/10 border-error/50 text-error dark:text-error text-xs sm:text-sm"
-                                    onClick={async () => {
-                                      await trackShareAction('email')
-                                      const emailBody = `Hi,\n\nYou're invited to register for: ${eventData.name}\n\nRegistration Link: ${window.location.origin}/event/register/${eventData.uuid}\n\nBest regards`
-                                      window.open(`mailto:?subject=${encodeURIComponent('Registration Invitation: ' + eventData.name)}&body=${encodeURIComponent(emailBody)}`)
-                                    }}
-                                  >
-                                    <Mail className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                    <span className="hidden sm:inline">Email</span>
-                                    <span className="sm:hidden">Mail</span>
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="bg-background hover:bg-info/10 border-info/50 text-info dark:text-info text-xs sm:text-sm"
-                                    onClick={async () => {
-                                      await trackShareAction('linkedin')
-                                      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}`, '_blank')
-                                    }}
-                                  >
-                                    <Linkedin className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                    <span className="hidden sm:inline">LinkedIn</span>
-                                    <span className="sm:hidden">LI</span>
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="bg-white hover:bg-pink-50 border-pink-300 text-pink-700 text-xs sm:text-sm"
-                                    onClick={async () => {
-                                      await trackShareAction('copy_text')
-                                      const text = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
-                                      navigator.clipboard.writeText(text)
-                                      toast.success('Registration message copied to clipboard!')
-                                    }}
-                                  >
-                                    <Copy className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                    <span className="hidden sm:inline">Copy Text</span>
-                                    <span className="sm:hidden">Copy</span>
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700 text-xs sm:text-sm"
-                                    onClick={async () => {
-                                      await trackShareAction('sms')
-                                      const smsText = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
-                                      window.open(`sms:?body=${encodeURIComponent(smsText)}`)
-                                    }}
-                                  >
-                                    <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                    <span className="hidden sm:inline">SMS</span>
-                                    <span className="sm:hidden">SMS</span>
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="bg-white hover:bg-teal-50 border-teal-300 text-teal-700 text-xs sm:text-sm"
-                                    onClick={async () => {
-                                      await trackShareAction('telegram')
-                                      const telegramText = `Register for ${eventData.name}: ${window.location.origin}/event/register/${eventData.uuid}`
-                                      window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.origin + '/event/register/' + eventData.uuid)}&text=${encodeURIComponent('Register for ' + eventData.name)}`)
-                                    }}
-                                  >
-                                    <Send className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                    <span className="hidden sm:inline">Telegram</span>
-                                    <span className="sm:hidden">TG</span>
-                                  </Button>
-                                </div>
-                              </div>
-
-                              {/* Embeddable Section */}
-                              <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-3 sm:p-4 border border-orange-200">
-                                <h3 className="text-sm font-semibold text-orange-900 mb-3 flex items-center gap-2">
-                                  <Code className="w-4 h-4" />
-                                  Embed on Website
-                                </h3>
-                                <div className="space-y-3">
-                                  <div>
-                                    <label className="text-xs font-medium text-orange-800 mb-1 block">HTML Embed Code:</label>
-                                    <Input
-                                      value={`<iframe src='${window.location.origin}/event/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`}
-                                      readOnly
-                                      className="text-xs bg-white font-mono border-orange-300"
-                                      onClick={e => (e.target as HTMLInputElement).select()}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-xs font-medium text-orange-800 mb-1 block">Direct Link:</label>
-                                    <Input
-                                      value={`${window.location.origin}/event/register/${eventData.uuid}`}
-                                      readOnly
-                                      className="text-xs bg-white font-mono border-orange-300"
-                                      onClick={e => (e.target as HTMLInputElement).select()}
-                                    />
-                                  </div>
-                                  <div className="flex flex-col sm:flex-row gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={async () => {
-                                        await trackShareAction('embed')
-                                        const embedCode = `<iframe src='${window.location.origin}/event/register/${eventData.uuid}' width='100%' height='600' style='border:none; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);'></iframe>`
-                                        navigator.clipboard.writeText(embedCode)
-                                        toast.success('Embed code copied to clipboard!')
-                                      }}
-                                      className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700 flex-1 sm:flex-none"
-                                    >
-                                      Copy Embed Code
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={async () => {
-                                        await trackShareAction('link')
-                                        const link = `${window.location.origin}/event/register/${eventData.uuid}`
-                                        navigator.clipboard.writeText(link)
-                                        toast.success('Direct link copied to clipboard!')
-                                      }}
-                                      className="bg-white hover:bg-orange-50 border-orange-300 text-orange-700 flex-1 sm:flex-none"
-                                    >
-                                      Copy Direct Link
-                                    </Button>
-                                  </div>
-                                  <p className="text-xs text-orange-700">
-                                    💡 <strong>Tip:</strong> Copy the HTML code and paste it into your website to embed the registration form directly.
-                                  </p>
-                                </div>
-                              </div>
-
-
+                              )}
                             </div>
                           ) : (
-                            <div className="text-center py-6 sm:py-8">
-                              <XCircle className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
-                              <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">Event Not Active</h3>
-                              <p className="text-sm text-gray-500 mb-4">The event must be active to share the public registration link.</p>
-                              <Button
-                                variant="outline"
-                                onClick={() => {
-                                  // Close dialog and navigate to edit event
-                                  // You can implement this based on your needs
-                                }}
-                              >
-                                Activate Event
-                              </Button>
-                            </div>
-                          )}
-                        </DialogContent>
-                      </Dialog>
-                      {/* <Button variant="outline" onClick={generateReport}>
-                        <BarChart3 className="w-4 h-4 mr-2" />
-                        Generate Report
-                      </Button> */}
-                      <UsherAssignmentDialog
-                        open={isAssignUsherDialogOpen}
-                        onOpenChange={setIsAssignUsherDialogOpen}
-                        eventId={eventData.id}
-                        eventName={eventData?.name || ''}
-                        trigger={
-                          <Button
-                            variant="default"
-                            className="flex items-center gap-2"
-                          >
-                            <UserPlus className="w-4 h-4" /> Assign Ushers
-                          </Button>
-                        }
-                      />
-                      <Button variant="destructive" onClick={handleDeleteEvent}>
-                        Move to Trash
-                      </Button>
-                    </>
-                  )}
-                </div>
+                            <div className="space-y-4">
+                              {guestTypes.length > 0 ? (
+                                guestTypes.map((gt: any, index: number) => {
+                                  let guestTypeName = '';
+                                  let guestTypePrice = '';
+                                  let guestTypeDescription = '';
 
-                {/* Event Overview Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {/* Event Type Card */}
-                  <div className="bg-gradient-to-br from-primary/10 to-warning/10 border border-primary/30 rounded-2xl p-6">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        eventData?.event_type === 'ticketed' 
-                          ? 'bg-primary/20 text-primary dark:text-primary' 
-                          : 'bg-success/20 text-success dark:text-success'
-                      }`}>
-                        {eventData?.event_type === 'ticketed' ? '🎫' : '🎉'}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Event Type</p>
-                        <p className={`font-bold ${
-                          eventData?.event_type === 'ticketed' ? 'text-primary dark:text-primary' : 'text-success dark:text-success'
-                        }`}>
-                          {eventData?.event_type === 'ticketed' ? 'Ticketed Event' : 'Free Event'}
-                        </p>
-                      </div>
-                      </div>
-                    <div className="text-xs text-muted-foreground">
-                      {eventData?.event_type === 'ticketed' 
-                        ? `${ticketTypes.length} ticket types available`
-                        : `${guestTypes.length} guest types available`
-                      }
-                      </div>
-                      </div>
+                                  if (typeof gt === 'object' && gt !== null) {
+                                    guestTypeName = gt.name || gt.id || String(gt.id) || 'Unknown';
+                                    guestTypePrice = gt.price ? parseFloat(gt.price).toLocaleString() : '0';
+                                    guestTypeDescription = gt.description || '';
+                                  } else {
+                                    guestTypeName = String(gt);
+                                    guestTypePrice = '0';
+                                  }
 
-                  {/* Status Card */}
-                  <div className="bg-gradient-to-br from-info/10 to-primary/10 border border-info/30 rounded-2xl p-6">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        eventData?.status === 'active' ? 'bg-success/20 text-success dark:text-success' :
-                        eventData?.status === 'draft' ? 'bg-warning/20 text-warning dark:text-warning' :
-                        eventData?.status === 'cancelled' ? 'bg-error/20 text-error dark:text-error' :
-                        'bg-muted text-muted-foreground'
-                      }`}>
-                        {eventData?.status === 'active' ? '✓' : 
-                         eventData?.status === 'draft' ? '📝' : 
-                         eventData?.status === 'cancelled' ? '✗' : '?'}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Status</p>
-                        <p className="font-bold text-foreground capitalize">{eventData?.status || 'Unknown'}</p>
-                      </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {eventData?.status === 'active' ? 'Event is live and accepting registrations' :
-                       eventData?.status === 'draft' ? 'Event is in preparation mode' :
-                       eventData?.status === 'cancelled' ? 'Event has been cancelled' : 'Status unknown'}
-                    </div>
-                  </div>
-
-                  {/* Registration Card */}
-                  <div className="bg-gradient-to-br from-success/10 to-success/20 border border-success/30 rounded-2xl p-6">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        eventData?.registration_start_date && new Date(eventData.registration_start_date) <= new Date() && 
-                        eventData?.registration_end_date && new Date(eventData.registration_end_date) >= new Date() 
-                          ? 'bg-success/20 text-success dark:text-success' : 'bg-error/20 text-error dark:text-error'
-                      }`}>
-                        {eventData?.registration_start_date && new Date(eventData.registration_start_date) <= new Date() && 
-                         eventData?.registration_end_date && new Date(eventData.registration_end_date) >= new Date() 
-                           ? '✓' : '✗'}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Registration</p>
-                        <p className="font-bold text-foreground">
-                          {eventData?.registration_start_date && eventData?.registration_end_date 
-                            ? (new Date(eventData.registration_start_date) <= new Date() && new Date(eventData.registration_end_date) >= new Date())
-                              ? 'Open'
-                              : new Date(eventData.registration_start_date) > new Date()
-                                ? 'Not Started'
-                                : 'Closed'
-                            : 'Not Set'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {attendees.length} attendees registered
-                    </div>
-                  </div>
-
-                  {/* Capacity Card */}
-                  <div className="bg-gradient-to-br from-warning/10 to-primary/10 border border-warning/30 rounded-2xl p-6">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-full bg-warning/20 text-warning dark:text-warning flex items-center justify-center">
-                        👥
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Capacity</p>
-                        <p className="font-bold text-foreground">
-                          {eventData?.max_guests ? `${eventData.max_guests} guests` : 'Unlimited'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {eventData?.max_guests 
-                        ? `${attendees.length}/${eventData.max_guests} spots filled`
-                        : 'No capacity limit'
-                      }
-                    </div>
-                  </div>
-                </div>
-
-                {/* Event Details Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Main Event Information */}
-                  <div className="lg:col-span-2 space-y-6">
-                    {/* Event Description */}
-                    <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-8 h-8 rounded-full bg-info/20 text-info dark:text-info flex items-center justify-center">
-                          📝
-                        </div>
-                        <h3 className="text-xl font-bold text-foreground">Event Description</h3>
-                      </div>
-                      <div className="prose prose-gray max-w-none">
-                        <p className="text-foreground leading-relaxed whitespace-pre-line">
-                          {eventData?.description || 'No description provided for this event.'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Event Type Details */}
-                    <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 text-primary dark:text-primary flex items-center justify-center">
-                          {eventData?.event_type === 'ticketed' ? '🎫' : '🎉'}
-                        </div>
-                        <h3 className="text-xl font-bold text-foreground">
-                          {eventData?.event_type === 'ticketed' ? 'Ticket Information' : 'Guest Type Information'}
-                        </h3>
-                      </div>
-                      
-                          {eventData?.event_type === 'ticketed' ? (
-                        <div className="space-y-4">
-                          {ticketTypes.length > 0 ? (
-                              ticketTypes.map((ticket: any, index: number) => {
-                                const ticketName = ticket?.name || 'Unknown Ticket';
-                                const ticketPrice = ticket?.price ? parseFloat(ticket.price).toLocaleString() : '0';
-                              const ticketQuantity = ticket?.quantity || 'Unlimited';
-                              const ticketDescription = ticket?.description || '';
-                              
-                                return (
-                                <div key={index} className="bg-gradient-to-r from-primary/10 to-warning/10 border border-primary/30 rounded-xl p-6">
-                                  <div className="flex items-start justify-between mb-3">
-                                    <div>
-                                      <h4 className="font-bold text-primary dark:text-primary text-lg">{ticketName}</h4>
-                                      {ticketDescription && (
-                                        <p className="text-primary/80 dark:text-primary/70 text-sm mt-1">{ticketDescription}</p>
-                                      )}
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="text-2xl font-bold text-primary dark:text-primary">ETB {ticketPrice}</div>
-                                      <div className="text-sm text-primary/80 dark:text-primary/70">
-                                        {ticketQuantity === 'Unlimited' ? 'Unlimited' : `${ticketQuantity} available`}
+                                  return (
+                                    <div key={index} className="bg-primary/5 border border-primary/10 rounded-xl p-6">
+                                      <div className="flex items-start justify-between mb-3">
+                                        <div>
+                                          <h4 className="font-bold text-primary text-xl">{guestTypeName}</h4>
+                                          {guestTypeDescription && (
+                                            <p className="text-muted-foreground text-sm mt-1 font-medium">{guestTypeDescription}</p>
+                                          )}
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-2xl font-bold text-primary">
+                                            {guestTypePrice === '0' ? 'Free' : `ETB ${guestTypePrice}`}
+                                          </div>
+                                          <div className="text-[10px] font-bold uppercase tracking-wider text-primary/60">Guest Type</div>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-primary/60">
+                                        <Users className="w-3.5 h-3.5" />
+                                        <span>Guest Type</span>
                                       </div>
                                     </div>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-xs text-primary/80 dark:text-primary/70">
-                                    <span>🎫</span>
-                                    <span>Ticket Type</span>
-                                  </div>
+                                  );
+                                })
+                              ) : (
+                                <div className="text-center py-8 text-muted-foreground">
+                                  <div className="text-4xl mb-2">👥</div>
+                                  <p>No guest types defined for this event</p>
                                 </div>
-                                );
-                              })
-                            ) : (
-                            <div className="text-center py-8 text-muted-foreground">
-                              <div className="text-4xl mb-2">🎫</div>
-                              <p>No ticket types defined for this event</p>
+                              )}
                             </div>
                           )}
                         </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {guestTypes.length > 0 ? (
-                              guestTypes.map((gt: any, index: number) => {
-                                let guestTypeName = '';
-                              let guestTypePrice = '';
-                              let guestTypeDescription = '';
-                              
-                                if (typeof gt === 'object' && gt !== null) {
-                                  guestTypeName = gt.name || gt.id || String(gt.id) || 'Unknown';
-                                guestTypePrice = gt.price ? parseFloat(gt.price).toLocaleString() : '0';
-                                guestTypeDescription = gt.description || '';
-                                } else {
-                                  guestTypeName = String(gt);
-                                guestTypePrice = '0';
-                                }
-                              
-                                return (
-                                <div key={index} className="bg-gradient-to-r from-success/10 to-success/20 border border-success/30 rounded-xl p-6">
-                                  <div className="flex items-start justify-between mb-3">
-                                    <div>
-                                      <h4 className="font-bold text-success dark:text-success text-lg">{guestTypeName}</h4>
-                                      {guestTypeDescription && (
-                                        <p className="text-success/80 dark:text-success/70 text-sm mt-1">{guestTypeDescription}</p>
-                                      )}
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="text-2xl font-bold text-success dark:text-success">
-                                        {guestTypePrice === '0' ? 'Free' : `ETB ${guestTypePrice}`}
-                                      </div>
-                                      <div className="text-sm text-success/80 dark:text-success/70">Guest Type</div>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2 text-xs text-success/80 dark:text-success/70">
-                                    <span>👥</span>
-                                    <span>Guest Type</span>
-                                  </div>
-                                </div>
-                                );
-                              })
-                            ) : (
-                            <div className="text-center py-8 text-muted-foreground">
-                              <div className="text-4xl mb-2">👥</div>
-                              <p>No guest types defined for this event</p>
+                      </div>
+
+                      {/* Sidebar Information */}
+                      <div className="space-y-6">
+                        {/* Event Details */}
+                        <div className="bg-card rounded-2xl shadow-sm border border-border p-6 h-fit">
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                              <CalendarDays className="w-5 h-5" />
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                        </div>
+                            <h3 className="text-lg font-bold text-foreground">Event Details</h3>
+                          </div>
 
-                  {/* Sidebar Information */}
-                  <div className="space-y-6">
-                    {/* Event Details */}
-                    <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-8 h-8 rounded-full bg-info/20 text-info dark:text-info flex items-center justify-center">
-                          📅
-                      </div>
-                        <h3 className="text-lg font-bold text-foreground">Event Details</h3>
-                    </div>
-                      
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                          <Calendar className="w-5 h-5 text-primary" />
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Start Date</p>
-                            <p className="text-sm text-foreground">
-                              {eventData?.start_date && format(parseISO(eventData.start_date), 'MMM d, yyyy')}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {eventData?.start_date && format(parseISO(eventData.start_date), 'h:mm a')}
-                            </p>
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Calendar className="w-5 h-5 text-primary" />
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Start Date</p>
+                                <p className="text-sm font-semibold text-foreground">
+                                  {eventData?.start_date && format(parseISO(eventData.start_date), 'MMM d, yyyy')}
+                                </p>
+                                <p className="text-xs text-muted-foreground font-medium">
+                                  {eventData?.start_date && format(parseISO(eventData.start_date), 'h:mm a')}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Calendar className="w-5 h-5 text-primary" />
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">End Date</p>
+                                <p className="text-sm font-semibold text-foreground">
+                                  {eventData?.end_date && format(parseISO(eventData.end_date), 'MMM d, yyyy')}
+                                </p>
+                                <p className="text-xs text-muted-foreground font-medium">
+                                  {eventData?.end_date && format(parseISO(eventData.end_date), 'h:mm a')}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <MapPin className="w-5 h-5 text-primary" />
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Location</p>
+                                <p className="text-sm font-semibold text-foreground">{eventData?.location}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Shield className="w-5 h-5 text-primary" />
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Organizer</p>
+                                <p className="text-sm font-semibold text-foreground">
+                                  {user?.organizer?.name || eventData?.organizer?.name}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Tag className="w-5 h-5 text-primary" />
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Category</p>
+                                <p className="text-sm font-semibold text-foreground capitalize">
+                                  {eventData?.eventCategory?.name || 'Not specified'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Tag className="w-5 h-5 text-primary" />
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Type Category</p>
+                                <p className="text-sm font-semibold text-foreground capitalize">
+                                  {eventData?.eventType?.name || 'Not specified'}
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                          <Calendar className="w-5 h-5 text-error" />
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">End Date</p>
-                            <p className="text-sm text-foreground">
-                              {eventData?.end_date && format(parseISO(eventData.end_date), 'MMM d, yyyy')}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {eventData?.end_date && format(parseISO(eventData.end_date), 'h:mm a')}
-                            </p>
+                        {/* Registration Period */}
+                        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 rounded-full bg-success/20 text-success dark:text-success flex items-center justify-center">
+                              ⏰
+                            </div>
+                            <h3 className="text-lg font-bold text-foreground">Registration Period</h3>
                           </div>
-                        </div>
 
-                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                          <MapPin className="w-5 h-5 text-primary" />
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Location</p>
-                            <p className="text-sm text-foreground">{eventData?.location}</p>
-                          </div>
-                        </div>
+                          <div className="space-y-4">
+                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Clock className="w-5 h-5 text-primary" />
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Opens</p>
+                                <p className="text-sm font-semibold text-foreground">
+                                  {eventData?.registration_start_date && format(parseISO(eventData.registration_start_date), 'MMM d, yyyy')}
+                                </p>
+                                <p className="text-xs text-muted-foreground font-medium">
+                                  {eventData?.registration_start_date && format(parseISO(eventData.registration_start_date), 'h:mm a')}
+                                </p>
+                              </div>
+                            </div>
 
-                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                          <UserPlus className="w-5 h-5 text-info" />
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Organizer</p>
-                            <p className="text-sm text-foreground">
-                              {user?.organizer?.name || eventData?.organizer?.name}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                          <Tag className="w-5 h-5 text-info" />
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Category</p>
-                            <p className="text-sm text-foreground capitalize">
-                              {eventData?.eventCategory?.name || 'Not specified'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                          <Tag className="w-5 h-5 text-primary" />
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Type Category</p>
-                            <p className="text-sm text-foreground capitalize">
-                              {eventData?.eventType?.name || 'Not specified'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Registration Period */}
-                    <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-8 h-8 rounded-full bg-success/20 text-success dark:text-success flex items-center justify-center">
-                          ⏰
-                        </div>
-                        <h3 className="text-lg font-bold text-foreground">Registration Period</h3>
-                      </div>
-                      
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-3 p-3 bg-success/10 rounded-lg">
-                          <Clock className="w-5 h-5 text-success dark:text-success" />
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Opens</p>
-                            <p className="text-sm text-foreground">
-                              {eventData?.registration_start_date && format(parseISO(eventData.registration_start_date), 'MMM d, yyyy')}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {eventData?.registration_start_date && format(parseISO(eventData.registration_start_date), 'h:mm a')}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 p-3 bg-error/10 rounded-lg">
-                          <Clock className="w-5 h-5 text-error dark:text-error" />
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Closes</p>
-                            <p className="text-sm text-foreground">
-                              {eventData?.registration_end_date && format(parseISO(eventData.registration_end_date), 'MMM d, yyyy')}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {eventData?.registration_end_date && format(parseISO(eventData.registration_end_date), 'h:mm a')}
-                            </p>
+                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Clock className="w-5 h-5 text-primary" />
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Closes</p>
+                                <p className="text-sm font-semibold text-foreground">
+                                  {eventData?.registration_end_date && format(parseISO(eventData.registration_end_date), 'MMM d, yyyy')}
+                                </p>
+                                <p className="text-xs text-muted-foreground font-medium">
+                                  {eventData?.registration_end_date && format(parseISO(eventData.registration_end_date), 'h:mm a')}
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                    </div>
-                  </div>
-                  
-                  {/* Event & Registration Dates Section */}
-                  {/* <div className="bg-white rounded-xl shadow p-6 mb-8">
+
+                    {/* Event & Registration Dates Section */}
+                    {/* <div className="bg-white rounded-xl shadow p-6 mb-8">
                     <h3 className="text-lg font-bold mb-4 text-gray-800 flex items-center gap-2">
                       <Calendar className="w-5 h-5 text-purple-500" />
                       Event & Registration Dates
@@ -3426,43 +2755,41 @@ export default function EventDetails() {
                       </div>
                     </div>
                   </div> */}
-                  
-                  {/* Additional Event Details Section */}
-                  {(eventData?.requirements || eventData?.agenda) && (
-                    <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-8 h-8 rounded-full bg-info/20 text-info dark:text-info flex items-center justify-center">
-                          📋
-                        </div>
-                        <h3 className="text-xl font-bold text-foreground">Additional Information</h3>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {eventData?.requirements && (
-                          <div className="bg-gradient-to-br from-warning/10 to-primary/10 border border-warning/30 rounded-xl p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                              <Shield className="w-5 h-5 text-warning dark:text-warning" />
-                              <h4 className="font-bold text-foreground">Requirements</h4>
-                            </div>
-                            <p className="text-foreground leading-relaxed whitespace-pre-line">{eventData.requirements}</p>
-                          </div>
-                        )}
-                        {eventData?.agenda && (
-                          <div className="bg-gradient-to-br from-info/10 to-primary/10 border border-info/30 rounded-xl p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                              <Clock className="w-5 h-5 text-info dark:text-info" />
-                              <h4 className="font-bold text-foreground">Agenda</h4>
-                            </div>
-                            <p className="text-foreground leading-relaxed whitespace-pre-line">{eventData.agenda}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
 
-                </div>
-              </TabsContent>
-            <TabsContent value="badges">
+                    {/* Additional Event Details Section */}
+                    {(eventData?.requirements || eventData?.agenda) && (
+                      <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                            <Info className="w-5 h-5" />
+                          </div>
+                          <h3 className="text-xl font-bold text-foreground">Additional Information</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          {eventData?.requirements && (
+                            <div className="bg-gradient-to-br from-warning/10 to-primary/10 border border-warning/30 rounded-xl p-6">
+                              <div className="flex items-center gap-3 mb-4">
+                                <Shield className="w-5 h-5 text-warning dark:text-warning" />
+                                <h4 className="font-bold text-foreground">Requirements</h4>
+                              </div>
+                              <p className="text-foreground leading-relaxed whitespace-pre-line">{eventData.requirements}</p>
+                            </div>
+                          )}
+                          {eventData?.agenda && (
+                            <div className="bg-gradient-to-br from-info/10 to-primary/10 border border-info/30 rounded-xl p-6">
+                              <div className="flex items-center gap-3 mb-4">
+                                <Clock className="w-5 h-5 text-info dark:text-info" />
+                                <h4 className="font-bold text-foreground">Agenda</h4>
+                              </div>
+                              <p className="text-foreground leading-relaxed whitespace-pre-line">{eventData.agenda}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+                <TabsContent value="badges">
                   <div className="flex flex-col gap-6">
                     {/* Header Section */}
                     <div className="flex flex-wrap gap-4 justify-between items-start mb-6">
@@ -3481,13 +2808,13 @@ export default function EventDetails() {
                       </div>
                       <div className="flex gap-3">
                         {/* Legacy designer removed - now using standalone Fabric.js app */}
-                        <Button 
-                          variant="default" 
-                          onClick={handleBadgeBatchPrintBadges} 
+                        <Button
+                          variant="default"
+                          onClick={handleBadgeBatchPrintBadges}
                           disabled={badgeSelectedAttendees.size === 0}
-                          className="bg-brand-gradient text-foreground dark:text-primary-foreground shadow-sm flex items-center gap-2"
+                          className="bg-primary text-primary-foreground shadow-sm flex items-center gap-2"
                         >
-                          <Printer className="w-4 h-4" /> 
+                          <Printer className="w-4 h-4" />
                           Print Selected ({badgeSelectedAttendees.size})
                         </Button>
                       </div>
@@ -3550,10 +2877,10 @@ export default function EventDetails() {
                       <div className="flex flex-wrap gap-4 items-center">
                         <div className="relative flex-1 max-w-md">
                           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                      <Input
+                          <Input
                             placeholder="Search attendees by name, email, or company..."
-                        value={badgeSearchTerm}
-                        onChange={e => setBadgeSearchTerm(e.target.value)}
+                            value={badgeSearchTerm}
+                            onChange={e => setBadgeSearchTerm(e.target.value)}
                             className="pl-10 pr-4 py-2 w-full"
                           />
                           {badgeSearchTerm && (
@@ -3567,27 +2894,27 @@ export default function EventDetails() {
                             </Button>
                           )}
                         </div>
-                      <Select value={badgeGuestTypeFilter} onValueChange={setBadgeGuestTypeFilter}>
+                        <Select value={badgeGuestTypeFilter} onValueChange={setBadgeGuestTypeFilter}>
                           <SelectTrigger className="w-40">
                             <SelectValue placeholder="All Types" />
                           </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Types</SelectItem>
-                          {guestTypes.map(type => (
-                            <SelectItem key={type.id} value={type.name.toLowerCase()}>{type.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select value={badgeCheckedInFilter} onValueChange={setBadgeCheckedInFilter}>
+                          <SelectContent>
+                            <SelectItem value="all">All Types</SelectItem>
+                            {guestTypes.map(type => (
+                              <SelectItem key={type.id} value={type.name.toLowerCase()}>{type.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select value={badgeCheckedInFilter} onValueChange={setBadgeCheckedInFilter}>
                           <SelectTrigger className="w-40">
                             <SelectValue placeholder="All Status" />
                           </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Status</SelectItem>
-                          <SelectItem value="checked-in">Checked In</SelectItem>
-                          <SelectItem value="not-checked-in">Not Checked In</SelectItem>
-                        </SelectContent>
-                      </Select>
+                          <SelectContent>
+                            <SelectItem value="all">All Status</SelectItem>
+                            <SelectItem value="checked-in">Checked In</SelectItem>
+                            <SelectItem value="not-checked-in">Not Checked In</SelectItem>
+                          </SelectContent>
+                        </Select>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -3600,7 +2927,7 @@ export default function EventDetails() {
                         >
                           <RotateCcw className="w-4 h-4" />
                         </Button>
-                    </div>
+                      </div>
                     </div>
 
                     {/* Badge List View */}
@@ -3608,9 +2935,9 @@ export default function EventDetails() {
                       <div className="p-4 border-b border-border">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <Checkbox 
-                              checked={badgeSelectedAttendees.size === filteredBadgesAttendees.length && filteredBadgesAttendees.length > 0} 
-                              onCheckedChange={handleBadgeSelectAllAttendees} 
+                            <Checkbox
+                              checked={badgeSelectedAttendees.size === filteredBadgesAttendees.length && filteredBadgesAttendees.length > 0}
+                              onCheckedChange={handleBadgeSelectAllAttendees}
                             />
                             <span className="text-sm text-muted-foreground">
                               {badgeSelectedAttendees.size} of {filteredBadgesAttendees.length} selected
@@ -3625,11 +2952,11 @@ export default function EventDetails() {
                               className="text-muted-foreground hover:text-foreground"
                             >
                               Clear Selection
-                      </Button>
-                    </div>
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                      
+
                       {filteredBadgesAttendees.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12">
                           <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
@@ -3637,7 +2964,7 @@ export default function EventDetails() {
                           </div>
                           <h3 className="text-lg font-medium text-foreground mb-2">No attendees found</h3>
                           <p className="text-muted-foreground text-center max-w-md">
-                            {badgeSearchTerm || badgeGuestTypeFilter !== 'all' || badgeCheckedInFilter !== 'all' 
+                            {badgeSearchTerm || badgeGuestTypeFilter !== 'all' || badgeCheckedInFilter !== 'all'
                               ? 'Try adjusting your search or filters to find attendees.'
                               : 'No attendees have been registered for this event yet.'
                             }
@@ -3646,20 +2973,19 @@ export default function EventDetails() {
                       ) : (
                         <div className="divide-y divide-border">
                           {filteredBadgesAttendees.map(attendee => (
-                            <div 
-                              key={attendee.id} 
-                              className={`p-4 transition-all duration-200 hover:bg-muted/50 ${
-                                badgeSelectedAttendees.has(attendee.id) 
-                                  ? 'bg-muted/50 border-l-4 border-primary' 
-                                  : 'border-l-4 border-transparent'
-                              }`}
+                            <div
+                              key={attendee.id}
+                              className={`p-4 transition-all duration-200 hover:bg-muted/50 ${badgeSelectedAttendees.has(attendee.id)
+                                ? 'bg-muted/50 border-l-4 border-primary'
+                                : 'border-l-4 border-transparent'
+                                }`}
                             >
                               <div className="flex items-center gap-4">
                                 {/* Selection Checkbox */}
                                 <div className="flex-shrink-0">
-                                  <Checkbox 
-                                    checked={badgeSelectedAttendees.has(attendee.id)} 
-                                    onCheckedChange={() => handleBadgeSelectAttendee(attendee.id)} 
+                                  <Checkbox
+                                    checked={badgeSelectedAttendees.has(attendee.id)}
+                                    onCheckedChange={() => handleBadgeSelectAttendee(attendee.id)}
                                   />
                                 </div>
 
@@ -3679,19 +3005,19 @@ export default function EventDetails() {
                                       {attendee.guest?.name || 'Unknown'}
                                     </h4>
                                     <Badge className={`text-xs ${getGuestTypeBadgeClasses((attendee.guestType || attendee.guest_type)?.name)}`}>
-                                  {(attendee.guestType || attendee.guest_type)?.name || 'General'}
-                                </Badge>
-                                {attendee.checked_in ? (
+                                      {(attendee.guestType || attendee.guest_type)?.name || 'General'}
+                                    </Badge>
+                                    {attendee.checked_in ? (
                                       <Badge className="bg-success/10 text-success dark:text-success text-xs border border-success/30">
                                         <CheckCircle className="w-3 h-3 mr-1" />
                                         Checked In
                                       </Badge>
-                                ) : (
+                                    ) : (
                                       <Badge className="bg-warning/10 text-warning dark:text-warning text-xs border border-warning/30">
                                         <Clock className="w-3 h-3 mr-1" />
                                         Pending
                                       </Badge>
-                                )}
+                                    )}
                                   </div>
                                   <p className="text-sm text-muted-foreground truncate">
                                     {attendee.guest?.email || 'No email'}
@@ -3705,18 +3031,18 @@ export default function EventDetails() {
 
                                 {/* Actions */}
                                 <div className="flex-shrink-0 flex gap-2">
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
                                     onClick={() => {
-                                  setBadgeSelectedAttendees(new Set([attendee.id]));
-                                  setPrinting(true);
+                                      setBadgeSelectedAttendees(new Set([attendee.id]));
+                                      setPrinting(true);
                                     }}
                                     className="border-border text-foreground hover:bg-muted"
                                   >
                                     <Printer className="w-4 h-4 mr-1" />
                                     Print
-                                </Button>
+                                  </Button>
 
                                 </div>
                               </div>
@@ -3743,13 +3069,13 @@ export default function EventDetails() {
                         @media print {
                           body * { visibility: hidden !important; }
                           #badge-print-area, #badge-print-area * { visibility: visible !important; }
-                          #badge-print-area { 
-                            position: absolute !important; 
-                            left: 0 !important; 
-                            top: 0 !important; 
-                            width: 100vw !important; 
-                            height: 100vh !important; 
-                            background: white !important; 
+                          #badge-print-area {
+                            position: absolute !important;
+                            left: 0 !important;
+                            top: 0 !important;
+                            width: 100vw !important;
+                            height: 100vh !important;
+                            background: white !important;
                             z-index: 9999 !important;
                           }
                           .printable-badge-batch {
@@ -3766,7 +3092,7 @@ export default function EventDetails() {
                         }
                       `}</style>
                       <div id="badge-print-area">
-                                              {printing && badgeSelectedAttendees.size > 0 ? (
+                        {printing && badgeSelectedAttendees.size > 0 ? (
                           filteredBadgesAttendees
                             .filter(attendee => badgeSelectedAttendees.has(attendee.id))
                             .map(attendee => (
@@ -3777,10 +3103,10 @@ export default function EventDetails() {
                         ) : (
                           <div>No badges selected for printing.</div>
                         )}
-                        </div>
                       </div>
+                    </div>
                   </div>
-            </TabsContent>
+                </TabsContent>
                 <TabsContent value="attendees">
                   <div className="flex flex-col gap-6">
                     {/* Page Header */}
@@ -3802,7 +3128,7 @@ export default function EventDetails() {
                       </div>
                       <div className="flex items-center gap-2">
                         {selectedAttendees.size > 0 && (
-                          <Button 
+                          <Button
                             variant="outline"
                             onClick={handleBatchPrintBadges}
                             disabled={selectedAttendees.size === 0}
@@ -3812,7 +3138,7 @@ export default function EventDetails() {
                             Print Selected ({selectedAttendees.size})
                           </Button>
                         )}
-                        <Button 
+                        <Button
                           variant="outline"
                           onClick={handleImportClick}
                           className="bg-background border-border hover:bg-accent"
@@ -3820,7 +3146,7 @@ export default function EventDetails() {
                           <Upload className="w-4 h-4 mr-2" />
                           Import CSV
                         </Button>
-                        <Button 
+                        <Button
                           className="bg-success hover:bg-success/90 text-white"
                           onClick={() => setAddAttendeeDialogOpen(true)}
                         >
@@ -3910,9 +3236,9 @@ export default function EventDetails() {
                           <TableHeader>
                             <TableRow className="bg-muted/50 border-b border-border">
                               <TableHead className="font-semibold text-foreground text-xs uppercase py-4 w-12">
-                                <Checkbox 
-                                  checked={selectedAttendees.size === filteredAttendees.length && filteredAttendees.length > 0} 
-                                  onCheckedChange={handleSelectAllAttendees} 
+                                <Checkbox
+                                  checked={selectedAttendees.size === filteredAttendees.length && filteredAttendees.length > 0}
+                                  onCheckedChange={handleSelectAllAttendees}
                                 />
                               </TableHead>
                               <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Name of Attendee</TableHead>
@@ -3928,9 +3254,9 @@ export default function EventDetails() {
                             {filteredAttendees.length > 0 ? filteredAttendees.map(attendee => (
                               <TableRow key={attendee.id} className="hover:bg-accent/50 transition-colors border-b border-border">
                                 <TableCell className="py-4">
-                                  <Checkbox 
-                                    checked={selectedAttendees.has(attendee.id)} 
-                                    onCheckedChange={() => handleSelectAttendee(attendee.id)} 
+                                  <Checkbox
+                                    checked={selectedAttendees.has(attendee.id)}
+                                    onCheckedChange={() => handleSelectAttendee(attendee.id)}
                                   />
                                 </TableCell>
                                 <TableCell className="py-4">
@@ -3973,8 +3299,8 @@ export default function EventDetails() {
                                 </TableCell>
                                 <TableCell className="py-4">
                                   <div className="flex items-center gap-1">
-                                    <Button 
-                                      variant="ghost" 
+                                    <Button
+                                      variant="ghost"
                                       size="sm"
                                       onClick={() => {
                                         setSelectedAttendees(new Set([attendee.id]));
@@ -3985,8 +3311,8 @@ export default function EventDetails() {
                                     >
                                       <Printer className="w-4 h-4" />
                                     </Button>
-                                    <Button 
-                                      variant="ghost" 
+                                    <Button
+                                      variant="ghost"
                                       size="sm"
                                       className="h-8 w-8 p-0 hover:bg-accent"
                                       title="View Custom Fields"
@@ -3994,8 +3320,8 @@ export default function EventDetails() {
                                     >
                                       <FileText className="w-4 h-4" />
                                     </Button>
-                                    <Button 
-                                      variant="ghost" 
+                                    <Button
+                                      variant="ghost"
                                       size="sm"
                                       onClick={() => openEditAttendeeDialog(attendee)}
                                       className="h-8 w-8 p-0 hover:bg-accent"
@@ -4003,8 +3329,8 @@ export default function EventDetails() {
                                     >
                                       <Edit className="w-4 h-4" />
                                     </Button>
-                                    <Button 
-                                      variant="ghost" 
+                                    <Button
+                                      variant="ghost"
                                       size="sm"
                                       onClick={() => handleRemoveAttendee(attendee)}
                                       className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
@@ -4026,7 +3352,7 @@ export default function EventDetails() {
                                       {searchTerm ? 'No attendees found' : 'No attendees'}
                                     </div>
                                     <div className="text-sm text-muted-foreground max-w-md text-center">
-                                      {searchTerm 
+                                      {searchTerm
                                         ? `No attendees match your search for "${searchTerm}". Try adjusting your search terms or filters.`
                                         : 'No attendees have been registered for this event yet.'
                                       }
@@ -4048,7 +3374,7 @@ export default function EventDetails() {
                         </Table>
                       </div>
                     </div>
-                    
+
                     {/* Pagination Component - Only for admin and organizer */}
                     {!attendeesLoading && !attendeesError && isAdminOrOrganizer && totalRecords > 0 && (
                       <Pagination
@@ -4062,12 +3388,12 @@ export default function EventDetails() {
                     )}
                   </div>
                 </TabsContent>
-            <TabsContent value="ushers">
+                <TabsContent value="ushers">
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-brand-gradient rounded-xl flex items-center justify-center">
-                          <Users className="w-6 h-6 text-white" />
+                        <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                          <Users className="w-6 h-6 text-primary" />
                         </div>
                         <div>
                           <h3 className="text-xl font-bold text-foreground">
@@ -4078,94 +3404,94 @@ export default function EventDetails() {
                           </p>
                         </div>
                       </div>
-                      <Button 
-                        variant="default" 
-                        onClick={() => setIsAssignUsherDialogOpen(true)} 
-                        className="bg-brand-gradient text-foreground dark:text-primary-foreground shadow-lg hover:shadow-xl flex items-center gap-2"
+                      <Button
+                        variant="default"
+                        onClick={() => setIsAssignUsherDialogOpen(true)}
+                        className="bg-primary text-primary-foreground shadow-md hover:shadow-lg flex items-center gap-2"
                       >
                         <Plus className="w-4 h-4" /> Assign Ushers
                       </Button>
                     </div>
 
                     <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
                             <TableRow className="bg-muted/50">
                               <TableHead className="font-semibold text-foreground text-sm py-4">Usher</TableHead>
                               <TableHead className="font-semibold text-foreground text-sm py-4">Contact</TableHead>
                               <TableHead className="font-semibold text-foreground text-sm py-4">Status</TableHead>
                               <TableHead className="font-semibold text-foreground text-sm py-4">Assigned Tasks</TableHead>
                               <TableHead className="font-semibold text-foreground text-sm py-4">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
                             {eventUshers && eventUshers.length > 0 ? eventUshers.map(usher => {
-                              const tasks = Array.isArray(usher.pivot?.tasks) 
-                                ? usher.pivot.tasks 
-                                : (typeof usher.pivot?.tasks === 'string' 
-                                  ? JSON.parse(usher.pivot.tasks) 
+                              const tasks = Array.isArray(usher.pivot?.tasks)
+                                ? usher.pivot.tasks
+                                : (typeof usher.pivot?.tasks === 'string'
+                                  ? JSON.parse(usher.pivot.tasks)
                                   : [])
                               return (
                                 <TableRow key={usher.id} className="hover:bg-muted/50 transition-colors border-b border-border">
                                   <TableCell className="py-4">
                                     <div className="flex items-center gap-3">
-                                      <div className="w-10 h-10 bg-brand-gradient rounded-full flex items-center justify-center text-white text-sm font-medium shadow-sm">
+                                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary text-sm font-medium">
                                         {usher.name.charAt(0).toUpperCase()}
                                       </div>
-                                <div>
+                                      <div>
                                         <div className="font-semibold text-foreground">{usher.name}</div>
                                         <div className="text-xs text-muted-foreground">
                                           ID: {usher.id}
                                         </div>
                                       </div>
-                                </div>
-                              </TableCell>
+                                    </div>
+                                  </TableCell>
                                   <TableCell className="py-4">
                                     <div className="text-sm text-foreground">{usher.email}</div>
                                     {usher.phone && (
-                                <div className="text-xs text-muted-foreground">{usher.phone}</div>
+                                      <div className="text-xs text-muted-foreground">{usher.phone}</div>
                                     )}
-                              </TableCell>
+                                  </TableCell>
                                   <TableCell className="py-4">
                                     <Badge className="bg-info/10 text-info dark:text-info border border-info/30">
                                       <UserCheck className="w-3 h-3 mr-1" />
                                       Assigned
-                                </Badge>
-                              </TableCell>
+                                    </Badge>
+                                  </TableCell>
                                   <TableCell className="py-4">
-                                {editingUsherId === usher.id ? (
+                                    {editingUsherId === usher.id ? (
                                       <div className="space-y-2">
                                         <Textarea
-                                      value={editTasks}
-                                      onChange={e => setEditTasks(e.target.value)}
+                                          value={editTasks}
+                                          onChange={e => setEditTasks(e.target.value)}
                                           placeholder="Enter tasks separated by commas"
                                           className="w-full"
                                           rows={3}
                                         />
                                         <div className="flex gap-2">
-                                          <Button 
-                                            size="sm" 
-                                            variant="outline" 
-                                            onClick={async () => { 
-                                              await updateUsherTasks(Number(eventId), usher.id, editTasks.split(',').map(t => t.trim()).filter(Boolean)); 
-                                              setEditingUsherId(null); 
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={async () => {
+                                              await updateUsherTasks(Number(eventId), usher.id, editTasks.split(',').map(t => t.trim()).filter(Boolean));
+                                              setEditingUsherId(null);
                                             }}
                                             className="bg-success/10 border-success/50 text-success dark:text-success hover:bg-success/20"
                                           >
                                             Save
                                           </Button>
-                                          <Button 
-                                            size="sm" 
-                                            variant="ghost" 
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
                                             onClick={() => setEditingUsherId(null)}
                                             className="text-muted-foreground"
                                           >
                                             Cancel
                                           </Button>
                                         </div>
-                                  </div>
-                                ) : (
+                                      </div>
+                                    ) : (
                                       <div className="space-y-2">
                                         {tasks.length > 0 ? (
                                           <div className="flex flex-wrap gap-1">
@@ -4184,21 +3510,21 @@ export default function EventDetails() {
                                             No tasks assigned
                                           </span>
                                         )}
-                                        <Button 
-                                          size="sm" 
-                                          variant="outline" 
-                                          onClick={() => { 
-                                            setEditingUsherId(usher.id); 
-                                            setEditTasks(tasks.join(', ')); 
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => {
+                                            setEditingUsherId(usher.id);
+                                            setEditTasks(tasks.join(', '));
                                           }}
                                           className="bg-background border-border hover:bg-muted text-xs"
                                         >
                                           <Edit className="w-3 h-3 mr-1" />
                                           Edit Tasks
                                         </Button>
-                                  </div>
-                                )}
-                              </TableCell>
+                                      </div>
+                                    )}
+                                  </TableCell>
                                   <TableCell className="py-4">
                                     <div className="flex items-center gap-2">
                                       <Button
@@ -4206,25 +3532,25 @@ export default function EventDetails() {
                                         size="sm"
                                         className="bg-background border-border hover:bg-muted"
                                         onClick={async () => {
-                                  try {
-                                    await api.delete(`/events/${Number(eventId)}/ushers/${usher.id}`);
-                                    const eventRes = await getEventUshers(Number(eventId));
-                                    setEventUshers(eventRes.data);
-                                    toast.success('Usher removed from event!');
-                                  } catch (err: any) {
-                                    toast.error(err.response?.data?.error || 'Failed to remove usher.');
-                                  }
+                                          try {
+                                            await api.delete(`/events/${Number(eventId)}/ushers/${usher.id}`);
+                                            const eventRes = await getEventUshers(Number(eventId));
+                                            setEventUshers(eventRes.data);
+                                            toast.success('Usher removed from event!');
+                                          } catch (err: any) {
+                                            toast.error(err.response?.data?.error || 'Failed to remove usher.');
+                                          }
                                         }}
                                       >
                                         <Trash2 className="w-3 h-3 mr-1" />
                                         Remove
                                       </Button>
                                     </div>
-                              </TableCell>
-                            </TableRow>
+                                  </TableCell>
+                                </TableRow>
                               )
                             }) : (
-                            <TableRow>
+                              <TableRow>
                                 <TableCell colSpan={5} className="text-center py-12">
                                   <div className="flex flex-col items-center space-y-3">
                                     <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
@@ -4236,20 +3562,20 @@ export default function EventDetails() {
                                     </div>
                                   </div>
                                 </TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
                       </div>
                     </div>
                     {/* Assign Usher Dialog is already implemented elsewhere in the file */}
                   </div>
-            </TabsContent>
-            <TabsContent value="team">
+                </TabsContent>
+                <TabsContent value="team">
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
                       <h3 className="text-xl font-bold text-foreground">Organizing Team</h3>
-                      <Button variant="default" onClick={() => setAddUsherDialogOpen(true)} className="flex items-center gap-2 bg-brand-gradient text-foreground dark:text-primary-foreground">
+                      <Button variant="default" onClick={() => setAddUsherDialogOpen(true)} className="flex items-center gap-2 bg-primary text-primary-foreground">
                         <Plus className="w-4 h-4" /> Add Team Member
                       </Button>
                     </div>
@@ -4301,484 +3627,468 @@ export default function EventDetails() {
                     </div>
                     {/* Add/Edit Team Member Dialogs are implemented elsewhere in the file */}
                   </div>
-            </TabsContent>
-            <TabsContent value="analytics">
-              <div className="min-h-screen bg-background p-6">
-                {/* Header Section */}
-                <div className="mb-8">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 bg-brand-gradient rounded-xl flex items-center justify-center">
-                      <BarChart3 className="w-6 h-6 text-white" />
+                </TabsContent>
+                <TabsContent value="analytics">
+                  <div className="min-h-screen bg-background p-6">
+                    {/* Header Section */}
+                    <div className="mb-8">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                          <BarChart3 className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                          <h1 className="text-3xl font-bold text-foreground">
+                            Event Analytics
+                          </h1>
+                          <p className="text-muted-foreground">Comprehensive insights and performance metrics</p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <h1 className="text-3xl font-bold text-foreground">
-                        Event Analytics
-                      </h1>
-                      <p className="text-muted-foreground">Comprehensive insights and performance metrics</p>
-                    </div>
-                  </div>
-                </div>
 
-                {analyticsLoading ? (
-                  <div className="flex flex-col items-center justify-center py-20">
-                    <Spinner size="xl" variant="primary" text="Loading analytics dashboard..." />
-                    <div className="text-sm text-muted-foreground mt-2">Gathering comprehensive event data</div>
-                  </div>
-                ) : analyticsError ? (
-                  <div className="flex flex-col items-center justify-center py-20">
-                    <div className="w-16 h-16 bg-error/10 rounded-full flex items-center justify-center mb-4">
-                      <XCircle className="w-8 h-8 text-error" />
-                    </div>
-                    <div className="text-lg font-medium text-foreground mb-2">Failed to load analytics</div>
-                    <div className="text-muted-foreground mb-6">{analyticsError}</div>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => window.location.reload()}
-                      className="flex items-center gap-2"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Retry
-                    </Button>
-                  </div>
-                ) : analytics ? (
-                  <div className="space-y-8">
-                    {/* Key Metrics Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-info/10 rounded-full -translate-y-10 translate-x-10"></div>
-                        <div className="relative">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-info/20 rounded-xl flex items-center justify-center">
-                              <Users className="w-5 h-5 text-info" />
+                    {analyticsLoading ? (
+                      <div className="flex flex-col items-center justify-center py-20">
+                        <Spinner size="xl" variant="primary" text="Loading analytics dashboard..." />
+                        <div className="text-sm text-muted-foreground mt-2">Gathering comprehensive event data</div>
+                      </div>
+                    ) : analyticsError ? (
+                      <div className="flex flex-col items-center justify-center py-20">
+                        <div className="w-16 h-16 bg-error/10 rounded-full flex items-center justify-center mb-4">
+                          <XCircle className="w-8 h-8 text-error" />
+                        </div>
+                        <div className="text-lg font-medium text-foreground mb-2">Failed to load analytics</div>
+                        <div className="text-muted-foreground mb-6">{analyticsError}</div>
+                        <Button
+                          variant="outline"
+                          onClick={() => window.location.reload()}
+                          className="flex items-center gap-2"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          Retry
+                        </Button>
+                      </div>
+                    ) : analytics ? (
+                      <div className="space-y-8">
+                        {/* Key Metrics Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                          <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:border-primary/20 transition-all duration-300">
+                            <div className="relative">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 bg-info/20 rounded-xl flex items-center justify-center">
+                                  <Users className="w-5 h-5 text-info" />
+                                </div>
+                                <div className="text-sm font-medium text-muted-foreground">Total Registered</div>
+                              </div>
+                              <div className="text-3xl font-bold text-foreground mb-1">{analytics.total_registered}</div>
+                              <div className="text-xs text-muted-foreground">Event attendees</div>
                             </div>
-                            <div className="text-sm font-medium text-muted-foreground">Total Registered</div>
                           </div>
-                          <div className="text-3xl font-bold text-foreground mb-1">{analytics.total_registered}</div>
-                          <div className="text-xs text-muted-foreground">Event attendees</div>
-                        </div>
-                      </div>
 
-                      <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-success/10 rounded-full -translate-y-10 translate-x-10"></div>
-                        <div className="relative">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-success/20 rounded-xl flex items-center justify-center">
-                              <CheckCircle className="w-5 h-5 text-success" />
+                          <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:border-primary/20 transition-all duration-300">
+                            <div className="relative">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 bg-success/20 rounded-xl flex items-center justify-center">
+                                  <CheckCircle className="w-5 h-5 text-success" />
+                                </div>
+                                <div className="text-sm font-medium text-muted-foreground">Checked In</div>
+                              </div>
+                              <div className="text-3xl font-bold text-foreground mb-1">{analytics.total_checked_in}</div>
+                              <div className="text-xs text-muted-foreground">Present attendees</div>
                             </div>
-                            <div className="text-sm font-medium text-muted-foreground">Checked In</div>
                           </div>
-                          <div className="text-3xl font-bold text-foreground mb-1">{analytics.total_checked_in}</div>
-                          <div className="text-xs text-muted-foreground">Present attendees</div>
-                        </div>
-                      </div>
 
-                      <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full -translate-y-10 translate-x-10"></div>
-                        <div className="relative">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
-                              <TrendingUp className="w-5 h-5 text-primary" />
+                          <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:border-primary/20 transition-all duration-300">
+                            <div className="relative">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
+                                  <TrendingUp className="w-5 h-5 text-primary" />
+                                </div>
+                                <div className="text-sm font-medium text-muted-foreground">Check-in Rate</div>
+                              </div>
+                              <div className="text-3xl font-bold text-foreground mb-1">
+                                {analytics.total_registered ? Math.round((analytics.total_checked_in / analytics.total_registered) * 100) : 0}%
+                              </div>
+                              <div className="text-xs text-muted-foreground">Attendance rate</div>
                             </div>
-                            <div className="text-sm font-medium text-muted-foreground">Check-in Rate</div>
                           </div>
-                          <div className="text-3xl font-bold text-foreground mb-1">
-                            {analytics.total_registered ? Math.round((analytics.total_checked_in / analytics.total_registered) * 100) : 0}%
-                          </div>
-                          <div className="text-xs text-muted-foreground">Attendance rate</div>
-                        </div>
-                      </div>
 
-                      <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
-                        <div className="absolute top-0 right-0 w-20 h-20 bg-muted/50 rounded-full -translate-y-10 translate-x-10"></div>
-                        <div className="relative">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center">
-                              <Clock className="w-5 h-5 text-muted-foreground" />
+                          <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:border-primary/20 transition-all duration-300">
+                            <div className="relative">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center">
+                                  <Clock className="w-5 h-5 text-muted-foreground" />
+                                </div>
+                                <div className="text-sm font-medium text-muted-foreground">Not Checked In</div>
+                              </div>
+                              <div className="text-3xl font-bold text-foreground mb-1">{analytics.total_registered - analytics.total_checked_in}</div>
+                              <div className="text-xs text-muted-foreground">Absent attendees</div>
                             </div>
-                            <div className="text-sm font-medium text-muted-foreground">Not Checked In</div>
-                          </div>
-                          <div className="text-3xl font-bold text-foreground mb-1">{analytics.total_registered - analytics.total_checked_in}</div>
-                          <div className="text-xs text-muted-foreground">Absent attendees</div>
-                        </div>
-                      </div>
-                    </div>
-                    {/* Charts Section */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-                        <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <h3 className="text-lg font-semibold text-foreground">Hourly Check-in Trend</h3>
-                            <p className="text-sm text-muted-foreground">Real-time attendance patterns</p>
-                          </div>
-                          <div className="w-8 h-8 bg-success/20 rounded-lg flex items-center justify-center">
-                            <TrendingUp className="w-4 h-4 text-success" />
                           </div>
                         </div>
-                        <ResponsiveContainer width="100%" height={280}>
-                          <LineChart data={analytics.hourly_checkin_trend || analytics.checkin_trend || []}>
-                            {(() => {
-                              const styles = getChartStyles();
-                              const chartColors = getChartColors();
-                              
-                              return (
-                                <>
-                                  <defs>
-                                    <linearGradient id="checkinGradient" x1="0" y1="0" x2="0" y2="1">
-                                      <stop offset="5%" stopColor={chartColors.line} stopOpacity={0.3}/>
-                                      <stop offset="95%" stopColor={chartColors.line} stopOpacity={0}/>
-                                    </linearGradient>
-                                  </defs>
-                                  <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
-                                  <XAxis 
-                                    dataKey="hour" 
-                                    stroke={styles.axisStroke}
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                  />
-                                  <YAxis 
-                                    allowDecimals={false}
-                                    stroke={styles.axisStroke}
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                  />
-                                  <RechartsTooltip 
-                                    contentStyle={{
-                                      backgroundColor: styles.tooltipBg,
-                                      border: `1px solid ${styles.tooltipBorder}`,
-                                      borderRadius: '8px',
-                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                      color: styles.tooltipText,
-                                    }}
-                                  />
-                                  <Area 
-                                    type="monotone" 
-                                    dataKey="checked_in" 
-                                    stroke={chartColors.line} 
-                                    strokeWidth={3}
-                                    fill="url(#checkinGradient)"
-                                  />
-                                  <Line 
-                                    type="monotone" 
-                                    dataKey="checked_in" 
-                                    stroke={chartColors.line} 
-                                    strokeWidth={3}
-                                    dot={{ fill: chartColors.line, strokeWidth: 2, r: 4 }}
-                                    activeDot={{ r: 6, stroke: chartColors.line, strokeWidth: 2 }}
-                                  />
-                                </>
-                              );
-                            })()}
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
+                        {/* Charts Section */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+                            <div className="flex items-center justify-between mb-6">
+                              <div>
+                                <h3 className="text-lg font-semibold text-foreground">Hourly Check-in Trend</h3>
+                                <p className="text-sm text-muted-foreground">Real-time attendance patterns</p>
+                              </div>
+                              <div className="w-8 h-8 bg-success/20 rounded-lg flex items-center justify-center">
+                                <TrendingUp className="w-4 h-4 text-success" />
+                              </div>
+                            </div>
+                            <ResponsiveContainer width="100%" height={280}>
+                              <LineChart data={analytics.hourly_checkin_trend || analytics.checkin_trend || []}>
+                                {(() => {
+                                  const styles = getChartStyles();
+                                  const chartColors = getChartColors();
 
-                      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-                        <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <h3 className="text-lg font-semibold text-foreground">Registration Timeline</h3>
-                            <p className="text-sm text-muted-foreground">Registration growth over time</p>
+                                  return (
+                                    <>
+                                      <defs>
+                                        <linearGradient id="checkinGradient" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="5%" stopColor={chartColors.line} stopOpacity={0.3} />
+                                          <stop offset="95%" stopColor={chartColors.line} stopOpacity={0} />
+                                        </linearGradient>
+                                      </defs>
+                                      <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                                      <XAxis
+                                        dataKey="hour"
+                                        stroke={styles.axisStroke}
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                      />
+                                      <YAxis
+                                        allowDecimals={false}
+                                        stroke={styles.axisStroke}
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                      />
+                                      <RechartsTooltip
+                                        contentStyle={{
+                                          backgroundColor: styles.tooltipBg,
+                                          border: `1px solid ${styles.tooltipBorder}`,
+                                          borderRadius: '8px',
+                                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                          color: styles.tooltipText,
+                                        }}
+                                      />
+                                      <Area
+                                        type="monotone"
+                                        dataKey="checked_in"
+                                        stroke={chartColors.line}
+                                        strokeWidth={3}
+                                        fill="url(#checkinGradient)"
+                                      />
+                                      <Line
+                                        type="monotone"
+                                        dataKey="checked_in"
+                                        stroke={chartColors.line}
+                                        strokeWidth={3}
+                                        dot={{ fill: chartColors.line, strokeWidth: 2, r: 4 }}
+                                        activeDot={{ r: 6, stroke: chartColors.line, strokeWidth: 2 }}
+                                      />
+                                    </>
+                                  );
+                                })()}
+                              </LineChart>
+                            </ResponsiveContainer>
                           </div>
-                          <div className="w-8 h-8 bg-info/20 rounded-lg flex items-center justify-center">
-                            <BarChart3 className="w-4 h-4 text-info" />
-                          </div>
-                        </div>
-{analytics.registration_timeline && analytics.registration_timeline.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={280}>
-                          <LineChart data={analytics.registration_timeline}>
-                            {(() => {
-                              const styles = getChartStyles();
-                              const chartColors = getChartColors();
-                              
-                              return (
-                                <>
-                                  <defs>
-                                    <linearGradient id="registrationGradient" x1="0" y1="0" x2="0" y2="1">
-                                      <stop offset="5%" stopColor={chartColors.line} stopOpacity={0.3}/>
-                                      <stop offset="95%" stopColor={chartColors.line} stopOpacity={0}/>
-                                    </linearGradient>
-                                  </defs>
-                                  <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
-                                  <XAxis 
-                                    dataKey="date" 
-                                    stroke={styles.axisStroke}
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                  />
-                                  <YAxis 
-                                    allowDecimals={false}
-                                    stroke={styles.axisStroke}
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                  />
-                                  <RechartsTooltip 
-                                    contentStyle={{
-                                      backgroundColor: styles.tooltipBg,
-                                      border: `1px solid ${styles.tooltipBorder}`,
-                                      borderRadius: '8px',
-                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                      color: styles.tooltipText,
-                                    }}
-                                  />
-                                  <Area 
-                                    type="monotone" 
-                                    dataKey="registered" 
-                                    stroke={chartColors.line} 
-                                    strokeWidth={3}
-                                    fill="url(#registrationGradient)"
-                                  />
-                                  <Line 
-                                    type="monotone" 
-                                    dataKey="registered" 
-                                    stroke={chartColors.line} 
-                                    strokeWidth={3}
-                                    dot={{ fill: chartColors.line, strokeWidth: 2, r: 4 }}
-                                    activeDot={{ r: 6, stroke: chartColors.line, strokeWidth: 2 }}
-                                  />
-                                </>
-                              );
-                            })()}
-                          </LineChart>
-                        </ResponsiveContainer>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                            <BarChart3 className="w-12 h-12 mb-4 opacity-50" />
-                            <p className="text-lg font-medium">No Registration Data</p>
-                            <p className="text-sm">Registration timeline will appear when attendees register for this event</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {/* Distribution Charts */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-                        <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <h3 className="text-lg font-semibold text-foreground">Top Companies</h3>
-                            <p className="text-sm text-muted-foreground">Most represented organizations</p>
-                          </div>
-                          <div className="w-8 h-8 bg-warning/20 rounded-lg flex items-center justify-center">
-                            <Building className="w-4 h-4 text-warning" />
-                          </div>
-                        </div>
-                        <ResponsiveContainer width="100%" height={280}>
-                          <BarChart data={analytics.top_companies || []}>
-                            {(() => {
-                              const styles = getChartStyles();
-                              const chartColors = getChartColors();
-                              
-                              return (
-                                <>
-                                  <defs>
-                                    <linearGradient id="companyGradient" x1="0" y1="0" x2="0" y2="1">
-                                      <stop offset="5%" stopColor={chartColors.warning} stopOpacity={0.8}/>
-                                      <stop offset="95%" stopColor={chartColors.warning} stopOpacity={0.3}/>
-                                    </linearGradient>
-                                  </defs>
-                                  <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
-                                  <XAxis 
-                                    dataKey="company" 
-                                    stroke={styles.axisStroke}
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                  />
-                                  <YAxis 
-                                    allowDecimals={false}
-                                    stroke={styles.axisStroke}
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                  />
-                                  <RechartsTooltip 
-                                    contentStyle={{
-                                      backgroundColor: styles.tooltipBg,
-                                      border: `1px solid ${styles.tooltipBorder}`,
-                                      borderRadius: '8px',
-                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                      color: styles.tooltipText,
-                                    }}
-                                  />
-                                  <Bar 
-                                    dataKey="count" 
-                                    fill="url(#companyGradient)"
-                                    radius={[4, 4, 0, 0]}
-                                  />
-                                </>
-                              );
-                            })()}
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
 
-                      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-                        <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <h3 className="text-lg font-semibold text-foreground">Guest Type Distribution</h3>
-                            <p className="text-sm text-muted-foreground">Attendee category breakdown</p>
-                          </div>
-                          <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
-                            <Users className="w-4 h-4 text-primary" />
+                          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+                            <div className="flex items-center justify-between mb-6">
+                              <div>
+                                <h3 className="text-lg font-semibold text-foreground">Registration Timeline</h3>
+                                <p className="text-sm text-muted-foreground">Registration growth over time</p>
+                              </div>
+                              <div className="w-8 h-8 bg-info/20 rounded-lg flex items-center justify-center">
+                                <BarChart3 className="w-4 h-4 text-info" />
+                              </div>
+                            </div>
+                            {analytics.registration_timeline && analytics.registration_timeline.length > 0 ? (
+                              <ResponsiveContainer width="100%" height={280}>
+                                <LineChart data={analytics.registration_timeline}>
+                                  {(() => {
+                                    const styles = getChartStyles();
+                                    const chartColors = getChartColors();
+
+                                    return (
+                                      <>
+                                        <defs>
+                                          <linearGradient id="registrationGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor={chartColors.line} stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor={chartColors.line} stopOpacity={0} />
+                                          </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                                        <XAxis
+                                          dataKey="date"
+                                          stroke={styles.axisStroke}
+                                          fontSize={12}
+                                          tickLine={false}
+                                          axisLine={false}
+                                        />
+                                        <YAxis
+                                          allowDecimals={false}
+                                          stroke={styles.axisStroke}
+                                          fontSize={12}
+                                          tickLine={false}
+                                          axisLine={false}
+                                        />
+                                        <RechartsTooltip
+                                          contentStyle={{
+                                            backgroundColor: styles.tooltipBg,
+                                            border: `1px solid ${styles.tooltipBorder}`,
+                                            borderRadius: '8px',
+                                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                            color: styles.tooltipText,
+                                          }}
+                                        />
+                                        <Area
+                                          type="monotone"
+                                          dataKey="registered"
+                                          stroke={chartColors.line}
+                                          strokeWidth={3}
+                                          fill="url(#registrationGradient)"
+                                        />
+                                        <Line
+                                          type="monotone"
+                                          dataKey="registered"
+                                          stroke={chartColors.line}
+                                          strokeWidth={3}
+                                          dot={{ fill: chartColors.line, strokeWidth: 2, r: 4 }}
+                                          activeDot={{ r: 6, stroke: chartColors.line, strokeWidth: 2 }}
+                                        />
+                                      </>
+                                    );
+                                  })()}
+                                </LineChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                                <BarChart3 className="w-12 h-12 mb-4 opacity-50" />
+                                <p className="text-lg font-medium">No Registration Data</p>
+                                <p className="text-sm">Registration timeline will appear when attendees register for this event</p>
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <ResponsiveContainer width="100%" height={280}>
-                          <BarChart data={analytics.top_guest_types || analytics.guest_type_distribution || []}>
-                            {(() => {
-                              const styles = getChartStyles();
-                              const chartColors = getChartColors();
-                              const gradientColor = chartColors.accent;
-                              
-                              return (
-                                <>
-                                  <defs>
-                                    <linearGradient id="guestTypeGradient" x1="0" y1="0" x2="0" y2="1">
-                                      <stop offset="5%" stopColor={gradientColor} stopOpacity={0.8}/>
-                                      <stop offset="95%" stopColor={gradientColor} stopOpacity={0.3}/>
-                                    </linearGradient>
-                                  </defs>
-                                  <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
-                                  <XAxis 
-                                    dataKey="type" 
-                                    stroke={styles.axisStroke}
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                  />
-                                  <YAxis 
-                                    allowDecimals={false}
-                                    stroke={styles.axisStroke}
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                  />
-                                  <RechartsTooltip 
-                                    contentStyle={{
-                                      backgroundColor: styles.tooltipBg,
-                                      border: `1px solid ${styles.tooltipBorder}`,
-                                      borderRadius: '8px',
-                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                      color: styles.tooltipText,
-                                    }}
-                                  />
-                                  <Bar 
-                                    dataKey="count" 
-                                    fill="url(#guestTypeGradient)"
-                                    radius={[4, 4, 0, 0]}
-                                  />
-                                </>
-                              );
-                            })()}
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                    {/* Pie Charts Section */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-                        <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <h3 className="text-lg font-semibold text-foreground">Gender Distribution</h3>
-                            <p className="text-sm text-muted-foreground">Attendee gender breakdown</p>
+                        {/* Distribution Charts */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+                            <div className="flex items-center justify-between mb-6">
+                              <div>
+                                <h3 className="text-lg font-semibold text-foreground">Top Companies</h3>
+                                <p className="text-sm text-muted-foreground">Most represented organizations</p>
+                              </div>
+                              <div className="w-8 h-8 bg-warning/20 rounded-lg flex items-center justify-center">
+                                <Building className="w-4 h-4 text-warning" />
+                              </div>
+                            </div>
+                            <ResponsiveContainer width="100%" height={280}>
+                              <BarChart data={analytics.top_companies || []}>
+                                {(() => {
+                                  const styles = getChartStyles();
+                                  const chartColors = getChartColors();
+
+                                  return (
+                                    <>
+                                      <defs>
+                                        <linearGradient id="companyGradient" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="5%" stopColor={chartColors.warning} stopOpacity={0.8} />
+                                          <stop offset="95%" stopColor={chartColors.warning} stopOpacity={0.3} />
+                                        </linearGradient>
+                                      </defs>
+                                      <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                                      <XAxis
+                                        dataKey="company"
+                                        stroke={styles.axisStroke}
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                      />
+                                      <YAxis
+                                        allowDecimals={false}
+                                        stroke={styles.axisStroke}
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                      />
+                                      <RechartsTooltip
+                                        contentStyle={{
+                                          backgroundColor: styles.tooltipBg,
+                                          border: `1px solid ${styles.tooltipBorder}`,
+                                          borderRadius: '8px',
+                                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                          color: styles.tooltipText,
+                                        }}
+                                      />
+                                      <Bar
+                                        dataKey="count"
+                                        fill="url(#companyGradient)"
+                                        radius={[4, 4, 0, 0]}
+                                      />
+                                    </>
+                                  );
+                                })()}
+                              </BarChart>
+                            </ResponsiveContainer>
                           </div>
-                          <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
-                            <User className="w-4 h-4 text-primary dark:text-primary" />
+
+                          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+                            <div className="flex items-center justify-between mb-6">
+                              <div>
+                                <h3 className="text-lg font-semibold text-foreground">Guest Type Distribution</h3>
+                                <p className="text-sm text-muted-foreground">Attendee category breakdown</p>
+                              </div>
+                              <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                                <Users className="w-4 h-4 text-primary" />
+                              </div>
+                            </div>
+                            <ResponsiveContainer width="100%" height={280}>
+                              <BarChart data={analytics.top_guest_types || analytics.guest_type_distribution || []}>
+                                {(() => {
+                                  const styles = getChartStyles();
+                                  const chartColors = getChartColors();
+                                  const gradientColor = chartColors.accent;
+
+                                  return (
+                                    <>
+                                      <defs>
+                                        <linearGradient id="guestTypeGradient" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="5%" stopColor={gradientColor} stopOpacity={0.8} />
+                                          <stop offset="95%" stopColor={gradientColor} stopOpacity={0.3} />
+                                        </linearGradient>
+                                      </defs>
+                                      <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
+                                      <XAxis
+                                        dataKey="type"
+                                        stroke={styles.axisStroke}
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                      />
+                                      <YAxis
+                                        allowDecimals={false}
+                                        stroke={styles.axisStroke}
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                      />
+                                      <RechartsTooltip
+                                        contentStyle={{
+                                          backgroundColor: styles.tooltipBg,
+                                          border: `1px solid ${styles.tooltipBorder}`,
+                                          borderRadius: '8px',
+                                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                          color: styles.tooltipText,
+                                        }}
+                                      />
+                                      <Bar
+                                        dataKey="count"
+                                        fill="url(#guestTypeGradient)"
+                                        radius={[4, 4, 0, 0]}
+                                      />
+                                    </>
+                                  );
+                                })()}
+                              </BarChart>
+                            </ResponsiveContainer>
                           </div>
                         </div>
-                        <ResponsiveContainer width="100%" height={280}>
-                          <PieChart>
-                            {(() => {
-                              const styles = getChartStyles();
-                              const colors = getChartColorPalette('primary');
-                              
-                              return (
-                                <>
+                        {/* Pie Charts Section */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+                            <div className="flex items-center justify-between mb-6">
+                              <div>
+                                <h3 className="text-lg font-semibold text-foreground">Gender Distribution</h3>
+                                <p className="text-sm text-muted-foreground">Attendee gender breakdown</p>
+                              </div>
+                              <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                                <User className="w-4 h-4 text-primary dark:text-primary" />
+                              </div>
+                            </div>
+                            <div className="h-[280px] w-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
                                   <Pie
                                     data={analytics.gender_distribution || []}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={60}
+                                    outerRadius={80}
+                                    paddingAngle={5}
                                     dataKey="count"
                                     nameKey="gender"
-                                    cx="50%"
-                                    cy="50%"
-                                    outerRadius={80}
-                                    innerRadius={40}
-                                    fill={colors[0]}
-                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                    labelLine={false}
-                                    labelStyle={{ fill: styles.labelColor }}
                                   >
-                                    {(analytics.gender_distribution || []).map((entry, idx) => (
-                                      <Cell key={`gender-cell-${idx}`} fill={colors[idx % colors.length]} />
+                                    {(analytics.gender_distribution || []).map((entry: any, index: number) => (
+                                      <Cell key={`cell-${index}`} fill={getChartColorPalette('primary')[index % getChartColorPalette('primary').length]} />
                                     ))}
                                   </Pie>
-                                  <RechartsTooltip 
+                                  <RechartsTooltip
                                     contentStyle={{
-                                      backgroundColor: styles.tooltipBg,
-                                      border: `1px solid ${styles.tooltipBorder}`,
+                                      backgroundColor: getChartStyles().tooltipBg,
+                                      border: `1px solid ${getChartStyles().tooltipBorder}`,
                                       borderRadius: '8px',
-                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                      color: styles.tooltipText,
+                                      color: getChartStyles().tooltipText,
                                     }}
                                   />
-                                </>
-                              );
-                            })()}
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
+                                </PieChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
 
-                      <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-                        <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <h3 className="text-lg font-semibold text-foreground">Country Distribution</h3>
-                            <p className="text-sm text-muted-foreground">Geographic representation</p>
-                          </div>
-                          <div className="w-8 h-8 bg-success/20 rounded-lg flex items-center justify-center">
-                            <Globe className="w-4 h-4 text-success dark:text-success" />
-                          </div>
-                        </div>
-                        <ResponsiveContainer width="100%" height={280}>
-                          <PieChart>
-                            {(() => {
-                              const styles = getChartStyles();
-                              const colors = getChartColorPalette('primary');
-                              
-                              return (
-                                <>
+                          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+                            <div className="flex items-center justify-between mb-6">
+                              <div>
+                                <h3 className="text-lg font-semibold text-foreground">Country Distribution</h3>
+                                <p className="text-sm text-muted-foreground">Attendee geographic breakdown</p>
+                              </div>
+                              <div className="w-8 h-8 bg-info/20 rounded-lg flex items-center justify-center">
+                                <Globe className="w-4 h-4 text-info" />
+                              </div>
+                            </div>
+                            <div className="h-[280px] w-full">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
                                   <Pie
                                     data={analytics.country_distribution || []}
-                                    dataKey="count"
-                                    nameKey="country"
                                     cx="50%"
                                     cy="50%"
+                                    innerRadius={60}
                                     outerRadius={80}
-                                    innerRadius={40}
-                                    fill={colors[0]}
-                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                    labelLine={false}
-                                    labelStyle={{ fill: styles.labelColor }}
+                                    paddingAngle={5}
+                                    dataKey="count"
+                                    nameKey="country"
                                   >
-                                    {(analytics.country_distribution || []).map((entry, idx) => (
-                                      <Cell key={`country-cell-${idx}`} fill={colors[idx % colors.length]} />
+                                    {(analytics.country_distribution || []).map((entry: any, index: number) => (
+                                      <Cell key={`cell-${index}`} fill={getChartColorPalette('info')[index % getChartColorPalette('info').length]} />
                                     ))}
                                   </Pie>
-                                  <RechartsTooltip 
+                                  <RechartsTooltip
                                     contentStyle={{
-                                      backgroundColor: styles.tooltipBg,
-                                      border: `1px solid ${styles.tooltipBorder}`,
+                                      backgroundColor: getChartStyles().tooltipBg,
+                                      border: `1px solid ${getChartStyles().tooltipBorder}`,
                                       borderRadius: '8px',
-                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                      color: styles.tooltipText,
+                                      color: getChartStyles().tooltipText,
                                     }}
                                   />
-                                </>
-                              );
-                            })()}
-                          </PieChart>
-                        </ResponsiveContainer>
+                                </PieChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-20 bg-card rounded-2xl border border-border">
+                        <Users className="w-16 h-16 text-muted-foreground/30 mb-4" />
+                        <h3 className="text-xl font-semibold text-foreground">No Analytics Data Yet</h3>
+                        <p className="text-muted-foreground max-w-sm text-center">
+                          Analytics will become available once attendees start registering and checking in for this event.
+                        </p>
+                      </div>
+                    )}
 
                     {/* Session Check-in Analytics Section */}
                     {sessionCheckInData.length > 0 && (
@@ -4837,9 +4147,9 @@ export default function EventDetails() {
                               <div className="text-3xl font-bold text-foreground mb-1">
                                 {sessionCheckInData.length > 0
                                   ? Math.round(
-                                      sessionCheckInData.reduce((sum, session) => sum + session.check_in_rate, 0) /
-                                        sessionCheckInData.length
-                                    )
+                                    sessionCheckInData.reduce((sum, session) => sum + session.check_in_rate, 0) /
+                                    sessionCheckInData.length
+                                  )
                                   : 0}%
                               </div>
                               <div className="text-xs text-muted-foreground">Average attendance rate</div>
@@ -4868,18 +4178,18 @@ export default function EventDetails() {
                                 {(() => {
                                   const styles = getChartStyles();
                                   const chartColors = getChartColors();
-                                  
+
                                   return (
                                     <>
                                       <defs>
                                         <linearGradient id="sessionCheckInGradient" x1="0" y1="0" x2="0" y2="1">
-                                          <stop offset="5%" stopColor={chartColors.info} stopOpacity={0.8}/>
-                                          <stop offset="95%" stopColor={chartColors.info} stopOpacity={0.3}/>
+                                          <stop offset="5%" stopColor={chartColors.info} stopOpacity={0.8} />
+                                          <stop offset="95%" stopColor={chartColors.info} stopOpacity={0.3} />
                                         </linearGradient>
                                       </defs>
                                       <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
-                                      <XAxis 
-                                        dataKey="session_name" 
+                                      <XAxis
+                                        dataKey="session_name"
                                         stroke={styles.axisStroke}
                                         fontSize={12}
                                         tickLine={false}
@@ -4888,14 +4198,14 @@ export default function EventDetails() {
                                         textAnchor="end"
                                         height={100}
                                       />
-                                      <YAxis 
+                                      <YAxis
                                         allowDecimals={false}
                                         stroke={styles.axisStroke}
                                         fontSize={12}
                                         tickLine={false}
                                         axisLine={false}
                                       />
-                                      <RechartsTooltip 
+                                      <RechartsTooltip
                                         contentStyle={{
                                           backgroundColor: styles.tooltipBg,
                                           border: `1px solid ${styles.tooltipBorder}`,
@@ -4909,8 +4219,8 @@ export default function EventDetails() {
                                           return [value, name];
                                         }}
                                       />
-                                      <Bar 
-                                        dataKey="checked_in" 
+                                      <Bar
+                                        dataKey="checked_in"
                                         fill="url(#sessionCheckInGradient)"
                                         radius={[4, 4, 0, 0]}
                                         name="Checked In"
@@ -4955,13 +4265,13 @@ export default function EventDetails() {
                                     </TableCell>
                                     <TableCell className="text-muted-foreground">{session.location || 'N/A'}</TableCell>
                                     <TableCell className="text-muted-foreground">
-                                      {session.start_time 
+                                      {session.start_time
                                         ? new Date(session.start_time).toLocaleString('en-US', {
-                                            month: 'short',
-                                            day: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                          })
+                                          month: 'short',
+                                          day: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })
                                         : 'N/A'}
                                     </TableCell>
                                     <TableCell className="font-semibold text-success">{session.checked_in}</TableCell>
@@ -5008,870 +4318,639 @@ export default function EventDetails() {
                       />
                     </div>
                   </div>
+                </TabsContent>
+                <TabsContent value="forms">
+                  <div className="min-h-screen bg-background p-6">
+                    <FormsList
+                      eventId={Number(eventId)}
+                      onCreateForm={() => {
+                        // TODO: Open form creation modal
+                        console.log('Create new form');
+                      }}
+                    />
+                  </div>
+                </TabsContent>
+                <TabsContent value="sessions">
+                  <div className="min-h-[200px]">
+                    <EventSessions eventId={Number(eventId)} />
+                  </div>
+                </TabsContent>
+                <TabsContent value="invitations">
+                  <InvitationsTab
+                    eventId={Number(eventId)}
+                    eventUuid={eventData?.uuid || ''}
+                    eventName={eventData?.name || ''}
+                    eventType={eventData?.event_type as 'free' | 'ticketed' || 'free'}
+                    isOrganizer={user?.role === 'organizer' || user?.role === 'organizer_admin' || user?.role === 'admin' || user?.role === 'superadmin'}
+                  />
+                </TabsContent>
+                {user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin' ? (
+                  <TabsContent value="bulk-badges">
+                    <BulkBadgesTab
+                      eventId={Number(eventId)}
+                      guestTypes={guestTypes || []}
+                      eventName={eventData?.name}
+                    />
+                  </TabsContent>
                 ) : null}
               </div>
-            </TabsContent>
-            <TabsContent value="forms">
-              <div className="min-h-screen bg-background p-6">
-                <FormsList
-                  eventId={Number(eventId)}
-                  onCreateForm={() => {
-                    // TODO: Open form creation modal
-                    console.log('Create new form');
-                  }}
-                />
-              </div>
-            </TabsContent>
-            <TabsContent value="sessions">
-              <div className="min-h-[200px]">
-                <EventSessions eventId={Number(eventId)} />
-              </div>
-            </TabsContent>
-            <TabsContent value="invitations">
-              <InvitationsTab
-                eventId={Number(eventId)}
-                eventUuid={eventData?.uuid || ''}
-                eventName={eventData?.name || ''}
-                eventType={eventData?.event_type as 'free' | 'ticketed' || 'free'}
-                isOrganizer={user?.role === 'organizer' || user?.role === 'organizer_admin' || user?.role === 'admin' || user?.role === 'superadmin'}
-              />
-            </TabsContent>
-            {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin') && (
-            <TabsContent value="bulk-badges">
-              <BulkBadgesTab 
-                eventId={Number(eventId)}
-                guestTypes={guestTypes || []}
-                eventName={eventData?.name}
-              />
-            </TabsContent>
-            )}
-        </Tabs>
+            </Tabs>
 
-          {/* Edit Event Dialog */}
-          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-            <style>{customRangeStyles}</style>
-            <DialogContent className="max-w-6xl w-full h-[95vh] flex flex-col bg-gradient-to-br from-slate-50 to-blue-50">
-              <DialogHeader className="flex-shrink-0 bg-white rounded-t-xl p-6 border-b border-gray-200">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-                    <Edit className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                      Edit Event
-                    </DialogTitle>
-                    <DialogDescription className="text-gray-600 mt-1">
-                      Update your event details and configuration
-                    </DialogDescription>
-                  </div>
-                </div>
-              </DialogHeader>
-              {editForm && (
-                <form onSubmit={handleEditEvent} className="flex-1 overflow-y-auto p-6">
-                  <div className="max-w-5xl mx-auto space-y-8">
-                  {/* Event Information */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                        <Tag className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">
-                          Event Information
-                        </h3>
-                        <p className="text-gray-500 text-sm">
-                          Basic event details and logistics
-                        </p>
-                      </div>
+            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+              <style>{customRangeStyles}</style>
+              <DialogContent className="max-w-6xl w-full h-[95vh] flex flex-col bg-gradient-to-br from-slate-50 to-blue-50">
+                <DialogHeader className="flex-shrink-0 bg-white rounded-t-xl p-6 border-b border-gray-200">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
+                      <Edit className="w-6 h-6 text-white" />
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div>
-                        <Label htmlFor="edit_name" className="flex items-center gap-2 text-gray-700 font-medium">
-                          <Tag className="w-4 h-4 text-blue-500" /> Event Name
-                        </Label>
-                        <Input
-                          id="edit_name"
-                          value={editForm.name}
-                          onChange={(e) => handleEditInput('name', e.target.value)}
-                          placeholder="Enter event name"
-                          required
-                          className="mt-2 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit_location" className="flex items-center gap-2 text-gray-700 font-medium">
-                          <MapPin className="w-4 h-4 text-green-500" /> Location
-                        </Label>
-                        <Input
-                          id="edit_location"
-                          value={editForm.location}
-                          onChange={(e) => handleEditInput('location', e.target.value)}
-                          placeholder="e.g. Grand Convention Center"
-                          className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl"
-                        />
-                      </div>
-                      <div className="lg:col-span-2">
-                        <Label htmlFor="edit_description" className="flex items-center gap-2 text-gray-700 font-medium">
-                          <FileText className="w-4 h-4 text-purple-500" /> Description
-                        </Label>
-                        <Textarea
-                          id="edit_description"
-                          value={editForm.description}
-                          onChange={(e) => handleEditInput('description', e.target.value)}
-                          placeholder="Describe your event..."
-                          rows={4}
-                          className="mt-2 border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-xl resize-none"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit_event_type_id" className="flex items-center gap-2 text-gray-700 font-medium">
-                          <Tag className="w-4 h-4 text-orange-500" /> Event Type
-                        </Label>
-                        <Select
-                          value={editForm.event_type_id}
-                          onValueChange={(value) => handleEditInput('event_type_id', value)}
-                          disabled={editLoadingStates.eventTypes}
-                          required
-                        >
-                          <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl" id="edit_event_type_id">
-                            <SelectValue placeholder="Select event type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {filterValidOptions(eventTypes).map((type: any) => (
-                              <SelectItem key={type.id} value={String(type.id)}>
-                                {type.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {editErrors.eventTypes && (
-                          <div className="text-xs text-error mt-2">
-                            {editErrors.eventTypes}
+                    <div>
+                      <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                        Edit Event
+                      </DialogTitle>
+                      <DialogDescription className="text-gray-600 mt-1">
+                        Update your event details and configuration
+                      </DialogDescription>
+                    </div>
+                  </div>
+                </DialogHeader>
+                {editForm && (
+                  <form onSubmit={handleEditEvent} className="flex-1 overflow-y-auto p-6">
+                    <div className="max-w-5xl mx-auto space-y-8">
+                      {/* Event Information */}
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                            <Tag className="w-5 h-5 text-white" />
                           </div>
-                        )}
-                      </div>
-                      <div>
-                        <Label htmlFor="edit_event_category_id" className="flex items-center gap-2 text-gray-700 font-medium">
-                          <Tag className="w-4 h-4 text-indigo-500" /> Event Category
-                        </Label>
-                        <Select
-                          value={editForm.event_category_id}
-                          onValueChange={(value) => handleEditInput('event_category_id', value)}
-                          disabled={editLoadingStates.eventCategories}
-                          required
-                        >
-                          <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl" id="edit_event_category_id">
-                            <SelectValue placeholder="Select event category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {filterValidOptions(eventCategories).map((cat: any) => (
-                              <SelectItem key={cat.id} value={String(cat.id)}>
-                                {cat.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {editErrors.eventCategories && (
-                          <div className="text-xs text-error mt-2">
-                            {editErrors.eventCategories}
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900">
+                              Event Information
+                            </h3>
+                            <p className="text-gray-500 text-sm">
+                              Basic event details and logistics
+                            </p>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Event Configuration Section */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                        <Settings className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">
-                          Event Configuration
-                        </h3>
-                        <p className="text-gray-500 text-sm">
-                          Capacity, guest types, and event image
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div>
-                        <Label htmlFor="edit_max_guests" className="flex items-center gap-2 text-gray-700 font-medium">
-                          <Users className="w-4 h-4 text-teal-500" /> Max Guests
-                        </Label>
-                        <Input
-                          id="edit_max_guests"
-                          type="number"
-                          value={editForm.max_guests}
-                          onChange={(e) => handleEditInput('max_guests', e.target.value)}
-                          placeholder="e.g. 500"
-                          className="mt-2 h-12 border-gray-300 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
-                        />
-                      </div>
-                      <div className="lg:col-span-2">
-                        <Label htmlFor="edit_guest_types" className="flex items-center gap-2 text-gray-700 font-medium">
-                          <Users className="w-4 h-4 text-pink-500" /> Guest Types
-                        </Label>
-                                            <div className="flex flex-wrap gap-2 mb-3 mt-2">
-                          {PREDEFINED_GUEST_TYPES.map(type => {
-                            const isSelected = Array.isArray(editForm.guest_types)
-                              ? editForm.guest_types.includes(type)
-                              : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).includes(type);
-                            return (
-                              <Button
-                                key={type}
-                                type="button"
-                                variant={isSelected ? 'default' : 'outline'}
-                                className={`${isSelected ? 'bg-pink-600 text-white border-pink-600' : 'border-gray-300 hover:border-pink-300'} rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200`}
-                                onClick={() => {
-                                  let current = Array.isArray(editForm.guest_types)
-                                    ? editForm.guest_types
-                                    : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).filter(Boolean);
-                                  if (current.includes(type)) {
-                                    current = current.filter((t: string) => t !== type);
-                                  } else {
-                                    current = [...current, type];
-                                  }
-                                  handleEditInput('guest_types', current);
-                                }}
-                              >
-                                {type}
-                              </Button>
-                            );
-                          })}
                         </div>
-                        <Input
-                          id="edit_guest_types_custom"
-                          value={Array.isArray(editForm.guest_types) ? editForm.guest_types.filter((t: string) => !PREDEFINED_GUEST_TYPES.includes(t)).join(', ') : ''}
-                          onChange={e => {
-                            let custom = e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean);
-                            let current = Array.isArray(editForm.guest_types)
-                              ? editForm.guest_types.filter((t: string) => PREDEFINED_GUEST_TYPES.includes(t))
-                              : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).filter(t => PREDEFINED_GUEST_TYPES.includes(t));
-                            handleEditInput('guest_types', [...current, ...custom]);
-                          }}
-                          placeholder="Add custom guest types, comma separated"
-                          className="border-gray-300 focus:border-pink-500 focus:ring-pink-500 rounded-xl"
-                        />
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <div>
+                            <Label htmlFor="edit_name" className="flex items-center gap-2 text-gray-700 font-medium">
+                              <Tag className="w-4 h-4 text-blue-500" /> Event Name
+                            </Label>
+                            <Input
+                              id="edit_name"
+                              value={editForm.name}
+                              onChange={(e) => handleEditInput('name', e.target.value)}
+                              placeholder="Enter event name"
+                              required
+                              className="mt-2 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="edit_location" className="flex items-center gap-2 text-gray-700 font-medium">
+                              <MapPin className="w-4 h-4 text-green-500" /> Location
+                            </Label>
+                            <Input
+                              id="edit_location"
+                              value={editForm.location}
+                              onChange={(e) => handleEditInput('location', e.target.value)}
+                              placeholder="e.g. Grand Convention Center"
+                              className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl"
+                            />
+                          </div>
+                          <div className="lg:col-span-2">
+                            <Label htmlFor="edit_description" className="flex items-center gap-2 text-gray-700 font-medium">
+                              <FileText className="w-4 h-4 text-purple-500" /> Description
+                            </Label>
+                            <Textarea
+                              id="edit_description"
+                              value={editForm.description}
+                              onChange={(e) => handleEditInput('description', e.target.value)}
+                              placeholder="Describe your event..."
+                              rows={4}
+                              className="mt-2 border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-xl resize-none"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="edit_event_type_id" className="flex items-center gap-2 text-gray-700 font-medium">
+                              <Tag className="w-4 h-4 text-orange-500" /> Event Type
+                            </Label>
+                            <Select
+                              value={editForm.event_type_id}
+                              onValueChange={(value) => handleEditInput('event_type_id', value)}
+                              disabled={editLoadingStates.eventTypes}
+                              required
+                            >
+                              <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl" id="edit_event_type_id">
+                                <SelectValue placeholder="Select event type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {filterValidOptions(eventTypes).map((type: any) => (
+                                  <SelectItem key={type.id} value={String(type.id)}>
+                                    {type.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {editErrors.eventTypes && (
+                              <div className="text-xs text-error mt-2">
+                                {editErrors.eventTypes}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <Label htmlFor="edit_event_category_id" className="flex items-center gap-2 text-gray-700 font-medium">
+                              <Tag className="w-4 h-4 text-indigo-500" /> Event Category
+                            </Label>
+                            <Select
+                              value={editForm.event_category_id}
+                              onValueChange={(value) => handleEditInput('event_category_id', value)}
+                              disabled={editLoadingStates.eventCategories}
+                              required
+                            >
+                              <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl" id="edit_event_category_id">
+                                <SelectValue placeholder="Select event category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {filterValidOptions(eventCategories).map((cat: any) => (
+                                  <SelectItem key={cat.id} value={String(cat.id)}>
+                                    {cat.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {editErrors.eventCategories && (
+                              <div className="text-xs text-error mt-2">
+                                {editErrors.eventCategories}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Event Configuration Section */}
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+                            <Settings className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900">
+                              Event Configuration
+                            </h3>
+                            <p className="text-gray-500 text-sm">
+                              Capacity, guest types, and event image
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <div>
+                            <Label htmlFor="edit_max_guests" className="flex items-center gap-2 text-gray-700 font-medium">
+                              <Users className="w-4 h-4 text-teal-500" /> Max Guests
+                            </Label>
+                            <Input
+                              id="edit_max_guests"
+                              type="number"
+                              value={editForm.max_guests}
+                              onChange={(e) => handleEditInput('max_guests', e.target.value)}
+                              placeholder="e.g. 500"
+                              className="mt-2 h-12 border-gray-300 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                            />
+                          </div>
+                          <div className="lg:col-span-2">
+                            <Label htmlFor="edit_guest_types" className="flex items-center gap-2 text-gray-700 font-medium">
+                              <Users className="w-4 h-4 text-pink-500" /> Guest Types
+                            </Label>
+                            <div className="flex flex-wrap gap-2 mb-3 mt-2">
+                              {PREDEFINED_GUEST_TYPES.map(type => {
+                                const isSelected = Array.isArray(editForm.guest_types)
+                                  ? editForm.guest_types.includes(type)
+                                  : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).includes(type);
+                                return (
+                                  <Button
+                                    key={type}
+                                    type="button"
+                                    variant={isSelected ? 'default' : 'outline'}
+                                    className={`${isSelected ? 'bg-pink-600 text-white border-pink-600' : 'border-gray-300 hover:border-pink-300'} rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200`}
+                                    onClick={() => {
+                                      let current = Array.isArray(editForm.guest_types)
+                                        ? editForm.guest_types
+                                        : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                                      if (current.includes(type)) {
+                                        current = current.filter((t: string) => t !== type);
+                                      } else {
+                                        current = [...current, type];
+                                      }
+                                      handleEditInput('guest_types', current);
+                                    }}
+                                  >
+                                    {type}
+                                  </Button>
+                                );
+                              })}
+                            </div>
+                            <Input
+                              id="edit_guest_types_custom"
+                              value={Array.isArray(editForm.guest_types) ? editForm.guest_types.filter((t: string) => !PREDEFINED_GUEST_TYPES.includes(t)).join(', ') : ''}
+                              onChange={e => {
+                                let custom = e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean);
+                                let current = Array.isArray(editForm.guest_types)
+                                  ? editForm.guest_types.filter((t: string) => PREDEFINED_GUEST_TYPES.includes(t))
+                                  : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).filter(t => PREDEFINED_GUEST_TYPES.includes(t));
+                                handleEditInput('guest_types', [...current, ...custom]);
+                              }}
+                              placeholder="Add custom guest types, comma separated"
+                              className="border-gray-300 focus:border-pink-500 focus:ring-pink-500 rounded-xl"
+                            />
+                            <p className="text-xs text-gray-500 mt-2">
+                              Select from predefined or add custom guest types
+                            </p>
+
+                            {/* Current Guest Types Display */}
+                            {Array.isArray(editForm.guest_types) && editForm.guest_types.length > 0 && (
+                              <div className="mt-4 p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl border border-pink-200">
+                                <h4 className="text-sm font-semibold text-pink-800 mb-3 flex items-center gap-2">
+                                  <Users className="w-4 h-4" />
+                                  Currently Selected Guest Types
+                                </h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {editForm.guest_types.map((gt: any, index: number) => {
+                                    const guestTypeName = typeof gt === 'object' && gt !== null && gt.name ? gt.name : String(gt);
+                                    return (
+                                      <Badge key={index} variant="secondary" className="text-xs bg-pink-100 text-pink-800 border-pink-300">
+                                        {guestTypeName}
+                                      </Badge>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Event Image Section - Hidden */}
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hidden">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                            <Image className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900">
+                              Event Image
+                            </h3>
+                            <p className="text-gray-500 text-sm">
+                              Upload your event banner or promotional image
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="file"
+                            id="edit_event_image"
+                            ref={editImageInputRef}
+                            accept="image/*"
+                            onChange={handleEditFile}
+                            className="hidden"
+                          />
+                          <label htmlFor="edit_event_image" className="inline-block">
+                            <div className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl cursor-pointer border border-emerald-600 hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm">
+                              Choose File
+                            </div>
+                          </label>
+                          <span className="text-gray-600 text-sm">
+                            {editForm.event_image instanceof File
+                              ? editForm.event_image.name
+                              : editForm.event_image
+                                ? 'Current image'
+                                : 'No file chosen'}
+                          </span>
+                        </div>
                         <p className="text-xs text-gray-500 mt-2">
-                          Select from predefined or add custom guest types
+                          Upload your event banner (PNG, JPG, SVG) - Max 2MB
                         </p>
-                        
-                        {/* Current Guest Types Display */}
+                        {editImagePreview && (
+                          <div className="mt-4 relative inline-block">
+                            <img
+                              src={editImagePreview}
+                              alt="Event image preview"
+                              className="h-32 rounded-xl shadow-lg border border-gray-200"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              className="absolute -top-2 -right-2 rounded-full h-8 w-8 shadow-lg"
+                              onClick={handleRemoveEditImage}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Additional Information Section */}
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900">
+                              Additional Information
+                            </h3>
+                            <p className="text-gray-500 text-sm">
+                              Requirements, agenda, and additional details
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-6">
+                          <div>
+                            <Label htmlFor="edit_requirements" className="flex items-center gap-2 text-gray-700 font-medium">
+                              <FileText className="w-4 h-4 text-amber-500" /> Requirements & Prerequisites
+                            </Label>
+                            <Textarea
+                              id="edit_requirements"
+                              value={editForm.requirements || ''}
+                              onChange={(e) => handleEditInput('requirements', e.target.value)}
+                              placeholder="Any requirements or prerequisites for attendees..."
+                              rows={3}
+                              className="mt-2 border-gray-300 focus:border-amber-500 focus:ring-amber-500 rounded-xl resize-none"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="edit_agenda" className="flex items-center gap-2 text-gray-700 font-medium">
+                              <FileText className="w-4 h-4 text-amber-500" /> Event Agenda
+                            </Label>
+                            <Textarea
+                              id="edit_agenda"
+                              value={editForm.agenda || ''}
+                              onChange={(e) => handleEditInput('agenda', e.target.value)}
+                              placeholder="Detailed event schedule and agenda..."
+                              rows={4}
+                              className="mt-2 border-gray-300 focus:border-amber-500 focus:ring-amber-500 rounded-xl resize-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Event & Registration Dates Section */}
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-violet-600 rounded-xl flex items-center justify-center">
+                            <Calendar className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900">
+                              Event & Registration Dates
+                            </h3>
+                            <p className="text-gray-500 text-sm">
+                              Set event and registration periods
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          <div>
+                            <Label className="flex items-center gap-2 text-gray-700 font-medium">
+                              <Calendar className="w-4 h-4 text-violet-500" /> Event Date Range
+                            </Label>
+                            <Button
+                              type="button"
+                              className="w-full mt-2 h-12 bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 hover:from-violet-200 hover:to-purple-200 border border-violet-300 rounded-xl font-medium"
+                              onClick={() => setShowEditEventRange(true)}
+                            >
+                              {editForm.start_date && editForm.end_date
+                                ? `${editEventRange[0].startDate.toLocaleDateString()} - ${editEventRange[0].endDate.toLocaleDateString()}`
+                                : 'Select event date range'}
+                            </Button>
+                            {showEditEventRange && (
+                              <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+                                <div className="bg-white border rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+                                  <DateRange
+                                    ranges={editEventRange}
+                                    onChange={(item) => setEditEventRange([item.selection])}
+                                    editableDateInputs
+                                    moveRangeOnFirstSelection={false}
+                                    direction="horizontal"
+                                  />
+                                  <div className="flex justify-end gap-3 mt-6">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => setShowEditEventRange(false)}
+                                      className="rounded-xl px-6"
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      className="bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl px-6"
+                                      onClick={() => {
+                                        setEditForm((prev: any) => ({
+                                          ...prev,
+                                          start_date: editEventRange[0].startDate,
+                                          end_date: editEventRange[0].endDate,
+                                        }))
+                                        setShowEditEventRange(false)
+                                      }}
+                                    >
+                                      Apply
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <Label className="flex items-center gap-2 text-gray-700 font-medium">
+                              <Calendar className="w-4 h-4 text-emerald-500" /> Registration Date Range
+                            </Label>
+                            <Button
+                              type="button"
+                              className="w-full mt-2 h-12 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 hover:from-emerald-200 hover:to-green-200 border border-emerald-300 rounded-xl font-medium"
+                              onClick={() => setShowEditRegRange(true)}
+                            >
+                              {editForm.registration_start_date && editForm.registration_end_date
+                                ? `${editRegRange[0].startDate.toLocaleDateString()} - ${editRegRange[0].endDate.toLocaleDateString()}`
+                                : 'Select registration date range'}
+                            </Button>
+                            {showEditRegRange && (
+                              <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+                                <div className="bg-white border rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+                                  <DateRange
+                                    ranges={editRegRange}
+                                    onChange={(item) => setEditRegRange([item.selection])}
+                                    editableDateInputs
+                                    moveRangeOnFirstSelection={false}
+                                    direction="horizontal"
+                                  />
+                                  <div className="flex justify-end gap-3 mt-6">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => setShowEditRegRange(false)}
+                                      className="rounded-xl px-6"
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      className="bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl px-6"
+                                      onClick={() => {
+                                        setEditForm((prev: any) => ({
+                                          ...prev,
+                                          registration_start_date: editRegRange[0].startDate,
+                                          registration_end_date: editRegRange[0].endDate,
+                                        }))
+                                        setShowEditRegRange(false)
+                                      }}
+                                    >
+                                      Apply
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Current Guest Types Display in Event & Registration Dates Section */}
                         {Array.isArray(editForm.guest_types) && editForm.guest_types.length > 0 && (
-                          <div className="mt-4 p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl border border-pink-200">
-                            <h4 className="text-sm font-semibold text-pink-800 mb-3 flex items-center gap-2">
+                          <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                            <h4 className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
                               <Users className="w-4 h-4" />
-                              Currently Selected Guest Types
+                              Current Guest Types for This Event
                             </h4>
                             <div className="flex flex-wrap gap-2">
                               {editForm.guest_types.map((gt: any, index: number) => {
                                 const guestTypeName = typeof gt === 'object' && gt !== null && gt.name ? gt.name : String(gt);
                                 return (
-                                  <Badge key={index} variant="secondary" className="text-xs bg-pink-100 text-pink-800 border-pink-300">
+                                  <Badge key={index} variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
                                     {guestTypeName}
                                   </Badge>
                                 );
                               })}
                             </div>
+                            <p className="text-xs text-blue-600 mt-2">
+                              These guest types are currently configured for this event. You can modify them in the Guest Types section above.
+                            </p>
                           </div>
                         )}
                       </div>
-                    </div>
-                  </div>
-                  
-                  {/* Event Image Section - Hidden */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hidden">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                        <Image className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">
-                          Event Image
-                        </h3>
-                        <p className="text-gray-500 text-sm">
-                          Upload your event banner or promotional image
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="file"
-                        id="edit_event_image"
-                        ref={editImageInputRef}
-                        accept="image/*"
-                        onChange={handleEditFile}
-                        className="hidden"
-                      />
-                      <label htmlFor="edit_event_image" className="inline-block">
-                        <div className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl cursor-pointer border border-emerald-600 hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm">
-                          Choose File
-                        </div>
-                      </label>
-                      <span className="text-gray-600 text-sm">
-                        {editForm.event_image instanceof File
-                          ? editForm.event_image.name
-                          : editForm.event_image
-                          ? 'Current image'
-                          : 'No file chosen'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Upload your event banner (PNG, JPG, SVG) - Max 2MB
-                    </p>
-                    {editImagePreview && (
-                      <div className="mt-4 relative inline-block">
-                        <img
-                          src={editImagePreview}
-                          alt="Event image preview"
-                          className="h-32 rounded-xl shadow-lg border border-gray-200"
-                        />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute -top-2 -right-2 rounded-full h-8 w-8 shadow-lg"
-                          onClick={handleRemoveEditImage}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Additional Information Section */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">
-                          Additional Information
-                        </h3>
-                        <p className="text-gray-500 text-sm">
-                          Requirements, agenda, and additional details
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 gap-6">
-                      <div>
-                        <Label htmlFor="edit_requirements" className="flex items-center gap-2 text-gray-700 font-medium">
-                          <FileText className="w-4 h-4 text-amber-500" /> Requirements & Prerequisites
-                        </Label>
-                        <Textarea
-                          id="edit_requirements"
-                          value={editForm.requirements || ''}
-                          onChange={(e) => handleEditInput('requirements', e.target.value)}
-                          placeholder="Any requirements or prerequisites for attendees..."
-                          rows={3}
-                          className="mt-2 border-gray-300 focus:border-amber-500 focus:ring-amber-500 rounded-xl resize-none"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit_agenda" className="flex items-center gap-2 text-gray-700 font-medium">
-                          <FileText className="w-4 h-4 text-amber-500" /> Event Agenda
-                        </Label>
-                        <Textarea
-                          id="edit_agenda"
-                          value={editForm.agenda || ''}
-                          onChange={(e) => handleEditInput('agenda', e.target.value)}
-                          placeholder="Detailed event schedule and agenda..."
-                          rows={4}
-                          className="mt-2 border-gray-300 focus:border-amber-500 focus:ring-amber-500 rounded-xl resize-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Event & Registration Dates Section */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-violet-600 rounded-xl flex items-center justify-center">
-                        <Calendar className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">
-                          Event & Registration Dates
-                        </h3>
-                        <p className="text-gray-500 text-sm">
-                          Set event and registration periods
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div>
-                        <Label className="flex items-center gap-2 text-gray-700 font-medium">
-                          <Calendar className="w-4 h-4 text-violet-500" /> Event Date Range
-                        </Label>
-                        <Button
-                          type="button"
-                          className="w-full mt-2 h-12 bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 hover:from-violet-200 hover:to-purple-200 border border-violet-300 rounded-xl font-medium"
-                          onClick={() => setShowEditEventRange(true)}
-                        >
-                          {editForm.start_date && editForm.end_date
-                            ? `${editEventRange[0].startDate.toLocaleDateString()} - ${editEventRange[0].endDate.toLocaleDateString()}`
-                            : 'Select event date range'}
-                        </Button>
-                        {showEditEventRange && (
-                          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
-                            <div className="bg-white border rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
-                              <DateRange
-                                ranges={editEventRange}
-                                onChange={(item) => setEditEventRange([item.selection])}
-                                editableDateInputs
-                                moveRangeOnFirstSelection={false}
-                                direction="horizontal"
-                              />
-                              <div className="flex justify-end gap-3 mt-6">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => setShowEditEventRange(false)}
-                                  className="rounded-xl px-6"
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  type="button"
-                                  className="bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl px-6"
-                                  onClick={() => {
-                                    setEditForm((prev: any) => ({
-                                      ...prev,
-                                      start_date: editEventRange[0].startDate,
-                                      end_date: editEventRange[0].endDate,
-                                    }))
-                                    setShowEditEventRange(false)
-                                  }}
-                                >
-                                  Apply
-                                </Button>
+                      {/* Action Buttons */}
+                      <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-2xl border border-gray-200 p-6">
+                        <div className="flex flex-col sm:flex-row gap-4 justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setEditDialogOpen(false)}
+                            className="px-8 py-3 rounded-xl border-gray-300 hover:border-gray-400 font-medium"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={editLoading}
+                            className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+                          >
+                            {editLoading ? (
+                              <div className="flex items-center gap-2">
+                                <SpinnerInline size="sm" />
+                                Updating Event...
                               </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <Label className="flex items-center gap-2 text-gray-700 font-medium">
-                          <Calendar className="w-4 h-4 text-emerald-500" /> Registration Date Range
-                        </Label>
-                        <Button
-                          type="button"
-                          className="w-full mt-2 h-12 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 hover:from-emerald-200 hover:to-green-200 border border-emerald-300 rounded-xl font-medium"
-                          onClick={() => setShowEditRegRange(true)}
-                        >
-                          {editForm.registration_start_date && editForm.registration_end_date
-                            ? `${editRegRange[0].startDate.toLocaleDateString()} - ${editRegRange[0].endDate.toLocaleDateString()}`
-                            : 'Select registration date range'}
-                        </Button>
-                        {showEditRegRange && (
-                          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
-                            <div className="bg-white border rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
-                              <DateRange
-                                ranges={editRegRange}
-                                onChange={(item) => setEditRegRange([item.selection])}
-                                editableDateInputs
-                                moveRangeOnFirstSelection={false}
-                                direction="horizontal"
-                              />
-                              <div className="flex justify-end gap-3 mt-6">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => setShowEditRegRange(false)}
-                                  className="rounded-xl px-6"
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  type="button"
-                                  className="bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl px-6"
-                                  onClick={() => {
-                                    setEditForm((prev: any) => ({
-                                      ...prev,
-                                      registration_start_date: editRegRange[0].startDate,
-                                      registration_end_date: editRegRange[0].endDate,
-                                    }))
-                                    setShowEditRegRange(false)
-                                  }}
-                                >
-                                  Apply
-                                </Button>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-4 h-4" />
+                                Update Event
                               </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Current Guest Types Display in Event & Registration Dates Section */}
-                    {Array.isArray(editForm.guest_types) && editForm.guest_types.length > 0 && (
-                      <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-                        <h4 className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
-                          <Users className="w-4 h-4" />
-                          Current Guest Types for This Event
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {editForm.guest_types.map((gt: any, index: number) => {
-                            const guestTypeName = typeof gt === 'object' && gt !== null && gt.name ? gt.name : String(gt);
-                            return (
-                              <Badge key={index} variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
-                                {guestTypeName}
-                              </Badge>
-                            );
-                          })}
+                            )}
+                          </Button>
                         </div>
-                        <p className="text-xs text-blue-600 mt-2">
-                          These guest types are currently configured for this event. You can modify them in the Guest Types section above.
-                        </p>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-2xl border border-gray-200 p-6">
-                    <div className="flex flex-col sm:flex-row gap-4 justify-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setEditDialogOpen(false)}
-                        className="px-8 py-3 rounded-xl border-gray-300 hover:border-gray-400 font-medium"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={editLoading}
-                        className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-                      >
-                        {editLoading ? (
-                          <div className="flex items-center gap-2">
-                            <SpinnerInline size="sm" />
-                            Updating Event...
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4" />
-                            Update Event
-                          </div>
-                        )}
-                      </Button>
                     </div>
-                  </div>
-                </div>
-            </form>
-              )}
-            </DialogContent>
-          </Dialog>
-
-          {/* Create Participant Dialog */}
-          <Dialog
-            open={createParticipantDialogOpen}
-            onOpenChange={setCreateParticipantDialogOpen}
-          >
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Create Participants</DialogTitle>
-                <DialogDescription>
-                  Create participant attendees with the name "PARTICIPANT". These will be accessible in the bulk badges tab for assignment and printing.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div>
-                  <Label htmlFor="participant_count">Number of Participants</Label>
-                  <Input
-                    id="participant_count"
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={participantCount}
-                    onChange={(e) => setParticipantCount(parseInt(e.target.value) || 1)}
-                    className="mt-1"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Enter the number of participants to create (1-100)
-                  </p>
-                </div>
-                
-                {guestTypes && guestTypes.length > 0 && (
-                  <div>
-                    <Label htmlFor="participant_guest_type">Guest Type</Label>
-                    <Select
-                      value={addAttendeeForm.guest_type_id || ''}
-                      onValueChange={(value) => handleAddAttendeeInput('guest_type_id', value)}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select a guest type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {guestTypes
-                          .filter((type) => type.id !== undefined && type.id !== null && type.id !== '')
-                          .map((type) => (
-                            <SelectItem key={type.id} value={String(type.id)}>
-                              {type.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Select the guest type for all participants
-                    </p>
-                  </div>
+                  </form>
                 )}
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setCreateParticipantDialogOpen(false)
-                    setParticipantCount(1)
-                  }}
-                  disabled={addAttendeeLoading}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="button"
-                  onClick={handleCreateParticipant}
-                  disabled={addAttendeeLoading}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  {addAttendeeLoading ? (
-                    <>
-                      <svg
-                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Participants'
-                  )}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
 
-          {/* Add Attendee Dialog */}
-          <Dialog
-            open={addAttendeeDialogOpen}
-            onOpenChange={setAddAttendeeDialogOpen}
-          >
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Add New Attendee</DialogTitle>
-                <DialogDescription>
-                  Enter the details of the new attendee for {eventData.name}.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddAttendee} className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
+            {/* Create Participant Dialog */}
+            < Dialog
+              open={createParticipantDialogOpen}
+              onOpenChange={setCreateParticipantDialogOpen}
+            >
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Create Participants</DialogTitle>
+                  <DialogDescription>
+                    Create participant attendees with the name "PARTICIPANT". These will be accessible in the bulk badges tab for assignment and printing.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
                   <div>
-                    <Label htmlFor="first_name">First Name</Label>
+                    <Label htmlFor="participant_count">Number of Participants</Label>
                     <Input
-                      id="first_name"
-                      value={addAttendeeForm.first_name}
-                      onChange={(e) =>
-                        handleAddAttendeeInput('first_name', e.target.value)
-                      }
-                      required
+                      id="participant_count"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={participantCount}
+                      onChange={(e) => setParticipantCount(parseInt(e.target.value) || 1)}
+                      className="mt-1"
                     />
+                    <p className="text-sm text-gray-500 mt-1">
+                      Enter the number of participants to create (1-100)
+                    </p>
                   </div>
-                  <div>
-                    <Label htmlFor="last_name">Last Name</Label>
-                    <Input
-                      id="last_name"
-                      value={addAttendeeForm.last_name}
-                      onChange={(e) =>
-                        handleAddAttendeeInput('last_name', e.target.value)
-                      }
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={addAttendeeForm.email}
-                      onChange={(e) =>
-                        handleAddAttendeeInput('email', e.target.value)
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      value={addAttendeeForm.phone}
-                      onChange={(e) =>
-                        handleAddAttendeeInput('phone', e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="company">Company</Label>
-                    <Input
-                      id="company"
-                      value={addAttendeeForm.company}
-                      onChange={(e) =>
-                        handleAddAttendeeInput('company', e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="jobtitle">Job Title</Label>
-                    <Input
-                      id="jobtitle"
-                      value={addAttendeeForm.jobtitle}
-                      onChange={(e) =>
-                        handleAddAttendeeInput('jobtitle', e.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="gender">Gender</Label>
-                    <Select
-                      onValueChange={(value) =>
-                        handleAddAttendeeInput('gender', value)
-                      }
-                      value={addAttendeeForm.gender}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select gender" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Male">Male</SelectItem>
-                        <SelectItem value="Female">Female</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                        <SelectItem value="Prefer not to say">Prefer not to say</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="country">Country</Label>
-                    <Select
-                      onValueChange={(value) =>
-                        handleAddAttendeeInput('country', value)
-                      }
-                      value={addAttendeeForm.country}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select country" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from(new Set([
-                          "Ethiopia", "United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium", "Switzerland", "Austria", "Sweden", "Norway", "Denmark", "Finland", "Poland", "Czech Republic", "Hungary", "Romania", "Bulgaria", "Greece", "Portugal", "Ireland", "New Zealand", "Japan", "South Korea", "China", "India", "Brazil", "Argentina", "Mexico", "Chile", "Colombia", "Peru", "Venezuela", "Ecuador", "Bolivia", "Paraguay", "Uruguay", "Guyana", "Suriname", "French Guiana", "South Africa", "Egypt", "Nigeria", "Kenya", "Ghana", "Uganda", "Tanzania", "Morocco", "Algeria", "Tunisia", "Libya", "Sudan", "Somalia", "Djibouti", "Eritrea", "Saudi Arabia", "United Arab Emirates", "Qatar", "Kuwait", "Bahrain", "Oman", "Yemen", "Jordan", "Lebanon", "Syria", "Iraq", "Iran", "Afghanistan", "Pakistan", "Bangladesh", "Sri Lanka", "Nepal", "Bhutan", "Maldives", "Myanmar", "Thailand", "Laos", "Cambodia", "Vietnam", "Malaysia", "Singapore", "Indonesia", "Philippines", "Brunei", "East Timor", "Papua New Guinea", "Fiji", "Solomon Islands", "Vanuatu", "New Caledonia", "French Polynesia", "Samoa", "Tonga", "Kiribati", "Tuvalu", "Nauru", "Palau", "Micronesia", "Marshall Islands", "Cook Islands", "Niue", "Tokelau", "American Samoa", "Guam", "Northern Mariana Islands", "Puerto Rico", "U.S. Virgin Islands", "British Virgin Islands", "Anguilla", "Montserrat", "Saint Kitts and Nevis", "Antigua and Barbuda", "Dominica", "Saint Lucia", "Saint Vincent and the Grenadines", "Barbados", "Grenada", "Trinidad and Tobago", "Jamaica", "Haiti", "Dominican Republic", "Cuba", "Bahamas", "Belize", "Guatemala", "El Salvador", "Honduras", "Nicaragua", "Costa Rica", "Panama", "Vatican City", "Zambia", "Zimbabwe"
-                        ])).map((country, idx) => (
-  <SelectItem key={`${country}-${idx}`} value={country}>{country}</SelectItem>
-))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1">
-                  <div>
-                    {eventData?.event_type === 'ticketed' ? (
-                      <>
-                        <Label htmlFor="ticket_type_id">Ticket Type</Label>
-                        <Select
-                          onValueChange={(value) =>
-                            handleAddAttendeeInput('ticket_type_id', value)
-                          }
-                          value={addAttendeeForm.ticket_type_id || ''}
-                          required
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a ticket type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ticketTypes
-                              .filter(
-                                (type) =>
-                                  type.id !== undefined &&
-                                  type.id !== null &&
-                                  type.id !== ''
-                              )
-                              .map((type) => (
-                                <SelectItem key={type.id} value={String(type.id)}>
-                                  {type.name} - ETB {parseFloat(type.price).toLocaleString()}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </>
-                    ) : (
-                      <>
-                        <Label htmlFor="guest_type_id">Guest Type</Label>
-                        <Select
-                          onValueChange={(value) =>
-                            handleAddAttendeeInput('guest_type_id', value)
-                          }
-                          value={addAttendeeForm.guest_type_id}
-                          required
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a guest type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {guestTypes
-                              .filter(
-                                (type) =>
-                                  type.id !== undefined &&
-                                  type.id !== null &&
-                                  type.id !== ''
-                              )
-                              .map((type) => (
-                                <SelectItem key={type.id} value={String(type.id)}>
-                                  {type.name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </>
-                    )}
-                  </div>
+
+                  {guestTypes && guestTypes.length > 0 && (
+                    <div>
+                      <Label htmlFor="participant_guest_type">Guest Type</Label>
+                      <Select
+                        value={addAttendeeForm.guest_type_id || ''}
+                        onValueChange={(value) => handleAddAttendeeInput('guest_type_id', value)}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select a guest type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {guestTypes
+                            .filter((type) => type.id !== undefined && type.id !== null && type.id !== '')
+                            .map((type) => (
+                              <SelectItem key={type.id} value={String(type.id)}>
+                                {type.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Select the guest type for all participants
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setAddAttendeeDialogOpen(false)}
+                    onClick={() => {
+                      setCreateParticipantDialogOpen(false)
+                      setParticipantCount(1)
+                    }}
                     disabled={addAttendeeLoading}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={addAttendeeLoading}>
+                  <Button
+                    type="button"
+                    onClick={handleCreateParticipant}
+                    disabled={addAttendeeLoading}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
                     {addAttendeeLoading ? (
                       <>
                         <svg
-                          className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
                           xmlns="http://www.w3.org/2000/svg"
                           fill="none"
                           viewBox="0 0 24 24"
@@ -5890,82 +4969,107 @@ export default function EventDetails() {
                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                           ></path>
                         </svg>
-                        Adding...
+                        Creating...
                       </>
                     ) : (
-                      'Add Attendee'
+                      'Create Participants'
                     )}
                   </Button>
                 </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
 
-          {/* Edit Attendee Dialog */}
-          <Dialog open={editAttendeeDialogOpen} onOpenChange={setEditAttendeeDialogOpen}>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Edit Attendee</DialogTitle>
-                <DialogDescription>
-                  Update the attendee information below.
-                </DialogDescription>
-              </DialogHeader>
-              {editAttendeeForm && (
-                <form onSubmit={handleEditAttendeeSubmit} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Add Attendee Dialog */}
+            < Dialog
+              open={addAttendeeDialogOpen}
+              onOpenChange={setAddAttendeeDialogOpen}
+            >
+              <DialogContent className="sm:max-w-[600px]">
+                <DialogHeader>
+                  <DialogTitle>Add New Attendee</DialogTitle>
+                  <DialogDescription>
+                    Enter the details of the new attendee for {eventData.name}.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddAttendee} className="space-y-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="edit_attendee_name">Name</Label>
+                      <Label htmlFor="first_name">First Name</Label>
                       <Input
-                        id="edit_attendee_name"
-                        value={editAttendeeForm.name}
-                        onChange={(e) => handleEditAttendeeInput('name', e.target.value)}
-                        placeholder="Full Name"
+                        id="first_name"
+                        value={addAttendeeForm.first_name}
+                        onChange={(e) =>
+                          handleAddAttendeeInput('first_name', e.target.value)
+                        }
                         required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="edit_attendee_email">Email</Label>
+                      <Label htmlFor="last_name">Last Name</Label>
                       <Input
-                        id="edit_attendee_email"
-                        value={editAttendeeForm.email}
-                        onChange={(e) => handleEditAttendeeInput('email', e.target.value)}
-                        placeholder="Email Address"
+                        id="last_name"
+                        value={addAttendeeForm.last_name}
+                        onChange={(e) =>
+                          handleAddAttendeeInput('last_name', e.target.value)
+                        }
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="email">Email Address</Label>
+                      <Input
+                        id="email"
                         type="email"
+                        value={addAttendeeForm.email}
+                        onChange={(e) =>
+                          handleAddAttendeeInput('email', e.target.value)
+                        }
                         required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="edit_attendee_phone">Phone</Label>
+                      <Label htmlFor="phone">Phone Number</Label>
                       <Input
-                        id="edit_attendee_phone"
-                        value={editAttendeeForm.phone}
-                        onChange={(e) => handleEditAttendeeInput('phone', e.target.value)}
-                        placeholder="Phone Number"
+                        id="phone"
+                        value={addAttendeeForm.phone}
+                        onChange={(e) =>
+                          handleAddAttendeeInput('phone', e.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="company">Company</Label>
+                      <Input
+                        id="company"
+                        value={addAttendeeForm.company}
+                        onChange={(e) =>
+                          handleAddAttendeeInput('company', e.target.value)
+                        }
                       />
                     </div>
                     <div>
-                      <Label htmlFor="edit_attendee_company">Company</Label>
+                      <Label htmlFor="jobtitle">Job Title</Label>
                       <Input
-                        id="edit_attendee_company"
-                        value={editAttendeeForm.company}
-                        onChange={(e) => handleEditAttendeeInput('company', e.target.value)}
-                        placeholder="Company Name"
+                        id="jobtitle"
+                        value={addAttendeeForm.jobtitle}
+                        onChange={(e) =>
+                          handleAddAttendeeInput('jobtitle', e.target.value)
+                        }
                       />
                     </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="edit_attendee_jobtitle">Job Title</Label>
-                      <Input
-                        id="edit_attendee_jobtitle"
-                        value={editAttendeeForm.jobtitle}
-                        onChange={(e) => handleEditAttendeeInput('jobtitle', e.target.value)}
-                        placeholder="Job Title"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="edit_attendee_gender">Gender</Label>
+                      <Label htmlFor="gender">Gender</Label>
                       <Select
-                        value={editAttendeeForm.gender}
-                        onValueChange={(value) => handleEditAttendeeInput('gender', value)}
+                        onValueChange={(value) =>
+                          handleAddAttendeeInput('gender', value)
+                        }
+                        value={addAttendeeForm.gender}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select gender" />
@@ -5979,10 +5083,12 @@ export default function EventDetails() {
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="edit_attendee_country">Country</Label>
+                      <Label htmlFor="country">Country</Label>
                       <Select
-                        value={editAttendeeForm.country}
-                        onValueChange={(value) => handleEditAttendeeInput('country', value)}
+                        onValueChange={(value) =>
+                          handleAddAttendeeInput('country', value)
+                        }
+                        value={addAttendeeForm.country}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select country" />
@@ -5990,19 +5096,23 @@ export default function EventDetails() {
                         <SelectContent>
                           {Array.from(new Set([
                             "Ethiopia", "United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium", "Switzerland", "Austria", "Sweden", "Norway", "Denmark", "Finland", "Poland", "Czech Republic", "Hungary", "Romania", "Bulgaria", "Greece", "Portugal", "Ireland", "New Zealand", "Japan", "South Korea", "China", "India", "Brazil", "Argentina", "Mexico", "Chile", "Colombia", "Peru", "Venezuela", "Ecuador", "Bolivia", "Paraguay", "Uruguay", "Guyana", "Suriname", "French Guiana", "South Africa", "Egypt", "Nigeria", "Kenya", "Ghana", "Uganda", "Tanzania", "Morocco", "Algeria", "Tunisia", "Libya", "Sudan", "Somalia", "Djibouti", "Eritrea", "Saudi Arabia", "United Arab Emirates", "Qatar", "Kuwait", "Bahrain", "Oman", "Yemen", "Jordan", "Lebanon", "Syria", "Iraq", "Iran", "Afghanistan", "Pakistan", "Bangladesh", "Sri Lanka", "Nepal", "Bhutan", "Maldives", "Myanmar", "Thailand", "Laos", "Cambodia", "Vietnam", "Malaysia", "Singapore", "Indonesia", "Philippines", "Brunei", "East Timor", "Papua New Guinea", "Fiji", "Solomon Islands", "Vanuatu", "New Caledonia", "French Polynesia", "Samoa", "Tonga", "Kiribati", "Tuvalu", "Nauru", "Palau", "Micronesia", "Marshall Islands", "Cook Islands", "Niue", "Tokelau", "American Samoa", "Guam", "Northern Mariana Islands", "Puerto Rico", "U.S. Virgin Islands", "British Virgin Islands", "Anguilla", "Montserrat", "Saint Kitts and Nevis", "Antigua and Barbuda", "Dominica", "Saint Lucia", "Saint Vincent and the Grenadines", "Barbados", "Grenada", "Trinidad and Tobago", "Jamaica", "Haiti", "Dominican Republic", "Cuba", "Bahamas", "Belize", "Guatemala", "El Salvador", "Honduras", "Nicaragua", "Costa Rica", "Panama", "Vatican City", "Zambia", "Zimbabwe"
-                            ])).map((country, idx) => (
-  <SelectItem key={`${country}-${idx}`} value={country}>{country}</SelectItem>
-))}
+                          ])).map((country, idx) => (
+                            <SelectItem key={`${country}-${idx}`} value={country}>{country}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="md:col-span-2">
+                  </div>
+                  <div className="grid grid-cols-1">
+                    <div>
                       {eventData?.event_type === 'ticketed' ? (
                         <>
-                          <Label htmlFor="edit_attendee_ticket_type">Ticket Type</Label>
+                          <Label htmlFor="ticket_type_id">Ticket Type</Label>
                           <Select
-                            value={editAttendeeForm.ticket_type_id || ''}
-                            onValueChange={(value) => handleEditAttendeeInput('ticket_type_id', value)}
+                            onValueChange={(value) =>
+                              handleAddAttendeeInput('ticket_type_id', value)
+                            }
+                            value={addAttendeeForm.ticket_type_id || ''}
                             required
                           >
                             <SelectTrigger>
@@ -6026,10 +5136,12 @@ export default function EventDetails() {
                         </>
                       ) : (
                         <>
-                          <Label htmlFor="edit_attendee_guest_type">Guest Type</Label>
+                          <Label htmlFor="guest_type_id">Guest Type</Label>
                           <Select
-                            value={editAttendeeForm.guest_type_id}
-                            onValueChange={(value) => handleEditAttendeeInput('guest_type_id', value)}
+                            onValueChange={(value) =>
+                              handleAddAttendeeInput('guest_type_id', value)
+                            }
+                            value={addAttendeeForm.guest_type_id}
                             required
                           >
                             <SelectTrigger>
@@ -6058,13 +5170,13 @@ export default function EventDetails() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setEditAttendeeDialogOpen(false)}
-                      disabled={editAttendeeLoading}
+                      onClick={() => setAddAttendeeDialogOpen(false)}
+                      disabled={addAttendeeLoading}
                     >
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={editAttendeeLoading}>
-                      {editAttendeeLoading ? (
+                    <Button type="submit" disabled={addAttendeeLoading}>
+                      {addAttendeeLoading ? (
                         <>
                           <svg
                             className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
@@ -6086,147 +5198,344 @@ export default function EventDetails() {
                               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                             ></path>
                           </svg>
-                          Updating...
+                          Adding...
                         </>
                       ) : (
-                        'Update Attendee'
+                        'Add Attendee'
                       )}
                     </Button>
                   </DialogFooter>
                 </form>
+              </DialogContent>
+            </Dialog>
+
+            {/* Edit Attendee Dialog */}
+            <Dialog open={editAttendeeDialogOpen} onOpenChange={setEditAttendeeDialogOpen} >
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Edit Attendee</DialogTitle>
+                  <DialogDescription>
+                    Update the attendee information below.
+                  </DialogDescription>
+                </DialogHeader>
+                {editAttendeeForm && (
+                  <form onSubmit={handleEditAttendeeSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="edit_attendee_name">Name</Label>
+                        <Input
+                          id="edit_attendee_name"
+                          value={editAttendeeForm.name}
+                          onChange={(e) => handleEditAttendeeInput('name', e.target.value)}
+                          placeholder="Full Name"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_attendee_email">Email</Label>
+                        <Input
+                          id="edit_attendee_email"
+                          value={editAttendeeForm.email}
+                          onChange={(e) => handleEditAttendeeInput('email', e.target.value)}
+                          placeholder="Email Address"
+                          type="email"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_attendee_phone">Phone</Label>
+                        <Input
+                          id="edit_attendee_phone"
+                          value={editAttendeeForm.phone}
+                          onChange={(e) => handleEditAttendeeInput('phone', e.target.value)}
+                          placeholder="Phone Number"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_attendee_company">Company</Label>
+                        <Input
+                          id="edit_attendee_company"
+                          value={editAttendeeForm.company}
+                          onChange={(e) => handleEditAttendeeInput('company', e.target.value)}
+                          placeholder="Company Name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_attendee_jobtitle">Job Title</Label>
+                        <Input
+                          id="edit_attendee_jobtitle"
+                          value={editAttendeeForm.jobtitle}
+                          onChange={(e) => handleEditAttendeeInput('jobtitle', e.target.value)}
+                          placeholder="Job Title"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_attendee_gender">Gender</Label>
+                        <Select
+                          value={editAttendeeForm.gender}
+                          onValueChange={(value) => handleEditAttendeeInput('gender', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select gender" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Male">Male</SelectItem>
+                            <SelectItem value="Female">Female</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                            <SelectItem value="Prefer not to say">Prefer not to say</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="edit_attendee_country">Country</Label>
+                        <Select
+                          value={editAttendeeForm.country}
+                          onValueChange={(value) => handleEditAttendeeInput('country', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select country" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from(new Set([
+                              "Ethiopia", "United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium", "Switzerland", "Austria", "Sweden", "Norway", "Denmark", "Finland", "Poland", "Czech Republic", "Hungary", "Romania", "Bulgaria", "Greece", "Portugal", "Ireland", "New Zealand", "Japan", "South Korea", "China", "India", "Brazil", "Argentina", "Mexico", "Chile", "Colombia", "Peru", "Venezuela", "Ecuador", "Bolivia", "Paraguay", "Uruguay", "Guyana", "Suriname", "French Guiana", "South Africa", "Egypt", "Nigeria", "Kenya", "Ghana", "Uganda", "Tanzania", "Morocco", "Algeria", "Tunisia", "Libya", "Sudan", "Somalia", "Djibouti", "Eritrea", "Saudi Arabia", "United Arab Emirates", "Qatar", "Kuwait", "Bahrain", "Oman", "Yemen", "Jordan", "Lebanon", "Syria", "Iraq", "Iran", "Afghanistan", "Pakistan", "Bangladesh", "Sri Lanka", "Nepal", "Bhutan", "Maldives", "Myanmar", "Thailand", "Laos", "Cambodia", "Vietnam", "Malaysia", "Singapore", "Indonesia", "Philippines", "Brunei", "East Timor", "Papua New Guinea", "Fiji", "Solomon Islands", "Vanuatu", "New Caledonia", "French Polynesia", "Samoa", "Tonga", "Kiribati", "Tuvalu", "Nauru", "Palau", "Micronesia", "Marshall Islands", "Cook Islands", "Niue", "Tokelau", "American Samoa", "Guam", "Northern Mariana Islands", "Puerto Rico", "U.S. Virgin Islands", "British Virgin Islands", "Anguilla", "Montserrat", "Saint Kitts and Nevis", "Antigua and Barbuda", "Dominica", "Saint Lucia", "Saint Vincent and the Grenadines", "Barbados", "Grenada", "Trinidad and Tobago", "Jamaica", "Haiti", "Dominican Republic", "Cuba", "Bahamas", "Belize", "Guatemala", "El Salvador", "Honduras", "Nicaragua", "Costa Rica", "Panama", "Vatican City", "Zambia", "Zimbabwe"
+                            ])).map((country, idx) => (
+                              <SelectItem key={`${country}-${idx}`} value={country}>{country}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="md:col-span-2">
+                        {eventData?.event_type === 'ticketed' ? (
+                          <>
+                            <Label htmlFor="edit_attendee_ticket_type">Ticket Type</Label>
+                            <Select
+                              value={editAttendeeForm.ticket_type_id || ''}
+                              onValueChange={(value) => handleEditAttendeeInput('ticket_type_id', value)}
+                              required
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a ticket type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ticketTypes
+                                  .filter(
+                                    (type) =>
+                                      type.id !== undefined &&
+                                      type.id !== null &&
+                                      type.id !== ''
+                                  )
+                                  .map((type) => (
+                                    <SelectItem key={type.id} value={String(type.id)}>
+                                      {type.name} - ETB {parseFloat(type.price).toLocaleString()}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </>
+                        ) : (
+                          <>
+                            <Label htmlFor="edit_attendee_guest_type">Guest Type</Label>
+                            <Select
+                              value={editAttendeeForm.guest_type_id}
+                              onValueChange={(value) => handleEditAttendeeInput('guest_type_id', value)}
+                              required
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a guest type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {guestTypes
+                                  .filter(
+                                    (type) =>
+                                      type.id !== undefined &&
+                                      type.id !== null &&
+                                      type.id !== ''
+                                  )
+                                  .map((type) => (
+                                    <SelectItem key={type.id} value={String(type.id)}>
+                                      {type.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setEditAttendeeDialogOpen(false)}
+                        disabled={editAttendeeLoading}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={editAttendeeLoading}>
+                        {editAttendeeLoading ? (
+                          <>
+                            <svg
+                              className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              ></circle>
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
+                            </svg>
+                            Updating...
+                          </>
+                        ) : (
+                          'Update Attendee'
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                )}
+              </DialogContent>
+            </Dialog>
+
+            {/* Create Usher Dialog */}
+            < Dialog
+              open={createUsherDialogOpen}
+              onOpenChange={setCreateUsherDialogOpen}
+            >
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Usher</DialogTitle>
+                  <DialogDescription>
+                    Fill in the details to create a new usher account.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Name</Label>
+                    <Input
+                      value={newUsher.name}
+                      onChange={(e) =>
+                        setNewUsher({ ...newUsher, name: e.target.value })
+                      }
+                      placeholder="Full Name"
+                    />
+                  </div>
+                  <div>
+                    <Label>Email</Label>
+                    <Input
+                      value={newUsher.email}
+                      onChange={(e) =>
+                        setNewUsher({ ...newUsher, email: e.target.value })
+                      }
+                      placeholder="Email Address"
+                      type="email"
+                    />
+                  </div>
+                  <div>
+                    <Label>Password</Label>
+                    <Input
+                      value={newUsher.password}
+                      onChange={(e) =>
+                        setNewUsher({ ...newUsher, password: e.target.value })
+                      }
+                      placeholder="Password"
+                      type="password"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCreateUsherDialogOpen(false)}
+                    disabled={creatingUsher}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="bg-gradient-to-r from-blue-600 to-purple-600"
+                    disabled={
+                      creatingUsher ||
+                      !newUsher.name ||
+                      !newUsher.email ||
+                      !newUsher.password
+                    }
+                    onClick={async () => {
+                      setCreatingUsher(true)
+                      try {
+                        await api.post('/users', {
+                          name: newUsher.name,
+                          email: newUsher.email,
+                          password: newUsher.password,
+                          role: 'usher',
+                        })
+                        toast.success('Usher account created!')
+                        setCreateUsherDialogOpen(false)
+                        setNewUsher({ name: '', email: '', password: '' })
+                      } catch (err) {
+                        toast.error('Failed to create usher')
+                      } finally {
+                        setCreatingUsher(false)
+                      }
+                    }}
+                  >
+                    {creatingUsher ? 'Creating...' : 'Create Usher'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Hidden single badge print area */}
+            < div
+              ref={singleBadgePrintRef}
+              style={{
+                position: 'fixed',
+                left: '-9999px',
+                top: 0,
+                visibility: 'hidden',
+                zIndex: -1,
+                width: '100%',
+                height: '100%'
+              }
+              }
+              className="printable-badge-container"
+            >
+              {singlePrintAttendee && (
+                <div className="printable-badge-batch">
+                  <BadgePrint
+                    attendee={{
+                      ...singlePrintAttendee,
+                      guest: {
+                        ...singlePrintAttendee.guest,
+                        // Ensure we use the latest guest data with complete information
+                        name: singlePrintAttendee.guest?.name || 'Participant',
+                        company: singlePrintAttendee.guest?.company || '',
+                        jobtitle: singlePrintAttendee.guest?.jobtitle || '',
+                        email: singlePrintAttendee.guest?.email || '',
+                        phone: singlePrintAttendee.guest?.phone || '',
+                        country: singlePrintAttendee.guest?.country || '',
+                        uuid: singlePrintAttendee.guest?.uuid || '',
+                      },
+                      // Include attendee ID for the badge
+                      id: singlePrintAttendee.id,
+                    }}
+                  />
+                </div>
               )}
-            </DialogContent>
-          </Dialog>
-
-          {/* Create Usher Dialog */}
-          <Dialog
-            open={createUsherDialogOpen}
-            onOpenChange={setCreateUsherDialogOpen}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Usher</DialogTitle>
-                <DialogDescription>
-                  Fill in the details to create a new usher account.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label>Name</Label>
-                  <Input
-                    value={newUsher.name}
-                    onChange={(e) =>
-                      setNewUsher({ ...newUsher, name: e.target.value })
-                    }
-                    placeholder="Full Name"
-                  />
-                </div>
-                <div>
-                  <Label>Email</Label>
-                  <Input
-                    value={newUsher.email}
-                    onChange={(e) =>
-                      setNewUsher({ ...newUsher, email: e.target.value })
-                    }
-                    placeholder="Email Address"
-                    type="email"
-                  />
-                </div>
-                <div>
-                  <Label>Password</Label>
-                  <Input
-                    value={newUsher.password}
-                    onChange={(e) =>
-                      setNewUsher({ ...newUsher, password: e.target.value })
-                    }
-                    placeholder="Password"
-                    type="password"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setCreateUsherDialogOpen(false)}
-                  disabled={creatingUsher}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="bg-gradient-to-r from-blue-600 to-purple-600"
-                  disabled={
-                    creatingUsher ||
-                    !newUsher.name ||
-                    !newUsher.email ||
-                    !newUsher.password
-                  }
-                  onClick={async () => {
-                    setCreatingUsher(true)
-                    try {
-                      await api.post('/users', {
-                        name: newUsher.name,
-                        email: newUsher.email,
-                        password: newUsher.password,
-                        role: 'usher',
-                      })
-                      toast.success('Usher account created!')
-                      setCreateUsherDialogOpen(false)
-                      setNewUsher({ name: '', email: '', password: '' })
-                    } catch (err) {
-                      toast.error('Failed to create usher')
-                    } finally {
-                      setCreatingUsher(false)
-                    }
-                  }}
-                >
-                  {creatingUsher ? 'Creating...' : 'Create Usher'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Hidden single badge print area */}
-          <div 
-            ref={singleBadgePrintRef}
-            style={{ 
-              position: 'fixed', 
-              left: '-9999px', 
-              top: 0,
-              visibility: 'hidden',
-              zIndex: -1,
-              width: '100%',
-              height: '100%'
-            }}
-            className="printable-badge-container"
-          >
-          {singlePrintAttendee && (
-            <div className="printable-badge-batch">
-              <BadgePrint 
-                attendee={{
-                  ...singlePrintAttendee,
-                  guest: {
-                    ...singlePrintAttendee.guest,
-                    // Ensure we use the latest guest data with complete information
-                    name: singlePrintAttendee.guest?.name || 'Participant',
-                    company: singlePrintAttendee.guest?.company || '',
-                    jobtitle: singlePrintAttendee.guest?.jobtitle || '',
-                    email: singlePrintAttendee.guest?.email || '',
-                    phone: singlePrintAttendee.guest?.phone || '',
-                    country: singlePrintAttendee.guest?.country || '',
-                    uuid: singlePrintAttendee.guest?.uuid || '',
-                  },
-                  // Include attendee ID for the badge
-                  id: singlePrintAttendee.id,
-                }} 
-              />
             </div>
-          )}
-          </div>
 
 
 
             {/* CSV Upload Dialog */}
-            <Dialog open={csvUploadDialogOpen} onOpenChange={setCsvUploadDialogOpen}>
+            <Dialog open={csvUploadDialogOpen} onOpenChange={setCsvUploadDialogOpen} >
               <DialogContent
                 className="w-full max-w-5xl min-w-[900px] p-0 overflow-visible rounded-2xl shadow-2xl border border-border bg-card"
                 style={{ width: '1100px', maxWidth: '99vw' }}
@@ -6577,7 +5886,7 @@ export default function EventDetails() {
                     {removeMember?.guest ? 'Remove Attendee' : 'Remove Team Member'}
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    {removeMember?.guest 
+                    {removeMember?.guest
                       ? `Are you sure you want to remove ${removeMember?.guest?.name || 'this attendee'} from the event? This action cannot be undone.`
                       : `Are you sure you want to remove ${removeMember?.name || 'this team member'}? This action cannot be undone.`
                     }
@@ -6585,9 +5894,9 @@ export default function EventDetails() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel disabled={removeLoading}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={handleRemoveConfirm} 
-                    disabled={removeLoading} 
+                  <AlertDialogAction
+                    onClick={handleRemoveConfirm}
+                    disabled={removeLoading}
                     className="bg-error text-error-foreground hover:bg-error/90"
                   >
                     {removeLoading ? 'Removing...' : (removeMember?.guest ? 'Remove Attendee' : 'Remove Member')}
@@ -6602,8 +5911,8 @@ export default function EventDetails() {
               style={{ position: 'fixed', left: '-9999px', top: 0, width: 320, height: 480, zIndex: -2, background: 'white' }}
             >
               {singlePrintAttendee && (
-        <>
-          <style>{`
+                <>
+                  <style>{`
             @media print {
               body * { visibility: hidden !important; }
               #single-badge-print-area, #single-badge-print-area * { visibility: visible !important; }
@@ -6621,142 +5930,141 @@ export default function EventDetails() {
               }
             }
           `}</style>
-          <div id="single-badge-print-area" ref={singleBadgePrintRef}>
-            <BadgePrint 
-              attendee={{
-                ...singlePrintAttendee,
-                guest: {
-                  ...singlePrintAttendee?.guest,
-                  // Ensure we use the latest guest data with complete information
-                  name: singlePrintAttendee?.guest?.name || 'Participant',
-                  company: singlePrintAttendee?.guest?.company || '',
-                  jobtitle: singlePrintAttendee?.guest?.jobtitle || '',
-                  email: singlePrintAttendee?.guest?.email || '',
-                  phone: singlePrintAttendee?.guest?.phone || '',
-                  country: singlePrintAttendee?.guest?.country || '',
-                  uuid: singlePrintAttendee?.guest?.uuid || '',
-                },
-                // Include attendee ID for the badge
-                id: singlePrintAttendee?.id,
-              }} 
-            />
-          </div>
-        </>
-      )}
+                  <div id="single-badge-print-area" ref={singleBadgePrintRef}>
+                    <BadgePrint
+                      attendee={{
+                        ...singlePrintAttendee,
+                        guest: {
+                          ...singlePrintAttendee?.guest,
+                          // Ensure we use the latest guest data with complete information
+                          name: singlePrintAttendee?.guest?.name || 'Participant',
+                          company: singlePrintAttendee?.guest?.company || '',
+                          jobtitle: singlePrintAttendee?.guest?.jobtitle || '',
+                          email: singlePrintAttendee?.guest?.email || '',
+                          phone: singlePrintAttendee?.guest?.phone || '',
+                          country: singlePrintAttendee?.guest?.country || '',
+                          uuid: singlePrintAttendee?.guest?.uuid || '',
+                        },
+                        // Include attendee ID for the badge
+                        id: singlePrintAttendee?.id,
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Session Guests Dialog */}
+              <Dialog open={sessionGuestsDialogOpen} onOpenChange={setSessionGuestsDialogOpen}>
+                <DialogContent className="max-w-6xl w-full h-[90vh] flex flex-col">
+                  <DialogHeader className="flex-shrink-0">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <DialogTitle className="text-2xl font-bold text-gray-900">
+                          Checked-in Guests - {selectedSession?.session_name}
+                        </DialogTitle>
+                        <DialogDescription className="text-gray-600 mt-1">
+                          View and export checked-in guests for this session
+                        </DialogDescription>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="text-sm text-gray-600">Total Checked-in</div>
+                          <div className="text-2xl font-bold text-green-600">{sessionGuests.length}</div>
+                        </div>
+                        <Button
+                          onClick={exportSessionGuests}
+                          disabled={sessionGuests.length === 0}
+                          className="flex items-center gap-2"
+                        >
+                          <Download className="w-4 h-4" />
+                          Export CSV
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogHeader>
+
+                  <div className="flex-1 overflow-hidden">
+                    {sessionGuestsLoading ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                          <Spinner size="lg" variant="primary" text="Loading session guests..." />
+                        </div>
+                      </div>
+                    ) : sessionGuests.length > 0 ? (
+                      <div className="h-full overflow-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="font-semibold">Name</TableHead>
+                              <TableHead className="font-semibold">Email</TableHead>
+                              <TableHead className="font-semibold">Phone</TableHead>
+                              <TableHead className="font-semibold">Company</TableHead>
+                              <TableHead className="font-semibold">Job Title</TableHead>
+                              <TableHead className="font-semibold">Guest Type</TableHead>
+                              <TableHead className="font-semibold">Check-in Time</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {sessionGuests.map((guest, index) => (
+                              <TableRow key={guest.id || index} className="hover:bg-gray-50">
+                                <TableCell className="font-medium">{guest.name || 'N/A'}</TableCell>
+                                <TableCell className="text-gray-600">{guest.email || 'N/A'}</TableCell>
+                                <TableCell className="text-gray-600">{guest.phone || 'N/A'}</TableCell>
+                                <TableCell className="text-gray-600">{guest.company || 'N/A'}</TableCell>
+                                <TableCell className="text-gray-600">{guest.jobtitle || 'N/A'}</TableCell>
+                                <TableCell>
+                                  <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">
+                                    {guest.guest_type || 'General'}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-gray-600">
+                                  {guest.check_in_time ? new Date(guest.check_in_time).toLocaleString() : 'N/A'}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Users className="w-8 h-8 text-gray-400" />
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Checked-in Guests</h3>
+                          <p className="text-gray-600">
+                            No guests have checked in for this session yet.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <DialogFooter className="flex-shrink-0 border-t border-gray-200 pt-4">
+                    <div className="flex items-center justify-between w-full">
+                      <div className="text-sm text-gray-600">
+                        Showing {sessionGuests.length} checked-in guests
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setSessionGuestsDialogOpen(false)}>
+                          Close
+                        </Button>
+                        <Button
+                          onClick={exportSessionGuests}
+                          disabled={sessionGuests.length === 0}
+                          className="flex items-center gap-2"
+                        >
+                          <Download className="w-4 h-4" />
+                          Export CSV
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </>
         )}
-
-        {/* Session Guests Dialog */}
-        <Dialog open={sessionGuestsDialogOpen} onOpenChange={setSessionGuestsDialogOpen}>
-          <DialogContent className="max-w-6xl w-full h-[90vh] flex flex-col">
-            <DialogHeader className="flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <div>
-                  <DialogTitle className="text-2xl font-bold text-gray-900">
-                    Checked-in Guests - {selectedSession?.session_name}
-                  </DialogTitle>
-                  <DialogDescription className="text-gray-600 mt-1">
-                    View and export checked-in guests for this session
-                  </DialogDescription>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="text-sm text-gray-600">Total Checked-in</div>
-                    <div className="text-2xl font-bold text-green-600">{sessionGuests.length}</div>
-                  </div>
-                  <Button 
-                    onClick={exportSessionGuests}
-                    disabled={sessionGuests.length === 0}
-                    className="flex items-center gap-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export CSV
-                  </Button>
-                </div>
-              </div>
-            </DialogHeader>
-
-            <div className="flex-1 overflow-hidden">
-              {sessionGuestsLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <Spinner size="lg" variant="primary" text="Loading session guests..." />
-                  </div>
-                </div>
-              ) : sessionGuests.length > 0 ? (
-                <div className="h-full overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="font-semibold">Name</TableHead>
-                        <TableHead className="font-semibold">Email</TableHead>
-                        <TableHead className="font-semibold">Phone</TableHead>
-                        <TableHead className="font-semibold">Company</TableHead>
-                        <TableHead className="font-semibold">Job Title</TableHead>
-                        <TableHead className="font-semibold">Guest Type</TableHead>
-                        <TableHead className="font-semibold">Check-in Time</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sessionGuests.map((guest, index) => (
-                        <TableRow key={guest.id || index} className="hover:bg-gray-50">
-                          <TableCell className="font-medium">{guest.name || 'N/A'}</TableCell>
-                          <TableCell className="text-gray-600">{guest.email || 'N/A'}</TableCell>
-                          <TableCell className="text-gray-600">{guest.phone || 'N/A'}</TableCell>
-                          <TableCell className="text-gray-600">{guest.company || 'N/A'}</TableCell>
-                          <TableCell className="text-gray-600">{guest.jobtitle || 'N/A'}</TableCell>
-                          <TableCell>
-                            <Badge className={getGuestTypeBadgeClasses(guest.guest_type)}>
-                              {guest.guest_type || 'General'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-gray-600">
-                            {guest.check_in_time ? new Date(guest.check_in_time).toLocaleString() : 'N/A'}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Users className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Checked-in Guests</h3>
-                    <p className="text-gray-600">
-                      No guests have checked in for this session yet.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <DialogFooter className="flex-shrink-0 border-t border-gray-200 pt-4">
-              <div className="flex items-center justify-between w-full">
-                <div className="text-sm text-gray-600">
-                  Showing {sessionGuests.length} checked-in guests
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setSessionGuestsDialogOpen(false)}>
-                    Close
-                  </Button>
-                  <Button 
-                    onClick={exportSessionGuests}
-                    disabled={sessionGuests.length === 0}
-                    className="flex items-center gap-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export CSV
-                  </Button>
-                </div>
-              </div>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
       </div>
     </>
   )

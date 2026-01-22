@@ -26,9 +26,9 @@ export function LoadingDialog({
   const getStatusIcon = () => {
     switch (status) {
       case 'success':
-        return <CheckCircle className="h-8 w-8 text-green-600" />;
+        return <CheckCircle className="h-10 w-10 text-green-600 dark:text-green-400" />;
       case 'error':
-        return <XCircle className="h-8 w-8 text-red-600" />;
+        return <XCircle className="h-10 w-10 text-red-600 dark:text-red-400" />;
       case 'loading':
       default:
         return <Spinner size="lg" variant="primary" />;
@@ -38,12 +38,12 @@ export function LoadingDialog({
   const getStatusColor = () => {
     switch (status) {
       case 'success':
-        return 'text-green-600';
+        return 'text-green-600 dark:text-green-400';
       case 'error':
-        return 'text-red-600';
+        return 'text-red-600 dark:text-red-400';
       case 'loading':
       default:
-        return 'text-blue-600';
+        return 'text-blue-600 dark:text-blue-400';
     }
   };
 
@@ -51,25 +51,25 @@ export function LoadingDialog({
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent className="sm:max-w-md">
         <div className="flex flex-col items-center justify-center py-8">
-          <div className="mb-4">
+          <div className="mb-6">
             {getStatusIcon()}
           </div>
           
-          <h3 className={`text-lg font-semibold mb-2 ${getStatusColor()}`}>
+          <h3 className={`text-xl font-semibold mb-2 ${getStatusColor()}`}>
             {title}
           </h3>
           
-          <p className="text-gray-600 text-center mb-6">
+          <p className="text-sm text-muted-foreground text-center mb-6">
             {description}
           </p>
           
           {showProgress && progress !== undefined && (
-            <div className="w-full max-w-xs">
-              <div className="flex justify-between text-sm text-gray-600 mb-2">
+            <div className="w-full max-w-xs space-y-2">
+              <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Progress</span>
                 <span>{Math.round(progress)}%</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div 
                   className={`h-2 rounded-full transition-all duration-300 ${
                     status === 'success' ? 'bg-green-600' :

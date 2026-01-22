@@ -266,13 +266,13 @@ export default function VendorDetailsDialog({ vendorId, isOpen, onClose }: Vendo
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+          <DialogHeader className="pb-4 border-b border-border/50">
             <div className="flex items-center justify-between">
               <div>
-                <DialogTitle className="text-2xl">
+                <DialogTitle className="text-xl font-semibold">
                   {vendor?.name || 'Vendor Details'}
                 </DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-sm text-muted-foreground mt-2">
                   {vendor?.name ? `Business Name: ${vendor.name}` : 'View and manage vendor information'}
                 </DialogDescription>
               </div>

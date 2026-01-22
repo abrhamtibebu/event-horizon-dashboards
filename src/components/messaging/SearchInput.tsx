@@ -76,7 +76,7 @@ const SearchInput: React.FC<SearchInputProps> = ({
     inputRef.current?.focus()
   }
 
-  const filteredRecentSearches = recentSearches.filter(search => 
+  const filteredRecentSearches = recentSearches.filter(search =>
     search.toLowerCase().includes(value.toLowerCase())
   )
 
@@ -92,9 +92,9 @@ const SearchInput: React.FC<SearchInputProps> = ({
   }, [])
 
   return (
-    <div className={`relative ${className}`}>
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+    <div className={cn("relative", className)}>
+      <div className="relative group">
+        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-4 h-4" />
         <Input
           ref={inputRef}
           value={value}
@@ -102,49 +102,52 @@ const SearchInput: React.FC<SearchInputProps> = ({
           onKeyDown={handleKeyPress}
           onFocus={() => setShowSuggestions(value.length > 0)}
           placeholder={placeholder}
-          className="pl-10 pr-20"
+          className="pl-12 pr-24 h-12 bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800 focus:bg-white dark:focus:bg-gray-950 shadow-sm rounded-xl text-sm font-medium transition-all"
         />
-        
-        {/* Clear button */}
-        {value && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClear}
-            className="absolute right-12 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-          >
-            <X className="w-4 h-4" />
-          </Button>
-        )}
 
-        {/* Search button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => handleSearch()}
-          disabled={!value.trim()}
-          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-        >
-          <Search className="w-4 h-4" />
-        </Button>
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          {value && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClear}
+              className="h-8 w-8 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          )}
+
+          <Button
+            size="icon"
+            onClick={() => handleSearch()}
+            disabled={!value.trim()}
+            className="h-8 w-8 bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 rounded-lg"
+          >
+            <Search className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
       {showFilters && (
-        <div className="flex items-center space-x-2 mt-2">
+        <div className="flex items-center gap-2 mt-3 ml-1">
           {searchTypes.map((type) => {
             const Icon = type.icon
+            const isActive = selectedType === type.value
             return (
-              <Button
+              <button
                 key={type.value}
-                variant={selectedType === type.value ? 'default' : 'outline'}
-                size="sm"
                 onClick={() => onTypeChange?.(type.value)}
-                className="text-xs h-7"
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                  isActive
+                    ? "bg-primary text-white shadow-md shadow-primary/10"
+                    : "bg-gray-50 dark:bg-gray-900 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 border border-gray-100 dark:border-gray-800"
+                )}
               >
-                <Icon className="w-3 h-3 mr-1" />
+                <Icon className="w-3 h-3" />
                 {type.label}
-              </Button>
+              </button>
             )
           })}
         </div>
@@ -152,48 +155,54 @@ const SearchInput: React.FC<SearchInputProps> = ({
 
       {/* Suggestions dropdown */}
       {(showSuggestions || isOpen) && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-          {/* Recent searches */}
-          {filteredRecentSearches.length > 0 && (
-            <div className="p-2">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-muted-foreground flex items-center">
-                  <Clock className="w-3 h-3 mr-1" />
-                  Recent searches
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearRecentSearches}
-                  className="text-xs h-6 px-2"
-                >
-                  Clear
-                </Button>
-              </div>
-              {filteredRecentSearches.map((search, index) => (
-                <div
-                  key={index}
-                  className="px-2 py-1 text-sm text-foreground hover:bg-muted rounded cursor-pointer"
-                  onClick={() => handleSuggestionClick(search)}
-                >
-                  {search}
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-950 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+          <ScrollArea className="max-h-64">
+            {/* Recent searches */}
+            {filteredRecentSearches.length > 0 && (
+              <div className="p-2">
+                <div className="flex items-center justify-between px-3 py-2">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <Clock className="w-3 h-3" />
+                    Recently Searched
+                  </span>
+                  <button
+                    onClick={clearRecentSearches}
+                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                  >
+                    Clear All
+                  </button>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Quick suggestions */}
-          {value.length > 0 && (
-            <div className="p-2 border-t border-border">
-              <div className="text-xs font-medium text-muted-foreground mb-2">Quick search</div>
-              <div
-                className="px-2 py-1 text-sm text-foreground hover:bg-muted rounded cursor-pointer"
-                onClick={() => handleSuggestionClick(value)}
-              >
-                Search for "{value}"
+                <div className="space-y-1">
+                  {filteredRecentSearches.map((search, index) => (
+                    <button
+                      key={index}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 rounded-xl transition-all text-left group"
+                      onClick={() => handleSuggestionClick(search)}
+                    >
+                      <Search className="w-3.5 h-3.5 text-gray-400 group-hover:text-primary transition-colors" />
+                      {search}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Quick suggestions */}
+            {value.length > 0 && (
+              <div className="p-2 border-t border-gray-50 dark:border-gray-900">
+                <div className="px-3 py-2">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Quick Result</span>
+                </div>
+                <button
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-primary hover:bg-primary/5 rounded-xl transition-all text-left"
+                  onClick={() => handleSuggestionClick(value)}
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  Search for "{value}"
+                </button>
+              </div>
+            )}
+          </ScrollArea>
         </div>
       )}
     </div>

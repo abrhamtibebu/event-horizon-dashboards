@@ -1,28 +1,29 @@
-import { useLocation, NavLink } from 'react-router-dom'
+import { useLocation, NavLink, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import {
-  Calendar,
-  Users,
-  Building2,
-  BarChart,
-  MessageSquare,
-  Settings,
-  Activity,
-  Shield,
+  CalendarDays,
+  Users2,
+  Store,
+  BarChart3,
+  MessageCircleMore,
+  ShieldCheck,
   MapPin,
-  ClipboardList,
+  ClipboardCheck,
   Ticket,
   UserCheck,
-  Trash2,
-  UserPlus,
-  Globe,
-  TrendingUp,
+  Archive,
+  UserPlus2,
   Briefcase,
-  Mail,
-  Palette,
+  Send,
   ChevronRight,
   ChevronLeft,
   PanelLeft,
+  LogOut,
+  Settings,
+  UserCircle,
+  MessageCircle,
+  LayoutDashboard,
+  Fingerprint,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -35,7 +36,6 @@ import {
   SidebarMenuItem,
   SidebarFooter,
   SidebarHeader,
-  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
 import { Badge } from '@/components/ui/badge'
@@ -46,6 +46,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { useUnreadCount } from '@/hooks/use-messages'
@@ -63,36 +71,36 @@ const getInitials = (name?: string) => {
 // Organized navigation items by category
 const navigationCategories = [
   {
-    label: 'DASHBOARD',
+    label: 'Overview',
     items: [
       {
-        title: 'Overview',
+        title: 'Dashboard',
         url: '/dashboard',
-        icon: Activity,
+        icon: LayoutDashboard,
         roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher'],
         permission: 'dashboard.view',
       },
     ],
   },
   {
-    label: 'EVENTS',
+    label: 'Events & Tickets',
     items: [
       {
         title: 'Events',
         url: '/dashboard/events',
-        icon: Calendar,
+        icon: CalendarDays,
         roles: ['superadmin', 'admin', 'organizer', 'organizer_admin'],
         permission: 'events.view',
       },
       {
         title: 'Create Event',
         url: '/dashboard/events/create',
-        icon: ClipboardList,
+        icon: ClipboardCheck,
         roles: ['superadmin', 'organizer', 'organizer_admin'],
         permission: 'events.create',
       },
       {
-        title: 'Ticket Management',
+        title: 'Ticket Sales',
         url: '/dashboard/ticket-management',
         icon: Ticket,
         roles: ['organizer', 'organizer_admin', 'admin', 'superadmin'],
@@ -107,95 +115,87 @@ const navigationCategories = [
     ],
   },
   {
-    label: 'MANAGEMENT',
+    label: 'Management',
     items: [
       {
         title: 'Users',
         url: '/dashboard/users',
-        icon: Users,
+        icon: Users2,
         roles: ['superadmin', 'admin'],
       },
       {
         title: 'Organizers',
         url: '/dashboard/organizers',
-        icon: Building2,
+        icon: Store,
         roles: ['superadmin', 'admin'],
       },
       {
         title: 'Guests',
         url: '/dashboard/guests',
-        icon: Users,
+        icon: Users2,
         roles: ['organizer', 'organizer_admin'],
         permission: 'guests.manage',
       },
       {
-        title: 'Usher Management',
+        title: 'Ushers',
         url: '/dashboard/usher-management',
-        icon: UserPlus,
+        icon: UserPlus2,
         roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'user'],
         permission: 'ushers.manage',
       },
       {
-        title: 'Vendor Management',
+        title: 'Vendors',
         url: '/dashboard/vendor-management',
         icon: Briefcase,
         roles: ['superadmin', 'admin', 'organizer', 'organizer_admin'],
-        // Check for any vendor permission - handled in filtering logic
         permission: 'vendors.any',
       },
       {
-        title: 'Salesperson Management',
+        title: 'Sales Team',
         url: '/dashboard/salesperson-management',
-        icon: Users,
+        icon: Users2,
         roles: ['superadmin', 'admin'],
       },
       {
-        title: 'Subscription Management',
+        title: 'Admin Subs',
         url: '/dashboard/admin/subscriptions',
-        icon: Shield,
+        icon: ShieldCheck,
         roles: ['superadmin', 'admin'],
       },
       {
         title: 'Subscription',
         url: '/dashboard/subscription',
-        icon: Shield,
+        icon: ShieldCheck,
         roles: ['organizer', 'organizer_admin'],
         permission: 'subscription.view',
       },
       {
-        title: 'My Team',
+        title: 'Team',
         url: '/dashboard/team',
-        icon: Users,
+        icon: Users2,
         roles: ['superadmin', 'organizer', 'organizer_admin'],
-        permission: 'team.manage',
-      },
-      {
-        title: 'Role Management',
-        url: '/dashboard/role-management',
-        icon: Shield,
-        roles: ['organizer_admin'],
         permission: 'team.manage',
       },
     ],
   },
   {
-    label: 'OPERATIONS',
+    label: 'Operations',
     items: [
       {
-        title: 'Tasks & Deliverables',
+        title: 'Tasks',
         url: '/dashboard/tasks',
-        icon: ClipboardList,
+        icon: ClipboardCheck,
         roles: ['superadmin', 'admin', 'organizer', 'organizer_admin'],
         permission: 'tasks.manage',
       },
       {
-        title: 'Attendee Check-in',
+        title: 'Check-in',
         url: '/dashboard/check-in',
         icon: UserCheck,
         roles: ['usher'],
       },
       {
-        title: 'Ticket Validator',
+        title: 'Validator',
         url: '/dashboard/ticket-validator',
         icon: UserCheck,
         roles: ['usher', 'organizer', 'organizer_admin', 'admin', 'superadmin'],
@@ -211,49 +211,49 @@ const navigationCategories = [
     ],
   },
   {
-    label: 'ANALYTICS',
+    label: 'Insights',
     items: [
       {
-        title: 'Event Analytics',
+        title: 'Analytics',
         url: '/dashboard/reports',
-        icon: BarChart,
+        icon: BarChart3,
         roles: ['superadmin', 'organizer', 'organizer_admin'],
         permission: 'reports.view',
       },
     ],
   },
   {
-    label: 'COMMUNICATION',
+    label: 'Connect',
     items: [
       {
         title: 'Messages',
         url: '/dashboard/messages',
-        icon: MessageSquare,
+        icon: MessageCircleMore,
         roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher'],
         permission: 'messages.manage',
       },
       {
         title: 'Marketing',
         url: '/dashboard/marketing',
-        icon: Mail,
+        icon: Send,
         roles: ['superadmin', 'admin', 'organizer', 'organizer_admin'],
         permission: 'marketing.manage',
       },
     ],
   },
   {
-    label: 'SYSTEM',
+    label: 'System',
     items: [
       {
-        title: 'System Logs',
+        title: 'Audit Logs',
         url: '/dashboard/audit-logs',
-        icon: Shield,
+        icon: Fingerprint,
         roles: ['superadmin', 'admin'],
       },
       {
         title: 'Trash',
         url: '/dashboard/trash',
-        icon: Trash2,
+        icon: Archive,
         roles: ['superadmin', 'admin'],
       },
     ],
@@ -262,27 +262,36 @@ const navigationCategories = [
 
 export function AppSidebar() {
   const { state, toggleSidebar } = useSidebar()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const { hasPermission, isOrganizerAdmin } = useOrganizerPermissions()
   const isCollapsed = state === 'collapsed'
   const [trashCount, setTrashCount] = useState(0)
   const location = useLocation()
-  
+  const navigate = useNavigate()
+
   // Get unread message count
   const { data: unreadData } = useUnreadCount()
   const unreadCount = unreadData?.unread_count || 0
+
+  // Simplified navigation for organizers
+  const isOrganizer = user?.role === 'organizer' || user?.role === 'organizer_admin'
 
   // Filter categories and items based on user role and permissions
   const filteredCategories = navigationCategories
     .map((category) => ({
       ...category,
+      // Simplify category labels for organizers
+      label: isOrganizer && category.label === 'Management' ? 'Manage' :
+        isOrganizer && category.label === 'Operations' ? 'Tools' :
+          isOrganizer && category.label === 'Connect' ? 'Communicate' :
+            category.label,
       items: category.items.filter((item) => {
         // Guests menu is only for organizers, not for admin/superadmin
         if (item.title === 'Guests' && user && (user.role === 'admin' || user.role === 'superadmin')) {
           return false
         }
 
-        // System admins see everything (except Guests and Messages)
+        // System admins see everything
         if (user && (user.role === 'admin' || user.role === 'superadmin')) {
           return true
         }
@@ -292,14 +301,10 @@ export function AppSidebar() {
           return false
         }
 
-        // For organizer and organizer_admin users, check permissions if specified
+        // For organizer and organizer_admin users, check permissions
         if (user && (user.role === 'organizer' || user.role === 'organizer_admin') && item.permission) {
-          // Organizer admin has all permissions
-          if (isOrganizerAdmin || user.role === 'organizer_admin') {
-            return true
-          }
-          
-          // Special case: Check for any vendor permission
+          if (isOrganizerAdmin || user.role === 'organizer_admin') return true
+
           if (item.permission === 'vendors.any') {
             const vendorPermissions = [
               'vendors.view', 'vendors.manage', 'vendors.create', 'vendors.edit', 'vendors.delete',
@@ -315,7 +320,6 @@ export function AppSidebar() {
             ]
             return vendorPermissions.some(perm => hasPermission(perm))
           }
-          
           return hasPermission(item.permission)
         }
 
@@ -323,8 +327,8 @@ export function AppSidebar() {
       }),
     }))
     .filter((category) => {
-      // Hide OPERATIONS section for admin and superadmin
-      if (category.label === 'OPERATIONS' && user && (user.role === 'admin' || user.role === 'superadmin')) {
+      // Hide Operations section for admin and superadmin
+      if (category.label === 'Operations' && user && (user.role === 'admin' || user.role === 'superadmin')) {
         return false
       }
       return category.items.length > 0
@@ -338,55 +342,57 @@ export function AppSidebar() {
           const response = await api.get('/trash')
           setTrashCount(response.data.total_items || 0)
         } catch (error: any) {
-          // Suppress 403 errors as they're expected for non-admin users
-          // Only log unexpected errors
           if (error?.response?.status !== 403) {
             console.error('Failed to fetch trash count:', error)
           }
         }
       }
-
       fetchTrashCount()
     }
   }, [user?.role])
 
   return (
     <Sidebar
-      className="bg-sidebar border-r border-sidebar-border text-sidebar-foreground"
+      className={cn(
+        "!bg-transparent border-r border-border/50 z-50",
+        "[&>div>div]:!bg-transparent",
+        "transition-all duration-300 ease-in-out"
+      )}
       collapsible="icon"
     >
-      {/* Header with Logo and Settings */}
-      <SidebarHeader className={`border-b border-sidebar-border ${isCollapsed ? 'p-3 space-y-3' : 'p-4 space-y-3'}`}>
-        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-          {isCollapsed ? (
-            /* Collapsed: Just logo centered */
-            <div className="w-10 h-10 flex items-center justify-center">
-              <img
-                src="/evella-logo.png"
-                alt="Evella Logo"
-                className="w-10 h-10 object-contain"
-              />
-            </div>
-          ) : (
-            /* Expanded: Logo with text and settings */
+      {/* Header with Logo */}
+      <SidebarHeader className={cn(
+        "flex items-center transition-all duration-300 border-b border-border/50 bg-transparent",
+        isCollapsed ? 'p-4 justify-center' : 'px-6 py-6'
+      )}>
+        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-4 w-full'}`}>
+          <div className={cn(
+            "flex items-center justify-center transition-all duration-300 rounded-xl",
+            isCollapsed ? "w-10 h-10" : "w-12 h-12",
+            "bg-orange-50 dark:bg-orange-950/20 border-2 border-orange-200 dark:border-orange-800"
+          )}>
+            <img
+              src="/evella-logo.png"
+              alt="Evella Logo"
+              className="w-8 h-8 object-contain"
+            />
+          </div>
+          {!isCollapsed && (
             <>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 flex items-center justify-center">
-                  <img
-                    src="/evella-logo.png"
-                    alt="Evella Logo"
-                    className="w-10 h-10 object-contain"
-                  />
-                </div>
-                <div>
-                  <h2 className="font-bold text-sidebar-foreground text-lg">Evella</h2>
-                  <p className="text-xs text-sidebar-foreground/70 font-medium">
-                    Event Management
-                  </p>
-                </div>
+              <div className="flex flex-col flex-1 min-w-0">
+                <span className="text-xl font-semibold text-foreground">
+                  Evella
+                </span>
+                <span className="text-xs font-medium text-orange-600 dark:text-orange-400 uppercase tracking-wider mt-0.5">
+                  {isOrganizer ? 'Organizer' : 'Admin Console'}
+                </span>
               </div>
-              <button className="p-1.5 rounded-md hover:bg-sidebar-accent transition-colors">
-                <Settings className="w-4 h-4 text-sidebar-foreground/70" />
+              <button
+                onClick={toggleSidebar}
+                className="p-1.5 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                title="Collapse sidebar"
+              >
+                <ChevronLeft className="w-4 h-4" />
               </button>
             </>
           )}
@@ -394,20 +400,22 @@ export function AppSidebar() {
       </SidebarHeader>
 
       {/* Navigation Content */}
-      <SidebarContent className="flex-1 overflow-y-auto">
+      <SidebarContent className="flex-1 overflow-y-auto px-3 gap-4 pb-4 bg-transparent">
         {filteredCategories.map((category) => (
-          <SidebarGroup key={category.label}>
-            <SidebarGroupLabel className={`text-sidebar-foreground/70 text-xs uppercase tracking-wider font-semibold ${isCollapsed ? 'px-2 pt-4 pb-2' : 'px-4 pt-4 pb-2'}`}>
-              {!isCollapsed ? category.label : ''}
-            </SidebarGroupLabel>
+          <SidebarGroup key={category.label} className="p-0">
+            {!isCollapsed && (
+              <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2 mt-4 select-none">
+                {category.label}
+              </SidebarGroupLabel>
+            )}
             <SidebarGroupContent>
-              <SidebarMenu className={`space-y-1 ${isCollapsed ? 'px-1' : 'px-2'}`}>
+              <SidebarMenu className="space-y-1">
                 {category.items.map((item) => {
                   const isActive =
                     location.pathname === item.url ||
                     (item.url !== '/dashboard' &&
                       location.pathname.startsWith(item.url))
-                  
+
                   const showBadge =
                     !isCollapsed &&
                     ((item.title === 'Trash' && trashCount > 0) ||
@@ -420,30 +428,47 @@ export function AppSidebar() {
                         isActive={isActive}
                         tooltip={item.title}
                         className={cn(
+                          'group relative w-full transition-all duration-200 rounded-lg',
                           isActive
-                            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                            : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                          'transition-all duration-200 rounded-lg',
-                          isCollapsed && 'justify-center'
+                            ? 'bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+                          isCollapsed ? 'justify-center p-2.5 h-10 w-10 mx-auto' : 'px-3 py-2.5 h-10'
                         )}
                       >
                         <NavLink
                           to={item.url}
                           end={item.url === '/dashboard'}
-                          className="flex items-center justify-between w-full"
+                          className={cn(
+                            "flex items-center w-full",
+                            isCollapsed ? 'justify-center' : 'justify-between'
+                          )}
                         >
                           <div className="flex items-center gap-3">
-                            <item.icon className="w-5 h-5 flex-shrink-0" />
+                            <item.icon className={cn(
+                              "flex-shrink-0 transition-colors",
+                              isActive
+                                ? "w-4 h-4 text-orange-600 dark:text-orange-400"
+                                : "w-4 h-4 text-muted-foreground group-hover:text-foreground"
+                            )} />
                             {!isCollapsed && (
-                              <span className="font-medium text-sm">
+                              <span className="text-sm font-medium">
                                 {item.title}
                               </span>
                             )}
                           </div>
+                          {isActive && !isCollapsed && (
+                            <div className="w-1.5 h-1.5 rounded-full bg-orange-600 dark:bg-orange-400" />
+                          )}
                           {showBadge && (
                             <Badge
-                              variant="destructive"
-                              className="ml-2 text-xs"
+                              className={cn(
+                                "ml-auto h-5 min-w-5 px-1.5 flex items-center justify-center text-xs font-semibold shadow-none border-0",
+                                item.title === 'Trash'
+                                  ? "bg-red-600 text-white"
+                                  : isActive
+                                    ? "bg-orange-600 text-white"
+                                    : "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
+                              )}
                             >
                               {item.title === 'Trash' ? trashCount : unreadCount}
                             </Badge>
@@ -459,57 +484,116 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
 
-      {/* Footer with User Profile and Collapse Button */}
-      <SidebarFooter className={`border-t border-sidebar-border ${isCollapsed ? 'p-3' : 'p-4'} space-y-3`}>
-        {/* User Profile Section */}
-        {!isCollapsed && user ? (
-          <>
-            <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-sidebar-accent transition-colors cursor-pointer">
-              <Avatar className="w-10 h-10">
-                <AvatarImage src={user.profile_image} />
-                <AvatarFallback className="bg-gradient-to-br from-primary to-warning text-primary-foreground text-sm font-semibold">
-                  {getInitials(user.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-sidebar-foreground text-sm truncate">
-                  {user.name || 'User'}
+      <SidebarFooter className={cn(
+        "mt-auto p-3 border-t border-border/50 bg-transparent",
+      )}>
+        {user && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div className={cn(
+                "flex items-center gap-3 rounded-lg transition-all duration-200 group cursor-pointer",
+                !isCollapsed && "bg-muted/30 hover:bg-muted/50 p-2.5",
+                isCollapsed && "justify-center p-2"
+              )}>
+                <div className="relative">
+                  <Avatar className="w-8 h-8 ring-2 ring-background shadow-sm transition-transform duration-200 group-hover:scale-105">
+                    <AvatarImage src={user.profile_image} />
+                    <AvatarFallback className="bg-orange-600 text-white text-xs font-semibold">
+                      {getInitials(user.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></div>
                 </div>
-                <div className="text-xs text-sidebar-foreground/70 truncate">
-                  {user.email || ''}
-                </div>
+
+                {!isCollapsed && (
+                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <span className="font-medium text-sm text-foreground truncate">
+                      {user.name || 'User'}
+                    </span>
+                    <span className="text-xs text-muted-foreground truncate">
+                      {user.email || ''}
+                    </span>
+                  </div>
+                )}
+
+                {!isCollapsed && (
+                  <div className="p-1 text-muted-foreground hover:text-foreground transition-colors">
+                    <Settings className="w-4 h-4" />
+                  </div>
+                )}
               </div>
-              <ChevronRight className="w-4 h-4 text-sidebar-foreground/50 flex-shrink-0" />
-            </div>
-            {/* Collapse Button - Only visible when expanded */}
-            <TooltipProvider delayDuration={0}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={toggleSidebar}
-                    className="w-full flex items-center justify-center p-2 rounded-md hover:bg-sidebar-accent transition-colors"
-                  >
-                    <ChevronLeft className="w-5 h-5 text-sidebar-foreground/70" />
-                  </button>
-                </TooltipTrigger>
-              </Tooltip>
-            </TooltipProvider>
-          </>
-        ) : (
-          user && (
-            /* Collapsed: Just avatar, clickable to expand */
-            <button
-              onClick={toggleSidebar}
-              className="flex justify-center w-full"
-            >
-              <Avatar className="w-10 h-10">
-                <AvatarImage src={user.profile_image} />
-                <AvatarFallback className="bg-gradient-to-br from-primary to-warning text-primary-foreground text-sm font-semibold">
-                  {getInitials(user.name)}
-                </AvatarFallback>
-              </Avatar>
-            </button>
-          )
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align={isCollapsed ? "center" : "end"} side={isCollapsed ? "right" : "bottom"} className="w-56 mb-2 rounded-xl">
+              <DropdownMenuItem onClick={() => navigate('/dashboard/profile')} className="cursor-pointer">
+                <UserCircle className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
+                <span>My Profile</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={() => navigate('/dashboard/settings')} className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4 text-muted-foreground" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={() => navigate('/dashboard/messages')} className="cursor-pointer">
+                <MessageCircle className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
+                <span>Messages</span>
+                {unreadCount > 0 && (
+                  <Badge className="ml-auto bg-orange-600 text-white text-xs">
+                    {unreadCount}
+                  </Badge>
+                )}
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={() => navigate('/dashboard/events')} className="cursor-pointer">
+                <CalendarDays className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
+                <span>My Events</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={() => navigate('/dashboard/reports')} className="cursor-pointer">
+                <BarChart3 className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
+                <span>Reports</span>
+              </DropdownMenuItem>
+
+              {user?.role === 'organizer' && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/dashboard/subscription')} className="cursor-pointer">
+                    <ShieldCheck className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    <span>Subscription</span>
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {(user?.role === 'admin' || user?.role === 'superadmin') && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/dashboard')} className="cursor-pointer">
+                    <ShieldCheck className="mr-2 h-4 w-4 text-red-600 dark:text-red-400" />
+                    <span>Admin Panel</span>
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={logout}
+                className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/20"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Logout</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {isCollapsed && user && (
+          <button
+            onClick={toggleSidebar}
+            className="w-full flex justify-center mt-2 p-2 hover:bg-muted rounded-lg text-muted-foreground transition-colors"
+            title="Expand sidebar"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         )}
       </SidebarFooter>
     </Sidebar>

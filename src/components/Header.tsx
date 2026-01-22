@@ -13,8 +13,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { MessagesDropdown } from '@/components/messaging/MessagesDropdown'
 import { useAuth } from '@/hooks/use-auth'
-import { useUnreadCount } from '@/hooks/use-messages'
 import { useSubscription } from '@/hooks/useSubscription'
 import { SubscriptionStatusBadge } from '@/components/subscription/SubscriptionStatusBadge'
 import { useState, useEffect, useRef } from 'react'
@@ -38,10 +38,6 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
   const [showSearchResults, setShowSearchResults] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
-  
-  // Get unread message count
-  const { data: unreadData } = useUnreadCount()
-  const unreadCount = unreadData?.unread_count || 0
 
   // Helper to get initials
   const getInitials = (name?: string) => {
@@ -148,14 +144,14 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
   }
 
   return (
-    <header className="h-16 border-b bg-background/80 backdrop-blur-sm flex items-center px-6 justify-between sticky top-0 z-50 border-border">
+    <header className="h-16 border-b bg-background/60 backdrop-blur-xl flex items-center px-6 justify-between sticky top-0 z-50 border-border/50 transition-all duration-300">
       <div className="flex items-center gap-4">
         {/* Enhanced Search with Dropdown */}
         <div className="relative" ref={searchRef}>
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Search events, users..."
-            className="pl-10 pr-10 w-80 bg-muted/50 border-border focus:bg-background focus:border-primary transition-all"
+            placeholder="Quick search..."
+            className="pl-10 pr-10 w-72 bg-muted/30 border-white/5 focus:bg-background/50 focus:border-primary/50 focus:w-80 transition-all duration-300 rounded-full h-10 text-sm"
             value={searchValue}
             onChange={handleSearchChange}
             onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
@@ -212,162 +208,39 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
       <div className="flex items-center gap-4">
         {/* Theme Toggle */}
         <ThemeToggle />
-        
+
+        {/* Messages Dropdown */}
+        <MessagesDropdown />
+
         {/* Notifications Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="relative">
-              <Bell className="w-5 h-5" />
-              {unreadCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center p-0 bg-red-500 text-xs">
-                  {unreadCount}
-                </Badge>
-              )}
+            <Button variant="ghost" size="sm" className="relative group hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+              <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400 group-hover:text-primary transition-colors" />
+              {/* This could be for platform notifications in the future */}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel className="flex items-center justify-between">
-              <span>Notifications</span>
-              {unreadCount > 0 && (
-                <Badge variant="destructive" className="text-xs">
-                  {unreadCount} new
-                </Badge>
-              )}
+          <DropdownMenuContent align="end" className="w-80 p-0 overflow-hidden rounded-xl border-gray-200 dark:border-gray-800 shadow-2xl bg-white dark:bg-gray-950">
+            <DropdownMenuLabel className="p-4 bg-gray-50/50 dark:bg-gray-900/50 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
+              <span className="font-bold text-base text-gray-900 dark:text-gray-100">Notifications</span>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {unreadCount > 0 ? (
-              <>
-                <DropdownMenuItem onClick={() => navigate('/dashboard/messages')}>
-                  <MessageCircle className="mr-2 h-4 w-4" />
-                  <span>You have {unreadCount} unread message{unreadCount > 1 ? 's' : ''}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/dashboard/messages')}>
-                  <MessageCircle className="mr-2 h-4 w-4" />
-                  <span>View all messages</span>
-                </DropdownMenuItem>
-              </>
-            ) : (
-              <DropdownMenuItem disabled>
-                <MessageCircle className="mr-2 h-4 w-4" />
-                <span>No new notifications</span>
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate('/dashboard/settings')}>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Message settings</span>
-            </DropdownMenuItem>
+            <div className="py-8 px-6 flex flex-col items-center justify-center text-center gap-3">
+              <div className="w-12 h-12 bg-gray-100 dark:bg-gray-900 rounded-full flex items-center justify-center">
+                <Bell className="w-6 h-6 text-gray-400" />
+              </div>
+              <p className="text-sm text-gray-500">No new notifications</p>
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
-        
+
         {/* Subscription Status Badge (Organizers only) */}
         {user?.role === 'organizer' && subscription && (
           <div className="hidden md:block">
             <SubscriptionStatusBadge subscription={subscription} />
           </div>
         )}
-        
-        {/* Enhanced Profile Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="flex items-center gap-2 px-2">
-              <Avatar className="w-8 h-8">
-                <AvatarImage src={user?.profile_image} />
-                <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs font-semibold">
-                  {getInitials(user?.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="hidden md:flex flex-col items-start">
-                <span className="text-sm font-medium text-foreground">
-                  {getShortName(user?.name || 'User')}
-                </span>
-                <span className="text-xs text-muted-foreground capitalize">{user?.role}</span>
-              </div>
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64">
-            {/* User Info Section */}
-            <DropdownMenuLabel className="pb-3">
-              <div className="flex items-center gap-3">
-                <Avatar className="w-12 h-12">
-                  <AvatarImage src={user?.profile_image} />
-                  <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold">
-                    {getInitials(user?.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-foreground truncate">{user?.name}</div>
-                  <div className="text-xs text-muted-foreground truncate">{user?.email}</div>
-                  <Badge variant="secondary" className="text-xs mt-1 capitalize">
-                    {user?.role}
-                  </Badge>
-                </div>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            
-            {/* Profile Actions */}
-            <DropdownMenuItem onClick={() => navigate('/dashboard/profile')} className="cursor-pointer">
-              <UserCircle className="mr-2 h-4 w-4 text-blue-600" />
-              <span>My Profile</span>
-            </DropdownMenuItem>
-            
-            <DropdownMenuItem onClick={() => navigate('/dashboard/settings')} className="cursor-pointer">
-              <Settings className="mr-2 h-4 w-4 text-gray-600" />
-              <span>Settings</span>
-            </DropdownMenuItem>
-            
-            <DropdownMenuItem onClick={() => navigate('/dashboard/messages')} className="cursor-pointer">
-              <MessageCircle className="mr-2 h-4 w-4 text-green-600" />
-              <span>Messages</span>
-              {unreadCount > 0 && (
-                <Badge variant="destructive" className="ml-auto text-xs">
-                  {unreadCount}
-                </Badge>
-              )}
-            </DropdownMenuItem>
-            
-            <DropdownMenuItem onClick={() => navigate('/dashboard/events')} className="cursor-pointer">
-              <Calendar className="mr-2 h-4 w-4 text-purple-600" />
-              <span>My Events</span>
-            </DropdownMenuItem>
-            
-            <DropdownMenuItem onClick={() => navigate('/dashboard/reports')} className="cursor-pointer">
-              <BarChart className="mr-2 h-4 w-4 text-orange-600" />
-              <span>Reports</span>
-            </DropdownMenuItem>
-            
-            {user?.role === 'organizer' && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate('/dashboard/subscription')} className="cursor-pointer">
-                  <Shield className="mr-2 h-4 w-4 text-blue-600" />
-                  <span>Subscription</span>
-                </DropdownMenuItem>
-              </>
-            )}
-            
-            {(user?.role === 'admin' || user?.role === 'superadmin') && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate('/dashboard')} className="cursor-pointer">
-                  <Shield className="mr-2 h-4 w-4 text-red-600" />
-                  <span>Admin Panel</span>
-                </DropdownMenuItem>
-              </>
-            )}
-            
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={handleLogout} 
-              className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Logout</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+
+
       </div>
     </header>
   )

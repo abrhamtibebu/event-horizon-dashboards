@@ -105,15 +105,16 @@ export function TaskDetailsModal({
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent':
-        return 'bg-error/10 text-error'
+      case 'critical':
+        return 'bg-red-50 text-red-600 border-red-200'
       case 'high':
-        return 'bg-warning/10 text-warning'
+        return 'bg-orange-100 text-orange-700 border-orange-200'
       case 'medium':
-        return 'bg-info/10 text-info'
+        return 'bg-orange-50 text-orange-600 border-orange-200'
       case 'low':
-        return 'bg-muted text-muted-foreground'
+        return 'bg-slate-50 text-slate-600 border-slate-200'
       default:
-        return 'bg-muted text-muted-foreground'
+        return 'bg-slate-50 text-slate-600 border-slate-200'
     }
   }
 

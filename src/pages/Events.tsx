@@ -75,7 +75,7 @@ export default function Events() {
       // Show error toast if available
     }
   }
-  
+
   // Pagination hook
   const {
     currentPage,
@@ -88,7 +88,7 @@ export default function Events() {
     handlePerPageChange,
     resetPagination
   } = usePagination({ defaultPerPage: 10, searchParamPrefix: 'events' });
-  
+
   // Debug logging
   console.log('Events component rendered, user:', user?.id)
 
@@ -96,7 +96,7 @@ export default function Events() {
   useEffect(() => {
     const fetchEventCounts = async () => {
       if (!user) return
-      
+
       try {
         // Fetch all events without pagination to get accurate counts
         const res = await api.get('/events', {
@@ -104,7 +104,7 @@ export default function Events() {
             per_page: 1000, // Large number to get all events
           }
         })
-        
+
         // Handle both paginated and non-paginated responses
         let allEvents: any[] = []
         if (res.data.data) {
@@ -118,7 +118,7 @@ export default function Events() {
         } else {
           allEvents = []
         }
-        
+
         // Count events by type - handle both event_type_column and event_type
         const ticketedCount = allEvents.filter((e: any) => {
           const eventType = e.event_type_column || e.event_type
@@ -126,14 +126,14 @@ export default function Events() {
           const eventTypeValue = typeof eventType === 'string' ? eventType : (eventType?.name || 'free')
           return eventTypeValue === 'ticketed'
         }).length
-        
+
         const freeCount = allEvents.filter((e: any) => {
           const eventType = e.event_type_column || e.event_type
           // Handle both string and object (relationship) cases
           const eventTypeValue = typeof eventType === 'string' ? eventType : (eventType?.name || 'free')
           return eventTypeValue === 'free'
         }).length
-        
+
         setEventCounts({
           ticketed: ticketedCount,
           free: freeCount,
@@ -149,7 +149,7 @@ export default function Events() {
         })
       }
     }
-    
+
     if (user) {
       fetchEventCounts()
     }
@@ -166,22 +166,22 @@ export default function Events() {
           page: currentPage.toString(),
           per_page: perPage.toString(),
         });
-        
+
         if (searchTerm) {
           params.append('search', searchTerm);
         }
-        
+
         if (statusFilter !== 'all') {
           params.append('status', statusFilter);
         }
-        
+
         if (pricingFilter !== 'all') {
           params.append('pricing', pricingFilter);
         }
-        
+
         const res = await api.get(`/events?${params.toString()}`)
         console.log('[Events] API Response:', res.data)
-        
+
         // Handle paginated response
         if (res.data.data) {
           setEvents(res.data.data)
@@ -199,14 +199,14 @@ export default function Events() {
         setLoading(false)
       }
     }
-    
+
     // Only fetch if we have a user
     if (user) {
       fetchEvents()
       // Temporarily disabled polling to prevent reloading issues
       // intervalRef.current = setInterval(fetchEvents, 150000)
     }
-    
+
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
@@ -249,13 +249,13 @@ export default function Events() {
   return (
     <div className="min-h-screen bg-background p-6">
       {/* Breadcrumbs */}
-      <Breadcrumbs 
+      <Breadcrumbs
         items={[
           { label: 'Events', href: '/dashboard/events' }
         ]}
         className="mb-4"
       />
-      
+
       <Tabs defaultValue="all-events" className="space-y-6">
         {/* Header Section */}
         <div className="mb-8">
@@ -268,25 +268,25 @@ export default function Events() {
                 {user?.role === 'usher' ? 'My Assigned Events' : 'Events'}
               </h1>
               <p className="text-muted-foreground">
-                {user?.role === 'usher' 
+                {user?.role === 'usher'
                   ? 'View and manage events you are assigned to as an usher'
                   : 'Manage and monitor all your events'
                 }
               </p>
             </div>
           </div>
-          
+
           {/* Tabs */}
           <div className="mt-6">
             <TabsList className="bg-card/80 backdrop-blur-sm border border-border shadow-sm">
-              <TabsTrigger 
+              <TabsTrigger
                 value="all-events"
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
               >
                 {user?.role === 'usher' ? 'Assigned Events' : 'All Events'}
               </TabsTrigger>
               {user?.role !== 'usher' && (
-                <TabsTrigger 
+                <TabsTrigger
                   value="settings"
                   className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
@@ -315,14 +315,13 @@ export default function Events() {
                 showToast={true}
                 actionName="create events"
               >
-                {user?.role !== 'usher' && (hasPermission('events.create') || hasPermission('events.manage')) && (
-                  <Link to="/dashboard/events/create">
-                    <Button className="bg-brand-gradient bg-brand-gradient-hover text-foreground shadow-lg">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create Event
-                    </Button>
-                  </Link>
-                )}
+                {/* Create button wrapped in PermissionGuard - only shows if permitted */}
+                <Link to="/dashboard/events/create">
+                  <Button className="bg-brand-gradient bg-brand-gradient-hover text-foreground shadow-lg">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Event
+                  </Button>
+                </Link>
               </PermissionGuard>
             </div>
 
@@ -362,7 +361,7 @@ export default function Events() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             {/* Pricing Statistics */}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-info/10 border border-info/30 rounded-xl p-4">
@@ -421,8 +420,8 @@ export default function Events() {
               </div>
               <div className="text-lg font-medium text-foreground mb-2">Failed to load events</div>
               <div className="text-muted-foreground mb-6">{error}</div>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => window.location.reload()}
                 className="flex items-center gap-2"
               >
@@ -537,7 +536,7 @@ export default function Events() {
                           <div className="relative h-48 w-full overflow-hidden">
                             {event.event_image ? (
                               <img
-                                                src={getImageUrl(event.event_image)}
+                                src={getImageUrl(event.event_image)}
                                 alt={event.name}
                                 className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
                               />
@@ -555,18 +554,18 @@ export default function Events() {
                               </span>
                             </div>
                           </div>
-                          
+
                           <div className="flex flex-col flex-1 p-6">
                             {/* Event Name */}
                             <h3 className="text-lg font-bold text-card-foreground mb-2 line-clamp-2" title={event.name}>
                               {event.name}
                             </h3>
-                            
+
                             {/* Description */}
                             <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
                               {event.description}
                             </p>
-                            
+
                             {/* Event Details */}
                             <div className="space-y-3 mb-4">
                               <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -590,7 +589,7 @@ export default function Events() {
                                 <span>{attendeeCount}/{attendeeLimit} attendees</span>
                               </div>
                             </div>
-                            
+
                             {/* Registration Progress */}
                             <div className="mb-4">
                               <div className="flex justify-between text-sm text-muted-foreground mb-2">
@@ -604,7 +603,7 @@ export default function Events() {
                                 ></div>
                               </div>
                             </div>
-                            
+
                             {/* Usher Tasks */}
                             {user?.role === 'usher' && event.pivot?.tasks && (
                               <div className="mb-4 p-3 bg-info/10 rounded-lg">
@@ -619,7 +618,7 @@ export default function Events() {
                                 </div>
                               </div>
                             )}
-                            
+
                             {/* Action Button */}
                             <div className="mt-auto">
                               <Link to={`/dashboard/events/${event.id}`} className="block">
@@ -627,7 +626,7 @@ export default function Events() {
                                   variant="outline"
                                   className="w-full bg-card border-border hover:bg-accent hover:border-border transition-all duration-200"
                                 >
-                                  <Eye className="w-4 h-4 mr-2" /> 
+                                  <Eye className="w-4 h-4 mr-2" />
                                   {user?.role === 'usher' ? 'Manage Event' : 'View Details'}
                                 </Button>
                               </Link>

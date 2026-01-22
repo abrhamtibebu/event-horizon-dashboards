@@ -24,6 +24,7 @@ interface User {
   id: string
   email: string
   role: Role
+  roles?: string[]
   organizer_id: number | null
   organizer: Organizer | null
 }
@@ -32,7 +33,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   user: User | null
   login: (
-    credentials: { email: string; password: string; captchaToken: string },
+    credentials: { email: string; password: string },
     remember?: boolean
   ) => Promise<void>
   logout: () => Promise<void>
@@ -196,16 +197,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   const login = async (
-    credentials: { email: string; password: string; captchaToken: string },
+    credentials: { email: string; password: string },
     remember = false
   ) => {
     try {
       // Login endpoint doesn't require API key, so we don't send it
-      const res = await api.post('/login', {
-        email: credentials.email,
-        password: credentials.password,
-        captcha_token: credentials.captchaToken,
-      })
+      const res = await api.post('/login', credentials)
       const { token, user, expires_in } = res.data
 
       // Store token based on remember preference

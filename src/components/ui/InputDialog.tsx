@@ -77,22 +77,22 @@ export function InputDialog({
     switch (variant) {
       case 'success':
         return {
-          icon: <CheckCircle className="h-6 w-6 text-green-600" />,
-          iconBg: 'bg-green-50',
-          borderColor: 'border-green-200',
+          icon: <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />,
+          iconBg: 'bg-green-50 dark:bg-green-950/20',
+          borderColor: 'border-green-200 dark:border-green-800',
         };
       case 'warning':
         return {
-          icon: <AlertTriangle className="h-6 w-6 text-yellow-600" />,
-          iconBg: 'bg-yellow-50',
-          borderColor: 'border-yellow-200',
+          icon: <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />,
+          iconBg: 'bg-amber-50 dark:bg-amber-950/20',
+          borderColor: 'border-amber-200 dark:border-amber-800',
         };
       case 'info':
       default:
         return {
-          icon: <Info className="h-6 w-6 text-blue-600" />,
-          iconBg: 'bg-blue-50',
-          borderColor: 'border-blue-200',
+          icon: <Info className="h-6 w-6 text-blue-600 dark:text-blue-400" />,
+          iconBg: 'bg-blue-50 dark:bg-blue-950/20',
+          borderColor: 'border-blue-200 dark:border-blue-800',
         };
     }
   };
@@ -134,13 +134,13 @@ export function InputDialog({
 
   const getFieldIcon = (fieldName: string) => {
     if (fieldName.toLowerCase().includes('transaction')) {
-      return <Hash className="h-4 w-4 text-gray-500" />;
+      return <Hash className="h-4 w-4 text-muted-foreground" />;
     }
     if (fieldName.toLowerCase().includes('note')) {
-      return <FileText className="h-4 w-4 text-gray-500" />;
+      return <FileText className="h-4 w-4 text-muted-foreground" />;
     }
     if (fieldName.toLowerCase().includes('payment')) {
-      return <CreditCard className="h-4 w-4 text-gray-500" />;
+      return <CreditCard className="h-4 w-4 text-muted-foreground" />;
     }
     return null;
   };
@@ -148,15 +148,15 @@ export function InputDialog({
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader className="text-center">
+        <DialogHeader className="text-center pb-4 border-b border-border/50">
           <div className={`mx-auto flex h-12 w-12 items-center justify-center rounded-full ${styles.iconBg} ${styles.borderColor} border-2 mb-4`}>
             {displayIcon}
           </div>
-          <DialogTitle className="text-xl font-semibold text-gray-900">
+          <DialogTitle className="text-xl font-semibold">
             {title}
           </DialogTitle>
           {description && (
-            <DialogDescription className="text-gray-600 mt-2">
+            <DialogDescription className="text-sm text-muted-foreground mt-2">
               {description}
             </DialogDescription>
           )}
@@ -165,7 +165,7 @@ export function InputDialog({
         <div className="space-y-4 mt-6">
           {fields.map((field) => (
             <div key={field.name} className="space-y-2">
-              <Label htmlFor={field.name} className="text-sm font-medium text-gray-700">
+              <Label htmlFor={field.name} className="text-sm font-medium">
                 {field.label}
                 {field.required && <span className="text-red-500 ml-1">*</span>}
               </Label>
@@ -177,7 +177,7 @@ export function InputDialog({
                     value={formData[field.name] || ''}
                     onChange={(e) => handleInputChange(field.name, e.target.value)}
                     placeholder={field.placeholder}
-                    className={`pr-10 ${errors[field.name] ? 'border-red-500' : ''}`}
+                    className={`pr-10 ${errors[field.name] ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                     rows={3}
                   />
                 ) : (
@@ -187,7 +187,7 @@ export function InputDialog({
                     value={formData[field.name] || ''}
                     onChange={(e) => handleInputChange(field.name, e.target.value)}
                     placeholder={field.placeholder}
-                    className={`pr-10 ${errors[field.name] ? 'border-red-500' : ''}`}
+                    className={`pr-10 ${errors[field.name] ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                   />
                 )}
                 
@@ -199,7 +199,7 @@ export function InputDialog({
               </div>
               
               {field.description && (
-                <p className="text-xs text-gray-500">{field.description}</p>
+                <p className="text-xs text-muted-foreground">{field.description}</p>
               )}
               
               {errors[field.name] && (
@@ -209,7 +209,7 @@ export function InputDialog({
           ))}
         </div>
         
-        <DialogFooter className="flex-col sm:flex-row gap-3 mt-6">
+        <DialogFooter className="flex-col sm:flex-row gap-3 pt-6 border-t border-border/50">
           <Button
             variant="outline"
             onClick={handleClose}

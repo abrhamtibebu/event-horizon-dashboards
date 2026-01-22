@@ -36,34 +36,34 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   }
 
   return (
-    <div className="flex items-center space-x-2 px-4 py-2 animate-in slide-in-from-bottom-2 fade-in duration-300">
+    <div className="flex items-center gap-2 animate-in fade-in duration-300">
       {/* Avatars for group chats */}
       {isGroup && (
-        <div className="flex -space-x-1">
+        <div className="flex -space-x-2">
           {users.slice(0, 3).map((user) => (
-            <Avatar key={user.id} className="w-6 h-6 border border-background">
+            <Avatar key={user.id} className="w-5 h-5 border-2 border-white dark:border-gray-900 shadow-sm">
               <AvatarImage src={user.profile_image} />
-              <AvatarFallback className="bg-primary/10 text-primary text-xs">
+              <AvatarFallback className="bg-primary text-white text-[8px] font-black">
                 {getInitials(user.name)}
               </AvatarFallback>
             </Avatar>
           ))}
           {users.length > 3 && (
-            <div className="w-6 h-6 rounded-full bg-muted border border-background flex items-center justify-center">
-              <span className="text-xs text-muted-foreground font-medium">+{users.length - 3}</span>
+            <div className="w-5 h-5 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-white dark:border-gray-900 flex items-center justify-center">
+              <span className="text-[8px] text-gray-400 font-black">+{users.length - 3}</span>
             </div>
           )}
         </div>
       )}
 
       {/* Typing animation */}
-      <div className="flex items-center space-x-2 bg-muted rounded-full px-3 py-2">
-        <div className="flex space-x-1">
-          <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-          <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-          <div className="w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+      <div className="flex items-center gap-2">
+        <div className="flex gap-1">
+          <div className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-duration:0.6s]" style={{ animationDelay: '0ms' }}></div>
+          <div className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-duration:0.6s]" style={{ animationDelay: '200ms' }}></div>
+          <div className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-duration:0.6s]" style={{ animationDelay: '400ms' }}></div>
         </div>
-        <span className="text-sm text-muted-foreground font-medium">
+        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">
           {getTypingText()}
         </span>
       </div>

@@ -30,10 +30,10 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const [lightboxImages, setLightboxImages] = useState<string[]>([])
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
-  
+
   // Initialize real-time messaging (disabled for now, using polling instead)
   // useRealtimeMessages()
-  
+
   // Use optimistic messages hook first
   const {
     optimisticMessages,
@@ -43,11 +43,11 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     retryMessage,
     removeOptimisticMessage,
   } = useOptimisticMessages({
-    onAddMessage: () => {}, // Will be set after usePaginatedMessages
-    onUpdateMessage: () => {}, // Will be set after usePaginatedMessages
-    onRemoveMessage: () => {}, // Will be set after usePaginatedMessages
+    onAddMessage: () => { }, // Will be set after usePaginatedMessages
+    onUpdateMessage: () => { }, // Will be set after usePaginatedMessages
+    onRemoveMessage: () => { }, // Will be set after usePaginatedMessages
   })
-  
+
   // Use paginated messages hook
   const {
     messages,
@@ -64,15 +64,15 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     pageSize: 50,
     onConfirmOptimisticMessage: confirmMessage,
   })
-  
+
   const deleteMessageMutation = useDeleteMessage()
   const markMessageReadMutation = useMarkMessageRead()
-  
+
   // Pinned messages
   const { data: pinnedMessages = [] } = usePinnedMessages(conversationId)
   const pinMessageMutation = usePinMessage()
   const unpinMessageMutation = useUnpinMessage()
-  
+
   // Typing indicator hook
   const { typingUsers } = useTypingIndicator({ conversationId, currentUserId })
 
@@ -81,19 +81,19 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     // Filter out optimistic messages that have been confirmed (to avoid duplicates)
     const confirmedOptimisticIds = new Set(messages.map(m => (m as any).tempId).filter(Boolean))
     const filteredOptimistic = optimisticMessages.filter(opt => !confirmedOptimisticIds.has(opt.tempId))
-    
+
     const combined = [...messages, ...filteredOptimistic] as (Message | any)[]
-    const sorted = combined.sort((a, b) => 
+    const sorted = combined.sort((a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     )
-    
+
     console.log('All messages combined:', {
       regular: messages.length,
       optimistic: filteredOptimistic.length,
       total: sorted.length,
       conversationId
     })
-    
+
     return sorted
   }, [messages, optimisticMessages, conversationId])
 
@@ -103,7 +103,7 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       .filter(msg => msg.file_type?.startsWith('image/') && (msg.file_path || msg.file_url))
       .map(msg => getMessageImageUrl(msg as Message, 'original') || getMessageFileUrl(msg))
       .filter((url): url is string => Boolean(url))
-    
+
     setLightboxImages(imageUrls)
   }, [allMessages])
 
@@ -119,10 +119,10 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   useEffect(() => {
     if (messages.length > 0 && currentUserId) {
       // Get unread messages that the current user received
-      const unreadMessages = messages.filter(msg => 
+      const unreadMessages = messages.filter(msg =>
         msg.recipient_id === currentUserId && !msg.read_at
       )
-      
+
       // Mark each unread message as read individually
       unreadMessages.forEach(msg => {
         markMessageReadMutation.mutate(msg.id.toString())
@@ -131,13 +131,13 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   }, [messages, currentUserId]) // Remove markMessageReadMutation from dependencies
 
   const handleDeleteMessage = async (messageId: number) => {
-      try {
-        await deleteMessageMutation.mutateAsync(messageId.toString())
+    try {
+      await deleteMessageMutation.mutateAsync(messageId.toString())
       // Remove message from local state immediately
       removeMessage(messageId)
-      } catch (error) {
-        console.error('Failed to delete message:', error)
-      }
+    } catch (error) {
+      console.error('Failed to delete message:', error)
+    }
   }
 
   // Handle optimistic message updates
@@ -162,12 +162,12 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
 
   if (!conversationId) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 text-center bg-muted/30">
-        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4 shadow-sm">
-          <span className="text-3xl">💬</span>
+      <div className="flex flex-col items-center justify-center h-full p-6 text-center bg-white dark:bg-gray-950 animate-in fade-in duration-500">
+        <div className="w-20 h-20 bg-gray-50 dark:bg-gray-900 rounded-3xl flex items-center justify-center mb-6 border border-gray-100 dark:border-gray-800">
+          <MessageCircle className="w-10 h-10 text-primary/40" />
         </div>
-        <h3 className="text-lg font-semibold text-foreground mb-2">Select a conversation</h3>
-        <p className="text-sm text-muted-foreground">Choose a conversation from the sidebar to start messaging</p>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Select a conversation</h3>
+        <p className="text-sm text-gray-500 max-w-[240px]">Choose a chat from the list to view your message history.</p>
       </div>
     )
   }
@@ -186,10 +186,10 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   }, [])
 
   return (
-    <div className="flex flex-col h-full bg-muted/30 min-h-0">
+    <div className="flex flex-col h-full bg-white dark:bg-gray-950 min-h-0">
       {/* Pinned Messages Banner */}
       {pinnedMessages.length > 0 && (
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 animate-in slide-in-from-top duration-300">
           <PinnedMessagesBanner
             pinnedMessages={pinnedMessages}
             onUnpin={handleUnpinMessage}
@@ -199,15 +199,15 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
         </div>
       )}
 
-      {/* Messages - Scrollable area with constrained height */}
+      {/* Messages */}
       <div className="flex-1 min-h-0 relative">
         {allMessages.length === 0 && !isLoading && optimisticMessages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center p-8">
-            <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6 shadow-md">
-              <span className="text-4xl">💬</span>
+          <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-in fade-in duration-500">
+            <div className="w-16 h-16 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center mb-4 border border-gray-100 dark:border-gray-800">
+              <MessageSquare className="w-8 h-8 text-primary/30" />
             </div>
-            <h3 className="text-xl font-bold text-foreground mb-3">No messages yet</h3>
-            <p className="text-sm text-muted-foreground max-w-sm">Start the conversation by sending a message below. Your messages will appear here.</p>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No messages yet</h3>
+            <p className="text-sm text-gray-500 max-w-xs">Start the conversation! Your messages will appear here as you type.</p>
           </div>
         ) : (
           <div className="h-full flex flex-col">
@@ -230,41 +230,31 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
               onUnpin={handleUnpinMessage}
               onOpenThread={onOpenThread}
             />
-            
+
             {/* Typing Indicator */}
             {typingUsers.length > 0 && (
-              <div className="flex-shrink-0 px-4 py-2">
-                <TypingIndicator
-                  users={typingUsers.map(user => ({
-                    id: user.id,
-                    name: user.name,
-                    email: '',
-                    profile_image: user.avatar,
-                    role: 'user',
-                    created_at: '',
-                    updated_at: '',
-                  }))}
-                  conversationId={conversationId || ''}
-                  isGroup={conversationId?.startsWith('event_')}
-                />
-              </div>
-            )}
-            
-            {/* Debug info for development */}
-            {import.meta.env.DEV && (
-              <div className="flex-shrink-0 text-xs text-muted-foreground mt-2 p-2 bg-muted rounded mx-4">
-                Messages: {messages.length} | Optimistic: {optimisticMessages.length} | Total: {allMessages.length}
-                {optimisticMessages.length > 0 && (
-                  <div className="mt-1">
-                    Optimistic: {optimisticMessages.map(m => `${m.status}(${m.tempId})`).join(', ')}
-                  </div>
-                )}
+              <div className="absolute bottom-2 left-6 z-10 animate-in slide-in-from-bottom-2 duration-200">
+                <div className="bg-white dark:bg-gray-900 px-3 py-1.5 rounded-full border border-gray-100 dark:border-gray-800 shadow-lg">
+                  <TypingIndicator
+                    users={typingUsers.map(user => ({
+                      id: user.id,
+                      name: user.name,
+                      email: '',
+                      profile_image: user.avatar,
+                      role: 'user',
+                      created_at: '',
+                      updated_at: '',
+                    }))}
+                    conversationId={conversationId || ''}
+                    isGroup={conversationId?.startsWith('event_')}
+                  />
+                </div>
               </div>
             )}
           </div>
         )}
       </div>
-      
+
       {/* Image Lightbox */}
       <ImageLightbox
         isOpen={isLightboxOpen}

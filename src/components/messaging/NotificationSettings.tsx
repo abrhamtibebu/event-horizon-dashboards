@@ -6,11 +6,11 @@ import { Slider } from '../ui/slider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Separator } from '../ui/separator'
 import { Badge } from '../ui/badge'
-import { 
-  isSoundEnabled, 
-  setSoundEnabled, 
-  getSoundVolume, 
-  setSoundVolume, 
+import {
+  isSoundEnabled,
+  setSoundEnabled,
+  getSoundVolume,
+  setSoundVolume,
   testSound,
   playMessageReceived,
   playMessageSent,
@@ -56,7 +56,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ onCl
 
   const testNotificationSound = async () => {
     if (isTestingSound) return
-    
+
     setIsTestingSound(true)
     try {
       await playMessageReceived()
@@ -69,7 +69,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ onCl
 
   const testSentSound = async () => {
     if (isTestingSound) return
-    
+
     setIsTestingSound(true)
     try {
       await playMessageSent()
@@ -82,7 +82,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ onCl
 
   const testGeneralNotification = async () => {
     if (isTestingSound) return
-    
+
     setIsTestingSound(true)
     try {
       await playNotification()
@@ -94,36 +94,48 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ onCl
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader className="pb-4">
+    <Card className="w-full max-w-md mx-auto bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800 shadow-2xl rounded-2xl overflow-hidden border">
+      <CardHeader className="p-6 pb-4 border-b border-gray-50 dark:border-gray-900">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Settings className="w-5 h-5 text-gray-600" />
-            <CardTitle className="text-lg">Notification Settings</CardTitle>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+              <Settings className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-black text-gray-900 dark:text-white">Notification Settings</CardTitle>
+              <CardDescription className="text-xs font-medium text-gray-500">
+                Customize your sound and alert preferences
+              </CardDescription>
+            </div>
           </div>
           {onClose && (
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <span className="sr-only">Close</span>
-              ×
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="h-9 w-9 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all"
+            >
+              <X className="w-5 h-5" />
             </Button>
           )}
         </div>
-        <CardDescription>
-          Customize your notification preferences for messages and alerts
-        </CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-6">
+      <CardContent className="p-6 space-y-8">
         {/* Sound Notifications */}
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              {soundEnabled ? (
-                <Volume2 className="w-4 h-4 text-green-600" />
-              ) : (
-                <VolumeX className="w-4 h-4 text-gray-400" />
-              )}
-              <span className="font-medium">Sound Notifications</span>
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
+                soundEnabled ? "bg-green-50 text-green-600 border border-green-100 dark:bg-green-950/20 dark:border-green-900/30" : "bg-gray-50 text-gray-400 border border-gray-100 dark:bg-gray-900 dark:border-gray-800"
+              )}>
+                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </div>
+              <div>
+                <span className="block text-sm font-bold text-gray-900 dark:text-white">Sound Notifications</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Audio feedback for system events</span>
+              </div>
             </div>
             <Switch
               checked={soundEnabled}
@@ -132,11 +144,11 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ onCl
           </div>
 
           {soundEnabled && (
-            <div className="space-y-3 pl-6">
-              <div className="space-y-2">
+            <div className="space-y-6 pl-12 animate-in slide-in-from-top-2 duration-200">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Volume</span>
-                  <Badge variant="secondary" className="text-xs">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Master Volume</span>
+                  <Badge className="bg-primary/10 text-primary border-none text-[10px] font-black px-2 py-0.5 rounded-full">
                     {Math.round(volume * 100)}%
                   </Badge>
                 </div>
@@ -150,40 +162,30 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ onCl
                 />
               </div>
 
-              <Separator />
+              <div className="h-px bg-gray-50 dark:bg-gray-900" />
 
-              <div className="space-y-2">
-                <span className="text-sm font-medium text-gray-700">Test Sounds</span>
-                <div className="flex flex-wrap gap-2">
+              <div className="space-y-3">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Test Feedback</span>
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={testNotificationSound}
                     disabled={isTestingSound}
-                    className="text-xs"
+                    className="h-9 text-[10px] font-black uppercase tracking-widest border-gray-100 dark:border-gray-800 hover:bg-gray-50 transition-all gap-2"
                   >
-                    <TestTube className="w-3 h-3 mr-1" />
-                    Message Received
+                    <TestTube className="w-3 h-3 text-primary" />
+                    Reception
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={testSentSound}
                     disabled={isTestingSound}
-                    className="text-xs"
+                    className="h-9 text-[10px] font-black uppercase tracking-widest border-gray-100 dark:border-gray-800 hover:bg-gray-50 transition-all gap-2"
                   >
-                    <TestTube className="w-3 h-3 mr-1" />
-                    Message Sent
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={testGeneralNotification}
-                    disabled={isTestingSound}
-                    className="text-xs"
-                  >
-                    <TestTube className="w-3 h-3 mr-1" />
-                    General Alert
+                    <TestTube className="w-3 h-3 text-primary" />
+                    Sent Conf.
                   </Button>
                 </div>
               </div>
@@ -191,18 +193,22 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ onCl
           )}
         </div>
 
-        <Separator />
+        <div className="h-px bg-gray-50 dark:bg-gray-900" />
 
         {/* Browser Notifications */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              {browserNotifications ? (
-                <Bell className="w-4 h-4 text-green-600" />
-              ) : (
-                <BellOff className="w-4 h-4 text-gray-400" />
-              )}
-              <span className="font-medium">Browser Notifications</span>
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-9 h-9 rounded-xl flex items-center justify-center transition-all",
+                browserNotifications ? "bg-primary/5 text-primary border border-primary/10" : "bg-gray-50 text-gray-400 border border-gray-100 dark:bg-gray-900 dark:border-gray-800"
+              )}>
+                {browserNotifications ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+              </div>
+              <div>
+                <span className="block text-sm font-bold text-gray-900 dark:text-white">Push Notifications</span>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">System-wide browser alerts</span>
+              </div>
             </div>
             <Switch
               checked={browserNotifications}
@@ -211,57 +217,36 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ onCl
           </div>
 
           {!browserNotifications && (
-            <div className="pl-6">
-              <p className="text-sm text-gray-500">
-                Enable browser notifications to receive alerts when you're not actively using the app.
+            <div className="pl-12">
+              <p className="text-[11px] font-medium text-gray-500 leading-relaxed uppercase tracking-tight">
+                Recommended to receive alerts when application is not in foreground.
               </p>
             </div>
           )}
         </div>
 
-        <Separator />
+        <div className="h-px bg-gray-50 dark:bg-gray-900" />
 
-        {/* Notification Types */}
-        <div className="space-y-3">
-          <span className="text-sm font-medium text-gray-700">Notification Types</span>
-          <div className="space-y-2 pl-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">New Messages</span>
-              <Badge variant="outline" className="text-xs">
-                {soundEnabled ? 'Sound + Visual' : 'Visual Only'}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">Message Sent Confirmation</span>
-              <Badge variant="outline" className="text-xs">
-                {soundEnabled ? 'Sound + Visual' : 'Visual Only'}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">System Alerts</span>
-              <Badge variant="outline" className="text-xs">
-                {soundEnabled ? 'Sound + Visual' : 'Visual Only'}
-              </Badge>
-            </div>
-          </div>
-        </div>
-
-        {/* Status */}
-        <div className="bg-gray-50 rounded-lg p-3">
-          <div className="flex items-center space-x-2 text-sm">
-            <div className={`w-2 h-2 rounded-full ${soundEnabled ? 'bg-green-500' : 'bg-gray-400'}`} />
-            <span className="text-gray-600">
-              Sound notifications are {soundEnabled ? 'enabled' : 'disabled'}
-            </span>
-          </div>
-          <div className="flex items-center space-x-2 text-sm mt-1">
-            <div className={`w-2 h-2 rounded-full ${browserNotifications ? 'bg-green-500' : 'bg-gray-400'}`} />
-            <span className="text-gray-600">
-              Browser notifications are {browserNotifications ? 'enabled' : 'disabled'}
-            </span>
+        {/* Summary / Status */}
+        <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-3">
+          <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Active Channels</h4>
+          <div className="space-y-2">
+            {[
+              { label: 'Direct Messaging', channel: soundEnabled ? 'Audio + UI' : 'UI Pulse' },
+              { label: 'Event Group Chat', channel: soundEnabled ? 'Audio + UI' : 'UI Pulse' },
+              { label: 'System Service', channel: browserNotifications ? 'Push Native' : 'In-App Only' }
+            ].map((item, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">{item.label}</span>
+                <Badge className="bg-white dark:bg-gray-800 text-gray-500 border-gray-100 dark:border-gray-700 text-[9px] font-black uppercase px-2 py-0">
+                  {item.channel}
+                </Badge>
+              </div>
+            ))}
           </div>
         </div>
       </CardContent>
     </Card>
+
   )
 }

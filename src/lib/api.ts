@@ -1,22 +1,22 @@
 import axios from 'axios'
 
-  // Ensure baseURL always includes /api suffix
-  const getBaseURL = () => {
-    const envURL = import.meta.env.VITE_API_URL;
-    if (envURL) {
-      // If VITE_API_URL is provided, ensure it ends with /api
-      return envURL.endsWith('/api') ? envURL : `${envURL.replace(/\/$/, '')}/api`;
-    }
-    // Default to localhost for development
-    return 'http://localhost:8000/api';
-  };
+// Ensure baseURL always includes /api suffix
+const getBaseURL = () => {
+  const envURL = import.meta.env.VITE_API_URL;
+  if (envURL) {
+    // If VITE_API_URL is provided, ensure it ends with /api
+    return envURL.endsWith('/api') ? envURL : `${envURL.replace(/\/$/, '')}/api`;
+  }
+  // Default to localhost for development
+  return 'http://localhost:8000/api';
+};
 
-  const api = axios.create({
-    baseURL: getBaseURL(),
-    timeout: 60000, // 60 seconds timeout for long-running operations like campaign sending
-    headers: {
-      'Content-Type': 'application/json',
-    },
+const api = axios.create({
+  baseURL: getBaseURL(),
+  timeout: 60000, // 60 seconds timeout for long-running operations like campaign sending
+  headers: {
+    'Content-Type': 'application/json',
+  },
 })
 
 // Flag to prevent multiple refresh attempts
@@ -38,7 +38,7 @@ const processQueue = (error: any, token: string | null = null) => {
       resolve()
     }
   })
-  
+
   failedQueue = []
 }
 
@@ -96,7 +96,7 @@ const refreshToken = async (): Promise<string | null> => {
     localStorage.removeItem('user_role')
     localStorage.removeItem('user_id')
     localStorage.removeItem('organizer_id')
-    
+
     throw error
   }
 }
@@ -104,28 +104,28 @@ const refreshToken = async (): Promise<string | null> => {
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
-    
+
     // Check if URL matches public event patterns: /events/{id} or /events/{id}/ticket-types/available
-    const isPublicEventEndpoint = config.url?.match(/^\/events\/\d+$/) || 
-                                   config.url?.includes('/ticket-types/available') ||
-                                   config.url?.includes('/share-analytics')
-    
+    const isPublicEventEndpoint = config.url?.match(/^\/events\/\d+$/) ||
+      config.url?.includes('/ticket-types/available') ||
+      config.url?.includes('/share-analytics')
+
     const isPublicEndpoint = config.url?.startsWith('/public/') ||
-                            config.url?.startsWith('/guest/') ||
-                            config.url?.startsWith('/events/uuid/') ||
-                            config.url?.startsWith('/invitations/track') ||
-                            config.url?.startsWith('/invitation/track') ||
-                            config.url?.includes('/register') ||
-                            config.url?.includes('/guest-types') ||
-                            config.url?.startsWith('/forms/') || // Public form access
-                            config.url === '/login' ||
-                            config.url === '/register' ||
-                            config.url === '/forgot-password' ||
-                            config.url === '/reset-password' ||
-                            config.url === '/refresh' ||
-                            config.url?.startsWith('/analytics/') ||
-                            isPublicEventEndpoint
-    
+      config.url?.startsWith('/guest/') ||
+      config.url?.startsWith('/events/uuid/') ||
+      config.url?.startsWith('/invitations/track') ||
+      config.url?.startsWith('/invitation/track') ||
+      config.url?.includes('/register') ||
+      config.url?.includes('/guest-types') ||
+      config.url?.startsWith('/forms/') || // Public form access
+      config.url === '/login' ||
+      config.url === '/register' ||
+      config.url === '/forgot-password' ||
+      config.url === '/reset-password' ||
+      config.url === '/refresh' ||
+      config.url?.startsWith('/analytics/') ||
+      isPublicEventEndpoint
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     } else if (!isPublicEndpoint) {
@@ -147,7 +147,7 @@ api.interceptors.response.use(
       const expiresAt = Date.now() + response.data.expires_in * 1000
       const storage = localStorage.getItem('jwt') ? localStorage : sessionStorage
       storage.setItem('token_expires_at', expiresAt.toString())
-      
+
       // Store token creation time if this is a new token
       if (!storage.getItem('token_created_at')) {
         storage.setItem('token_created_at', Date.now().toString())
@@ -171,11 +171,11 @@ api.interceptors.response.use(
       localStorage.removeItem('user_id')
       localStorage.removeItem('organizer_id')
       localStorage.removeItem('mock_auth')
-      
+
       if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
         window.location.href = '/'
       }
-      
+
       return Promise.reject(error)
     }
 
@@ -202,21 +202,21 @@ api.interceptors.response.use(
 
       try {
         const newToken = await refreshToken()
-        
+
         if (newToken) {
           // Update the original request with new token
           originalRequest.headers.Authorization = `Bearer ${newToken}`
-          
+
           // Process queued requests
           processQueue(null, newToken)
-          
+
           // Retry the original request
           return api(originalRequest)
         }
       } catch (refreshError) {
         // Refresh failed - clear tokens and logout
         processQueue(refreshError, null)
-        
+
         localStorage.removeItem('jwt')
         sessionStorage.removeItem('jwt')
         localStorage.removeItem('token_expires_at')
@@ -227,7 +227,7 @@ api.interceptors.response.use(
         localStorage.removeItem('user_id')
         localStorage.removeItem('organizer_id')
         localStorage.removeItem('mock_auth')
-        
+
         // Redirect to login if not already there
         if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
           window.location.href = '/'
@@ -426,8 +426,8 @@ export const getAttendees = (eventId: string) => api.get(`/events/${eventId}/att
 export const getAllOrganizers = () => api.get('/organizers')
 
 // Fetch events for the current organizer (organizer)
-export const getMyEvents = (status: string = 'draft,active') =>
-  api.get('/organizer/events', { params: { status } })
+export const getMyEvents = (status: string = 'draft,active', excludeStatus?: string) =>
+  api.get('/organizer/events', { params: { status: status === 'all' ? undefined : status, exclude_status: excludeStatus } })
 
 // Fetch events for a specific organizer (admin only)
 export const getEventsForOrganizer = (organizerId: number) =>
@@ -517,6 +517,50 @@ export const updateVendorPayment = (id: number, data: any) => api.put(`/vendors/
 export const deleteVendorPayment = (id: number) => api.delete(`/vendors/payments/${id}`)
 export const markPaymentAsPaid = (id: number, data: any) => api.post(`/vendors/payments/${id}/mark-paid`, data)
 export const markPaymentAsFailed = (id: number, data: any) => api.post(`/vendors/payments/${id}/mark-failed`, data)
+
+// Purchase Requests (PR)
+export const getPurchaseRequests = (params = {}) => api.get('/purchase-requests', { params })
+export const getPRStatistics = () => api.get('/purchase-requests/statistics')
+export const getPurchaseRequestById = (id: number) => api.get(`/purchase-requests/${id}`)
+export const createPurchaseRequest = (data: any) => api.post('/purchase-requests', data)
+export const updatePurchaseRequest = (id: number, data: any) => api.put(`/purchase-requests/${id}`, data)
+export const deletePurchaseRequest = (id: number) => api.delete(`/purchase-requests/${id}`)
+export const approvePurchaseRequest = (id: number, data: { status: 'approved' | 'rejected', comments?: string }) =>
+  api.post(`/purchase-requests/${id}/approve`, data)
+
+// Proforma Invoices
+export const getProformaInvoices = (params = {}) => api.get('/proforma-invoices', { params })
+export const getProformaInvoiceById = (id: number) => api.get(`/proforma-invoices/${id}`)
+export const uploadProformaInvoice = (data: FormData) => api.post('/proforma-invoices', data, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+})
+export const approveProformaInvoice = (id: number, data: { status: 'approved' | 'rejected', comments?: string }) =>
+  api.post(`/proforma-invoices/${id}/approve`, data)
+export const getProformaStatistics = () => api.get('/proforma-invoices/statistics')
+
+// Purchase Orders (PO)
+export const getPurchaseOrders = (params = {}) => api.get('/purchase-orders', { params })
+export const getPurchaseOrderById = (id: number) => api.get(`/purchase-orders/${id}`)
+export const createPurchaseOrder = (data: any) => api.post('/purchase-orders', data)
+export const sendPOToVendor = (id: number) => api.post(`/purchase-orders/${id}/send`)
+export const getApprovedProformas = (params = {}) => api.get('/purchase-orders/approved-proformas', { params })
+export const downloadPOPDF = (id: number) => api.get(`/purchase-orders/${id}/download`, { responseType: 'blob' })
+export const getPOStatistics = () => api.get('/purchase-orders/statistics')
+
+// Payment Requests
+export const getPaymentRequests = (params = {}) => api.get('/payment-requests', { params })
+export const getPaymentRequestById = (id: number) => api.get(`/payment-requests/${id}`)
+export const createPaymentRequest = (data: any) => api.post('/payment-requests', data)
+export const approvePaymentRequest = (id: number, data: { status: 'approved' | 'rejected', comments?: string }) =>
+  api.post(`/payment-requests/${id}/approve`, data)
+export const processPaymentRequest = (id: number, data: any) =>
+  api.post(`/payment-requests/${id}/process-payment`, data)
+export const getPaymentRequestStatistics = () => api.get('/payment-requests/statistics')
+
+// Revamped Vendor Payments
+export const getVendorPaymentsRevamped = (params = {}) => api.get('/vendor-payments', { params })
+export const processVendorPayment = (id: number, data: any) => api.post(`/vendor-payments/${id}/process`, data)
+export const getVendorPaymentRevampedStatistics = () => api.get('/vendor-payments/statistics')
 
 // Vendor Deliveries
 export const getVendorDeliveries = (params = {}) => api.get('/vendors/deliveries', { params })
@@ -615,13 +659,13 @@ export const exportPaymentReport = (params = {}) => api.get('/vendors/payments/e
 export const exportDeliveryReport = (params = {}) => api.get('/vendors/deliveries/export', { params, responseType: 'blob' })
 
 // Bulk Operations
-export const bulkVendorOperations = (data: { action: string; vendor_ids: number[]; data?: any }) => 
+export const bulkVendorOperations = (data: { action: string; vendor_ids: number[]; data?: any }) =>
   api.post('/vendors/bulk-operations', data)
-export const bulkActivateVendors = (vendorIds: number[]) => 
+export const bulkActivateVendors = (vendorIds: number[]) =>
   bulkVendorOperations({ action: 'activate', vendor_ids: vendorIds })
-export const bulkDeactivateVendors = (vendorIds: number[]) => 
+export const bulkDeactivateVendors = (vendorIds: number[]) =>
   bulkVendorOperations({ action: 'deactivate', vendor_ids: vendorIds })
-export const bulkDeleteVendors = (vendorIds: number[]) => 
+export const bulkDeleteVendors = (vendorIds: number[]) =>
   bulkVendorOperations({ action: 'delete', vendor_ids: vendorIds })
 
 
@@ -678,11 +722,11 @@ export const getVendorEventDeliverables = (vendorId: number, eventId: number) =>
 export const bulkGenerateBadges = (eventId: number, data: { guest_type_id: number; quantity: number }) =>
   api.post(`/events/${eventId}/pre-generated-badges/bulk-generate`, data)
 
-export const getPreGeneratedBadges = (eventId: number, filters?: { 
-  guest_type_id?: number; 
-  status?: string; 
-  search?: string; 
-  per_page?: number 
+export const getPreGeneratedBadges = (eventId: number, filters?: {
+  guest_type_id?: number;
+  status?: string;
+  search?: string;
+  per_page?: number
 }) =>
   api.get(`/events/${eventId}/pre-generated-badges`, { params: filters })
 
@@ -705,13 +749,13 @@ export const getPreGeneratedBadgeStats = (eventId: number) =>
   api.get(`/events/${eventId}/pre-generated-badges/statistics`)
 
 export const exportPreGeneratedBadges = (eventId: number, format: 'csv' | 'pdf', guestTypeId?: number) =>
-  api.get(`/events/${eventId}/pre-generated-badges/export`, { 
-    params: { format, guest_type_id: guestTypeId }, 
-    responseType: 'blob' 
+  api.get(`/events/${eventId}/pre-generated-badges/export`, {
+    params: { format, guest_type_id: guestTypeId },
+    responseType: 'blob'
   })
 
 export const generatePrintableBadges = (eventId: number, badgeIds: number[]) =>
-  api.post(`/events/${eventId}/pre-generated-badges/generate-printables`, 
+  api.post(`/events/${eventId}/pre-generated-badges/generate-printables`,
     { badge_ids: badgeIds },
     { responseType: 'blob' }
   )

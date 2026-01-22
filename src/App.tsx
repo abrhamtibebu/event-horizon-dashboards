@@ -23,14 +23,15 @@ import Settings from './pages/Settings'
 import Profile from './pages/Profile'
 import AuditLogs from './pages/AuditLogs'
 import Trash from './pages/Trash'
-import SignIn from './pages/SignIn'
+import SignIn from './pages/SignInPage'
 import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
 import NotFound from './pages/NotFound'
-import RoleDashboard from './pages/RoleDashboard'
+import AdminDashboard from './pages/AdminDashboard'
+import OrganizerDashboard from './pages/OrganizerDashboard'
 import LocateBadges from './pages/LocateBadges'
 import CheckIn from './pages/CheckIn'
 import Tickets from './pages/Tickets'
@@ -48,7 +49,6 @@ import BatchBadgePage from './pages/BatchBadgePage'
 import Guests from './pages/Guests'
 
 import Team from '@/pages/Team'
-import RoleManagement from '@/pages/RoleManagement'
 import UsherManagement from '@/pages/UsherManagement'
 import UsherEventManagement from '@/pages/UsherEventManagement'
 import UsherEvents from '@/pages/UsherEvents'
@@ -90,9 +90,9 @@ const queryClient = new QueryClient({
 
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { isAuthenticated, isLoading } = useAuth()
-  
+
   console.log('[ProtectedRoute] isAuthenticated:', isAuthenticated, 'isLoading:', isLoading)
-  
+
   // Show loading spinner while checking authentication
   if (isLoading) {
     console.log('[ProtectedRoute] Showing loading spinner')
@@ -102,21 +102,21 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
       </div>
     )
   }
-  
+
   if (!isAuthenticated) {
     console.log('[ProtectedRoute] Not authenticated, redirecting to /')
     return <Navigate to="/" replace />
   }
-  
+
   console.log('[ProtectedRoute] Authenticated, showing children')
   return children
 }
 
 const UnauthenticatedRoute = ({ children }: { children: JSX.Element }) => {
   const { isAuthenticated, isLoading } = useAuth()
-  
+
   console.log('[UnauthenticatedRoute] isAuthenticated:', isAuthenticated, 'isLoading:', isLoading)
-  
+
   // Show loading spinner while checking authentication
   if (isLoading) {
     console.log('[UnauthenticatedRoute] Showing loading spinner')
@@ -126,12 +126,12 @@ const UnauthenticatedRoute = ({ children }: { children: JSX.Element }) => {
       </div>
     )
   }
-  
+
   if (isAuthenticated) {
     console.log('[UnauthenticatedRoute] Authenticated, redirecting to /dashboard')
     return <Navigate to="/dashboard" replace />
   }
-  
+
   console.log('[UnauthenticatedRoute] Not authenticated, showing children')
   return children
 }
@@ -139,7 +139,7 @@ const UnauthenticatedRoute = ({ children }: { children: JSX.Element }) => {
 // Public route - accessible to both authenticated and unauthenticated users
 const PublicRoute = ({ children }: { children: JSX.Element }) => {
   const { isLoading } = useAuth()
-  
+
   // Show loading spinner while checking authentication (but don't redirect)
   if (isLoading) {
     return (
@@ -148,9 +148,31 @@ const PublicRoute = ({ children }: { children: JSX.Element }) => {
       </div>
     )
   }
-  
-  // Always render children for public routes, regardless of authentication
+
   return children
+}
+
+// Dashboard router based on user role
+const DashboardRouter = () => {
+  const { user } = useAuth()
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Spinner size="md" text="Loading dashboard..." />
+      </div>
+    )
+  }
+
+  // Route to appropriate dashboard based on user role
+  if (user.role === 'admin' || user.role === 'superadmin') {
+    return <AdminDashboard />
+  } else if (user.role === 'organizer' || user.role === 'organizer_admin') {
+    return <OrganizerDashboard />
+  } else {
+    // Default to organizer dashboard for other roles
+    return <OrganizerDashboard />
+  }
 }
 
 // Component to initialize real-time messaging inside QueryClientProvider
@@ -168,7 +190,7 @@ const AppContent = () => {
 const AppWithRealtime = () => {
   // Initialize real-time messaging for notifications
   useRealtimeMessages()
-  
+
   // Register service worker
   useEffect(() => {
     if ('serviceWorker' in navigator) {
@@ -181,7 +203,7 @@ const AppWithRealtime = () => {
         })
     }
   }, [])
-  
+
   return (
     <>
       <ThemeTransition />
@@ -203,7 +225,7 @@ const AppWithRealtime = () => {
           <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
           <Route path="/privacy" element={<PublicRoute><PrivacyPolicy /></PublicRoute>} />
           <Route path="/terms" element={<PublicRoute><TermsOfService /></PublicRoute>} />
-          
+
           {/* Event public registration routes */}
           <Route path="/event/register/:eventUuid" element={<PublicRoute><PublicEventRegister /></PublicRoute>} />
           <Route path="/event/custom-register/:eventId" element={<PublicRoute><CustomEventRegistration /></PublicRoute>} />
@@ -215,7 +237,7 @@ const AppWithRealtime = () => {
           <Route path="/usher/register/success" element={<PublicRoute><UsherRegistrationSuccess /></PublicRoute>} />
           <Route path="/salesperson/register/:code" element={<PublicRoute><SalespersonRegistration /></PublicRoute>} />
           <Route path="/r/:shortCode" element={<PublicRoute><ShortLinkResolver /></PublicRoute>} />
-          
+
           {/* Public ticket purchase routes - no login required */}
           <Route path="/tickets/purchase/:eventId" element={<PublicRoute><TicketPurchasePage /></PublicRoute>} />
           <Route path="/tickets/purchase/success" element={<PublicRoute><TicketPurchaseSuccess /></PublicRoute>} />
@@ -239,14 +261,13 @@ const AppWithRealtime = () => {
               </ProtectedRoute>
             }
           >
-            <Route index element={<RoleDashboard />} />
+            <Route index element={<DashboardRouter />} />
             <Route path="events" element={<Events />} />
             <Route path="events/create" element={<EventTypeSelection />} />
             <Route path="events/create/ticketed" element={<CreateTicketedEvent />} />
             <Route path="events/create/free" element={<CreateFreeEvent />} />
             <Route path="events/:eventId" element={<EventDetails />} />
             <Route path="team" element={<Team />} />
-            <Route path="role-management" element={<RoleManagement />} />
             <Route path="users" element={<Users />} />
             <Route path="organizers" element={<Organizers />} />
             <Route path="organizers/add" element={<AddOrganizer />} />

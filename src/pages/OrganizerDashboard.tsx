@@ -124,14 +124,14 @@ export default function OrganizerDashboard() {
     console.log('[Dashboard] Clicked event:', event)
     console.log('[Dashboard] Event organizer_id:', event.organizer_id)
     console.log('[Dashboard] User organizer_id:', user?.organizer_id)
-    
+
     // Pre-check: Verify the event belongs to this organizer
     if (user?.organizer_id && event.organizer_id !== user.organizer_id) {
       console.error('[Dashboard] Event does not belong to this organizer')
       showError('Access Denied', 'This event belongs to another organizer and cannot be accessed.')
       return
     }
-    
+
     try {
       // Check if user has permission to view this event
       const response = await api.get(`/events/${event.id}`)
@@ -142,7 +142,7 @@ export default function OrganizerDashboard() {
     } catch (error: any) {
       console.error('[Dashboard] Error accessing event:', error)
       console.error('[Dashboard] Error response:', error.response?.data)
-      
+
       if (error.response?.status === 403) {
         showError('Access Denied', 'You do not have permission to view this event. It may belong to another organizer.')
       } else if (error.response?.status === 404) {
@@ -178,17 +178,11 @@ export default function OrganizerDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
-      
-      if (isMockMode()) {
-        // Use mock data in development mode
-        const mockDashboardData = await getMockData(mockData.dashboardData)
-        setDashboardData(mockDashboardData)
-        setError(null)
-      } else {
-        const response = await api.get('/dashboard/organizer')
-        setDashboardData(response.data)
-        setError(null)
-      }
+
+      // Always use real data for organizer dashboard
+      const response = await api.get('/dashboard/organizer')
+      setDashboardData(response.data)
+      setError(null)
     } catch (err: any) {
       let message = 'Failed to fetch organizer dashboard data.'
       if (err.response && err.response.data && err.response.data.error) {
@@ -226,19 +220,19 @@ export default function OrganizerDashboard() {
           per_page: 10,
         }).catch(() => ({ data: [] })),
       ]);
-      
+
       // Handle paginated response - response.data might be the paginated object
       const pendingTasks = pendingResponse.data?.data || pendingResponse.data || [];
       const inProgressTasks = inProgressResponse.data?.data || inProgressResponse.data || [];
-      
+
       // Combine and sort all tasks
       const allTasks = [...(Array.isArray(pendingTasks) ? pendingTasks : []), ...(Array.isArray(inProgressTasks) ? inProgressTasks : [])];
-      
+
       // Filter to only show tasks due in the next 30 days or overdue
       const now = new Date();
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(now.getDate() + 30);
-      
+
       const upcomingTasks = allTasks.filter((task: Task) => {
         if (!task.due_date) return true; // Include tasks without due dates
         try {
@@ -259,7 +253,7 @@ export default function OrganizerDashboard() {
           return 0;
         }
       });
-      
+
       setTasks(upcomingTasks.slice(0, 5)); // Show top 5
     } catch (err: any) {
       console.error('Error fetching tasks:', err);
@@ -279,19 +273,19 @@ export default function OrganizerDashboard() {
       const response = await api.get('/messages/activity', {
         params: { limit: 50 } // Fetch more to ensure we get latest from each conversation
       });
-      
+
       const allActivities = response.data.activities || [];
-      
+
       // Group activities by conversation
       // For event chats: group by event_name
       // For direct chats: group by other_user_name
       const conversationMap = new Map<string, any>();
-      
+
       allActivities.forEach((activity: any) => {
         if (activity.type === 'message') {
           // Create a unique key for each conversation
           let conversationKey: string;
-          
+
           if (activity.event_name) {
             // Event chat - group by event name (event names should be unique)
             conversationKey = `event_${activity.event_name}`;
@@ -301,7 +295,7 @@ export default function OrganizerDashboard() {
             const otherUser = activity.other_user_name || activity.recipient_name || activity.sender_name;
             conversationKey = `direct_${(otherUser || 'unknown').toLowerCase().trim()}`;
           }
-          
+
           // If this conversation doesn't exist or this message is newer, update it
           const existing = conversationMap.get(conversationKey);
           if (!existing) {
@@ -323,14 +317,14 @@ export default function OrganizerDashboard() {
           }
         }
       });
-      
+
       // Convert map to array and sort by created_at (newest first)
       const uniqueConversations = Array.from(conversationMap.values()).sort((a, b) => {
         const dateA = new Date(a.created_at).getTime();
         const dateB = new Date(b.created_at).getTime();
         return dateB - dateA; // Descending order
       });
-      
+
       // Take only the top conversations (limit)
       setRecentActivities(uniqueConversations.slice(0, 8));
     } catch (err: any) {
@@ -386,7 +380,7 @@ export default function OrganizerDashboard() {
     tomorrow.setHours(0, 0, 0, 0);
     const dueDateOnly = new Date(date);
     dueDateOnly.setHours(0, 0, 0, 0);
-    
+
     if (isPast(date) && !isToday(date)) {
       return `Overdue: ${format(date, 'MMM d, yyyy')}`;
     } else if (isToday(date)) {
@@ -437,20 +431,16 @@ export default function OrganizerDashboard() {
   useEffect(() => {
     const start = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1)
     const end = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0)
-    
-    if (isMockMode()) {
-      // Use mock data in development mode
-      setMonthEvents(mockData.events)
-    } else {
-      api.get('/organizer/events', {
+
+    // Always use real data
+    api.get('/organizer/events', {
         params: {
           start_date: start.toISOString().slice(0, 10),
           end_date: end.toISOString().slice(0, 10),
         },
       })
-        .then((res) => setMonthEvents(res.data))
-        .catch(() => setMonthEvents([]))
-    }
+      .then((res) => setMonthEvents(res.data))
+      .catch(() => setMonthEvents([]))
   }, [calendarMonth])
 
   // Fetch events for selected date
@@ -531,15 +521,11 @@ export default function OrganizerDashboard() {
     setEventsLoading(true);
     setEventsError(null);
     try {
-      if (isMockMode()) {
-        // Use mock data in development mode
-        const mockEventsData = await getMockData(mockData.events)
-        setAllEvents(mockEventsData);
-      } else {
-        const res = await api.get('/events');
+      // Always use real data
+      const res = await api.get('/events');
         console.log('[Dashboard] Fetched events:', res.data.length)
         console.log('[Dashboard] User organizer_id:', user?.organizer_id)
-        
+
         // Filter events to only show those belonging to current organizer
         const filteredEvents = res.data.filter((event: any) => {
           // If user has organizer_id, only show events from their organization
@@ -554,10 +540,9 @@ export default function OrganizerDashboard() {
           console.log('[Dashboard] Admin mode - showing all events')
           return true
         });
-        
+
         console.log('[Dashboard] Filtered events:', filteredEvents.length)
         setAllEvents(filteredEvents);
-      }
     } catch (err: any) {
       console.error('[Dashboard] Error fetching events:', err)
       setEventsError(err.response?.data?.message || 'Failed to fetch events');
@@ -602,7 +587,7 @@ export default function OrganizerDashboard() {
     const assigned = event?.ushers?.map((u: any) => u.id) || []
     setSelectedUshers(assigned)
     setAssignDialogOpen(true)
-    
+
     // Fetch available ushers for this event
     setUshersLoading(true)
     try {
@@ -655,26 +640,17 @@ export default function OrganizerDashboard() {
     let isMounted = true;
     const fetchAnalytics = async () => {
       try {
-        if (isMockMode()) {
-          // Use mock data in development mode
-          const mockAnalyticsData = await getMockData(mockData.analytics)
-          setGuestTypeDistribution([
-            { name: 'VIP', value: 25 },
-            { name: 'Standard', value: 75 },
-            { name: 'Student', value: 50 }
-          ]);
-          setEventPopularity(mockAnalyticsData.top_events);
-        } else {
-          const [summaryRes, eventsRes] = await Promise.all([
-            api.get('/reports/summary'),
-            api.get('/events'),
-          ]);
-          
+        // Always use real data
+        const [summaryRes, eventsRes] = await Promise.all([
+          api.get('/reports/summary'),
+          api.get('/events'),
+        ]);
+
           if (!isMounted) return;
-          
+
           const metrics = summaryRes.data as ReportMetrics;
           setReportMetrics(metrics);
-          
+
           // Guest type distribution using transformer - PieChartComponent will use its own theme colors
           if (metrics.guest_type_breakdown) {
             const primaryColors = getChartColorPalette('primary');
@@ -683,7 +659,7 @@ export default function OrganizerDashboard() {
           } else {
             setGuestTypeDistribution([]);
           }
-          
+
           // Event popularity (top events by attendance) using transformer
           if (metrics.top_events_by_attendance && Array.isArray(eventsRes.data)) {
             const eventIdToName: Record<string, string> = {};
@@ -695,7 +671,6 @@ export default function OrganizerDashboard() {
           } else {
             setEventPopularity([]);
           }
-        }
       } catch (err: any) {
         if (!isMounted) return;
         const errorMessage = err.response?.data?.message || 'Failed to fetch analytics data';
@@ -706,7 +681,7 @@ export default function OrganizerDashboard() {
       }
     };
     fetchAnalytics();
-    
+
     return () => {
       isMounted = false;
     };
@@ -739,7 +714,7 @@ export default function OrganizerDashboard() {
       '6months': 6,
       '1year': 12
     };
-    
+
     const monthsToShow = monthsMap[level];
     return data.slice(-monthsToShow);
   };
@@ -764,16 +739,16 @@ export default function OrganizerDashboard() {
           <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
             <CalendarIcon className="w-6 h-6 text-[hsl(var(--color-rich-black))]" />
           </div>
-        <div>
+          <div>
             <h1 className="text-3xl font-bold text-foreground">
-            Welcome{user && (user as any).name ? `, ${(user as any).name}` : ''}!
-          </h1>
+              Welcome{user && (user as any).name ? `, ${(user as any).name}` : ''}!
+            </h1>
             <p className="text-muted-foreground">
               Today is {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
+          </div>
         </div>
-        </div>
-        
+
         {/* Quick Actions */}
         <div className="flex gap-3 mt-6">
           <Link to="/dashboard/events/create">
@@ -885,7 +860,7 @@ export default function OrganizerDashboard() {
                     1Y
                   </Button>
                 </div>
-                
+
                 {/* Detailed View Button */}
                 <Button
                   variant="outline"
@@ -896,47 +871,47 @@ export default function OrganizerDashboard() {
                   <Maximize2 className="w-4 h-4 mr-1" />
                   Details
                 </Button>
-                
+
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                   <CalendarIcon className="w-4 h-4 text-[hsl(var(--color-rich-black))]" />
                 </div>
               </div>
             </div>
-            
+
             <div className="w-full h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={currentChartData}>
                   {(() => {
                     const styles = getChartStyles();
                     const chartColors = getChartColors();
-                    
+
                     return (
                       <>
                         <defs>
                           <linearGradient id="registrationGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={chartColors.info} stopOpacity={0.35}/>
-                            <stop offset="95%" stopColor={chartColors.info} stopOpacity={0}/>
+                            <stop offset="5%" stopColor={chartColors.info} stopOpacity={0.35} />
+                            <stop offset="95%" stopColor={chartColors.info} stopOpacity={0} />
                           </linearGradient>
                           <linearGradient id="attendanceGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={chartColors.success} stopOpacity={0.35}/>
-                            <stop offset="95%" stopColor={chartColors.success} stopOpacity={0}/>
+                            <stop offset="5%" stopColor={chartColors.success} stopOpacity={0.35} />
+                            <stop offset="95%" stopColor={chartColors.success} stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
-                        <XAxis 
-                          dataKey="month" 
+                        <XAxis
+                          dataKey="month"
                           stroke={styles.axisStroke}
                           fontSize={12}
                           tickLine={false}
                           axisLine={false}
                         />
-                        <YAxis 
+                        <YAxis
                           stroke={styles.axisStroke}
                           fontSize={12}
                           tickLine={false}
                           axisLine={false}
                         />
-                        <RechartsTooltip 
+                        <RechartsTooltip
                           contentStyle={{
                             backgroundColor: styles.tooltipBg,
                             border: `1px solid ${styles.tooltipBorder}`,
@@ -945,21 +920,21 @@ export default function OrganizerDashboard() {
                             color: styles.tooltipText,
                           }}
                         />
-                        <Area 
-                          type="monotone" 
-                          dataKey="registrations" 
-                          stackId="1" 
-                          stroke={chartColors.info} 
-                          fill="url(#registrationGradient)" 
-                          name="Registrations" 
+                        <Area
+                          type="monotone"
+                          dataKey="registrations"
+                          stackId="1"
+                          stroke={chartColors.info}
+                          fill="url(#registrationGradient)"
+                          name="Registrations"
                         />
-                        <Area 
-                          type="monotone" 
-                          dataKey="attendance" 
-                          stackId="2" 
-                          stroke={chartColors.success} 
-                          fill="url(#attendanceGradient)" 
-                          name="Attendance" 
+                        <Area
+                          type="monotone"
+                          dataKey="attendance"
+                          stackId="2"
+                          stroke={chartColors.success}
+                          fill="url(#attendanceGradient)"
+                          name="Attendance"
                         />
                       </>
                     );
@@ -967,7 +942,7 @@ export default function OrganizerDashboard() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            
+
             {/* Chart Summary */}
             <div className="mt-4 grid grid-cols-2 gap-4">
               <div className="bg-info/10 rounded-lg p-3 border border-info/30">
@@ -999,7 +974,7 @@ export default function OrganizerDashboard() {
 
             {/* Event Filters */}
             <div className="mb-6">
-              <EventFilterChips 
+              <EventFilterChips
                 selectedFilters={eventFilters}
                 onFilterChange={setEventFilters}
               />
@@ -1045,11 +1020,11 @@ export default function OrganizerDashboard() {
 
               {/* List View Content */}
               <TabsContent value="list" className="mt-0">
-                  {eventsLoading && (
-                    <div className="flex flex-col items-center justify-center py-12">
-                      <Spinner size="md" variant="primary" text="Loading events..." />
-                    </div>
-                  )}
+                {eventsLoading && (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Spinner size="md" variant="primary" text="Loading events..." />
+                  </div>
+                )}
                 {eventsError && (
                   <div className="flex flex-col items-center justify-center py-12">
                     <div className="w-8 h-8 bg-error/10 rounded-full flex items-center justify-center mb-3">
@@ -1058,7 +1033,7 @@ export default function OrganizerDashboard() {
                     <div className="text-sm text-error">{eventsError}</div>
                   </div>
                 )}
-                
+
                 {/* Table for desktop */}
                 <div className="hidden lg:block overflow-x-auto">
                   <Table className="min-w-full">
@@ -1118,19 +1093,19 @@ export default function OrganizerDashboard() {
                         const matchesFilter = eventFilters.length === 0 || eventFilters.includes(event.status)
                         return matchesFilter
                       }).length === 0 && !eventsLoading && !eventsError && (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                            <div className="flex flex-col items-center">
-                              <Clock className="w-8 h-8 text-muted-foreground/50 mb-2" />
-                              <span>No events match the selected filters</span>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                              <div className="flex flex-col items-center">
+                                <Clock className="w-8 h-8 text-muted-foreground/50 mb-2" />
+                                <span>No events match the selected filters</span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
                     </TableBody>
                   </Table>
                 </div>
-                
+
                 {/* Card view for mobile/tablet */}
                 <div className="lg:hidden space-y-4">
                   {allEvents
@@ -1152,7 +1127,7 @@ export default function OrganizerDashboard() {
                             <div className="flex-1">
                               <h4 className="font-semibold text-card-foreground text-sm mb-1">{event.name}</h4>
                               <p className="text-xs text-muted-foreground">{event.date} {event.time} • {event.location || 'Convention Center'}</p>
-                          </div>
+                            </div>
                             <Badge className={`${getStatusColor(event.status)} text-xs font-medium ml-3`}>{event.status}</Badge>
                           </div>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
@@ -1163,16 +1138,16 @@ export default function OrganizerDashboard() {
                           </div>
                           <div className="mb-3">
                             <div className="flex justify-between text-xs text-muted-foreground/70 mb-1">
-                            <span>Progress:</span>
-                            <span>{registrationProgress}%</span>
+                              <span>Progress:</span>
+                              <span>{registrationProgress}%</span>
                             </div>
                             <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
                               <div className="h-2 bg-brand-gradient rounded-full transition-all duration-300" style={{ width: `${registrationProgress}%` }}></div>
-                          </div>
+                            </div>
                           </div>
                           <Button size="sm" variant="outline" className="w-full bg-card border-border hover:bg-accent" onClick={() => navigate(`/dashboard/events/${event.id}`)}>
                             <Eye className="w-4 h-4 mr-2" /> View Details
-                            </Button>
+                          </Button>
                         </div>
                       );
                     })}
@@ -1180,11 +1155,11 @@ export default function OrganizerDashboard() {
                     const matchesFilter = eventFilters.length === 0 || eventFilters.includes(event.status)
                     return matchesFilter
                   }).length === 0 && !eventsLoading && !eventsError && (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Clock className="w-8 h-8 mx-auto mb-2 text-muted-foreground/50" />
-                      <span>No events match the selected filters</span>
-                    </div>
-                  )}
+                      <div className="text-center py-12 text-muted-foreground">
+                        <Clock className="w-8 h-8 mx-auto mb-2 text-muted-foreground/50" />
+                        <span>No events match the selected filters</span>
+                      </div>
+                    )}
                 </div>
               </TabsContent>
             </Tabs>
@@ -1235,7 +1210,7 @@ export default function OrganizerDashboard() {
                 {!tasksLoading && !tasksError && tasks.map((task: Task) => {
                   const dueDate = task.due_date ? new Date(task.due_date) : null;
                   const isOverdue = dueDate && isPast(dueDate) && !isToday(dueDate) && task.status !== 'completed';
-                  
+
                   return (
                     <div
                       key={task.id}
@@ -1266,8 +1241,8 @@ export default function OrganizerDashboard() {
                             </div>
                           )}
                           <div className="flex items-center gap-2 flex-wrap">
-                            <Badge 
-                              variant="secondary" 
+                            <Badge
+                              variant="secondary"
                               className={`text-xs ${isOverdue ? 'bg-error/10 text-error border-error/30' : 'bg-warning/10 text-warning border-warning/30'}`}
                             >
                               {formatDueDate(task.due_date)}
@@ -1295,7 +1270,7 @@ export default function OrganizerDashboard() {
                 })}
               </div>
             </div>
-            
+
             <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -1324,8 +1299,8 @@ export default function OrganizerDashboard() {
                     </div>
                   </div>
                 ))}
-          </div>
-        </div>
+              </div>
+            </div>
           </div>
         </div>
         {/* Right: Charts and Activity */}
@@ -1351,7 +1326,7 @@ export default function OrganizerDashboard() {
               emptyMessage="No guest type data available"
             />
           </div>
-          
+
           {/* Bar Chart for Event Popularity */}
           <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center justify-between mb-6">
@@ -1373,14 +1348,14 @@ export default function OrganizerDashboard() {
             />
           </div>
           {/* Recent Activity */}
-          <RecentActivity 
-            limit={8} 
+          <RecentActivity
+            limit={8}
             activities={recentActivities}
             loading={activitiesLoading}
             error={activitiesError}
             onRefresh={fetchRecentActivities}
           />
-          
+
           {/* Quick Actions */}
           <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center justify-between mb-6">
@@ -1450,8 +1425,8 @@ export default function OrganizerDashboard() {
                       }}
                       className="w-4 h-4 text-primary rounded border-border"
                     />
-                    <label 
-                      htmlFor={`usher-${usher.id}`} 
+                    <label
+                      htmlFor={`usher-${usher.id}`}
                       className="flex-1 cursor-pointer text-foreground"
                     >
                       <div className="font-medium">{usher.name}</div>
@@ -1463,19 +1438,19 @@ export default function OrganizerDashboard() {
             )}
           </div>
           <div className="flex gap-2 mt-4 justify-end">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setAssignDialogOpen(false)
                 setSelectedUshers([])
                 setAvailableUshers([])
-              }} 
+              }}
               disabled={assigning}
             >
               Cancel
             </Button>
-            <Button 
-              onClick={handleAssignUshers} 
+            <Button
+              onClick={handleAssignUshers}
               disabled={assigning || selectedUshers.length === 0 || ushersLoading}
             >
               {assigning ? 'Assigning...' : 'Assign Ushers'}
@@ -1572,12 +1547,12 @@ export default function OrganizerDashboard() {
                       <>
                         <defs>
                           <linearGradient id="detailedRegistrationGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={chartColors.info} stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor={chartColors.info} stopOpacity={0}/>
+                            <stop offset="5%" stopColor={chartColors.info} stopOpacity={0.4} />
+                            <stop offset="95%" stopColor={chartColors.info} stopOpacity={0} />
                           </linearGradient>
                           <linearGradient id="detailedAttendanceGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={chartColors.success} stopOpacity={0.4}/>
-                            <stop offset="95%" stopColor={chartColors.success} stopOpacity={0}/>
+                            <stop offset="5%" stopColor={chartColors.success} stopOpacity={0.4} />
+                            <stop offset="95%" stopColor={chartColors.success} stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
@@ -1717,7 +1692,7 @@ export default function OrganizerDashboard() {
                       const prevItem = index > 0 ? currentChartData[index - 1] : null;
                       const trend = prevItem ?
                         (item.registrations > prevItem.registrations ? '↗️' :
-                         item.registrations < prevItem.registrations ? '↘️' : '→') : '→';
+                          item.registrations < prevItem.registrations ? '↘️' : '→') : '→';
 
                       return (
                         <TableRow key={item.month} className="hover:bg-muted/50">
@@ -1776,7 +1751,7 @@ export default function OrganizerDashboard() {
               )}
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedTask && (
             <div className="space-y-4">
               {/* Task Status and Priority */}
@@ -1898,8 +1873,8 @@ export default function OrganizerDashboard() {
                   </Button>
                 </Link>
                 {selectedTask.status !== 'completed' && (
-                  <Button 
-                    variant="default" 
+                  <Button
+                    variant="default"
                     size="sm"
                     onClick={() => handleCompleteTask(selectedTask.id)}
                     className="bg-success hover:bg-success/90"
@@ -1908,8 +1883,8 @@ export default function OrganizerDashboard() {
                     Mark Complete
                   </Button>
                 )}
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   onClick={() => setTaskDialogOpen(false)}
                 >

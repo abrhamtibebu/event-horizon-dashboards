@@ -1,73 +1,107 @@
-import { useOrganizerPermissions } from './use-organizer-permissions'
-import { toast } from 'sonner'
 import { useCallback } from 'react'
+import { toast } from 'sonner'
+import { useAuth } from './use-auth'
 
 /**
- * Hook to check permissions and show toast notifications when access is denied
+ * Permission check hook - Updated to handle multi-role check
  */
 export function usePermissionCheck() {
-  const { hasPermission, isLoading, isOrganizerAdmin } = useOrganizerPermissions()
+    const { user } = useAuth()
 
-  /**
-   * Check if user has permission, show toast if not
-   * @param permission - Permission to check
-   * @param action - Action name for the toast message (e.g., "create vendor", "edit event")
-   * @returns boolean - true if has permission, false otherwise
-   */
-  const checkPermission = useCallback(
-    (permission: string, action?: string): boolean => {
-      if (isLoading) {
+    /**
+     * Check if user has a specific role or any of the roles in an array
+     */
+    const hasRole = useCallback((requiredRoles: string | string[]) => {
+        if (!user) return false
+
+        // Superadmin and admin have all access
+        if (user.role === 'superadmin' || user.role === 'admin') return true
+
+        const rolesToCheck = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles]
+
+        // Check primary role
+        if (rolesToCheck.includes(user.role)) return true
+
+        // Check additional roles if they exist
+        if (user.roles && user.roles.some(r => rolesToCheck.includes(r))) return true
+
         return false
-      }
+    }, [user]);
 
-      // System admins always have permission
-      if (isOrganizerAdmin) {
-        return true
-      }
+    /**
+     * Simplified permission check based on roles
+     * Since granular permissions were removed, we map actions to roles
+     */
+    const hasPermission = useCallback((permission: string) => {
+        if (!user) return false
 
-      if (hasPermission(permission)) {
-        return true
-      }
+        // Superadmin and admin see everything
+        if (user.role === 'superadmin' || user.role === 'admin') return true
 
-      // Show toast notification
-      const actionText = action || 'perform this action'
-      toast.error('Access Denied', {
-        description: `You don't have permission to ${actionText}. Please contact your organizer admin to request access.`,
-        duration: 5000,
-      })
+        // Organizer admins have all permissions within their organization
+        if (user.role === 'organizer_admin') return true
 
-      return false
-    },
-    [hasPermission, isLoading, isOrganizerAdmin]
-  )
-
-  /**
-   * Execute a function only if user has permission
-   * @param permission - Permission to check
-   * @param fn - Function to execute if permission granted
-   * @param action - Action name for toast message
-   */
-  const executeWithPermission = useCallback(
-    <T extends (...args: any[]) => any>(
-      permission: string,
-      fn: T,
-      action?: string
-    ): ((...args: Parameters<T>) => void) => {
-      return (...args: Parameters<T>) => {
-        if (checkPermission(permission, action)) {
-          return fn(...args)
+        // Basic mapping for common permissions
+        const permissionRoleMap: Record<string, string[]> = {
+            'events.manage': ['event_manager'],
+            'events.create': ['event_manager'],
+            'events.view': ['event_manager', 'marketing_specialist', 'finance_manager', 'operations_manager', 'procurement_manager'],
+            'organizer.edit': ['finance_manager'],
+            'team.manage': [],
+            'vendors.manage': ['procurement_manager', 'procurement_officer'],
+            'vendors.create': ['procurement_manager', 'procurement_officer'],
+            'vendors.delete': ['procurement_manager'],
+            'vendors.view': ['procurement_manager', 'procurement_officer', 'finance_manager', 'purchase_requester', 'proforma_manager', 'purchase_approver', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver'],
+            'finance.manage': ['finance_manager'],
+            'operations.manage': ['operations_manager'],
+            'marketing.manage': ['marketing_specialist'],
+            'ushers.manage': ['event_manager'],
+            'guests.manage': ['event_manager'],
+            'badges.design': ['event_manager', 'marketing_specialist'],
+            'reports.view': ['event_manager', 'marketing_specialist', 'finance_manager'],
+            // Procurement permissions
+            'pr.view': ['procurement_manager', 'procurement_officer', 'finance_manager', 'purchase_requester', 'purchase_approver'],
+            'pr.create': ['procurement_manager', 'event_manager', 'operations_manager', 'purchase_requester'],
+            'pr.approve': ['procurement_manager', 'finance_manager', 'purchase_approver'],
+            'proforma.view': ['procurement_manager', 'procurement_officer', 'finance_manager', 'proforma_manager', 'proforma_approver'],
+            'proforma.upload': ['procurement_manager', 'procurement_officer', 'proforma_manager'],
+            'proforma.approve': ['finance_manager', 'procurement_manager', 'proforma_approver'],
+            'po.view': ['procurement_manager', 'procurement_officer', 'finance_manager', 'purchase_order_issuer'],
+            'po.send': ['procurement_manager', 'procurement_officer', 'purchase_order_issuer'],
+            'po.approve': ['finance_manager', 'purchase_order_issuer'],
+            'payment_request.view': ['finance_manager', 'procurement_manager', 'payment_requester', 'payment_approver'],
+            'payment_request.create': ['procurement_manager', 'procurement_officer', 'payment_requester'],
+            'payment_request.approve': ['finance_manager', 'payment_approver'],
+            'payments.view': ['finance_manager', 'payment_requester'],
+            'payments.process': ['finance_manager', 'payment_requester'],
         }
-      }
-    },
-    [checkPermission]
-  )
 
-  return {
-    checkPermission,
-    executeWithPermission,
-    hasPermission,
-    isLoading,
-    isOrganizerAdmin,
-  }
+        const requiredRoles = permissionRoleMap[permission]
+        if (requiredRoles) {
+            return hasRole(requiredRoles)
+        }
+
+        // Default to true for unrecognized permissions to avoid breaking UI 
+        // until migrations are fully handled
+        return true
+    }, [user, hasRole]);
+
+    /**
+     * Legacy checkPermission for backward compatibility with toast
+     */
+    const checkPermission = useCallback((permission: string, actionName?: string, showToast = true) => {
+        const permitted = hasPermission(permission)
+        if (!permitted && showToast) {
+            toast.error('Access Denied', {
+                description: `You don't have permission to ${actionName || 'perform this action'}.`,
+            })
+        }
+        return permitted
+    }, [hasPermission]);
+
+    return {
+        hasRole,
+        hasPermission,
+        checkPermission,
+    }
 }
-

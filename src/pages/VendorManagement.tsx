@@ -1,42 +1,110 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { 
-  Search, 
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Search,
   Plus,
   Users,
   FileText,
-  CheckCircle, 
+  CheckCircle,
   FileCheck,
-  PlayCircle,
+  DollarSign,
   CheckSquare,
-  BarChart3
+  ArrowRight,
+  Clock,
+  AlertCircle,
+  TrendingUp,
+  RefreshCw,
+  ChevronRight,
+  Filter
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { usePermissionCheck } from '@/hooks/use-permission-check';
-import { PermissionGuard } from '@/components/PermissionGuard';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 // Import stage components
-import VendorDiscoveryTab from '@/components/vendor/VendorDiscoveryTab';
-import VendorRequirementManager from '@/components/vendor/VendorRequirementManager';
-import QuoteComparisonMatrix from '@/components/vendor/QuoteComparisonMatrix';
-import ContractManagementView from '@/components/vendor/ContractManagementView';
-import DeliverablesTracker from '@/components/vendor/DeliverablesTracker';
-import PaymentSettlementView from '@/components/vendor/PaymentSettlementView';
+import VendorList from '@/components/vendor-revamped/VendorList';
+import PurchaseRequestList from '@/components/vendor-revamped/PurchaseRequestList';
+import ProformaList from '@/components/vendor-revamped/ProformaList';
+import PurchaseOrderList from '@/components/vendor-revamped/PurchaseOrderList';
+import PaymentRequestList from '@/components/vendor-revamped/PaymentRequestList';
+import PaymentHistoryList from '@/components/vendor-revamped/PaymentHistoryList';
+import VendorOnboardingModal from '@/components/vendor/VendorOnboardingModal';
+import CreatePurchaseRequestModal from '@/components/vendor-revamped/CreatePurchaseRequestModal';
+import VendorProfileModal from '@/components/vendor-revamped/VendorProfileModal';
+import {
+  getVendorStatistics,
+  getPRStatistics,
+  getProformaStatistics,
+  getPOStatistics,
+  getPaymentRequestStatistics,
+  getVendorPaymentRevampedStatistics,
+  api
+} from '@/lib/api';
+
+interface WorkflowStage {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  description: string;
+  permissions: string[];
+  color: string;
+}
 
 export default function VendorManagement() {
-  const { isAuthenticated, user, isLoading: authLoading } = useAuth();
-  const { checkPermission, hasPermission, isLoading: permissionsLoading } = usePermissionCheck();
   const navigate = useNavigate();
-  const [activeStage, setActiveStage] = useState<string>('discovery');
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { hasPermission, isLoading: permissionsLoading } = usePermissionCheck();
+
+  const [activeStage, setActiveStage] = useState('vendors');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isAddVendorOpen, setIsAddVendorOpen] = useState(false);
+  const [isAddPROpen, setIsAddPROpen] = useState(false);
+  const [selectedVendor, setSelectedVendor] = useState<any>(null);
+  const [isViewProfileOpen, setIsViewProfileOpen] = useState(false);
+
+  const handleEditVendor = useCallback((vendor: any) => {
+    setSelectedVendor(vendor);
+    setIsAddVendorOpen(true);
+  }, []);
+
+  const handleCreateVendor = useCallback(() => {
+    setSelectedVendor(null);
+    setIsAddVendorOpen(true);
+  }, []);
+
+  const handleViewProfile = useCallback((vendor: any) => {
+    setSelectedVendor(vendor);
+    setIsViewProfileOpen(true);
+  }, []);
+
+  const [stageCounts, setStageCounts] = useState<Record<string, number>>({
+    'vendors': 0,
+    'purchase-requests': 0,
+    'proforma': 0,
+    'purchase-orders': 0,
+    'payment-requests': 0,
+    'payments': 0,
+  });
+
+  const [vendorListKey, setVendorListKey] = useState(0);
+  const [countsLoading, setCountsLoading] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Redirect to sign-in if not authenticated
   useEffect(() => {
@@ -45,144 +113,163 @@ export default function VendorManagement() {
     }
   }, [isAuthenticated, authLoading, navigate]);
 
-  // Check if user has ANY vendor-related permission
-  // This allows access to the page if they have any vendor permission (e.g., approve quotations)
-  const vendorPermissions = [
-    'vendors.view',
-    'vendors.manage',
-    'vendors.create',
-    'vendors.edit',
-    'vendors.delete',
-    'vendors.discovery',
-    'vendors.onboard',
-    'vendors.lookup',
-    'vendors.requirements',
-    'vendors.rfq.create',
-    'vendors.rfq.send',
-    'vendors.rfq.invite',
-    'vendors.rfq.view',
-    'vendors.quotations.view',
-    'vendors.quotations.manage',
-    'vendors.quotations.approve',
-    'vendors.quotations.compare',
-    'vendors.contracts.view',
-    'vendors.contracts.create',
-    'vendors.contracts.edit',
-    'vendors.contracts.manage',
-    'vendors.contracts.milestones',
-    'vendors.contracts.po',
-    'vendors.deliverables.view',
-    'vendors.deliverables.manage',
-    'vendors.deliverables.track',
-    'vendors.payments.view',
-    'vendors.payments.manage',
-    'vendors.payments.process',
-    'vendors.reviews.view',
-    'vendors.reviews.create',
-    'vendors.reviews.manage',
-    'vendors.ratings.view',
-    'vendors.ratings.create',
-  ];
-
-  const hasAnyVendorPermission = vendorPermissions.some(perm => hasPermission(perm));
-
-  // Map stage IDs to required permissions
-  const stagePermissions: Record<string, string[]> = {
-    discovery: ['vendors.view', 'vendors.discovery'],
-    engagement: ['vendors.requirements', 'vendors.rfq.view'],
-    evaluation: ['vendors.quotations.view'],
-    contracting: ['vendors.contracts.view'],
-    execution: ['vendors.deliverables.view'],
-    closure: ['vendors.payments.view', 'vendors.reviews.view'],
-  };
-
-  const lifecycleStages = [
+  // Define the 6-stage workflow
+  const workflowStages: WorkflowStage[] = React.useMemo(() => [
     {
-      id: 'discovery',
-      label: 'Discovery',
+      id: 'vendors',
+      label: 'Vendors',
       icon: Users,
-      description: 'Find and onboard vendors',
-      permissions: ['vendors.view', 'vendors.discovery'],
+      description: 'Manage vendor directory and create new vendors',
+      permissions: ['vendors.view', 'vendors.create'],
+      color: 'primary',
     },
     {
-      id: 'engagement',
-      label: 'Engagement (RFQ)',
+      id: 'purchase-requests',
+      label: 'Purchase Requests',
       icon: FileText,
-      description: 'Create requirements and send RFQs',
-      permissions: ['vendors.requirements', 'vendors.rfq.view'],
+      description: 'Create and approve purchase requests',
+      permissions: ['pr.view', 'pr.create', 'pr.approve'],
+      color: 'primary',
     },
     {
-      id: 'evaluation',
-      label: 'Evaluation',
-      icon: CheckCircle,
-      description: 'Compare quotes and select vendors',
-      permissions: ['vendors.quotations.view'],
-    },
-    {
-      id: 'contracting',
-      label: 'Contracting',
+      id: 'proforma',
+      label: 'Proforma Invoices',
       icon: FileCheck,
-      description: 'Generate contracts and setup milestones',
-      permissions: ['vendors.contracts.view'],
+      description: 'Upload and approve proforma invoices',
+      permissions: ['proforma.view', 'proforma.upload'],
+      color: 'primary',
     },
     {
-      id: 'execution',
-      label: 'Execution',
-      icon: PlayCircle,
-      description: 'Track deliverables and progress',
-      permissions: ['vendors.deliverables.view'],
+      id: 'purchase-orders',
+      label: 'Purchase Orders',
+      icon: CheckCircle,
+      description: 'View and send purchase orders',
+      permissions: ['po.view', 'po.send'],
+      color: 'primary',
     },
     {
-      id: 'closure',
-      label: 'Closure & Review',
+      id: 'payment-requests',
+      label: 'Payment Requests',
+      icon: DollarSign,
+      description: 'Create and approve payment requests',
+      permissions: ['payment_request.view', 'payment_request.create'],
+      color: 'primary',
+    },
+    {
+      id: 'payments',
+      label: 'Payment History',
       icon: CheckSquare,
-      description: 'Final payments and vendor reviews',
-      permissions: ['vendors.payments.view', 'vendors.reviews.view'],
-    }
-  ];
+      description: 'Track completed payments and settlements',
+      permissions: ['payments.view'],
+      color: 'primary',
+    },
+  ], []);
 
-  // Auto-select first accessible stage once permissions are loaded
+  const hasAnyPurchasePermission = workflowStages.some(stage =>
+    stage.permissions.some(perm => hasPermission(perm))
+  );
+
+  const fetchCounts = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    setCountsLoading(true);
+    try {
+      // Helper to safely fetch stats if permitted
+      const fetchIfPermitted = async (permission: string, endpoint: string | (() => Promise<any>), dataKeys: string | string[]) => {
+        if (!hasPermission(permission)) return 0;
+        try {
+          const response = typeof endpoint === 'function' ? await endpoint() : await api.get(endpoint);
+
+          if (response.data?.success) {
+            const keys = Array.isArray(dataKeys) ? dataKeys : [dataKeys];
+            for (const key of keys) {
+              if (response.data.data?.[key] !== undefined) {
+                return response.data.data[key];
+              }
+            }
+          }
+          return 0;
+        } catch (err) {
+          console.warn(`Could not fetch stats for ${permission} (${dataKeys})`, err);
+          return 0;
+        }
+      };
+
+      const [vCount, prCount, pfCount, poCount, prqCount, pCount] = await Promise.all([
+        fetchIfPermitted('vendors.view', getVendorStatistics, ['total', 'total_vendors']),
+        fetchIfPermitted('pr.view', getPRStatistics, 'pending'),
+        fetchIfPermitted('proforma.view', getProformaStatistics, 'pending'),
+        fetchIfPermitted('po.view', getPOStatistics, 'draft'),
+        fetchIfPermitted('payment_request.view', getPaymentRequestStatistics, 'pending'),
+        fetchIfPermitted('payments.view', getVendorPaymentRevampedStatistics, 'paid_payments')
+      ]);
+
+      setStageCounts({
+        'vendors': vCount,
+        'purchase-requests': prCount,
+        'proforma': pfCount,
+        'purchase-orders': poCount,
+        'payment-requests': prqCount,
+        'payments': pCount,
+      });
+    } catch (error) {
+      console.error('Failed to fetch stage counts', error);
+    } finally {
+      setCountsLoading(false);
+    }
+  }, [hasPermission, isAuthenticated]);
+
+  // Fetch counts only on mount and when permissions change, not activeStage
   useEffect(() => {
-    if (permissionsLoading || !hasAnyVendorPermission) return; // Wait for permissions to load
-    
-    const firstAccessibleStage = lifecycleStages.find(stage =>
-      stage.permissions.some(perm => hasPermission(perm))
-    );
-    
-    if (firstAccessibleStage) {
-      const currentStage = lifecycleStages.find(s => s.id === activeStage);
-      const hasCurrentAccess = currentStage?.permissions.some(perm => hasPermission(perm));
-      
-      // If current stage is not accessible, switch to first accessible one
-      if (!hasCurrentAccess) {
-        setActiveStage(firstAccessibleStage.id);
+    if (isAuthenticated) {
+      fetchCounts();
+    }
+  }, [isAuthenticated, fetchCounts]);
+
+  // Handle stage switching based on permissions
+  useEffect(() => {
+    if (isAuthenticated && activeStage === 'vendors' && !hasPermission('vendors.view')) {
+      const firstPermittedStage = workflowStages.find(stage =>
+        stage.permissions.some(perm => hasPermission(perm))
+      );
+      if (firstPermittedStage) {
+        setActiveStage(firstPermittedStage.id);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [permissionsLoading, hasAnyVendorPermission]); // Re-run when permissions finish loading
+  }, [isAuthenticated, hasPermission, activeStage]);
 
   const handleStageChange = (stageId: string) => {
-    const stage = lifecycleStages.find(s => s.id === stageId);
+    const stage = workflowStages.find(s => s.id === stageId);
     if (stage) {
       const hasAccess = stage.permissions.some(perm => hasPermission(perm));
       if (hasAccess) {
         setActiveStage(stageId);
       } else {
         toast.error('Access Denied', {
-          description: `You don't have permission to access the ${stage.label} stage. Please contact your organizer admin to request access.`,
-          duration: 5000,
+          description: `You don't have permission to access ${stage.label}.`,
         });
       }
     }
   };
 
-  // Early return after all hooks are called
-  if (!hasAnyVendorPermission) {
+  if (authLoading || permissionsLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!hasAnyPurchasePermission) {
     return (
       <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground">You don't have permission to access vendor management.</p>
+        <Card className="border-none shadow-xl">
+          <CardContent className="flex flex-col items-center justify-center py-20 text-center">
+            <AlertCircle className="h-16 w-16 text-muted-foreground mb-4 opacity-20" />
+            <h2 className="text-2xl font-bold mb-2">Access Restricted</h2>
+            <p className="text-muted-foreground max-w-sm">
+              You don't have permission to access Vendor and Purchase Management. Please contact your administrator.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -190,114 +277,248 @@ export default function VendorManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-6 py-6">
-        {/* Breadcrumb Navigation */}
-        <div className="mb-6">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-500">
+      <div className="container mx-auto px-4 sm:px-6 py-8">
+        {/* Breadcrumb Navigation - More subtle */}
+        <div className="mb-8 opacity-80">
           <Breadcrumbs
             items={[
-              { label: 'Home', href: '/dashboard' },
               { label: 'Dashboard', href: '/dashboard' },
               { label: 'Vendor Management', href: '/dashboard/vendor-management' }
             ]}
           />
         </div>
 
-        {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex items-start justify-between mb-6">
-            <div className="flex-1">
-              <h1 className="text-4xl font-bold text-foreground mb-2">Vendor Management</h1>
-              <p className="text-muted-foreground text-lg">
-                Manage vendor lifecycle from discovery to closure
+        {/* Header Section - Refined and Modern */}
+        <div className="mb-10">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-10 bg-primary rounded-full" />
+                <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+                  Vendor <span className="text-primary">Management</span>
+                </h1>
+              </div>
+              <p className="text-muted-foreground text-sm md:text-base max-w-2xl font-medium">
+                Comprehensive procurement lifecycle: From discovery and onboarding to purchase requests and final settlement.
               </p>
             </div>
-            <div className="relative w-80">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                placeholder="Search vendors..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 h-10"
-              />
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="relative group">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Input
+                  placeholder="Search vendors or requests..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 h-11 w-full sm:w-72 bg-card border-border shadow-sm focus-visible:ring-primary rounded-xl"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl bg-card border-border shrink-0">
+                  <Filter className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={fetchCounts}
+                  className="h-11 w-11 rounded-xl bg-card border-border shrink-0 hover:text-primary transition-colors"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
 
-          {/* Lifecycle Stages Navigation */}
-          <Tabs value={activeStage} onValueChange={handleStageChange} className="w-full">
-            <div className="bg-[hsl(var(--color-primary)/0.12)] rounded-lg p-1 mb-6">
-              <TabsList className="inline-flex h-auto w-full bg-transparent p-0 gap-0">
-                {lifecycleStages.map((stage) => {
-                  const isActive = activeStage === stage.id;
-                  const hasAccess = stage.permissions.some(perm => hasPermission(perm));
-                  return (
-                    <TabsTrigger
-                      key={stage.id}
-                      value={stage.id}
-                      disabled={!hasAccess}
-                      className={`
-                        relative flex items-center justify-center px-6 py-3 rounded-md
-                        transition-all duration-200 ease-in-out
-                        ${isActive 
-                          ? 'bg-background text-foreground font-bold' 
-                          : hasAccess
-                          ? 'bg-transparent text-foreground/70 font-normal hover:text-foreground'
-                          : 'bg-transparent text-muted-foreground/50 font-normal cursor-not-allowed opacity-50'
-                        }
-                        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
-                      `}
-                      title={!hasAccess ? `You don't have permission to access ${stage.label}` : stage.description}
-                    >
-                      <span className="whitespace-nowrap relative z-10">
-                        {stage.label}
-                      </span>
-                      {isActive && (
-                        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-[calc(100%+1.5rem)] h-1.5 bg-primary rounded-full" />
-                      )}
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
-            </div>
+          {/* Workflow Pipeline - Simple Modern Stepper */}
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-10">
+            {workflowStages.map((stage, index) => {
+              const isActive = activeStage === stage.id;
+              const hasAccess = stage.permissions.some(perm => hasPermission(perm));
+              const Icon = stage.icon;
+              const count = stageCounts[stage.id] || 0;
 
-            {/* Stage Content - Only render if user has access to that stage */}
-            {lifecycleStages.find(s => s.id === 'discovery')?.permissions.some(perm => hasPermission(perm)) && (
-              <TabsContent value="discovery" className="mt-0">
-                <VendorDiscoveryTab />
-              </TabsContent>
-            )}
+              return (
+                <button
+                  key={stage.id}
+                  onClick={() => handleStageChange(stage.id)}
+                  disabled={!hasAccess}
+                  className={cn(
+                    "relative group flex flex-col items-start p-4 rounded-2xl border transition-all duration-300 text-left",
+                    isActive
+                      ? "bg-primary/5 border-primary shadow-[0_0_20px_rgba(var(--primary),0.05)]"
+                      : hasAccess
+                        ? "bg-card border-border hover:border-primary/50 hover:bg-accent/50 shadow-sm"
+                        : "bg-muted/30 border-transparent opacity-40 cursor-not-allowed grayscale"
+                  )}
+                >
+                  <div className="flex items-center justify-between w-full mb-3">
+                    <div className={cn(
+                      "p-2 rounded-lg transition-colors",
+                      isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary"
+                    )}>
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    {count > 0 && (
+                      <Badge variant={isActive ? "default" : "secondary"} className="text-[10px] font-bold rounded-md px-1.5 h-5">
+                        {count}
+                      </Badge>
+                    )}
+                  </div>
 
-            {lifecycleStages.find(s => s.id === 'engagement')?.permissions.some(perm => hasPermission(perm)) && (
-              <TabsContent value="engagement" className="mt-0">
-                <VendorRequirementManager />
-              </TabsContent>
-            )}
+                  <div className="space-y-0.5">
+                    <p className={cn(
+                      "text-[10px] font-bold uppercase tracking-wider opacity-60 transition-opacity",
+                      isActive ? "opacity-100" : ""
+                    )}>
+                      Step {index + 1}
+                    </p>
+                    <h3 className={cn(
+                      "text-xs sm:text-sm font-bold truncate w-full",
+                      isActive ? "text-primary" : "text-foreground"
+                    )}>
+                      {stage.label}
+                    </h3>
+                  </div>
 
-            {lifecycleStages.find(s => s.id === 'evaluation')?.permissions.some(perm => hasPermission(perm)) && (
-              <TabsContent value="evaluation" className="mt-0">
-                <QuoteComparisonMatrix />
-              </TabsContent>
-            )}
-
-            {lifecycleStages.find(s => s.id === 'contracting')?.permissions.some(perm => hasPermission(perm)) && (
-              <TabsContent value="contracting" className="mt-0">
-                <ContractManagementView />
-              </TabsContent>
-            )}
-
-            {lifecycleStages.find(s => s.id === 'execution')?.permissions.some(perm => hasPermission(perm)) && (
-              <TabsContent value="execution" className="mt-0">
-                <DeliverablesTracker />
-              </TabsContent>
-            )}
-
-            {lifecycleStages.find(s => s.id === 'closure')?.permissions.some(perm => hasPermission(perm)) && (
-              <TabsContent value="closure" className="mt-0">
-                <PaymentSettlementView />
-              </TabsContent>
-            )}
-          </Tabs>
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeTab"
+                      className="absolute -bottom-[1px] left-4 right-4 h-0.5 bg-primary rounded-t-full"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
+
+        {/* Stage Content */}
+        <div className="space-y-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeStage}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              {activeStage === 'vendors' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center sm:items-end flex-wrap gap-4">
+                    <div className="space-y-1">
+                      <h2 className="text-2xl font-bold tracking-tight">Vendor Directory</h2>
+                      <p className="text-muted-foreground text-sm">Browse and manage your verified service providers.</p>
+                    </div>
+                    {hasPermission('vendors.create') && (
+                      <Button onClick={handleCreateVendor} className="rounded-xl shadow-lg shadow-primary/20 h-10 px-5 transition-transform hover:scale-[1.02] active:scale-[0.98]">
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Vendor
+                      </Button>
+                    )}
+                  </div>
+                  <VendorList
+                    key={vendorListKey}
+                    searchTerm={debouncedSearch}
+                    onEdit={handleEditVendor}
+                    onViewProfile={handleViewProfile}
+                  />
+                </div>
+              )}
+
+              {activeStage === 'purchase-requests' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center sm:items-end flex-wrap gap-4">
+                    <div className="space-y-1">
+                      <h2 className="text-2xl font-bold tracking-tight">Purchase Requests</h2>
+                      <p className="text-muted-foreground text-sm">Internal requests awaiting vendor matching and approval.</p>
+                    </div>
+                    {hasPermission('pr.create') && (
+                      <Button onClick={() => setIsAddPROpen(true)} className="rounded-xl shadow-lg shadow-primary/20 h-10 px-5 transition-transform hover:scale-[1.02] active:scale-[0.98]">
+                        <FileText className="h-4 w-4 mr-2" />
+                        Create PR
+                      </Button>
+                    )}
+                  </div>
+                  <PurchaseRequestList searchTerm={debouncedSearch} />
+                </div>
+              )}
+
+              {activeStage === 'proforma' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center sm:items-end flex-wrap gap-4">
+                    <div className="space-y-1">
+                      <h2 className="text-2xl font-bold tracking-tight">Proforma Invoices</h2>
+                      <p className="text-muted-foreground text-sm">Vendor quotes awaiting formal approval for purchase order generation.</p>
+                    </div>
+                  </div>
+                  <ProformaList searchTerm={debouncedSearch} />
+                </div>
+              )}
+
+              {activeStage === 'purchase-orders' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center sm:items-end flex-wrap gap-4">
+                    <div className="space-y-1">
+                      <h2 className="text-2xl font-bold tracking-tight">Purchase Orders</h2>
+                      <p className="text-muted-foreground text-sm">Legally binding orders sent to vendors for fulfillment.</p>
+                    </div>
+                  </div>
+                  <PurchaseOrderList searchTerm={debouncedSearch} />
+                </div>
+              )}
+
+              {activeStage === 'payment-requests' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center sm:items-end flex-wrap gap-4">
+                    <div className="space-y-1">
+                      <h2 className="text-2xl font-bold tracking-tight">Payment Requests</h2>
+                      <p className="text-muted-foreground text-sm">Internal disbursement requests for verified vendor deliverables.</p>
+                    </div>
+                  </div>
+                  <PaymentRequestList searchTerm={debouncedSearch} />
+                </div>
+              )}
+
+              {activeStage === 'payments' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center sm:items-end flex-wrap gap-4">
+                    <div className="space-y-1">
+                      <h2 className="text-2xl font-bold tracking-tight">Payment History</h2>
+                      <p className="text-muted-foreground text-sm">Archived financial settlements and transaction records.</p>
+                    </div>
+                  </div>
+                  <PaymentHistoryList searchTerm={debouncedSearch} />
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Modals */}
+        {/* Modals */}
+        <VendorOnboardingModal
+          isOpen={isAddVendorOpen}
+          onClose={() => {
+            setIsAddVendorOpen(false);
+            fetchCounts();
+            setVendorListKey(prev => prev + 1);
+            // Clear selected vendor handled by handler hooks
+          }}
+          initialData={selectedVendor}
+        />
+        <CreatePurchaseRequestModal
+          isOpen={isAddPROpen}
+          onClose={() => {
+            setIsAddPROpen(false);
+            fetchCounts();
+          }}
+        />
+        <VendorProfileModal
+          isOpen={isViewProfileOpen}
+          onClose={() => setIsViewProfileOpen(false)}
+          vendor={selectedVendor}
+        />
       </div>
     </div>
   );

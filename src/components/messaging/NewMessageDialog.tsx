@@ -31,7 +31,7 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedType, setSelectedType] = useState<'users' | 'events'>('users')
   const { user: currentUser } = useAuth()
-  
+
   const { data: usersData = [], isLoading } = useQuery({
     queryKey: ['messagingContacts'],
     queryFn: getMessagingContacts,
@@ -39,10 +39,10 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
   })
 
   // Handle different data structures from API
-  const users = Array.isArray(usersData) 
-    ? usersData 
-    : Array.isArray(usersData?.data) 
-      ? usersData.data 
+  const users = Array.isArray(usersData)
+    ? usersData
+    : Array.isArray(usersData?.data)
+      ? usersData.data
       : []
 
   const filteredUsers = users.filter((user: User) =>
@@ -85,7 +85,7 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
   // Get role badge variant and icon
   const getRoleBadge = (role: string | undefined) => {
     if (!role) return null
-    
+
     const roleConfig: Record<string, { variant: 'default' | 'secondary' | 'outline' | 'destructive', icon: React.ReactNode, label: string }> = {
       admin: { variant: 'default', icon: <Shield className="w-3 h-3" />, label: 'Admin' },
       superadmin: { variant: 'default', icon: <Shield className="w-3 h-3" />, label: 'Super Admin' },
@@ -106,7 +106,7 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
   // Get messaging restrictions info based on current user role
   const getMessagingInfo = () => {
     if (!currentUser) return null
-    
+
     const role = currentUser.role
     if (in_array(role, ['admin', 'superadmin'])) {
       return 'You can message organizers and their staff (except ushers)'
@@ -151,355 +151,217 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Start New Conversation</DialogTitle>
-          <DialogDescription>
-            Choose a user or event to start a new conversation with.
+      <DialogContent className="max-w-md p-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-4 border-b border-border/50">
+          <DialogTitle className="text-xl font-semibold">Start Conversation</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground mt-2">
+            Select a connection or event to begin messaging.
           </DialogDescription>
           {getMessagingInfo() && (
-            <div className="mt-2">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground cursor-help">
-                      <Info className="w-3 h-3" />
-                      <span>{getMessagingInfo()}</span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="text-xs">Messaging permissions are based on your role</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+            <div className="mt-4 bg-blue-50 dark:bg-blue-950/20 p-3 rounded-xl border border-blue-200 dark:border-blue-800 flex items-start gap-3">
+              <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs font-medium text-blue-700 dark:text-blue-300 leading-relaxed">
+                {getMessagingInfo()}
+              </p>
             </div>
           )}
         </DialogHeader>
-        
-        <div className="space-y-4">
+
+        <div className="p-6 space-y-5">
           {/* Search input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <div className="relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors w-4 h-4" />
             <Input
-              placeholder="Search users or events..."
+              placeholder="Search by name, email or event..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-12 h-12 bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800 focus:bg-white dark:focus:bg-gray-900 rounded-xl text-sm font-medium transition-all"
             />
           </div>
-          
+
           {/* Type selector */}
-          <div className="flex space-x-1">
-            <Button
-              variant={selectedType === 'users' ? 'default' : 'outline'}
-              size="sm"
+          <div className="flex bg-gray-50 dark:bg-gray-900 p-1 rounded-xl h-11">
+            <button
               onClick={() => setSelectedType('users')}
-              className="flex-1"
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 rounded-lg text-xs font-black uppercase tracking-tighter transition-all",
+                selectedType === 'users'
+                  ? "bg-white dark:bg-gray-800 text-primary shadow-sm"
+                  : "text-gray-400 hover:text-gray-600"
+              )}
             >
-              <Users className="w-3 h-3 mr-1" />
+              <Users className="w-4 h-4" />
               Users
-            </Button>
+            </button>
             {events.length > 0 && (
-              <Button
-                variant={selectedType === 'events' ? 'default' : 'outline'}
-                size="sm"
+              <button
                 onClick={() => setSelectedType('events')}
-                className="flex-1"
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 rounded-lg text-xs font-black uppercase tracking-tighter transition-all",
+                  selectedType === 'events'
+                    ? "bg-white dark:bg-gray-800 text-primary shadow-sm"
+                    : "text-gray-400 hover:text-gray-600"
+                )}
               >
-                <Calendar className="w-3 h-3 mr-1" />
+                <Calendar className="w-4 h-4" />
                 Events
-              </Button>
+              </button>
             )}
           </div>
-          
+
           {/* Results */}
-          <ScrollArea className="h-64">
+          <ScrollArea className="h-[320px] pr-4">
             {selectedType === 'users' ? (
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {isLoading ? (
-                  <div className="space-y-2">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="flex items-center space-x-3 p-2">
-                        <div className="w-10 h-10 bg-muted rounded-full animate-pulse" />
+                  <div className="space-y-4">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="flex items-center gap-4 p-2">
+                        <div className="w-11 h-11 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />
                         <div className="flex-1 space-y-2">
-                          <div className="h-4 bg-muted rounded animate-pulse" />
-                          <div className="h-3 bg-muted rounded animate-pulse w-2/3" />
+                          <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded animate-pulse w-1/3" />
+                          <div className="h-3 bg-gray-50 dark:bg-gray-900 rounded animate-pulse w-1/2" />
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : filteredUsers.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                    <p>No users found</p>
-                    <p className="text-sm">Try adjusting your search terms</p>
-                    {getMessagingInfo() && (
-                      <p className="text-xs mt-2 text-muted-foreground/70">
-                        {getMessagingInfo()}
-                      </p>
-                    )}
+                  <div className="text-center py-12 flex flex-col items-center gap-4 animate-in fade-in">
+                    <div className="w-16 h-16 bg-gray-50 dark:bg-gray-900 rounded-3xl flex items-center justify-center border border-gray-100 dark:border-gray-800">
+                      <Users className="w-8 h-8 text-gray-200 dark:text-gray-800" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white">No users found</p>
+                      <p className="text-xs text-gray-500">Try searching for a different name or email.</p>
+                    </div>
                   </div>
                 ) : searchQuery ? (
-                  // Show flat list when searching
-                  filteredUsers.map((user: User) => (
-                    <div
-                      key={user.id}
-                      onClick={() => handleUserSelect(user)}
-                      className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                    >
-                      <Avatar className="w-10 h-10">
-                        <AvatarImage src={user.profile_image} />
-                        <AvatarFallback className="bg-muted text-muted-foreground">
-                          {getInitials(user.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium text-foreground truncate">
-                            {user.name}
-                          </h3>
-                          {getRoleBadge(user.role)}
+                  <div className="space-y-1">
+                    {filteredUsers.map((user: User) => (
+                      <button
+                        key={user.id}
+                        onClick={() => handleUserSelect(user)}
+                        className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-900 transition-all text-left group"
+                      >
+                        <Avatar className="w-11 h-11 border-2 border-white dark:border-gray-950 shadow-sm group-hover:scale-105 transition-transform">
+                          <AvatarImage src={user.profile_image} />
+                          <AvatarFallback className="bg-primary text-white text-xs font-black">
+                            {getInitials(user.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="font-bold text-gray-900 dark:text-white text-sm truncate">
+                              {user.name}
+                            </span>
+                            {user.role && (
+                              <Badge className="bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-none text-[9px] font-black uppercase px-1.5 py-0">
+                                {user.role}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs font-medium text-gray-400 truncate">
+                            {user.email}
+                          </p>
                         </div>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {user.email}
-                        </p>
-                      </div>
-                    </div>
-                  ))
+                      </button>
+                    ))}
+                  </div>
                 ) : (
-                  // Show grouped list when not searching
-                  <div className="space-y-4">
-                    {groupedUsers.admins.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-2 px-2">
-                          <Shield className="w-4 h-4 text-muted-foreground" />
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                            Administrators
+                  <div className="space-y-6">
+                    {Object.entries(groupedUsers).map(([groupName, groupUsers]) => (
+                      groupUsers.length > 0 && (
+                        <div key={groupName} className="space-y-2">
+                          <h4 className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest px-2">
+                            {groupName}
                           </h4>
-                        </div>
-                        {groupedUsers.admins.map((user: User) => (
-                          <div
-                            key={user.id}
-                            onClick={() => handleUserSelect(user)}
-                            className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                          >
-                            <Avatar className="w-10 h-10">
-                              <AvatarImage src={user.profile_image} />
-                              <AvatarFallback className="bg-muted text-muted-foreground">
-                                {getInitials(user.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-medium text-foreground truncate">
-                                  {user.name}
-                                </h3>
-                                {getRoleBadge(user.role)}
-                              </div>
-                              <p className="text-sm text-muted-foreground truncate">
-                                {user.email}
-                              </p>
-                            </div>
+                          <div className="space-y-1">
+                            {groupUsers.map((user: User) => (
+                              <button
+                                key={user.id}
+                                onClick={() => handleUserSelect(user)}
+                                className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-900 transition-all text-left group"
+                              >
+                                <Avatar className="w-11 h-11 border-2 border-white dark:border-gray-800 shadow-sm group-hover:scale-105 transition-transform">
+                                  <AvatarImage src={user.profile_image} />
+                                  <AvatarFallback className="bg-primary text-white text-xs font-black">
+                                    {getInitials(user.name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <span className="block font-bold text-gray-900 dark:text-white text-sm truncate">
+                                    {user.name}
+                                  </span>
+                                  <p className="text-[11px] font-medium text-gray-400 truncate">
+                                    {user.email}
+                                  </p>
+                                </div>
+                              </button>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {groupedUsers.organizers.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-2 px-2">
-                          <UserCog className="w-4 h-4 text-muted-foreground" />
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                            Organizers
-                          </h4>
                         </div>
-                        {groupedUsers.organizers.map((user: User) => (
-                          <div
-                            key={user.id}
-                            onClick={() => handleUserSelect(user)}
-                            className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                          >
-                            <Avatar className="w-10 h-10">
-                              <AvatarImage src={user.profile_image} />
-                              <AvatarFallback className="bg-muted text-muted-foreground">
-                                {getInitials(user.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-medium text-foreground truncate">
-                                  {user.name}
-                                </h3>
-                                {getRoleBadge(user.role)}
-                              </div>
-                              <p className="text-sm text-muted-foreground truncate">
-                                {user.email}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {groupedUsers.staff.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-2 px-2">
-                          <Users className="w-4 h-4 text-muted-foreground" />
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                            Staff
-                          </h4>
-                        </div>
-                        {groupedUsers.staff.map((user: User) => (
-                          <div
-                            key={user.id}
-                            onClick={() => handleUserSelect(user)}
-                            className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                          >
-                            <Avatar className="w-10 h-10">
-                              <AvatarImage src={user.profile_image} />
-                              <AvatarFallback className="bg-muted text-muted-foreground">
-                                {getInitials(user.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-medium text-foreground truncate">
-                                  {user.name}
-                                </h3>
-                                {getRoleBadge(user.role)}
-                              </div>
-                              <p className="text-sm text-muted-foreground truncate">
-                                {user.email}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {groupedUsers.ushers.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-2 px-2">
-                          <UserCheck className="w-4 h-4 text-muted-foreground" />
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                            Ushers
-                          </h4>
-                        </div>
-                        {groupedUsers.ushers.map((user: User) => (
-                          <div
-                            key={user.id}
-                            onClick={() => handleUserSelect(user)}
-                            className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                          >
-                            <Avatar className="w-10 h-10">
-                              <AvatarImage src={user.profile_image} />
-                              <AvatarFallback className="bg-muted text-muted-foreground">
-                                {getInitials(user.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-medium text-foreground truncate">
-                                  {user.name}
-                                </h3>
-                                {getRoleBadge(user.role)}
-                              </div>
-                              <p className="text-sm text-muted-foreground truncate">
-                                {user.email}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {groupedUsers.others.length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-2 px-2">
-                          <Users className="w-4 h-4 text-muted-foreground" />
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                            Others
-                          </h4>
-                        </div>
-                        {groupedUsers.others.map((user: User) => (
-                          <div
-                            key={user.id}
-                            onClick={() => handleUserSelect(user)}
-                            className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                          >
-                            <Avatar className="w-10 h-10">
-                              <AvatarImage src={user.profile_image} />
-                              <AvatarFallback className="bg-muted text-muted-foreground">
-                                {getInitials(user.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <h3 className="font-medium text-foreground truncate">
-                                  {user.name}
-                                </h3>
-                                {getRoleBadge(user.role)}
-                              </div>
-                              <p className="text-sm text-muted-foreground truncate">
-                                {user.email}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                      )
+                    ))}
                   </div>
                 )}
               </div>
             ) : (
               <div className="space-y-2">
                 {filteredEvents.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Calendar className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                    <p>No events found</p>
-                    <p className="text-sm">Try adjusting your search terms</p>
+                  <div className="text-center py-12 flex flex-col items-center gap-4 animate-in fade-in">
+                    <div className="w-16 h-16 bg-gray-50 dark:bg-gray-900 rounded-3xl flex items-center justify-center border border-gray-100 dark:border-gray-800">
+                      <Calendar className="w-8 h-8 text-gray-200 dark:text-gray-800" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white">No events found</p>
+                      <p className="text-xs text-gray-500">Try a different search term.</p>
+                    </div>
                   </div>
                 ) : (
-                  filteredEvents.map((event: Event) => (
-                    <div
-                      key={event.id}
-                      onClick={() => handleEventSelect(event)}
-                      className="flex items-center space-x-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                    >
-                      <div className="w-10 h-10 bg-info/10 rounded-lg flex items-center justify-center">
-                        <Calendar className="w-5 h-5 text-info" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-foreground truncate">
-                          {event.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {event.location}
-                        </p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            Event Chat
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(event.start_date).toLocaleDateString()}
-                          </span>
+                  <div className="space-y-1">
+                    {filteredEvents.map((event: Event) => (
+                      <button
+                        key={event.id}
+                        onClick={() => handleEventSelect(event)}
+                        className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-900 transition-all text-left group border border-transparent hover:border-gray-100 dark:hover:border-gray-800"
+                      >
+                        <div className="w-11 h-11 bg-primary/10 rounded-xl flex items-center justify-center text-primary group-hover:scale-105 transition-transform flex-shrink-0">
+                          <Calendar className="w-5 h-5" />
                         </div>
-                      </div>
-                    </div>
-                  ))
+                        <div className="flex-1 min-w-0">
+                          <span className="block font-bold text-gray-900 dark:text-white text-sm truncate">
+                            {event.title}
+                          </span>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <Badge className="bg-primary/5 text-primary border-none text-[9px] font-black uppercase px-1.5 py-0">
+                              Event Space
+                            </Badge>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase">
+                              {new Date(event.start_date).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
           </ScrollArea>
-          
-          {/* Footer */}
-          <div className="flex justify-end space-x-2 pt-4 border-t border-border">
-            <Button variant="outline" onClick={handleClose}>
-              Cancel
-            </Button>
-          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 bg-gray-50/50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-800 flex justify-end">
+          <Button
+            variant="ghost"
+            onClick={handleClose}
+            className="text-gray-500 font-bold uppercase tracking-widest text-[10px] hover:bg-transparent hover:text-gray-900 dark:hover:text-white"
+          >
+            Cancel Action
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
+
   )
 }

@@ -62,17 +62,17 @@ export function SuspendedAccountDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="text-left space-y-3">
+        <DialogHeader className="pb-4 border-b border-border/50">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-red-600" />
+              <div className="w-12 h-12 rounded-full bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-800 flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
               </div>
               <div>
-                <DialogTitle className="text-2xl font-bold text-gray-900">
+                <DialogTitle className="text-xl font-semibold">
                   Account Suspended
                 </DialogTitle>
-                <DialogDescription className="text-gray-600 mt-1">
+                <DialogDescription className="text-sm text-muted-foreground mt-2">
                   Your organizer account access has been restricted
                 </DialogDescription>
               </div>
@@ -183,11 +183,11 @@ export function SuspendedAccountDialog() {
         <Separator />
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-4">
+        <DialogFooter className="flex-col sm:flex-row gap-3 pt-6 border-t border-border/50">
           <Button 
             variant="outline" 
             onClick={() => window.location.href = '/settings'}
-            className="flex-1"
+            className="w-full sm:w-auto order-3 sm:order-1"
           >
             <User className="h-4 w-4 mr-2" />
             View Profile
@@ -196,7 +196,7 @@ export function SuspendedAccountDialog() {
           <Button 
             variant="outline" 
             onClick={handleDismiss}
-            className="flex-1"
+            className="w-full sm:w-auto order-2 sm:order-2"
           >
             Continue (Limited)
           </Button>
@@ -204,18 +204,18 @@ export function SuspendedAccountDialog() {
           <Button 
             variant="ghost" 
             onClick={handleLogout}
-            className="flex-1 text-gray-600 hover:text-gray-900"
+            className="w-full sm:w-auto order-1 sm:order-3"
           >
             <LogOut className="h-4 w-4 mr-2" />
             Sign Out
           </Button>
-        </div>
+        </DialogFooter>
 
         {/* Footer */}
-        <div className="text-center text-xs text-gray-500 pt-4 border-t">
+        <div className="text-center text-xs text-muted-foreground pt-4">
           <p>
             For immediate assistance: 
-            <a href="mailto:support@validity.et" className="text-blue-600 hover:underline ml-1">
+            <a href="mailto:support@validity.et" className="text-blue-600 dark:text-blue-400 hover:underline ml-1">
               support@validity.et
             </a>
           </p>

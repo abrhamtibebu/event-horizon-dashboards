@@ -20,38 +20,37 @@ export const ConversationFilters = ({
   onFilterChange,
 }: ConversationFiltersProps) => {
   return (
-    <div className="flex w-full gap-2 overflow-x-auto py-1">
+    <div className="flex w-full gap-2 overflow-x-auto scrollbar-none py-1">
       {filters.map(filter => (
-        <Button
+        <button
           key={filter.id}
           type="button"
-          variant="ghost"
-          size="sm"
           onClick={() => onFilterChange(filter.id)}
           className={cn(
-            'group relative flex min-w-[110px] items-center justify-between rounded-2xl border px-3 py-2 text-sm font-medium transition-all',
+            'flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all whitespace-nowrap border',
             activeFilter === filter.id
-              ? 'border-primary/60 bg-primary/10 text-primary'
-              : 'border-transparent bg-muted/40 text-muted-foreground hover:border-border hover:bg-muted/60'
+              ? 'bg-primary text-white border-primary shadow-sm shadow-primary/20'
+              : 'bg-white dark:bg-gray-900 text-gray-500 border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700'
           )}
         >
-          <div className="flex items-center gap-2">
-            {filter.icon}
-            <span>{filter.label}</span>
-          </div>
-          {typeof filter.count === 'number' && (
+          {filter.icon && <span className={cn(
+            "w-3.5 h-3.5",
+            activeFilter === filter.id ? "text-white" : "text-gray-400"
+          )}>{filter.icon}</span>}
+          <span>{filter.label}</span>
+          {typeof filter.count === 'number' && filter.count > 0 && (
             <span
               className={cn(
-                'rounded-full px-2 py-0.5 text-xs font-semibold',
+                'rounded-full px-1.5 py-0.5 text-[10px] font-black min-w-[18px] text-center',
                 activeFilter === filter.id
-                  ? 'bg-primary/20 text-primary-foreground'
-                  : 'bg-background/60 text-muted-foreground'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
               )}
             >
               {filter.count}
             </span>
           )}
-        </Button>
+        </button>
       ))}
     </div>
   )

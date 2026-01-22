@@ -59,12 +59,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [selectedMentionIndex, setSelectedMentionIndex] = useState(0)
   const [mentionDropdownPosition, setMentionDropdownPosition] = useState({ top: 0, left: 0 })
   const [mentionedUsers, setMentionedUsers] = useState<Map<string, number>>(new Map())
-  
+
   // Modern alerts system
   const { showError } = useModernAlerts()
   const { user } = useAuth()
   const { checkPermission } = usePermissionCheck()
-  
+
   const {
     content,
     selectedFile,
@@ -74,9 +74,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     clearFile,
     reset,
   } = useMessageInput()
-  
+
   const sendMessageMutation = useSendDirectMessage()
-  
+
   // Typing indicator hook
   const { startTyping, stopTyping } = useTypingIndicator({
     conversationId,
@@ -96,7 +96,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const newContent = currentContent + emoji
     handleContentChange(newContent)
     setIsEmojiPickerOpen(false)
-    
+
     // Focus back to textarea
     setTimeout(() => {
       textareaRef.current?.focus()
@@ -106,12 +106,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   // Custom content change handler with typing indicators and cursor tracking
   const handleContentChangeWithTyping = (newContent: string) => {
     handleContentChange(newContent)
-    
+
     // Update cursor position
     if (textareaRef.current) {
       setCursorPosition(textareaRef.current.selectionStart || 0)
     }
-    
+
     // Start typing if there's content and user is typing
     if (newContent.trim().length > 0) {
       startTyping()
@@ -131,13 +131,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const handleMentionSelect = useCallback((user: User) => {
     const newContent = insertMention(user.name, user.id)
     handleContentChange(newContent)
-    
+
     // Store the mapping of username to user ID
     setMentionedUsers(prev => new Map(prev).set(user.name, user.id))
-    
+
     // Reset mention state
     setSelectedMentionIndex(0)
-    
+
     // Focus back on textarea
     setTimeout(() => {
       textareaRef.current?.focus()
@@ -158,7 +158,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     if (mentionState.isActive && textareaRef.current) {
       const textarea = textareaRef.current
       const { top, left } = textarea.getBoundingClientRect()
-      
+
       // Approximate position based on cursor (this is simplified)
       // In a production app, you'd want more accurate positioning
       setMentionDropdownPosition({
@@ -172,7 +172,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     if (!canSend || !recipientId || !user?.id || sendMessageMutation.isPending) return
 
     // Extract event ID from conversation ID for group messages
-    const eventId = conversationId?.startsWith('event_') 
+    const eventId = conversationId?.startsWith('event_')
       ? parseInt(conversationId.replace('event_', ''))
       : undefined
 
@@ -226,10 +226,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
     // Play sound for sent message
     playMessageSent()
-    
+
     // Stop typing indicator
     stopTyping()
-    
+
     // Clear input
     reset()
     if (onCancelReply) {
@@ -245,13 +245,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       }
 
       const response = await sendMessageMutation.mutateAsync(messageData)
-      
+
       if (onMessageSent) {
         onMessageSent(response.data)
       }
     } catch (error: any) {
       console.error('Failed to send message:', error)
-      
+
       // Handle authorization errors (403)
       if (error?.response?.status === 403) {
         const errorMessage = error?.response?.data?.error || 'You are not authorized to message this user'
@@ -269,20 +269,20 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     if (mentionState.isActive && searchResults.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
-        setSelectedMentionIndex(prev => 
+        setSelectedMentionIndex(prev =>
           prev < searchResults.length - 1 ? prev + 1 : 0
         )
         return
       }
-      
+
       if (e.key === 'ArrowUp') {
         e.preventDefault()
-        setSelectedMentionIndex(prev => 
+        setSelectedMentionIndex(prev =>
           prev > 0 ? prev - 1 : searchResults.length - 1
         )
         return
       }
-      
+
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
         const selectedUser = searchResults[selectedMentionIndex]
@@ -291,7 +291,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         }
         return
       }
-      
+
       if (e.key === 'Escape') {
         e.preventDefault()
         // Reset mention state by moving cursor
@@ -299,7 +299,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         return
       }
     }
-    
+
     // Regular send message on Enter
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -363,11 +363,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const files = Array.from(e.dataTransfer.files)
     if (files.length > 0) {
       const file = files[0] // Only handle first file for now
-      
+
       if (!validateFile(file)) {
         return
       }
-      
+
       handleFileSelect(file)
     }
   }, [showError, handleFileSelect, validateFile])
@@ -376,7 +376,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = Array.from(e.clipboardData.items)
     const imageItem = items.find(item => item.type.startsWith('image/'))
-    
+
     if (imageItem) {
       const file = imageItem.getAsFile()
       if (file) {
@@ -412,82 +412,45 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   return (
-    <div 
-      className="bg-card relative"
+    <div
+      className="bg-white dark:bg-gray-950 relative"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {/* Enhanced Drag overlay */}
+      {/* Drag overlay */}
       {isDragOver && (
-        <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-lg flex items-center justify-center z-50 backdrop-blur-sm">
+        <div className="absolute inset-x-2 -top-12 bottom-2 bg-primary/5 dark:bg-primary/10 border-2 border-dashed border-primary/30 rounded-2xl flex items-center justify-center z-50">
           <div className="text-center">
-            <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Upload className="w-8 h-8 text-primary" />
+            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-2">
+              <Upload className="w-6 h-6 text-primary" />
             </div>
-            <p className="text-primary font-bold text-lg mb-1">Drop file here to upload</p>
-            <p className="text-muted-foreground text-sm">Supports images, documents, and more</p>
+            <p className="text-primary font-bold text-sm">Drop to upload</p>
           </div>
         </div>
       )}
 
-      {/* WhatsApp-style Reply indicator */}
+      {/* Reply indicator */}
       {replyingTo && (
-        <div className="px-6 py-2 bg-muted/30 border-b border-border shadow-sm">
-          <div className="flex items-start justify-between space-x-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2 px-3 py-2 bg-card border-l-4 border-primary rounded hover:bg-muted/50 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-primary mb-0.5">
-                    {replyingTo.sender.name}
-                  </p>
-                  <p className="text-sm text-foreground truncate">
-                    {replyingTo.file_path && !replyingTo.content 
-                      ? `📎 ${replyingTo.file_name || 'Attachment'}`
-                      : (replyingTo.content.length > 60 
-                          ? `${replyingTo.content.substring(0, 60)}...` 
-                          : replyingTo.content)
-                    }
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onCancelReply}
-                  className="text-muted-foreground hover:text-foreground hover:bg-accent p-1.5 rounded-full flex-shrink-0"
-                  title="Cancel reply"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Enhanced File preview */}
-      {selectedFile && (
-        <div className="px-6 py-3 bg-muted/30 border-b border-border">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center shadow-sm">
-                {getFileIcon(selectedFile)}
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">
-                  {selectedFile.name}
-                </p>
-                <p className="text-xs text-muted-foreground font-medium">
-                  {formatFileSize(selectedFile.size)}
-                </p>
-              </div>
+        <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-800 animate-in slide-in-from-bottom-2 duration-200">
+          <div className="flex items-center justify-between gap-3 bg-gray-50 dark:bg-gray-900/50 p-2 rounded-xl border border-gray-100 dark:border-gray-800">
+            <div className="flex-1 min-w-0 border-l-4 border-primary pl-3">
+              <p className="text-[11px] font-bold text-primary truncate">
+                Replying to {replyingTo.sender.name}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {replyingTo.file_path && !replyingTo.content
+                  ? `📎 Attachment`
+                  : replyingTo.content
+                }
+              </p>
             </div>
             <Button
               variant="ghost"
-              size="sm"
-              onClick={clearFile}
-              className="text-muted-foreground hover:text-foreground hover:bg-accent p-2 rounded-full"
+              size="icon"
+              onClick={onCancelReply}
+              className="h-8 w-8 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -495,21 +458,49 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </div>
       )}
 
-      {/* Enhanced Input area */}
-      <div className="px-6 py-4">
-        <div className="flex items-end space-x-3">
+      {/* File preview */}
+      {selectedFile && (
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                {getFileIcon(selectedFile)}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
+                  {selectedFile.name}
+                </p>
+                <p className="text-[10px] text-gray-400 font-medium">
+                  {formatFileSize(selectedFile.size)}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={clearFile}
+              className="h-8 w-8 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Input area */}
+      <div className="py-2">
+        <div className="flex items-end gap-2">
           {/* File upload button */}
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={() => fileInputRef.current?.click()}
-            className="text-muted-foreground hover:text-primary hover:bg-primary/10 p-2.5 rounded-lg transition-colors"
+            className="h-11 w-11 rounded-xl text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors shrink-0"
             title="Attach file"
           >
             <Paperclip className="w-5 h-5" />
           </Button>
-          
-          {/* Hidden file input */}
+
           <input
             ref={fileInputRef}
             type="file"
@@ -517,8 +508,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             className="hidden"
             accept={ACCEPTED_FILE_EXTENSIONS.join(',')}
           />
-          
-          {/* Text input */}
+
           <div className="flex-1 relative">
             <Textarea
               ref={textareaRef}
@@ -528,27 +518,27 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               onPaste={handlePaste}
               onSelect={handleCursorChange}
               onClick={handleCursorChange}
-              placeholder="Type a message... (use @ to mention someone)"
-              className="min-h-[48px] max-h-32 resize-none border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl pr-14 text-foreground placeholder:text-muted-foreground shadow-sm"
+              placeholder="Type a message..."
+              className="min-h-[44px] max-h-32 resize-none border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 focus:bg-white dark:focus:bg-gray-950 focus:ring-0 focus:border-primary/50 rounded-xl pr-12 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 transition-all py-3"
               rows={1}
             />
-            
+
             {/* Emoji button */}
             <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-primary hover:bg-primary/10 p-2 rounded-lg transition-colors h-8 w-8"
+                  size="icon"
+                  className="absolute right-1.5 bottom-1.5 h-8 w-8 rounded-lg text-gray-400 hover:text-primary hover:bg-primary/5 transition-colors"
                   title="Add emoji"
                 >
                   <Smile className="w-4 h-4" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 shadow-xl" align="end">
+              <PopoverContent className="w-auto p-0 shadow-2xl border-gray-100 dark:border-gray-800 rounded-xl mb-4" align="end">
                 <EmojiPicker
                   onEmojiClick={handleEmojiClick}
-                  width={300}
+                  width={320}
                   height={400}
                   searchDisabled={false}
                   skinTonesDisabled={false}
@@ -561,39 +551,24 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               </PopoverContent>
             </Popover>
           </div>
-          
-          {/* Send button */}
+
           <Button
             onClick={handleSend}
             disabled={!canSend || sendMessageMutation.isPending}
-            className={`rounded-full px-5 py-2.5 h-auto font-semibold shadow-md transition-all ${
-              canSend 
-                ? 'bg-brand-gradient text-foreground hover:opacity-90' 
-                : 'bg-muted text-muted-foreground cursor-not-allowed'
-            }`}
-            title="Send message"
+            className={cn(
+              "h-11 w-11 rounded-xl shadow-lg transition-all duration-200 shrink-0",
+              canSend
+                ? "bg-primary text-white hover:bg-primary/90 shadow-primary/20 scale-100 hover:scale-105 active:scale-95"
+                : "bg-gray-100 dark:bg-gray-900 text-gray-400 cursor-not-allowed shadow-none"
+            )}
+            title="Send"
           >
             {sendMessageMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
-              <Send className="w-4 h-4" />
+              <Send className="w-5 h-5 translate-x-0.5 -translate-y-0.5" />
             )}
           </Button>
-        </div>
-        
-        {/* Character count */}
-        <div className="flex justify-between items-center mt-2 text-xs text-muted-foreground">
-          <span>
-            {selectedFile && (
-              <span className="text-primary flex items-center font-medium">
-                <Paperclip className="w-3 h-3 mr-1" />
-                {selectedFile.name}
-              </span>
-            )}
-          </span>
-          <span className="font-medium">
-            {content.length}/2000
-          </span>
         </div>
       </div>
 

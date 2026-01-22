@@ -156,27 +156,27 @@ export default function UsherDashboard() {
       // Fetch event details to get organizer_id
       const eventResponse = await api.get(`/events/${event.id}`)
       const fullEvent = eventResponse.data
-      
+
       if (fullEvent?.organizer_id) {
         // Fetch organizer details
         const organizerResponse = await api.get(`/organizers/${fullEvent.organizer_id}`)
         const organizer = organizerResponse.data
-        
+
         // Fetch organizer's users to find primary contact or first user
         if (organizer) {
           const usersResponse = await api.get(`/organizers/${fullEvent.organizer_id}/users`)
           const users = Array.isArray(usersResponse.data) ? usersResponse.data : (usersResponse.data?.data || [])
-          
+
           // Find primary contact or use first user
           const organizerUser = users.find((u: any) => u.is_primary_contact) || users[0]
-          
+
           if (organizerUser?.id) {
             navigate(`/dashboard/messages?userId=${organizerUser.id}&conversationId=direct_${organizerUser.id}`)
             return
           }
         }
       }
-      
+
       // Fallback to event conversation if organizer not found
       handleEventMessage(event.id)
     } catch (err) {
@@ -228,18 +228,18 @@ export default function UsherDashboard() {
   const filteredAssignedEvents =
     searchQuery && assignedEvents
       ? assignedEvents.filter(
-          (event: any) =>
-            event.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            event.location?.toLowerCase().includes(searchQuery.toLowerCase())
-        )
+        (event: any) =>
+          event.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          event.location?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
       : assignedEvents
   const filteredCheckIns =
     searchQuery && recentCheckIns
       ? recentCheckIns.filter(
-          (checkIn: any) =>
-            checkIn.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            checkIn.company?.toLowerCase().includes(searchQuery.toLowerCase())
-        )
+        (checkIn: any) =>
+          checkIn.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          checkIn.company?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
       : recentCheckIns
 
   return (
@@ -251,12 +251,12 @@ export default function UsherDashboard() {
         <MetricCard
           title="Assigned Events"
           value={keyMetrics?.assignedEvents || 'N/A'}
-          icon={<Calendar className="w-6 h-6 text-blue-600" />}
+          icon={<Calendar className="w-6 h-6 text-primary" />}
         />
         <MetricCard
           title="Active Events"
           value={keyMetrics?.activeEvents || 'N/A'}
-          icon={<Users className="w-6 h-6 text-purple-600" />}
+          icon={<Users className="w-6 h-6 text-primary" />}
         />
         {/* Additional Stats */}
         <MetricCard
@@ -344,8 +344,8 @@ export default function UsherDashboard() {
                       <span>
                         {event.totalAttendees
                           ? Math.round(
-                              (event.checkedIn / event.totalAttendees) * 100
-                            )
+                            (event.checkedIn / event.totalAttendees) * 100
+                          )
                           : 0}
                         %
                       </span>
@@ -359,14 +359,14 @@ export default function UsherDashboard() {
                       className="h-2"
                     />
                     <div className="flex gap-2 mt-2">
-                      <Button 
+                      <Button
                         onClick={() => handleEventMessage(event.id)}
                         className="flex-1 bg-brand-gradient bg-brand-gradient-hover text-foreground text-sm py-2"
                       >
                         <MessageCircle className="w-4 h-4 mr-2" />
                         Event Chat
                       </Button>
-                      <Button 
+                      <Button
                         onClick={() => handleMessageOrganizer(event)}
                         variant="outline"
                         className="flex-1 text-sm py-2 border-[hsl(var(--color-warning))] text-[hsl(var(--color-warning))]"
@@ -563,14 +563,14 @@ export default function UsherDashboard() {
             to="/dashboard/messages"
             className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg"
           >
-            <MessageSquare className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+            <MessageSquare className="w-8 h-8 mx-auto mb-2 text-primary" />
             <span className="font-medium">Messages</span>
           </Link>
           <Link
             to="/dashboard/locate-badges"
             className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg"
           >
-            <MapPin className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+            <MapPin className="w-8 h-8 mx-auto mb-2 text-primary" />
             <span className="font-medium">Locate Badges</span>
           </Link>
         </div>
@@ -653,7 +653,7 @@ export default function UsherDashboard() {
   )
 }
 
-function calculateEarnings(dailyRate: number|string, fromDate: string, toDate: string) {
+function calculateEarnings(dailyRate: number | string, fromDate: string, toDate: string) {
   if (!dailyRate || !fromDate || !toDate) return 0;
   const start = new Date(fromDate);
   const end = new Date(toDate);

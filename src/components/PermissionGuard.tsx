@@ -1,65 +1,42 @@
 import { ReactNode } from 'react'
-import { useOrganizerPermissions } from '@/hooks/use-organizer-permissions'
-import { toast } from 'sonner'
-import { useEffect, useRef } from 'react'
+import { usePermissionCheck } from '@/hooks/use-permission-check'
 
 interface PermissionGuardProps {
-  permission: string
-  children: ReactNode
-  fallback?: ReactNode
-  requireAll?: boolean
-  permissions?: string[]
-  showToast?: boolean
-  actionName?: string
+    permission?: string
+    roles?: string | string[]
+    showToast?: boolean
+    actionName?: string
+    fallback?: ReactNode
+    children: ReactNode
 }
 
+/**
+ * Permission guard component - Updated to handle role-based access
+ */
 export function PermissionGuard({
-  permission,
-  children,
-  fallback = null,
-  requireAll = false,
-  permissions,
-  showToast = false,
-  actionName,
+    children,
+    fallback = null,
+    permission,
+    roles
 }: PermissionGuardProps) {
-  const { hasPermission, isLoading, isOrganizerAdmin } = useOrganizerPermissions()
-  const toastShownRef = useRef(false)
+    const { hasPermission, hasRole } = usePermissionCheck()
 
-  useEffect(() => {
-    // Reset toast flag when permissions change
-    toastShownRef.current = false
-  }, [permission, permissions])
+    // If roles are specified, check them
+    if (roles) {
+        if (hasRole(roles)) {
+            return <>{children}</>
+        }
+        return <>{fallback}</>
+    }
 
-  if (isLoading) {
-    return null // Or a loading spinner
-  }
+    // If permission is specified, check it
+    if (permission) {
+        if (hasPermission(permission)) {
+            return <>{children}</>
+        }
+        return <>{fallback}</>
+    }
 
-  let hasAccess = false
-
-  // If multiple permissions provided, check based on requireAll flag
-  if (permissions && permissions.length > 0) {
-    const hasAll = permissions.every((p) => hasPermission(p))
-    const hasAny = permissions.some((p) => hasPermission(p))
-    hasAccess = requireAll ? hasAll : hasAny
-  } else {
-    // Single permission check
-    hasAccess = hasPermission(permission) || isOrganizerAdmin
-  }
-
-  // Show toast notification if access denied and toast is enabled
-  if (!hasAccess && showToast && !toastShownRef.current) {
-    const actionText = actionName || 'access this feature'
-    toast.error('Access Denied', {
-      description: `You don't have permission to ${actionText}. Please contact your organizer admin to request access.`,
-      duration: 5000,
-    })
-    toastShownRef.current = true
-  }
-
-  if (!hasAccess) {
-    return <>{fallback}</>
-  }
-
-  return <>{children}</>
+    // If neither is specified, render children
+    return <>{children}</>
 }
-

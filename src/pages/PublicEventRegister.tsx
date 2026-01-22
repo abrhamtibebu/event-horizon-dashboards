@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle, Building, UserCog } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle, Building, UserCog, Mail, Phone } from 'lucide-react';
+import { getImageUrl } from '@/lib/utils';
 import { PublicTicketSelector } from '@/components/public/PublicTicketSelector';
 import { PublicPaymentSelector } from '@/components/public/PublicPaymentSelector';
 import { PublicTicketDisplay } from '@/components/public/PublicTicketDisplay';
@@ -59,7 +60,20 @@ export default function PublicEventRegister() {
   const [customFormParticipantType, setCustomFormParticipantType] = useState<string>('attendee'); // Deprecated - kept for backward compatibility
   const [existingGuestInfo, setExistingGuestInfo] = useState<any>(null);
   const [guestTypes, setGuestTypes] = useState<any[]>([]);
-  
+
+  const handleCustomFormSuccess = useCallback(() => {
+    setSuccess(true);
+    toast.success('Registration successful! Your e-badge is on its way.');
+  }, []);
+
+  const handleCustomFormError = useCallback((error: string) => {
+    toast.error(error);
+  }, []);
+
+  const handleCustomFormFallback = useCallback(() => {
+    setUseCustomForm(false);
+  }, []);
+
   // Ticketing state
   const { isAuthenticated } = useAuth();
   const [purchaseStep, setPurchaseStep] = useState<'tickets' | 'payment' | 'confirmation'>('tickets');
@@ -94,13 +108,13 @@ export default function PublicEventRegister() {
     if (isTicketedEvent && event?.id) {
       // Preserve invitation code in URL if present
       const invCode = searchParams.get('inv');
-      const redirectUrl = invCode 
+      const redirectUrl = invCode
         ? `/tickets/purchase/${event.id}?inv=${invCode}`
         : `/tickets/purchase/${event.id}`;
       navigate(redirectUrl, { replace: true });
     }
   }, [isTicketedEvent, event, navigate, searchParams]);
-  
+
   const genderOptions = ['Male', 'Female', 'Other'];
   const countryOptions = [
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
@@ -136,7 +150,7 @@ export default function PublicEventRegister() {
     if (refParam) {
       setReferralCode(refParam);
       console.log('Referral code detected:', refParam);
-      
+
       // Track referral link click
       const trackClick = async () => {
         try {
@@ -155,7 +169,7 @@ export default function PublicEventRegister() {
           console.warn('Failed to track referral click:', error);
         }
       };
-      
+
       trackClick();
     }
   }, [searchParams, eventUuid]);
@@ -166,7 +180,7 @@ export default function PublicEventRegister() {
     if (invParam) {
       setInvitationCode(invParam);
       console.log('[Invitation] Invitation code detected:', invParam);
-      
+
       // Track invitation link click
       const trackInvitationClick = async () => {
         try {
@@ -181,7 +195,7 @@ export default function PublicEventRegister() {
           console.warn('[Invitation] Failed to track click:', error);
         }
       };
-      
+
       trackInvitationClick();
     }
   }, [searchParams, eventUuid]);
@@ -209,20 +223,35 @@ export default function PublicEventRegister() {
 
   useEffect(() => {
     if (!event || !event.uuid) return;
-    api.get(`/public/events/${event.uuid}/guest-types`).then(res => {
-      // Handle both data and data.data response structures
-      const guestTypes = res.data?.data || res.data;
-      console.log('[PublicEventRegister] Guest types received:', guestTypes);
-      
+    api.get(`/public/events/${event.uuid}/guest-types`).then(async (res) => {
+      const guestTypesData = res.data?.data || res.data;
+      if (!guestTypesData || guestTypesData.length === 0) return;
+
+      setGuestTypes(guestTypesData);
+
       // Look for 'visitor' first, then 'regular', then use the first available guest type
-      let guestType = guestTypes.find((gt: any) => gt.name.toLowerCase() === 'visitor');
+      let guestType = guestTypesData.find((gt: any) => gt.name.toLowerCase() === 'visitor');
       if (!guestType) {
-        guestType = guestTypes.find((gt: any) => gt.name.toLowerCase() === 'regular');
+        guestType = guestTypesData.find((gt: any) => gt.name.toLowerCase() === 'regular');
       }
-      if (!guestType && guestTypes.length > 0) {
-        guestType = guestTypes[0]; // Use first available guest type
+      if (!guestType && guestTypesData.length > 0) {
+        guestType = guestTypesData[0];
       }
-      if (guestType) setVisitorGuestTypeId(guestType.id);
+
+      if (guestType) {
+        setVisitorGuestTypeId(guestType.id);
+        setSelectedGuestTypeId(guestType.id);
+
+        // Check if there's a custom form for this auto-selected guest type
+        try {
+          const formRes = await api.get(`/events/${event.id}/forms/by-guest-type/${guestType.id}`);
+          if (formRes.data?.status === 'active') {
+            setUseCustomForm(true);
+          }
+        } catch (err) {
+          setUseCustomForm(false);
+        }
+      }
     }).catch(err => {
       console.error('Error fetching guest types:', err);
     });
@@ -231,29 +260,29 @@ export default function PublicEventRegister() {
 
   const checkExistingGuest = async (email: string, phone: string) => {
     if (!event?.uuid || (!email && !phone)) return;
-    
+
     try {
       setValidationStatus(prev => ({ ...prev, email: 'checking', phone: 'checking' }));
-      
+
       const response = await api.post(`/public/events/${event.uuid}/check-guest`, {
         email: email || '',
         phone: phone || ''
       });
-      
+
       const { exists, already_registered, has_conflict, conflict_message, guest_info } = response.data;
-      
+
       if (exists) {
         if (already_registered) {
           setValidationStatus(prev => ({ ...prev, email: 'duplicate', phone: 'duplicate' }));
-          setFieldErrors(prev => ({ 
-            ...prev, 
+          setFieldErrors(prev => ({
+            ...prev,
             email: 'You are already registered for this event.',
             phone: 'You are already registered for this event.'
           }));
         } else if (has_conflict) {
           setValidationStatus(prev => ({ ...prev, email: 'invalid', phone: 'invalid' }));
-          setFieldErrors(prev => ({ 
-            ...prev, 
+          setFieldErrors(prev => ({
+            ...prev,
             email: conflict_message,
             phone: conflict_message
           }));
@@ -261,19 +290,19 @@ export default function PublicEventRegister() {
           // Guest exists but not registered for this event - allow registration silently
           setValidationStatus(prev => ({ ...prev, email: 'valid', phone: 'valid' }));
           setExistingGuestInfo(guest_info);
-          setFieldErrors(prev => ({ 
-            ...prev, 
-            email: '', 
-            phone: '' 
+          setFieldErrors(prev => ({
+            ...prev,
+            email: '',
+            phone: ''
           }));
         }
       } else {
         setValidationStatus(prev => ({ ...prev, email: 'valid', phone: 'valid' }));
         setExistingGuestInfo(null);
-        setFieldErrors(prev => ({ 
-          ...prev, 
-          email: '', 
-          phone: '' 
+        setFieldErrors(prev => ({
+          ...prev,
+          email: '',
+          phone: ''
         }));
       }
     } catch (error) {
@@ -285,7 +314,7 @@ export default function PublicEventRegister() {
   const handleFieldChange = (field: string, value: any) => {
     setForm(prev => ({ ...prev, [field]: value }));
     setTouchedFields(prev => ({ ...prev, [field]: true }));
-    
+
     // Clear field error when user starts typing
     if (fieldErrors[field]) {
       setFieldErrors(prev => ({ ...prev, [field]: '' }));
@@ -301,7 +330,7 @@ export default function PublicEventRegister() {
           );
         }
       }, 500);
-      
+
       return () => clearTimeout(timeoutId);
     }
   };
@@ -341,7 +370,7 @@ export default function PublicEventRegister() {
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
-    
+
     // Validate all required fields including email
     const requiredFields = ['name', 'email', 'phone', 'company', 'job_title', 'gender', 'country', 'agree'];
     requiredFields.forEach(field => {
@@ -357,7 +386,7 @@ export default function PublicEventRegister() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate form
     if (!validateForm()) {
       // Mark all fields as touched to show errors
@@ -381,7 +410,7 @@ export default function PublicEventRegister() {
     try {
       // Check if we need FormData (for future file uploads)
       const needsFormData = false;
-      
+
       if (needsFormData) {
         // Use FormData for file uploads
         const formData = new FormData();
@@ -401,7 +430,7 @@ export default function PublicEventRegister() {
             'Content-Type': 'multipart/form-data',
           },
         });
-        
+
         // Handle success response (same as below)
         if (response.data?.attendee && response.data?.event) {
           const params = new URLSearchParams({
@@ -438,7 +467,7 @@ export default function PublicEventRegister() {
       };
 
       const response = await api.post(`/public/events/${event.uuid}/register`, registrationData);
-      
+
       // Track referral activity if referral code exists
       if (referralCode) {
         try {
@@ -459,7 +488,7 @@ export default function PublicEventRegister() {
           // Don't fail the registration if tracking fails
         }
       }
-      
+
       // Navigate to confirmation page with registration data
       if (response.data?.attendee && response.data?.event) {
         const params = new URLSearchParams({
@@ -480,7 +509,7 @@ export default function PublicEventRegister() {
           guestTypeName: response.data.attendee.guest_type_name,
           guestTypePrice: response.data.attendee.guest_type_price?.toString() || '0',
         });
-        
+
         navigate(`/registration/success?${params.toString()}`);
       } else {
         // Fallback to old success state if backend doesn't return expected data
@@ -552,10 +581,10 @@ export default function PublicEventRegister() {
       // Poll payment status (simulating payment processing)
       let attempts = 0;
       const maxAttempts = 10;
-      
+
       const checkStatus = async (): Promise<void> => {
         attempts++;
-        
+
         try {
           const statusResponse = await api.get(`/guest/payments/${paymentId}`);
           const payment = statusResponse.data.data;
@@ -663,7 +692,7 @@ export default function PublicEventRegister() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Registration Successful!</h1>
           <p className="text-gray-600 mb-6">Thank you for registering for {event.name}.</p>
-          
+
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2 text-blue-800 mb-2">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -675,7 +704,7 @@ export default function PublicEventRegister() {
               Your digital visitor badge has been sent to your email. Please save it to your device or print it for easy access during the event.
             </p>
           </div>
-          
+
           <div className="text-xs text-muted-foreground/70">
             You will receive a confirmation email shortly with all the event details.
           </div>
@@ -688,7 +717,6 @@ export default function PublicEventRegister() {
   const startDate = event.start_date ? new Date(event.start_date) : null;
   const endDate = event.end_date ? new Date(event.end_date) : null;
   const organizerName = event.organizer?.name || 'Event Organizer';
-  const organizerLogo = event.organizer?.logo || '/default-organizer-logo.png';
 
   const getEventDuration = () => {
     if (!startDate || !endDate) return 'TBD';
@@ -722,525 +750,428 @@ export default function PublicEventRegister() {
   const daysRemaining = getDaysRemaining();
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-card border-b border-border py-2 px-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-yellow-500 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-sm">E</span>
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 py-6 sm:py-12 px-3 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto space-y-6 sm:space-y-10">
+        {/* Top Logos Header */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 sm:gap-10 animate-fade-in transition-all duration-700">
+          <Link to="/" className="inline-block group transition-transform hover:scale-105">
+            <div className="flex items-center gap-3">
+              <img src="/evella-logo.png" alt="Evella" className="w-10 h-10 object-contain shadow-lg shadow-primary/20 rounded-xl" />
+              <div className="flex flex-col">
+                <span className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-primary transition-colors">
+                  Evella
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Event Platform</span>
+              </div>
             </div>
-            <span className="font-semibold text-gray-900">Evella</span>
-          </div>
-          <span className="text-gray-500 text-sm">{organizerName}</span>
+          </Link>
+
+          {organizerName && (
+            <div className="flex items-center gap-4 bg-white/40 dark:bg-slate-800/40 backdrop-blur-md px-4 sm:px-5 py-2 sm:py-2.5 rounded-2xl border border-white/20 shadow-sm transition-all hover:shadow-md hover:bg-white/60 w-full sm:w-auto justify-center sm:justify-start">
+              <div className="flex flex-col items-center sm:items-end">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Organized by</span>
+                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white max-w-[180px] sm:max-w-[200px] truncate">{organizerName}</span>
+              </div>
+              {event.organizer?.logo ? (
+                <img
+                  src={getImageUrl(event.organizer.logo)}
+                  alt={organizerName}
+                  className="h-9 w-9 sm:h-10 sm:w-10 object-contain rounded-xl shadow-sm border border-white/50"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/evella-logo.png';
+                  }}
+                />
+              ) : (
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <Building className="w-5 h-5 text-primary" />
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* Hero Section */}
-      <div className="bg-card py-8 px-4">
-        <div className="max-w-7xl mx-auto text-center">
-          {/* Event Tag */}
-          <div className="inline-flex items-center gap-2 bg-yellow-500/10 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-3 py-1 rounded-full text-sm font-medium mb-4">
-            <Lamp className="w-4 h-4" />
-            <span>{event.category?.name || 'Tech Conference'} • Premium Event</span>
-          </div>
-          
-          {/* Main Title */}
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4">
-            <span className="block">Welcome to</span>
-            <span className="block text-yellow-600">{event.name}</span>
-          </h1>
-          
-          {/* Subtitle */}
-          <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            {event.description || 'An exclusive industry gathering designed for visionary professionals. Limited seats available for this premium experience.'}
-          </p>
-        </div>
-      </div>
-
-      {/* Key Event Details Cards */}
-      <div className="bg-white py-8 px-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Event Date Card */}
-            <div className="bg-card rounded-xl shadow-sm border border-border p-6 text-center">
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <Calendar className="w-6 h-6 text-yellow-600" />
-              </div>
-              <h3 className="text-muted-foreground text-sm font-medium mb-1">Event Date</h3>
-              <p className="text-card-foreground font-bold text-lg">
-                {startDate ? startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : 'TBD'}
-                {endDate && startDate && endDate.getTime() !== startDate.getTime() && 
-                  ` - ${endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`
-                }
-              </p>
-              <p className="text-muted-foreground/70 text-sm">
-                {startDate ? startDate.getFullYear() : ''}
-              </p>
-            </div>
-
-            {/* Location Card */}
-            <div className="bg-card rounded-xl shadow-sm border border-border p-6 text-center">
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <MapPin className="w-6 h-6 text-yellow-600" />
-              </div>
-              <h3 className="text-muted-foreground text-sm font-medium mb-1">Location</h3>
-              <p className="text-card-foreground font-bold text-lg">
-                {event.venue_name || event.location || 'TBD'}
-              </p>
-            </div>
-
-            {/* Attendees Card */}
-            <div className="bg-card rounded-xl shadow-sm border border-border p-6 text-center">
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <Users className="w-6 h-6 text-yellow-600" />
-              </div>
-              <h3 className="text-muted-foreground text-sm font-medium mb-1">Attendees</h3>
-              <p className="text-card-foreground font-bold text-lg">{getAttendeeInfo()}</p>
-              <p className="text-muted-foreground/70 text-sm">Still accepting</p>
-            </div>
-
-            {/* Duration Card */}
-            <div className="bg-card rounded-xl shadow-sm border border-border p-6 text-center">
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <Clock className="w-6 h-6 text-yellow-600" />
-              </div>
-              <h3 className="text-muted-foreground text-sm font-medium mb-1">Duration</h3>
-              <p className="text-card-foreground font-bold text-lg">{getEventDuration()}</p>
-              <p className="text-muted-foreground/70 text-sm">Full Event</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Informational Blocks */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Event Organizer Card */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <User className="w-5 h-5 text-gray-400" />
-                <h3 className="font-semibold text-gray-900">Event Organizer</h3>
-              </div>
-              <p className="font-semibold text-gray-900">{organizerName}</p>
-              <p className="text-muted-foreground/70 text-sm">Professional Event Management</p>
-            </div>
-
-            {/* What's Included Card */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <CheckCircle className="w-5 h-5 text-gray-400" />
-                <h3 className="font-semibold text-gray-900">What's Included</h3>
-              </div>
-              <ul className="space-y-2">
-                {getWhatsIncluded().map((item, index) => (
-                  <li key={index} className="flex items-center gap-2 text-sm text-gray-600">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Event Countdown Card */}
-            {daysRemaining !== null && (
-              <div className="bg-card rounded-xl shadow-sm border border-border p-6 text-center">
-                <Clock className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
-                <p className="text-gray-500 text-sm mb-1">Event starts in</p>
-                <p className="text-3xl font-bold text-yellow-600 mb-1">{daysRemaining}</p>
-                <p className="text-muted-foreground/70 text-sm">days remaining</p>
-              </div>
-            )}
-          </div>
-
-          {/* Right Column - Ticketing or Registration Form */}
-          <div className="lg:col-span-2">
-            {/* Custom Form Renderer */}
-            {useCustomForm && !isTicketedEvent && selectedGuestTypeId && (
-              <DynamicFormRenderer
-                eventId={Number(event?.id)}
-                guestTypeId={selectedGuestTypeId}
-                participantType={customFormParticipantType} // Deprecated - kept for backward compatibility
-                onSuccess={(result) => {
-                  setSuccess(true);
-                  toast.success('Registration successful! Check your email for confirmation and your e-badge.');
-                }}
-                onError={(error) => {
-                  toast.error(error);
-                }}
-                onFallback={() => {
-                  setUseCustomForm(false);
-                }}
+        {/* Main Card */}
+        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 dark:border-slate-800 shadow-2xl rounded-3xl overflow-hidden animate-scale-in transition-all duration-500">
+          {/* Event Banner */}
+          <div className="relative h-48 sm:h-80 overflow-hidden">
+            {event.event_image ? (
+              <img
+                src={getImageUrl(event.event_image)}
+                alt={event.name}
+                className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700"
               />
+            ) : (
+              <div className="w-full h-full relative group bg-slate-900">
+                <img
+                  src="/event-placeholder.png"
+                  alt="Event Placeholder"
+                  className="w-full h-full object-cover opacity-60 dark:opacity-50 blur-[1px]"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-transparent to-black/40">
+                  <Sparkles className="w-12 sm:w-20 h-12 sm:h-20 text-white/40 animate-pulse drop-shadow-[0_0_25px_rgba(255,255,255,0.3)]" />
+                </div>
+              </div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent flex items-end p-5 sm:p-10">
+              <div className="w-full">
+                <div className="inline-flex items-center gap-2 bg-primary/20 backdrop-blur-md border border-primary/30 text-white px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.15em] mb-2 sm:mb-4">
+                  <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-yellow-400 fill-yellow-400" />
+                  <span>{event.category?.name || 'Featured Event'}</span>
+                </div>
+                <h1 className="text-xl sm:text-5xl font-extrabold text-white tracking-tight drop-shadow-2xl leading-tight">
+                  {event.name}
+                </h1>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Info Grid - Responsive stacking */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-200/50 dark:bg-slate-800 border-b border-white/10">
+            <div className="bg-white/50 dark:bg-slate-900/50 p-4 sm:p-6 text-center group hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/5 flex items-center justify-center mx-auto mb-2 sm:mb-3 group-hover:bg-primary/10 transition-colors">
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary opacity-80 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <p className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Date</p>
+              <p className="text-[11px] sm:text-sm font-black text-slate-900 dark:text-white mt-0.5 sm:mt-1">
+                {startDate ? startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}
+              </p>
+            </div>
+            <div className="bg-white/50 dark:bg-slate-900/50 p-4 sm:p-6 text-center group hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/5 flex items-center justify-center mx-auto mb-2 sm:mb-3 group-hover:bg-primary/10 transition-colors">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary opacity-80 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <p className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Time</p>
+              <p className="text-[11px] sm:text-sm font-black text-slate-900 dark:text-white mt-0.5 sm:mt-1">
+                {event.time || (startDate ? startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Flexible')}
+              </p>
+            </div>
+            <div className="bg-white/50 dark:bg-slate-900/50 p-4 sm:p-6 text-center group hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/5 flex items-center justify-center mx-auto mb-2 sm:mb-3 group-hover:bg-primary/10 transition-colors">
+                <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-primary opacity-80 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <p className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Venue</p>
+              <p className="text-[11px] sm:text-sm font-black text-slate-900 dark:text-white mt-0.5 sm:mt-1 truncate px-1" title={event.venue_name || event.location}>
+                {event.venue_name || event.location || 'Online'}
+              </p>
+            </div>
+            <div className="bg-white/50 dark:bg-slate-900/50 p-4 sm:p-6 text-center group hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/5 flex items-center justify-center mx-auto mb-3 group-hover:bg-primary/10 transition-colors">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary opacity-80 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <p className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Capacity</p>
+              <p className="text-[11px] sm:text-sm font-black text-slate-900 dark:text-white mt-0.5 sm:mt-1">
+                {event.max_guests ? `${event.attendee_count || 0} / ${event.max_guests}` : 'Open'}
+              </p>
+            </div>
+          </div>
+
+          <div className="p-5 sm:p-12">
+            {/* Description Card */}
+            {event.description && (
+              <div className="mb-8 sm:mb-12 text-center max-w-2xl mx-auto">
+                <div className="inline-block px-4 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-full text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-3 sm:mb-4 uppercase tracking-widest border border-slate-100 dark:border-slate-700">
+                  About Event
+                </div>
+                <p className="text-sm sm:text-base leading-relaxed text-slate-600 dark:text-slate-300 italic font-medium px-2 sm:px-0">
+                  &ldquo;{event.description}&rdquo;
+                </p>
+              </div>
             )}
 
-            {/* Default Registration Form or Ticketed Event Flow */}
-            {(!useCustomForm || isTicketedEvent) && (
-              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 lg:p-8">
-                {/* Ticketed Event Flow */}
-                {isTicketedEvent && purchaseStep === 'tickets' && (
-                <>
-                  <div className="mb-6">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Purchase Tickets</h2>
-                    <p className="text-gray-600">
-                      Select your tickets and provide your information to complete your purchase.
-                    </p>
-                  </div>
-                  <PublicTicketSelector
-                    ticketTypes={ticketTypesData?.ticket_types || []}
-                    selections={selectedTickets}
-                    onSelectionsChange={setSelectedTickets}
-                    guestInfo={ticketGuestInfo}
-                    onGuestInfoChange={setTicketGuestInfo}
-                    onContinue={handleContinueToPayment}
-                    loading={ticketTypesLoading}
+            {/* Registration/Ticket Flow */}
+            <div className="max-w-2xl mx-auto">
+              {useCustomForm && !isTicketedEvent && selectedGuestTypeId ? (
+                <div className="bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-slate-100 dark:border-slate-800 shadow-inner overflow-hidden">
+                  <DynamicFormRenderer
+                    eventId={Number(event?.id)}
+                    guestTypeId={selectedGuestTypeId}
+                    participantType={customFormParticipantType}
+                    onSuccess={handleCustomFormSuccess}
+                    onError={handleCustomFormError}
+                    onFallback={handleCustomFormFallback}
                   />
-                </>
-              )}
+                </div>
+              ) : (
+                <div className="space-y-6 sm:space-y-10">
+                  {/* Ticketed Event View */}
+                  {isTicketedEvent && (
+                    <div className="animate-fade-in">
+                      {purchaseStep === 'tickets' && (
+                        <div className="space-y-6 sm:space-y-8">
+                          <div className="text-center">
+                            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Select Your Tickets</h2>
+                            <p className="text-xs sm:text-sm text-slate-500 mt-2">Choose the perfect pass for your experience</p>
+                          </div>
 
-              {isTicketedEvent && purchaseStep === 'payment' && (
-                <PublicPaymentSelector
-                  selected={selectedPaymentMethod}
-                  onSelect={setSelectedPaymentMethod}
-                  onBack={handleBackToTickets}
-                  onConfirm={handlePaymentConfirm}
-                  totalAmount={selectedTickets.reduce((sum, t) => sum + t.ticketType.price * t.quantity, 0)}
-                  loading={isProcessingPayment}
-                />
-              )}
+                          <PublicTicketSelector
+                            ticketTypes={ticketTypesData || []}
+                            selectedTickets={selectedTickets}
+                            onTicketChange={handleTicketChange}
+                          />
 
-              {isTicketedEvent && purchaseStep === 'confirmation' && (
-                <PublicTicketDisplay
-                  tickets={purchasedTickets}
-                  event={{
-                    name: event.name,
-                    start_date: event.start_date,
-                    location: event.location || event.venue_name || 'TBD',
-                  }}
-                  guestInfo={{
-                    name: ticketGuestInfo.name,
-                    email: ticketGuestInfo.email,
-                  }}
-                />
-              )}
-
-              {/* Free Event Registration Form */}
-              {!isTicketedEvent && (
-                <>
-                  {/* Guest Type Selection */}
-                  {guestTypes.length > 0 && (
-                  <div className="mb-6">
-                    <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                      I am registering as:
-                    </Label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {guestTypes.map((guestType) => {
-                        return (
-                          <button
-                              key={guestType.id}
-                            type="button"
-                            onClick={async () => {
-                                setSelectedGuestTypeId(guestType.id);
-
-                                // Check if there's a custom form for this guest type
-                              try {
-                                  const formResponse = await api.get(`/events/${event.id}/forms/by-guest-type/${guestType.id}`);
-                                  const form = formResponse.data;
-
-                                  if (form && form.status === 'active' && (!form.expires_at || new Date(form.expires_at) > new Date())) {
-                                  setUseCustomForm(true);
-                                } else {
-                                  setUseCustomForm(false);
-                                }
-                                } catch (error: any) {
-                                  // If form not found (404), use default form
-                                  if (error?.response?.status === 404) {
-                                    setUseCustomForm(false);
-                                  } else {
-                                console.error('Error checking for custom forms:', error);
-                                setUseCustomForm(false);
-                                  }
-                              }
-                            }}
-                            className={`p-3 border rounded-lg text-center hover:border-yellow-500 hover:bg-yellow-50 transition-colors ${
-                                selectedGuestTypeId === guestType.id
-                                ? 'border-yellow-500 bg-yellow-50'
-                                : 'border-gray-200'
-                            }`}
+                          <Button
+                            onClick={() => setPurchaseStep('payment')}
+                            disabled={selectedTickets.length === 0}
+                            className="w-full h-12 sm:h-14 rounded-2xl bg-primary hover:bg-primary-hover text-white font-extrabold shadow-xl shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 mt-4 text-sm sm:text-base"
                           >
-                              <Users className="w-5 h-5 mx-auto mb-1 text-gray-600" />
-                              <span className="text-sm font-medium text-gray-700">{guestType.name}</span>
-                          </button>
-                        );
-                      })}
+                            Proceed to Checkout
+                            <ArrowRight className="w-4 h-4 ml-2" />
+                          </Button>
+                        </div>
+                      )}
+
+                      {purchaseStep === 'payment' && (
+                        <PublicPaymentSelector
+                          selected={selectedPaymentMethod}
+                          onSelect={setSelectedPaymentMethod}
+                          onBack={handleBackToTickets}
+                          onConfirm={handlePaymentConfirm}
+                          totalAmount={selectedTickets.reduce((sum, t) => sum + t.ticketType.price * t.quantity, 0)}
+                          loading={isProcessingPayment}
+                        />
+                      )}
+
+                      {purchaseStep === 'confirmation' && (
+                        <PublicTicketDisplay
+                          tickets={purchasedTickets}
+                          event={{
+                            name: event.name,
+                            start_date: event.start_date,
+                            location: event.location || event.venue_name || 'TBD',
+                          }}
+                          guestInfo={{
+                            name: ticketGuestInfo.name,
+                            email: ticketGuestInfo.email,
+                          }}
+                        />
+                      )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                        Selecting your guest type will customize the registration form for your needs.
-                    </p>
-                  </div>
                   )}
 
-                  {/* Form Header */}
-                  <div className="mb-6">
-                    <div className="flex items-center gap-3 mb-2">
-                      <User className="w-5 h-5 text-gray-400" />
-                      <h2 className="text-2xl font-bold text-gray-900">Register for {event.name}</h2>
-                    </div>
-                    <p className="text-gray-600">
-                      Secure your spot at this exclusive industry event. Complete the form below to join this premium experience with limited availability.
-                    </p>
-                    
-                    {/* Referral Indicator */}
-                    {referralCode && (
-                      <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center">
-                            <Star className="w-3 h-3 text-purple-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-purple-800">
-                              You were referred to this event!
-                            </p>
-                            <p className="text-xs text-purple-600">
-                              Referral Code: <span className="font-mono font-semibold">{referralCode}</span>
-                            </p>
+                  {/* Free Event View */}
+                  {!isTicketedEvent && (
+                    <div className="animate-fade-in space-y-8 sm:space-y-12">
+                      {/* Guest Type Selector */}
+                      {guestTypes.length > 0 && (
+                        <div className="space-y-4 sm:space-y-6">
+                          <p className="text-[10px] sm:text-xs font-bold text-slate-500 text-center uppercase tracking-[0.2em]">
+                            Joining as
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 px-2 sm:px-0">
+                            {guestTypes.map((gt) => (
+                              <button
+                                key={gt.id}
+                                type="button"
+                                onClick={async () => {
+                                  setSelectedGuestTypeId(gt.id);
+                                  try {
+                                    const res = await api.get(`/events/${event.id}/forms/by-guest-type/${gt.id}`);
+                                    setUseCustomForm(res.data?.status === 'active');
+                                  } catch {
+                                    setUseCustomForm(false);
+                                  }
+                                }}
+                                className={`px-4 py-4 rounded-xl sm:rounded-2xl text-sm font-bold border-2 transition-all duration-300 flex items-center justify-center text-center ${selectedGuestTypeId === gt.id
+                                  ? 'bg-primary border-primary text-white shadow-xl shadow-primary/30 -translate-y-1'
+                                  : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-primary/40'
+                                  }`}
+                              >
+                                {gt.name}
+                              </button>
+                            ))}
                           </div>
                         </div>
+                      )}
+
+                      <div className="text-center px-4">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Secure Your Spot</h2>
+                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2">Registration is fast and takes less than a minute</p>
                       </div>
-                    )}
-                  </div>
 
-              {/* Registration Form */}
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Full Name */}
-                  <div>
-                    <Label htmlFor="name" className="text-sm font-medium text-gray-700">
-                      Full Name*
-                    </Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={form.name}
-                      onChange={(e) => handleFieldChange('name', e.target.value)}
-                      disabled={submitting}
-                      placeholder="Enter your full name"
-                      className={`mt-1 ${touchedFields.name && fieldErrors.name ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`}
-                    />
-                    {touchedFields.name && fieldErrors.name && (
-                      <p className="mt-1 text-sm text-red-600">{fieldErrors.name}</p>
-                    )}
-                  </div>
+                      {/* Referral Badge */}
+                      {referralCode && (
+                        <div className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800/50 p-5 rounded-3xl flex items-center gap-5">
+                          <div className="w-12 h-12 bg-white dark:bg-indigo-800 rounded-2xl flex items-center justify-center shadow-sm">
+                            <Sparkles className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-indigo-900 dark:text-indigo-100">Special Invitation</p>
+                            <p className="text-xs text-indigo-700/70 dark:text-indigo-300/70">Referred by code: <span className="font-mono font-bold">{referralCode}</span></p>
+                          </div>
+                        </div>
+                      )}
 
-                  {/* Email Address */}
-                  <div>
-                    <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                      Email Address*
-                    </Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={form.email}
-                      onChange={(e) => handleFieldChange('email', e.target.value)}
-                      disabled={submitting}
-                      placeholder="Enter your email address"
-                      className={`mt-1 ${touchedFields.email && fieldErrors.email ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`}
-                    />
-                    {touchedFields.email && fieldErrors.email && (
-                      <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
-                    )}
-                  </div>
+                      {/* Form */}
+                      <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
+                        <div className="space-y-2 sm:col-span-2 md:col-span-1">
+                          <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-slate-500">Full Name</Label>
+                          <div className="relative group">
+                            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                            <Input
+                              id="name"
+                              value={form.name}
+                              onChange={(e) => handleFieldChange('name', e.target.value)}
+                              className={`pl-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all ${touchedFields.name && fieldErrors.name ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''}`}
+                              placeholder="e.g. Abebe Bikila"
+                            />
+                          </div>
+                        </div>
 
-                  {/* Phone Number */}
-                  <div>
-                    <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
-                      Phone Number*
-                    </Label>
-                    <Input
-                      id="phone"
-                      name="phone"
-                      value={form.phone}
-                      onChange={(e) => handleFieldChange('phone', e.target.value)}
-                      disabled={submitting}
-                      placeholder="Enter your phone number"
-                      className={`mt-1 ${touchedFields.phone && fieldErrors.phone ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`}
-                    />
-                    {touchedFields.phone && fieldErrors.phone && (
-                      <p className="mt-1 text-sm text-red-600">{fieldErrors.phone}</p>
-                    )}
-                  </div>
+                        <div className="space-y-2 sm:col-span-2 md:col-span-1">
+                          <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-slate-500">Email Address</Label>
+                          <div className="relative group">
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                            <Input
+                              id="email"
+                              type="email"
+                              value={form.email}
+                              onChange={(e) => handleFieldChange('email', e.target.value)}
+                              className={`pl-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all ${touchedFields.email && fieldErrors.email ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''}`}
+                              placeholder="abebe@example.com"
+                            />
+                          </div>
+                        </div>
 
-                  {/* Company */}
-                  <div>
-                    <Label htmlFor="company" className="text-sm font-medium text-gray-700">
-                      Company*
-                    </Label>
-                    <Input
-                      id="company"
-                      name="company"
-                      value={form.company}
-                      onChange={(e) => handleFieldChange('company', e.target.value)}
-                      disabled={submitting}
-                      placeholder="Enter your company name"
-                      className={`mt-1 ${touchedFields.company && fieldErrors.company ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`}
-                    />
-                    {touchedFields.company && fieldErrors.company && (
-                      <p className="mt-1 text-sm text-red-600">{fieldErrors.company}</p>
-                    )}
-                  </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="phone" className="text-xs font-bold uppercase tracking-wider text-slate-500">Phone</Label>
+                          <div className="relative group">
+                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                            <Input
+                              id="phone"
+                              value={form.phone}
+                              onChange={(e) => handleFieldChange('phone', e.target.value)}
+                              className={`pl-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all ${touchedFields.phone && fieldErrors.phone ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''}`}
+                              placeholder="0911..."
+                            />
+                          </div>
+                        </div>
 
-                  {/* Job Title */}
-                  <div>
-                    <Label htmlFor="job_title" className="text-sm font-medium text-gray-700">
-                      Job Title*
-                    </Label>
-                    <Input
-                      id="job_title"
-                      name="job_title"
-                      value={form.job_title}
-                      onChange={(e) => handleFieldChange('job_title', e.target.value)}
-                      disabled={submitting}
-                      placeholder="Enter your job title"
-                      className={`mt-1 ${touchedFields.job_title && fieldErrors.job_title ? 'border-red-500 focus:border-red-500 focus:ring-red-200' : ''}`}
-                    />
-                    {touchedFields.job_title && fieldErrors.job_title && (
-                      <p className="mt-1 text-sm text-red-600">{fieldErrors.job_title}</p>
-                    )}
-                  </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="company" className="text-xs font-bold uppercase tracking-wider text-slate-500">Organization</Label>
+                          <div className="relative group">
+                            <Building className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                            <Input
+                              id="company"
+                              value={form.company}
+                              onChange={(e) => handleFieldChange('company', e.target.value)}
+                              className="pl-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all"
+                              placeholder="Company name"
+                            />
+                          </div>
+                        </div>
 
-                  {/* Age */}
-                  <div>
-                    <Label htmlFor="age" className="text-sm font-medium text-gray-700">
-                      Age*
-                    </Label>
-                    <Input
-                      id="age"
-                      name="age"
-                      type="number"
-                      min="18"
-                      max="120"
-                      value={form.age || ''}
-                      onChange={(e) => handleFieldChange('age', e.target.value)}
-                      disabled={submitting}
-                      placeholder="Enter your age"
-                      className="mt-1"
-                    />
-                  </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="job_title" className="text-xs font-bold uppercase tracking-wider text-slate-500">Current Role</Label>
+                          <div className="relative group">
+                            <UserCog className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                            <Input
+                              id="job_title"
+                              value={form.job_title}
+                              onChange={(e) => handleFieldChange('job_title', e.target.value)}
+                              className="pl-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all"
+                              placeholder="Position"
+                            />
+                          </div>
+                        </div>
 
-                  {/* Gender */}
-                  <div>
-                    <Label htmlFor="gender" className="text-sm font-medium text-gray-700">
-                      Gender*
-                    </Label>
-                    <Select value={form.gender} onValueChange={(value) => handleFieldChange('gender', value)} disabled={submitting}>
-                      <SelectTrigger className={`mt-1 ${touchedFields.gender && fieldErrors.gender ? 'border-error focus:border-error focus:ring-error/20' : ''}`}>
-                        <SelectValue placeholder="Select gender" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {genderOptions.map((gender) => (
-                          <SelectItem key={gender} value={gender}>
-                            {gender}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {touchedFields.gender && fieldErrors.gender && (
-                      <p className="mt-1 text-sm text-red-600">{fieldErrors.gender}</p>
-                    )}
-                  </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="country" className="text-xs font-bold uppercase tracking-wider text-slate-500">Country</Label>
+                          <Select value={form.country} onValueChange={(v) => handleFieldChange('country', v)}>
+                            <SelectTrigger className="h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:ring-4 focus:ring-primary/10 transition-all">
+                              <SelectValue placeholder="Select location" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl border-slate-100 dark:border-slate-800">
+                              {countryOptions.map(c => <SelectItem key={c} value={c} className="rounded-xl">{c}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                  {/* Country */}
-                  <div>
-                    <Label htmlFor="country" className="text-sm font-medium text-gray-700">
-                      Country*
-                    </Label>
-                    <Select value={form.country} onValueChange={(value) => handleFieldChange('country', value)} disabled={submitting}>
-                      <SelectTrigger className={`mt-1 ${touchedFields.country && fieldErrors.country ? 'border-error focus:border-error focus:ring-error/20' : ''}`}>
-                        <SelectValue placeholder="Select country" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {countryOptions.map((country) => (
-                          <SelectItem key={country} value={country}>
-                            {country}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {touchedFields.country && fieldErrors.country && (
-                      <p className="mt-1 text-sm text-red-600">{fieldErrors.country}</p>
-                    )}
-                  </div>
-                </div>
+                        <div className="sm:col-span-2 pt-6 border-t border-slate-100 dark:border-slate-800">
+                          <div className="flex items-start gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+                            <Checkbox
+                              id="agree"
+                              checked={form.agree}
+                              onCheckedChange={(v) => handleFieldChange('agree', v)}
+                              className="mt-1 rounded-md border-slate-300"
+                            />
+                            <Label htmlFor="agree" className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed cursor-pointer select-none">
+                              I certify that all information provided is accurate and I agree to the <a href="/terms" className="text-primary font-bold hover:underline">Terms of Service</a> and <a href="/privacy" className="text-primary font-bold hover:underline">Privacy Policy</a>.
+                            </Label>
+                          </div>
+                          {touchedFields.agree && fieldErrors.agree && (
+                            <p className="mt-2 text-xs text-red-500 font-bold px-4">{fieldErrors.agree}</p>
+                          )}
+                        </div>
 
-                {/* Consent and Newsletter */}
-                <div className="space-y-3 pt-4">
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      id="agree"
-                      checked={form.agree}
-                      onCheckedChange={(checked) => handleFieldChange('agree', checked)}
-                      disabled={submitting}
-                      className="mt-1"
-                    />
-                    <Label htmlFor="agree" className="text-sm text-gray-700 leading-relaxed">
-                      I agree to the{' '}
-                      <a href="/terms" target="_blank" className="text-yellow-600 hover:underline">
-                        Terms and Conditions
-                      </a>{' '}
-                      and{' '}
-                      <a href="/privacy" target="_blank" className="text-yellow-600 hover:underline">
-                        Privacy Policy
-                      </a>
-                      .*
-                    </Label>
-                  </div>
-                  {touchedFields.agree && fieldErrors.agree && (
-                    <p className="text-sm text-red-600">{fieldErrors.agree}</p>
+                        <Button
+                          type="submit"
+                          disabled={submitting}
+                          className="sm:col-span-2 h-14 bg-primary hover:bg-primary-hover text-white font-extrabold text-lg rounded-2xl shadow-2xl shadow-primary/30 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 disabled:hover:scale-100"
+                        >
+                          {submitting ? (
+                            <div className="flex items-center gap-3">
+                              <SpinnerInline size="sm" />
+                              <span>Confirming...</span>
+                            </div>
+                          ) : (
+                            'Join Event'
+                          )}
+                        </Button>
+                      </form>
+                    </div>
                   )}
-
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      id="newsletter"
-                      checked={form.newsletter}
-                      onCheckedChange={(checked) => handleFieldChange('newsletter', checked)}
-                      disabled={submitting}
-                      className="mt-1"
-                    />
-                    <Label htmlFor="newsletter" className="text-sm text-gray-700 leading-relaxed">
-                      Subscribe to our newsletter for event updates and future announcements
-                    </Label>
-                  </div>
                 </div>
-
-                {/* Submit Button */}
-                <Button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-3 px-6 rounded-lg text-lg transition-colors"
-                >
-                  {submitting ? 'Registering...' : 'Register Now'}
-                </Button>
-
-                {/* Footer Text */}
-                <p className="text-center text-xs text-gray-500">
-                  Secure registration protected by{' '}
-                  <a href="/privacy" target="_blank" className="text-yellow-600 hover:underline">
-                    Privacy Policy
-                  </a>
-                </p>
-              </form>
-              </>
               )}
-              </div>
-            )}
+            </div>
           </div>
+
+          {/* Clean Footer */}
+          <div className="bg-slate-50/80 dark:bg-slate-800/20 p-12 text-center backdrop-blur-sm">
+            <div className="flex items-center justify-center gap-2 text-slate-400 dark:text-slate-500 text-xs font-semibold mb-8">
+              <AlertCircle className="w-4 h-4" />
+              <span>Confirmation & E-Badge will be sent via email</span>
+            </div>
+
+            {/* Powered by Validity Section */}
+            <div className="flex flex-col items-center gap-5 border-t border-slate-100 dark:border-slate-800 pt-8 mt-4">
+              <div className="flex flex-col items-center gap-3">
+                <span className="text-[10px] text-slate-400 uppercase tracking-[0.3em] font-bold">Powered by</span>
+                <div className="flex items-center gap-4">
+                  <img
+                    src="/Validity_logo.png"
+                    alt="Validity logo"
+                    className="h-10 object-contain grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-500"
+                  />
+                  <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
+                  <span className="text-sm font-bold text-slate-500 dark:text-slate-400 tracking-tight">
+                    Validity Event and Marketing
+                  </span>
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400/40 uppercase tracking-widest font-bold mt-4">
+                Professional Registration & Badge Management System
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Support Links */}
+        <div className="mt-12 flex flex-wrap justify-center gap-x-12 gap-y-4 animate-fade-in" style={{ animationDelay: '0.4s' }}>
+          <a href="/help" className="text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-primary transition-colors flex items-center gap-2">
+            <div className="w-1.5 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full"></div>
+            Online Support
+          </a>
+          <a href="/contact" className="text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-primary transition-colors flex items-center gap-2">
+            <div className="w-1.5 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full"></div>
+            Contact Organizer
+          </a>
+          <a href="/privacy" className="text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-primary transition-colors flex items-center gap-2">
+            <div className="w-1.5 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full"></div>
+            Data Policy
+          </a>
         </div>
       </div>
 
-      {/* Payment Processing Modal */}
       <PaymentProcessingModal
         open={isProcessingPayment}
         status={paymentStatus}
@@ -1251,4 +1182,4 @@ export default function PublicEventRegister() {
       />
     </div>
   );
-} 
+}

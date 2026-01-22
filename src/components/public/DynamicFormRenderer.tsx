@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -6,10 +6,23 @@ import {
   Loader2,
   ArrowRight,
   ArrowLeft,
-  Send
+  Send,
+  Mail,
+  Phone,
+  User
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -69,20 +82,27 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   });
 
   // Transform form data to preview format
-  const formPreview = formData ? {
-    form: {
-      id: formData.id,
-      name: formData.name,
-      form_type: formData.form_type,
-      description: formData.description,
-      is_multi_page: formData.is_multi_page,
-      status: formData.status
-    },
-    fields: formData.formFields || [],
-    pages: {},
-    conditional_logic: [],
-    validation_rules: {}
-  } : null;
+  const formPreview = useMemo(() => {
+    if (!formData) return null;
+
+    // Handle potential data wrapping from API
+    const actualFormData = (formData as any).data || formData;
+
+    return {
+      form: {
+        id: actualFormData.id,
+        name: actualFormData.name,
+        form_type: actualFormData.form_type,
+        description: actualFormData.description,
+        is_multi_page: actualFormData.is_multi_page,
+        status: actualFormData.status
+      },
+      fields: actualFormData.formFields || actualFormData.form_fields || [],
+      pages: {},
+      conditional_logic: [],
+      validation_rules: {}
+    };
+  }, [formData]);
 
   // If no active form, use fallback
   useEffect(() => {
@@ -91,7 +111,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
     }
   }, [formsLoading, activeForm, onFallback]);
 
-  // Initialize form values when form data loads
+  // Initialize form values when form data loads or form changes
   useEffect(() => {
     if (formPreview?.fields) {
       const initialValues: Record<string, any> = {};
@@ -100,7 +120,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
       });
       setFormValues(initialValues);
     }
-  }, [formPreview]);
+  }, [formPreview?.form?.id]); // Only re-run when the form ID specifically changes
 
   const getDefaultValueForType = (fieldType: string): any => {
     switch (fieldType) {
@@ -202,9 +222,13 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   };
 
   const evaluateConditionalLogic = (logic: any, formData: Record<string, any>): boolean => {
-    if (!logic) return true;
+    if (!logic || (typeof logic === 'object' && Object.keys(logic).length === 0)) return true;
 
-    const fieldValue = formData[logic.field_id];
+    // Supports both 'field_id' and 'field_key' as the identifier
+    const identifier = logic.field_id || logic.field_key;
+    if (!identifier) return true;
+
+    const fieldValue = formData[identifier];
     if (fieldValue === undefined || fieldValue === null) return false;
 
     switch (logic.operator) {
@@ -309,98 +333,115 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
       }
     }
 
+    const getFieldIcon = (type: string) => {
+      switch (type) {
+        case 'email': return <Mail className="w-4 h-4" />;
+        case 'phone': return <Phone className="w-4 h-4" />;
+        case 'number': return <AlertCircle className="w-4 h-4" />;
+        default: return <User className="w-4 h-4" />;
+      }
+    };
+
     return (
       <div key={field.id} className="space-y-2">
-        <label className="text-sm font-medium flex items-center gap-2">
+        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+          {getFieldIcon(field.field_type)}
           {field.label}
-          {isRequired && <span className="text-destructive">*</span>}
-          {field.conditional_logic && (
-            <Badge variant="outline" className="text-xs">
-              Conditional
-            </Badge>
-          )}
-        </label>
+          {isRequired && <span className="text-primary">*</span>}
+        </Label>
 
         {renderFieldInput(field, value, fieldKey)}
+
         {error && (
-          <p className="text-sm text-destructive">{error}</p>
-        )}
-        {field.placeholder && !value && (
-          <p className="text-xs text-muted-foreground">{field.placeholder}</p>
+          <p className="text-[10px] text-red-500 font-bold uppercase tracking-tight pl-1">{error}</p>
         )}
       </div>
     );
   };
 
   const renderFieldInput = (field: FormField, value: any, fieldKey: string) => {
+    const commonClasses = `h-12 rounded-2xl bg-white dark:bg-slate-900 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all ${errors[fieldKey] ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''
+      }`;
+
     switch (field.field_type) {
       case 'text':
       case 'email':
       case 'phone':
-      case 'date':
-      case 'datetime':
       case 'number':
         return (
-          <input
-            type={field.field_type === 'number' ? 'number' : field.field_type === 'date' || field.field_type === 'datetime' ? field.field_type : 'text'}
+          <Input
+            type={field.field_type === 'number' ? 'number' : 'text'}
             value={value || ''}
             onChange={(e) => handleInputChange(fieldKey, e.target.value)}
             placeholder={field.placeholder}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-              errors[fieldKey] ? 'border-destructive' : 'border-input'
-            }`}
+            className={commonClasses}
+            required={field.is_required}
+          />
+        );
+
+      case 'date':
+      case 'datetime':
+        return (
+          <Input
+            type={field.field_type}
+            value={value || ''}
+            onChange={(e) => handleInputChange(fieldKey, e.target.value)}
+            className={commonClasses}
             required={field.is_required}
           />
         );
 
       case 'textarea':
         return (
-          <textarea
+          <Textarea
             value={value || ''}
             onChange={(e) => handleInputChange(fieldKey, e.target.value)}
             placeholder={field.placeholder}
-            rows={4}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none ${
-              errors[fieldKey] ? 'border-destructive' : 'border-input'
-            }`}
+            className={`rounded-2xl bg-white dark:bg-slate-900 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all min-h-[100px] ${errors[fieldKey] ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''
+              }`}
             required={field.is_required}
           />
         );
 
       case 'select':
         return (
-          <select
+          <Select
             value={value || ''}
-            onChange={(e) => handleInputChange(fieldKey, e.target.value)}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-              errors[fieldKey] ? 'border-destructive' : 'border-input'
-            }`}
-            required={field.is_required}
+            onValueChange={(val) => handleInputChange(fieldKey, val)}
           >
-            <option value="">{field.placeholder || 'Select an option'}</option>
-            {field.fieldOptions?.map((option) => (
-              <option key={option.id} value={option.option_value}>
-                {option.option_label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className={commonClasses}>
+              <SelectValue placeholder={field.placeholder || 'Select an option'} />
+            </SelectTrigger>
+            <SelectContent className="rounded-2xl">
+              {(field.fieldOptions || (field as any).field_options || []).map((option: any) => (
+                <SelectItem key={option.id} value={option.option_value} className="rounded-xl">
+                  {option.option_label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         );
 
       case 'radio':
         return (
-          <div className="space-y-2">
-            {field.fieldOptions?.map((option) => (
-              <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
+          <div className="grid grid-cols-1 gap-3">
+            {(field.fieldOptions || (field as any).field_options || []).map((option: any) => (
+              <label
+                key={option.id}
+                className={`flex items-center gap-3 p-4 rounded-3xl border-2 transition-all cursor-pointer ${value === option.option_value
+                  ? 'border-primary bg-primary/5 text-primary shadow-lg shadow-primary/5 scale-[1.01]'
+                  : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 hover:border-primary/30'
+                  }`}
+              >
                 <input
                   type="radio"
                   name={fieldKey}
                   value={option.option_value}
                   checked={value === option.option_value}
                   onChange={(e) => handleInputChange(fieldKey, e.target.value)}
-                  required={field.is_required}
-                  className="text-primary focus:ring-primary/50"
+                  className="w-5 h-5 text-primary accent-primary"
                 />
-                <span className="text-sm">{option.option_label}</span>
+                <span className="text-sm font-bold">{option.option_label}</span>
               </label>
             ))}
           </div>
@@ -408,17 +449,22 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
 
       case 'checkbox':
         return (
-          <div className="space-y-2">
-            {field.fieldOptions?.map((option) => (
-              <label key={option.id} className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  value={option.option_value}
+          <div className="grid grid-cols-1 gap-3">
+            {(field.fieldOptions || (field as any).field_options || []).map((option: any) => (
+              <label
+                key={option.id}
+                className={`flex items-center gap-3 p-4 rounded-3xl border-2 transition-all cursor-pointer ${(value || []).includes(option.option_value)
+                  ? 'border-primary bg-primary/5 text-primary shadow-lg shadow-primary/5 scale-[1.01]'
+                  : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 hover:border-primary/30'
+                  }`}
+              >
+                <Checkbox
+                  id={`check-${option.id}`}
                   checked={(value || []).includes(option.option_value)}
-                  onChange={(e) => handleCheckboxChange(fieldKey, option.option_value, e.target.checked)}
-                  className="text-primary focus:ring-primary/50"
+                  onCheckedChange={(checked) => handleCheckboxChange(fieldKey, option.option_value, !!checked)}
+                  className="w-5 h-5"
                 />
-                <span className="text-sm">{option.option_label}</span>
+                <span className="text-sm font-bold">{option.option_label}</span>
               </label>
             ))}
           </div>
@@ -426,39 +472,35 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
 
       case 'file':
         return (
-          <input
-            type="file"
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-              errors[fieldKey] ? 'border-destructive' : 'border-input'
-            }`}
-            required={field.is_required}
-          />
+          <div className="relative">
+            <Input
+              type="file"
+              className={commonClasses}
+              required={field.is_required}
+            />
+          </div>
         );
 
       case 'address':
         return (
-          <textarea
+          <Textarea
             value={value || ''}
             onChange={(e) => handleInputChange(fieldKey, e.target.value)}
             placeholder={field.placeholder || 'Enter full address'}
-            rows={3}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none ${
-              errors[fieldKey] ? 'border-destructive' : 'border-input'
-            }`}
+            className={`rounded-2xl bg-white dark:bg-slate-900 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all min-h-[80px] ${errors[fieldKey] ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''
+              }`}
             required={field.is_required}
           />
         );
 
       default:
         return (
-          <input
+          <Input
             type="text"
             value={value || ''}
             onChange={(e) => handleInputChange(fieldKey, e.target.value)}
             placeholder={field.placeholder}
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-              errors[fieldKey] ? 'border-destructive' : 'border-input'
-            }`}
+            className={commonClasses}
             required={field.is_required}
           />
         );
@@ -468,26 +510,31 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   // Loading state
   if (formsLoading) {
     return (
-      <Card>
-        <CardContent className="p-8">
-          <div className="flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" />
-            <span>Loading registration form...</span>
+      <div className="p-12 text-center animate-pulse">
+        <div className="flex flex-col items-center justify-center gap-4">
+          <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
-        </CardContent>
-      </Card>
+          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">
+            Loading Form...
+          </p>
+        </div>
+      </div>
     );
   }
 
   // Error state
   if (formsError) {
     return (
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          Failed to load registration form. Please try again later.
-        </AlertDescription>
-      </Alert>
+      <div className="p-8 rounded-3xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800">
+        <div className="flex items-center gap-4 text-red-600 dark:text-red-400">
+          <AlertCircle className="w-6 h-6" />
+          <div>
+            <p className="font-bold text-sm uppercase tracking-tight">Form Error</p>
+            <p className="text-xs opacity-80">Failed to load registration form. Please try again later.</p>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -499,26 +546,27 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   // Loading preview
   if (previewLoading) {
     return (
-      <Card>
-        <CardContent className="p-8">
-          <div className="flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" />
-            <span>Loading form fields...</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="p-12 text-center">
+        <div className="flex flex-col items-center justify-center gap-4">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Initialising Fields...</p>
+        </div>
+      </div>
     );
   }
 
   // Preview error
   if (previewError) {
     return (
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          Failed to load form configuration. Please try again later.
-        </AlertDescription>
-      </Alert>
+      <div className="p-8 rounded-3xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800">
+        <div className="flex items-center gap-4 text-red-600 dark:text-red-400">
+          <AlertCircle className="w-6 h-6" />
+          <div>
+            <p className="font-bold text-sm uppercase tracking-tight">Configuration Error</p>
+            <p className="text-xs opacity-80">Failed to load form configuration. Please try again later.</p>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -526,94 +574,97 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
     return null;
   }
 
-  const currentPageFields = formPreview.fields.filter(field => field.page_number === currentPage);
-  const totalPages = formPreview.form.is_multi_page ? Math.max(...formPreview.fields.map(f => f.page_number)) : 1;
+  const currentPageFields = formPreview.form.is_multi_page
+    ? formPreview.fields.filter(field => (field.page_number || 1) === currentPage)
+    : formPreview.fields;
+
+  const totalPages = formPreview.form.is_multi_page
+    ? Math.max(1, ...formPreview.fields.map(f => f.page_number || 1))
+    : 1;
   const progress = (currentPage / totalPages) * 100;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+    <div className="animate-fade-in space-y-8">
+      <div>
+        <div className="flex items-center justify-between mb-2">
           <div>
-            <h3 className="text-lg font-semibold">{formPreview.form.name}</h3>
-            <p className="text-sm text-muted-foreground">
-              {activeForm?.guest_type?.name || participantType?.charAt(0).toUpperCase() + participantType?.slice(1) || 'Registration'}
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+              {formPreview.form.name}
+            </h3>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+              {activeForm?.guest_type?.name || participantType?.charAt(0).toUpperCase() + participantType?.slice(1) || 'Registration'} Form
             </p>
           </div>
-          {formPreview.form.is_multi_page && (
-            <Badge variant="outline">
-              Page {currentPage} of {totalPages}
+          {formPreview.form.is_multi_page && totalPages > 1 && (
+            <Badge className="bg-primary/10 text-primary border-none rounded-full px-4 py-1">
+              Step {currentPage} of {totalPages}
             </Badge>
           )}
-        </CardTitle>
-        {formPreview.form.is_multi_page && (
-          <Progress value={progress} className="w-full" />
-        )}
-      </CardHeader>
-
-      <CardContent className="space-y-6">
-        {formPreview.form.description && (
-          <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-            {formPreview.form.description}
-          </div>
-        )}
-
-        {errors.general && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{errors.general}</AlertDescription>
-          </Alert>
-        )}
-
-        <div className="space-y-4">
-          {currentPageFields.map(field => renderField(field))}
         </div>
 
-        <Separator />
+        {formPreview.form.is_multi_page && totalPages > 1 && (
+          <Progress value={progress} className="h-1.5 bg-slate-100 dark:bg-slate-800" />
+        )}
+      </div>
 
-        <div className="flex justify-between">
-          <Button
-            variant="outline"
-            onClick={handlePrevPage}
-            disabled={currentPage === 1}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Previous
-          </Button>
-
-          <div className="flex gap-2">
-            {currentPage < totalPages ? (
-              <Button
-                onClick={handleNextPage}
-                className="flex items-center gap-2"
-              >
-                Next
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="flex items-center gap-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    Complete Registration
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
+      {formPreview.form.description && (
+        <div className="bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100/50 dark:border-blue-800/20 p-4 rounded-2xl">
+          <p className="text-sm text-blue-700/80 dark:text-blue-300/80 leading-relaxed italic">
+            &ldquo;{formPreview.form.description}&rdquo;
+          </p>
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      {errors.general && (
+        <Alert variant="destructive" className="rounded-2xl bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="font-bold text-xs uppercase tracking-tight">{errors.general}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-1 gap-6">
+        {currentPageFields.map(field => renderField(field))}
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-6 border-t border-slate-100 dark:border-slate-800">
+        <Button
+          variant="ghost"
+          onClick={handlePrevPage}
+          disabled={currentPage === 1}
+          className="rounded-xl h-12 px-6 font-bold text-slate-500 hover:text-primary transition-all disabled:opacity-0 w-full sm:w-auto order-2 sm:order-1"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back
+        </Button>
+
+        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto order-1 sm:order-2">
+          {currentPage < totalPages ? (
+            <Button
+              onClick={handleNextPage}
+              className="h-12 px-8 rounded-2xl bg-primary hover:bg-primary-hover text-white font-bold shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98] w-full"
+            >
+              Next Step
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="h-12 px-10 rounded-2xl bg-primary hover:bg-primary-hover text-white font-extrabold shadow-2xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 w-full"
+            >
+              {isSubmitting ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Submitting...</span>
+                </div>
+              ) : (
+                'Register Now'
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 

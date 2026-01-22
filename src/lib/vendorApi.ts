@@ -9,7 +9,7 @@ class VendorApiService {
   constructor() {
     // Load mock vendors from localStorage if available
     this.loadMockVendorsFromStorage();
-    
+
     // Listen for online/offline events
     window.addEventListener('online', () => {
       this.isOnline = true;
@@ -222,20 +222,20 @@ class VendorApiService {
   private getAuthHeaders(isFormData = false) {
     // Get token from localStorage or sessionStorage (same as main API)
     const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt');
-    
+
     // Don't auto-set test token - user must be properly authenticated
     // If no token, the request will fail with 401, which is expected behavior
-    
+
     const headers: Record<string, string> = {
       'Accept': 'application/json',
       ...(token && { 'Authorization': `Bearer ${token}` }),
     };
-    
+
     // Only set Content-Type for non-FormData requests
     if (!isFormData) {
       headers['Content-Type'] = 'application/json';
     }
-    
+
     return headers;
   }
 
@@ -260,7 +260,7 @@ class VendorApiService {
   ): Promise<T> {
     const isFormData = options.body instanceof FormData;
     const cacheKey = `${endpoint}-${JSON.stringify(options)}`;
-    
+
     // Return cached data if offline
     if (!this.isOnline && this.cache.has(cacheKey)) {
       console.log(`Using cached data for ${endpoint}`);
@@ -282,19 +282,19 @@ class VendorApiService {
 
       const data = await response.json();
       const result = data.data?.data || data.data || data;
-      
+
       // Cache the result
       this.cache.set(cacheKey, result);
-      
+
       return result;
     } catch (error) {
       console.warn(`API call failed for ${endpoint}, using fallback data:`, error);
-      
+
       // Return cached data if available, otherwise fallback data
       if (this.cache.has(cacheKey)) {
         return this.cache.get(cacheKey);
       }
-      
+
       return fallbackData;
     }
   }
@@ -337,11 +337,11 @@ class VendorApiService {
         cleanParams[key] = value;
       }
     });
-    
+
     const queryString = new URLSearchParams(cleanParams).toString();
     const endpoint = `/vendors${queryString ? `?${queryString}` : ''}`;
     console.log('Fetching vendors from:', endpoint, 'with clean params:', cleanParams);
-    
+
     try {
       const response = await fetch(`${this.baseURL}${endpoint}`, {
         method: 'GET',
@@ -367,13 +367,18 @@ class VendorApiService {
         filters: data.filters,
         firstVendor: data.data?.data?.[0]
       });
-      
+
       // Handle paginated response from Laravel
       if (data.success && data.data && data.data.data) {
         // Laravel paginated response: { success: true, data: { data: [...], current_page: 1, ... } }
-        const apiVendors = data.data.data;
-        console.log(`Returning ${apiVendors.length} vendors from API`);
-        return this.normalizeServicesProvided(apiVendors);
+        return {
+          data: this.normalizeServicesProvided(data.data.data),
+          total: data.data.total,
+          current_page: data.data.current_page,
+          last_page: data.data.last_page,
+          per_page: data.data.per_page,
+          is_paginated: true
+        };
       } else if (data.success && Array.isArray(data.data)) {
         // Direct array response: { success: true, data: [...] }
         const apiVendors = data.data;
@@ -385,7 +390,7 @@ class VendorApiService {
         console.log(`Returning ${apiVendors.length} vendors from API (root array)`);
         return this.normalizeServicesProvided(apiVendors);
       }
-      
+
       // If we get here, the response format is unexpected
       console.warn('Unexpected response format from vendors API:', data);
       return this.getVendorsFromMock(params);
@@ -403,7 +408,7 @@ class VendorApiService {
     // Apply search filter
     if (params.search) {
       const searchLower = params.search.toLowerCase();
-      filteredVendors = filteredVendors.filter(v => 
+      filteredVendors = filteredVendors.filter(v =>
         v.name?.toLowerCase().includes(searchLower) ||
         v.email?.toLowerCase().includes(searchLower) ||
         v.phone?.toLowerCase().includes(searchLower)
@@ -433,30 +438,30 @@ class VendorApiService {
       }
 
       const data = await response.json();
-      
+
       // Handle API response format
       if (data.success && data.data) {
         return this.normalizeServicesProvided([data.data])[0];
       } else if (data.data) {
         return this.normalizeServicesProvided([data.data])[0];
       }
-      
+
       // Fallback to mock data
       const vendor = this.mockVendors.find(v => v.id === id);
       if (vendor) {
         return this.normalizeServicesProvided([vendor])[0];
       }
-      
+
       throw new Error('Vendor not found');
     } catch (error) {
       console.warn(`Failed to fetch vendor ${id} from API, using mock data:`, error);
-      
+
       // Fallback to mock data
       const vendor = this.mockVendors.find(v => v.id === id);
       if (vendor) {
         return this.normalizeServicesProvided([vendor])[0];
       }
-      
+
       throw error;
     }
   }
@@ -488,7 +493,7 @@ class VendorApiService {
 
     try {
       console.log('Creating vendor with data:', processedData instanceof FormData ? 'FormData' : processedData);
-      
+
       const response = await fetch(`${this.baseURL}/vendors`, {
         ...requestOptions,
         headers: {
@@ -513,7 +518,7 @@ class VendorApiService {
 
       const result = await response.json();
       console.log('Vendor creation API response:', result);
-      
+
       // If successful, add to mock data for offline fallback
       if (result.success && result.data) {
         const newVendor = {
@@ -531,7 +536,7 @@ class VendorApiService {
         console.log('Vendor added to mock data and cache cleared');
         return result.data;
       }
-      
+
       console.warn('Unexpected vendor creation response format:', result);
       return result;
     } catch (error) {
@@ -539,15 +544,15 @@ class VendorApiService {
       // Only create mock data for network/server errors where we can't reach the API
       const errorResponse = (error as any)?.response;
       const isValidationError = errorResponse?.status === 422;
-      
+
       if (isValidationError) {
         // For validation errors, re-throw so the UI can show the error properly
         // Don't create mock data as the vendor wasn't actually created
         throw error;
       }
-      
+
       console.warn('Failed to create vendor via API, using mock data:', error);
-      
+
       // Extract data from FormData if needed
       let vendorData = {};
       if (data instanceof FormData) {
@@ -566,7 +571,7 @@ class VendorApiService {
       } else {
         vendorData = data;
       }
-      
+
       // Fallback to mock data only for non-validation errors
       const newVendor = {
         id: this.mockVendors.length + 1,
@@ -625,7 +630,7 @@ class VendorApiService {
       }
 
       const result = await response.json();
-      
+
       // Update mock data if successful
       if (result.success && result.data) {
         const vendorIndex = this.mockVendors.findIndex(v => v.id === id);
@@ -639,11 +644,11 @@ class VendorApiService {
         }
         return result.data;
       }
-      
+
       return result;
     } catch (error) {
       console.warn('Failed to update vendor via API, updating mock data:', error);
-      
+
       // Fallback: Update mock data
       const vendorIndex = this.mockVendors.findIndex(v => v.id === id);
       if (vendorIndex !== -1) {
@@ -655,7 +660,7 @@ class VendorApiService {
         this.saveMockVendorsToStorage();
         return this.mockVendors[vendorIndex];
       }
-      
+
       throw error;
     }
   }
@@ -680,7 +685,7 @@ class VendorApiService {
       return result.data || result;
     } catch (error) {
       console.warn('Failed to create quotation via API:', error);
-      
+
       // Fallback: Create mock quotation and add to mock data
       // For organizers, quotations are automatically approved
       const userRole = localStorage.getItem('user_role') || 'organizer';
@@ -693,10 +698,10 @@ class VendorApiService {
         approved_at: null,
         approved_by: null,
       };
-      
+
       // Add to mock quotations array so it appears in the list
       this.mockQuotations.push(mockQuotation);
-      
+
       // Update vendor's quotation counts
       const vendorIndex = this.mockVendors.findIndex(v => v.id === data.vendor_id);
       if (vendorIndex !== -1) {
@@ -705,11 +710,11 @@ class VendorApiService {
         this.mockVendors[vendorIndex].pending_quotations = (this.mockVendors[vendorIndex].pending_quotations || 0) + 1;
         this.saveMockVendorsToStorage();
       }
-      
+
       // Update global statistics
       this.mockStatistics.total_quotations = (this.mockStatistics.total_quotations || 0) + 1;
       this.mockStatistics.pending_quotations = (this.mockStatistics.pending_quotations || 0) + 1;
-      
+
       return mockQuotation;
     }
   }
@@ -719,7 +724,7 @@ class VendorApiService {
     try {
       const queryString = new URLSearchParams(params).toString();
       const endpoint = `/vendors/quotations${queryString ? `?${queryString}` : ''}`;
-      
+
       const response = await fetch(`${this.baseURL}${endpoint}`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
@@ -734,14 +739,14 @@ class VendorApiService {
       }
 
       const data = await response.json();
-      
+
       let quotations = [];
       if (data.success && Array.isArray(data.data)) {
         quotations = data.data;
       } else if (Array.isArray(data)) {
         quotations = data;
       }
-      
+
       // Sort quotations by creation date (newest first)
       return quotations.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     } catch (error) {
@@ -768,7 +773,7 @@ class VendorApiService {
       }
 
       const result = await response.json();
-      
+
       // If successful, remove from mock data
       if (result.success) {
         const vendorIndex = this.mockVendors.findIndex(v => v.id === id);
@@ -777,18 +782,18 @@ class VendorApiService {
           this.saveMockVendorsToStorage();
         }
       }
-      
+
       return result;
     } catch (error) {
       console.warn('Failed to delete vendor via API:', error);
-      
+
       // Fallback: Remove from mock data
       const vendorIndex = this.mockVendors.findIndex(v => v.id === id);
       if (vendorIndex !== -1) {
         this.mockVendors.splice(vendorIndex, 1);
         this.saveMockVendorsToStorage();
       }
-      
+
       throw error;
     }
   }
@@ -798,7 +803,7 @@ class VendorApiService {
     // First check if vendor exists in our current data
     const existingVendors = await this.getVendors();
     const vendorExists = existingVendors.some(v => v.id === id);
-    
+
     if (!vendorExists) {
       throw new Error(`Vendor with ID ${id} not found. Please refresh the page and try again.`);
     }
@@ -817,7 +822,7 @@ class VendorApiService {
       }
 
       const result = await response.json();
-      
+
       // If successful, remove from mock data
       if (result.success) {
         const vendorIndex = this.mockVendors.findIndex(v => v.id === id);
@@ -826,18 +831,18 @@ class VendorApiService {
           this.saveMockVendorsToStorage();
         }
       }
-      
+
       return result;
     } catch (error) {
       console.warn('Failed to hard delete vendor via API:', error);
-      
+
       // Fallback: Remove from mock data
       const vendorIndex = this.mockVendors.findIndex(v => v.id === id);
       if (vendorIndex !== -1) {
         this.mockVendors.splice(vendorIndex, 1);
         this.saveMockVendorsToStorage();
       }
-      
+
       throw error;
     }
   }
@@ -854,7 +859,7 @@ class VendorApiService {
     if (quotationIndex !== -1) {
       const quotation = this.mockQuotations[quotationIndex];
       quotation.status = 'approved';
-      
+
       // Update vendor's quotation counts
       const vendorIndex = this.mockVendors.findIndex(v => v.id === quotation.vendor_id);
       if (vendorIndex !== -1) {
@@ -862,7 +867,7 @@ class VendorApiService {
         this.mockVendors[vendorIndex].approved_quotations = (this.mockVendors[vendorIndex].approved_quotations || 0) + 1;
         this.saveMockVendorsToStorage();
       }
-      
+
       // Update global statistics
       this.mockStatistics.pending_quotations = Math.max(0, (this.mockStatistics.pending_quotations || 0) - 1);
       this.mockStatistics.approved_quotations = (this.mockStatistics.approved_quotations || 0) + 1;
@@ -878,7 +883,7 @@ class VendorApiService {
     if (quotationIndex !== -1) {
       const quotation = this.mockQuotations[quotationIndex];
       quotation.status = 'rejected';
-      
+
       // Update vendor's quotation counts
       const vendorIndex = this.mockVendors.findIndex(v => v.id === quotation.vendor_id);
       if (vendorIndex !== -1) {
@@ -886,7 +891,7 @@ class VendorApiService {
         this.mockVendors[vendorIndex].rejected_quotations = (this.mockVendors[vendorIndex].rejected_quotations || 0) + 1;
         this.saveMockVendorsToStorage();
       }
-      
+
       // Update global statistics
       this.mockStatistics.pending_quotations = Math.max(0, (this.mockStatistics.pending_quotations || 0) - 1);
       this.mockStatistics.rejected_quotations = (this.mockStatistics.rejected_quotations || 0) + 1;
@@ -910,14 +915,14 @@ class VendorApiService {
       }
 
       const data = await response.json();
-      
+
       // Handle API response structure
       if (data.success && data.data) {
         return data.data;
       } else if (data.success) {
         return data;
       }
-      
+
       // If we get here, the response format is unexpected
       console.warn('Unexpected response format from statistics API:', data);
       return {};
@@ -945,7 +950,7 @@ class VendorApiService {
       }
 
       const result = await response.json();
-      
+
       // If successful, update mock data
       if (result.success && result.data) {
         vendorIds.forEach(id => {
@@ -967,11 +972,11 @@ class VendorApiService {
         });
         this.saveMockVendorsToStorage();
       }
-      
+
       return result;
     } catch (error) {
       console.warn('Failed to perform bulk operation via API:', error);
-      
+
       // Fallback: Update mock data
       const results = vendorIds.map(id => {
         const vendor = this.mockVendors.find(v => v.id === id);
@@ -991,7 +996,7 @@ class VendorApiService {
         }
         return { id, success: true };
       });
-      
+
       this.saveMockVendorsToStorage();
       return { results };
     }
@@ -1022,7 +1027,7 @@ class VendorApiService {
       return data.success ? data.data : [];
     } catch (error) {
       console.warn('Failed to fetch organizer events via API:', error);
-      
+
       // Fallback: Return mock events
       return [
         {
@@ -1059,7 +1064,7 @@ class VendorApiService {
       return data.success ? data.data : [];
     } catch (error) {
       console.warn('Failed to fetch approved quotations via API:', error);
-      
+
       // Fallback: Return mock approved quotations
       return [
         {
@@ -1117,7 +1122,7 @@ class VendorApiService {
     try {
       const headers = this.getAuthHeaders();
       headers['Content-Type'] = 'application/json';
-      
+
       const response = await fetch(`${this.baseURL}/vendors/rfq-invites/${id}`, {
         method: 'PUT',
         headers: headers,

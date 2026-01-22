@@ -4,6 +4,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -135,9 +136,9 @@ export function CreateReferralDialog({ open, onOpenChange, onSuccess }: CreateRe
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Create Vendor Referral Campaign</DialogTitle>
-          <DialogDescription>
+        <DialogHeader className="pb-4 border-b border-border/50">
+          <DialogTitle className="text-xl font-semibold">Create Vendor Referral Campaign</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground mt-2">
             Create a new referral campaign for a vendor to promote an event and earn commissions.
           </DialogDescription>
         </DialogHeader>
@@ -286,25 +287,27 @@ export function CreateReferralDialog({ open, onOpenChange, onSuccess }: CreateRe
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
+          <DialogFooter className="flex-col sm:flex-row gap-3 pt-6 border-t border-border/50">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={createReferralMutation.isPending}
+              className="w-full sm:w-auto order-2 sm:order-1"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={createReferralMutation.isPending}
+              className="w-full sm:w-auto order-1 sm:order-2"
             >
               {createReferralMutation.isPending && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
               Create Referral
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

@@ -101,18 +101,18 @@ export default function AttendeeDashboard() {
   const filteredUpcomingEvents =
     searchQuery && upcomingEvents
       ? upcomingEvents.filter(
-          (event: any) =>
-            event.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            event.description?.toLowerCase().includes(searchQuery.toLowerCase())
-        )
+        (event: any) =>
+          event.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          event.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
       : upcomingEvents
   const filteredRegisteredEvents =
     searchQuery && myRegisteredEvents
       ? myRegisteredEvents.filter(
-          (event: any) =>
-            event.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            event.description?.toLowerCase().includes(searchQuery.toLowerCase())
-        )
+        (event: any) =>
+          event.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          event.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
       : myRegisteredEvents
 
   return (
@@ -122,13 +122,13 @@ export default function AttendeeDashboard() {
         <MetricCard
           title="Events Attended"
           value={keyMetrics?.eventsAttended?.value || 'N/A'}
-          icon={<Calendar className="w-6 h-6 text-blue-600" />}
+          icon={<Calendar className="w-6 h-6 text-primary" />}
           trend={keyMetrics?.eventsAttended?.trend}
         />
         <MetricCard
           title="Upcoming Events"
           value={keyMetrics?.upcomingEvents || 'N/A'}
-          icon={<Ticket className="w-6 h-6 text-purple-600" />}
+          icon={<Ticket className="w-6 h-6 text-orange-600" />}
         />
         <MetricCard
           title="Network Connections"
@@ -149,7 +149,7 @@ export default function AttendeeDashboard() {
           to="/dashboard/locate-badges"
           className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg w-full"
         >
-          <MapPin className="w-8 h-8 mx-auto mb-2 text-blue-600" />
+          <MapPin className="w-8 h-8 mx-auto mb-2 text-primary" />
           <span className="font-medium">Locate Badges</span>
         </Link>
       </div>
@@ -193,7 +193,7 @@ export default function AttendeeDashboard() {
               <div className="h-48 bg-gradient-to-r from-[hsl(var(--color-warning))]/20 to-[hsl(var(--primary))]/20 overflow-hidden">
                 {event.event_image ? (
                   <img
-                                    src={getImageUrl(event.event_image)}
+                    src={getImageUrl(event.event_image)}
                     alt={event.name}
                     className="w-full h-full object-cover"
                   />
@@ -346,14 +346,14 @@ export default function AttendeeDashboard() {
             ))}
           </div>
 
-          <div className="mt-4 p-4 bg-blue-500/10 dark:bg-blue-900/20 rounded-lg">
-            <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">
+          <div className="mt-4 p-4 bg-primary/10 rounded-lg">
+            <h4 className="font-medium text-primary mb-2">
               Start a Conversation
             </h4>
-            <p className="text-sm text-blue-700 dark:text-blue-400 mb-3">
+            <p className="text-sm text-primary/70 mb-3">
               Connect with other attendees and share experiences
             </p>
-            <Button size="sm" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
+            <Button size="sm" className="w-full sm:w-auto bg-primary hover:bg-primary/90">
               <MessageSquare className="w-4 h-4 mr-2" />
               New Conversation
             </Button>

@@ -148,14 +148,14 @@ export function QuickCreateEventDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <Calendar className="w-4 h-4 text-white" />
+        <DialogHeader className="pb-4 border-b border-border/50">
+          <DialogTitle className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-50 dark:bg-blue-950/20 rounded-xl flex items-center justify-center border-2 border-blue-200 dark:border-blue-800">
+              <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
             Quick Create Event
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm text-muted-foreground mt-2">
             Creating event for {formatDate(selectedDate)}
           </DialogDescription>
         </DialogHeader>
@@ -216,11 +216,11 @@ export function QuickCreateEventDialog({
             />
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-xs text-blue-700 font-medium mb-1">
+          <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+            <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-2">
               Quick Create Defaults:
             </p>
-            <ul className="text-xs text-blue-600 space-y-0.5 ml-3">
+            <ul className="text-xs text-blue-600 dark:text-blue-400 space-y-1 ml-3">
               <li>• Creates as 1-day event (start & end on selected date)</li>
               <li>• Registration opens 7 days before event</li>
               <li>• Default guest type: General Admission</li>
@@ -230,7 +230,7 @@ export function QuickCreateEventDialog({
           </div>
         </div>
 
-        <DialogFooter className="flex flex-col sm:flex-row gap-2">
+        <DialogFooter className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-border/50">
           <Button
             variant="outline"
             onClick={handleFullCreate}
@@ -243,7 +243,7 @@ export function QuickCreateEventDialog({
           <Button
             onClick={handleQuickCreate}
             disabled={loading || !formData.name}
-            className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
           >
             {loading ? 'Creating...' : 'Quick Create'}
           </Button>

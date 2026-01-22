@@ -174,9 +174,9 @@ export function UsherAssignmentDialog({
         </DialogTrigger>
       )}
       <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Assign Ushers to Event</DialogTitle>
-          <DialogDescription>
+        <DialogHeader className="pb-4 border-b border-border/50">
+          <DialogTitle className="text-xl font-semibold">Assign Ushers to Event</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground mt-2">
             Select ushers and assign tasks for "{eventName}". You can add multiple
             ushers.
           </DialogDescription>
@@ -302,18 +302,19 @@ export function UsherAssignmentDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row gap-3 pt-6 border-t border-border/50">
           <Button
             variant="outline"
             onClick={() => setOpen(false)}
             disabled={assigning}
+            className="w-full sm:w-auto order-2 sm:order-1"
           >
             Cancel
           </Button>
           <Button
             onClick={handleAssign}
             disabled={!isFormValid || assigning || loading}
-            className="bg-gradient-to-r from-blue-600 to-purple-600"
+            className="w-full sm:w-auto order-1 sm:order-2 bg-blue-600 hover:bg-blue-700 text-white"
           >
             {assigning ? 'Assigning...' : 'Assign Ushers'}
           </Button>
