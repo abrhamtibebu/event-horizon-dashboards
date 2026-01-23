@@ -55,14 +55,14 @@ export function TaskFilters({ filters, onChange, onClose }: TaskFiltersProps) {
         <div className="space-y-2">
           <Label>Status</Label>
           <Select
-            value={Array.isArray(localFilters.status) ? undefined : (localFilters.status || '')}
-            onValueChange={(value) => handleChange('status', value || undefined)}
+            value={Array.isArray(localFilters.status) ? undefined : (localFilters.status || 'all')}
+            onValueChange={(value) => handleChange('status', value === 'all' ? undefined : value)}
           >
             <SelectTrigger>
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All statuses</SelectItem>
+              <SelectItem value="all">All statuses</SelectItem>
               {statusOptions.map((status) => (
                 <SelectItem key={status} value={status}>
                   {status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
@@ -75,14 +75,14 @@ export function TaskFilters({ filters, onChange, onClose }: TaskFiltersProps) {
         <div className="space-y-2">
           <Label>Priority</Label>
           <Select
-            value={Array.isArray(localFilters.priority) ? undefined : (localFilters.priority || '')}
-            onValueChange={(value) => handleChange('priority', value || undefined)}
+            value={Array.isArray(localFilters.priority) ? undefined : (localFilters.priority || 'all')}
+            onValueChange={(value) => handleChange('priority', value === 'all' ? undefined : value)}
           >
             <SelectTrigger>
               <SelectValue placeholder="All priorities" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All priorities</SelectItem>
+              <SelectItem value="all">All priorities</SelectItem>
               {priorityOptions.map((priority) => (
                 <SelectItem key={priority} value={priority}>
                   {priority.charAt(0).toUpperCase() + priority.slice(1)}
@@ -95,14 +95,14 @@ export function TaskFilters({ filters, onChange, onClose }: TaskFiltersProps) {
         <div className="space-y-2">
           <Label>Category</Label>
           <Select
-            value={Array.isArray(localFilters.task_category) ? undefined : (localFilters.task_category || '')}
-            onValueChange={(value) => handleChange('task_category', value || undefined)}
+            value={Array.isArray(localFilters.task_category) ? undefined : (localFilters.task_category || 'all')}
+            onValueChange={(value) => handleChange('task_category', value === 'all' ? undefined : value)}
           >
             <SelectTrigger>
               <SelectValue placeholder="All categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All categories</SelectItem>
+              <SelectItem value="all">All categories</SelectItem>
               {categoryOptions.map((category) => (
                 <SelectItem key={category} value={category}>
                   {category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
