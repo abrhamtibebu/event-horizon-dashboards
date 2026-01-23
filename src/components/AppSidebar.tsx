@@ -24,6 +24,7 @@ import {
   MessageCircle,
   LayoutDashboard,
   Fingerprint,
+  CheckSquare,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -58,6 +59,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { useUnreadCount } from '@/hooks/use-messages'
 import { useOrganizerPermissions } from '@/hooks/use-organizer-permissions'
+import { usePermissionCheck } from '@/hooks/use-permission-check'
 import api from '@/lib/api'
 
 // Helper function to get user initials
@@ -77,7 +79,7 @@ const navigationCategories = [
         title: 'Dashboard',
         url: '/dashboard',
         icon: LayoutDashboard,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher'],
+        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver'],
         permission: 'dashboard.view',
       },
     ],
@@ -89,14 +91,14 @@ const navigationCategories = [
         title: 'Events',
         url: '/dashboard/events',
         icon: CalendarDays,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin'],
+        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'event_manager'],
         permission: 'events.view',
       },
       {
         title: 'Create Event',
         url: '/dashboard/events/create',
         icon: ClipboardCheck,
-        roles: ['superadmin', 'organizer', 'organizer_admin'],
+        roles: ['superadmin', 'organizer', 'organizer_admin', 'event_manager'],
         permission: 'events.create',
       },
       {
@@ -117,6 +119,14 @@ const navigationCategories = [
   {
     label: 'Management',
     items: [
+      {
+        title: 'Tasks',
+        url: '/dashboard/tasks',
+        icon: CheckSquare,
+        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'attendee', 'sales'],
+        accessibleToAll: true,
+        permission: 'tasks.view',
+      },
       {
         title: 'Users',
         url: '/dashboard/users',
@@ -147,7 +157,7 @@ const navigationCategories = [
         title: 'Vendors',
         url: '/dashboard/vendor-management',
         icon: Briefcase,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin'],
+        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver'],
         permission: 'vendors.any',
       },
       {
@@ -181,13 +191,6 @@ const navigationCategories = [
   {
     label: 'Operations',
     items: [
-      {
-        title: 'Tasks',
-        url: '/dashboard/tasks',
-        icon: ClipboardCheck,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin'],
-        permission: 'tasks.manage',
-      },
       {
         title: 'Check-in',
         url: '/dashboard/check-in',
@@ -229,14 +232,15 @@ const navigationCategories = [
         title: 'Messages',
         url: '/dashboard/messages',
         icon: MessageCircleMore,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher'],
+        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'attendee', 'sales'],
+        accessibleToAll: true,
         permission: 'messages.manage',
       },
       {
         title: 'Marketing',
         url: '/dashboard/marketing',
         icon: Send,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin'],
+        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'marketing_specialist'],
         permission: 'marketing.manage',
       },
     ],
@@ -264,6 +268,7 @@ export function AppSidebar() {
   const { state, toggleSidebar } = useSidebar()
   const { user, logout } = useAuth()
   const { hasPermission, isOrganizerAdmin } = useOrganizerPermissions()
+  const { hasRole } = usePermissionCheck()
   const isCollapsed = state === 'collapsed'
   const [trashCount, setTrashCount] = useState(0)
   const location = useLocation()
@@ -286,23 +291,30 @@ export function AppSidebar() {
           isOrganizer && category.label === 'Connect' ? 'Communicate' :
             category.label,
       items: category.items.filter((item) => {
-        // Guests menu is only for organizers, not for admin/superadmin
-        if (item.title === 'Guests' && user && (user.role === 'admin' || user.role === 'superadmin')) {
-          return false
-        }
+        if (!user) return false
 
-        // System admins see everything
-        if (user && (user.role === 'admin' || user.role === 'superadmin')) {
+        // Items accessible to all authenticated users
+        if (item.accessibleToAll) {
           return true
         }
 
-        // Check role-based access first
-        if (user && !item.roles.includes(user.role)) {
+        // Guests menu is only for organizers, not for admin/superadmin
+        if (item.title === 'Guests' && (user.role === 'admin' || user.role === 'superadmin')) {
+          return false
+        }
+
+        // System admins see everything (they have all roles)
+        if (user.role === 'admin' || user.role === 'superadmin') {
+          return true
+        }
+
+        // Check role-based access using hasRole which checks both user.role and user.roles array
+        if (!hasRole(item.roles)) {
           return false
         }
 
         // For organizer and organizer_admin users, check permissions
-        if (user && (user.role === 'organizer' || user.role === 'organizer_admin') && item.permission) {
+        if ((user.role === 'organizer' || user.role === 'organizer_admin') && item.permission) {
           if (isOrganizerAdmin || user.role === 'organizer_admin') return true
 
           if (item.permission === 'vendors.any') {
@@ -354,36 +366,37 @@ export function AppSidebar() {
   return (
     <Sidebar
       className={cn(
-        "!bg-transparent border-r border-border/50 z-50",
-        "[&>div>div]:!bg-transparent",
-        "transition-all duration-300 ease-in-out"
+        "!bg-background border-r border-border/40 z-50",
+        "[&>div>div]:!bg-background",
+        "transition-all duration-300 ease-in-out",
+        "shadow-none"
       )}
       collapsible="icon"
     >
       {/* Header with Logo */}
       <SidebarHeader className={cn(
-        "flex items-center transition-all duration-300 border-b border-border/50 bg-transparent",
+        "flex items-center transition-all duration-300 border-b border-border/40 bg-background",
         isCollapsed ? 'p-4 justify-center' : 'px-6 py-6'
       )}>
         <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-4 w-full'}`}>
           <div className={cn(
-            "flex items-center justify-center transition-all duration-300 rounded-xl",
+            "flex items-center justify-center transition-all duration-300",
             isCollapsed ? "w-10 h-10" : "w-12 h-12",
-            "bg-orange-50 dark:bg-orange-950/20 border-2 border-orange-200 dark:border-orange-800"
+            "bg-transparent"
           )}>
             <img
               src="/evella-logo.png"
               alt="Evella Logo"
-              className="w-8 h-8 object-contain"
+              className="w-full h-full object-contain"
             />
           </div>
           {!isCollapsed && (
             <>
               <div className="flex flex-col flex-1 min-w-0">
-                <span className="text-xl font-semibold text-foreground">
+                <span className="text-xl font-semibold text-foreground" style={{ fontFamily: 'Mosk, sans-serif' }}>
                   Evella
                 </span>
-                <span className="text-xs font-medium text-orange-600 dark:text-orange-400 uppercase tracking-wider mt-0.5">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-0.5" style={{ fontFamily: 'Mosk, sans-serif' }}>
                   {isOrganizer ? 'Organizer' : 'Admin Console'}
                 </span>
               </div>
@@ -400,11 +413,11 @@ export function AppSidebar() {
       </SidebarHeader>
 
       {/* Navigation Content */}
-      <SidebarContent className="flex-1 overflow-y-auto px-3 gap-4 pb-4 bg-transparent">
+      <SidebarContent className="flex-1 overflow-y-auto px-3 gap-4 pb-4 bg-background">
         {filteredCategories.map((category) => (
           <SidebarGroup key={category.label} className="p-0">
             {!isCollapsed && (
-              <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2 mt-4 select-none">
+              <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2 mt-4 select-none" style={{ fontFamily: 'Mosk, sans-serif' }}>
                 {category.label}
               </SidebarGroupLabel>
             )}
@@ -430,7 +443,7 @@ export function AppSidebar() {
                         className={cn(
                           'group relative w-full transition-all duration-200 rounded-lg',
                           isActive
-                            ? 'bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 font-medium'
+                            ? 'bg-accent/50 text-foreground font-medium'
                             : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
                           isCollapsed ? 'justify-center p-2.5 h-10 w-10 mx-auto' : 'px-3 py-2.5 h-10'
                         )}
@@ -447,28 +460,29 @@ export function AppSidebar() {
                             <item.icon className={cn(
                               "flex-shrink-0 transition-colors",
                               isActive
-                                ? "w-4 h-4 text-orange-600 dark:text-orange-400"
+                                ? "w-4 h-4 text-foreground"
                                 : "w-4 h-4 text-muted-foreground group-hover:text-foreground"
                             )} />
                             {!isCollapsed && (
-                              <span className="text-sm font-medium">
+                              <span className="text-sm font-medium" style={{ fontFamily: 'Mosk, sans-serif' }}>
                                 {item.title}
                               </span>
                             )}
                           </div>
                           {isActive && !isCollapsed && (
-                            <div className="w-1.5 h-1.5 rounded-full bg-orange-600 dark:bg-orange-400" />
+                            <div className="w-1 h-6 rounded-full bg-primary" />
                           )}
                           {showBadge && (
                             <Badge
                               className={cn(
                                 "ml-auto h-5 min-w-5 px-1.5 flex items-center justify-center text-xs font-semibold shadow-none border-0",
                                 item.title === 'Trash'
-                                  ? "bg-red-600 text-white"
+                                  ? "bg-destructive text-destructive-foreground"
                                   : isActive
-                                    ? "bg-orange-600 text-white"
-                                    : "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-muted text-muted-foreground"
                               )}
+                              style={{ fontFamily: 'Mosk, sans-serif' }}
                             >
                               {item.title === 'Trash' ? trashCount : unreadCount}
                             </Badge>
@@ -485,7 +499,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className={cn(
-        "mt-auto p-3 border-t border-border/50 bg-transparent",
+        "mt-auto p-3 border-t border-border/40 bg-background",
       )}>
         {user && (
           <DropdownMenu>
@@ -498,7 +512,7 @@ export function AppSidebar() {
                 <div className="relative">
                   <Avatar className="w-8 h-8 ring-2 ring-background shadow-sm transition-transform duration-200 group-hover:scale-105">
                     <AvatarImage src={user.profile_image} />
-                    <AvatarFallback className="bg-orange-600 text-white text-xs font-semibold">
+                    <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold" style={{ fontFamily: 'Mosk, sans-serif' }}>
                       {getInitials(user.name)}
                     </AvatarFallback>
                   </Avatar>
@@ -507,10 +521,10 @@ export function AppSidebar() {
 
                 {!isCollapsed && (
                   <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                    <span className="font-medium text-sm text-foreground truncate">
+                    <span className="font-medium text-sm text-foreground truncate" style={{ fontFamily: 'Mosk, sans-serif' }}>
                       {user.name || 'User'}
                     </span>
-                    <span className="text-xs text-muted-foreground truncate">
+                    <span className="text-xs text-muted-foreground truncate" style={{ fontFamily: 'Mosk, sans-serif' }}>
                       {user.email || ''}
                     </span>
                   </div>
@@ -525,41 +539,41 @@ export function AppSidebar() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align={isCollapsed ? "center" : "end"} side={isCollapsed ? "right" : "bottom"} className="w-56 mb-2 rounded-xl">
               <DropdownMenuItem onClick={() => navigate('/dashboard/profile')} className="cursor-pointer">
-                <UserCircle className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
-                <span>My Profile</span>
+                <UserCircle className="mr-2 h-4 w-4 text-primary" />
+                <span style={{ fontFamily: 'Mosk, sans-serif' }}>My Profile</span>
               </DropdownMenuItem>
 
               <DropdownMenuItem onClick={() => navigate('/dashboard/settings')} className="cursor-pointer">
                 <Settings className="mr-2 h-4 w-4 text-muted-foreground" />
-                <span>Settings</span>
+                <span style={{ fontFamily: 'Mosk, sans-serif' }}>Settings</span>
               </DropdownMenuItem>
 
               <DropdownMenuItem onClick={() => navigate('/dashboard/messages')} className="cursor-pointer">
-                <MessageCircle className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
-                <span>Messages</span>
+                <MessageCircle className="mr-2 h-4 w-4 text-primary" />
+                <span style={{ fontFamily: 'Mosk, sans-serif' }}>Messages</span>
                 {unreadCount > 0 && (
-                  <Badge className="ml-auto bg-orange-600 text-white text-xs">
+                  <Badge className="ml-auto bg-primary text-primary-foreground text-xs" style={{ fontFamily: 'Mosk, sans-serif' }}>
                     {unreadCount}
                   </Badge>
                 )}
               </DropdownMenuItem>
 
               <DropdownMenuItem onClick={() => navigate('/dashboard/events')} className="cursor-pointer">
-                <CalendarDays className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
-                <span>My Events</span>
+                <CalendarDays className="mr-2 h-4 w-4 text-primary" />
+                <span style={{ fontFamily: 'Mosk, sans-serif' }}>My Events</span>
               </DropdownMenuItem>
 
               <DropdownMenuItem onClick={() => navigate('/dashboard/reports')} className="cursor-pointer">
-                <BarChart3 className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
-                <span>Reports</span>
+                <BarChart3 className="mr-2 h-4 w-4 text-primary" />
+                <span style={{ fontFamily: 'Mosk, sans-serif' }}>Reports</span>
               </DropdownMenuItem>
 
               {user?.role === 'organizer' && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/dashboard/subscription')} className="cursor-pointer">
-                    <ShieldCheck className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
-                    <span>Subscription</span>
+                    <ShieldCheck className="mr-2 h-4 w-4 text-primary" />
+                    <span style={{ fontFamily: 'Mosk, sans-serif' }}>Subscription</span>
                   </DropdownMenuItem>
                 </>
               )}
@@ -568,8 +582,8 @@ export function AppSidebar() {
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate('/dashboard')} className="cursor-pointer">
-                    <ShieldCheck className="mr-2 h-4 w-4 text-red-600 dark:text-red-400" />
-                    <span>Admin Panel</span>
+                    <ShieldCheck className="mr-2 h-4 w-4 text-destructive" />
+                    <span style={{ fontFamily: 'Mosk, sans-serif' }}>Admin Panel</span>
                   </DropdownMenuItem>
                 </>
               )}
@@ -577,10 +591,10 @@ export function AppSidebar() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={logout}
-                className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/20"
+                className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                <span>Logout</span>
+                <span style={{ fontFamily: 'Mosk, sans-serif' }}>Logout</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

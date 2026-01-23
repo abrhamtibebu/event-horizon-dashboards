@@ -61,7 +61,7 @@ export default function Events() {
   })
 
   const { user } = useAuth()
-  const { hasPermission } = usePermissionCheck()
+  const { hasPermission, hasRole } = usePermissionCheck()
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Toggle featured status for admin
@@ -99,6 +99,7 @@ export default function Events() {
 
       try {
         // Fetch all events without pagination to get accurate counts
+        // For event_manager/organizer, also use this to populate events if main fetch fails
         const res = await api.get('/events', {
           params: {
             per_page: 1000, // Large number to get all events
@@ -113,12 +114,12 @@ export default function Events() {
           // If there are more pages, we might need to fetch them, but for now use what we have
           // For organizers, backend returns all events in one response, so this should work
         } else if (Array.isArray(res.data)) {
-          // Non-paginated response (organizers)
+          // Non-paginated response (organizers/event_managers)
           allEvents = res.data
         } else {
           allEvents = []
         }
-
+        
         // Count events by type - handle both event_type_column and event_type
         const ticketedCount = allEvents.filter((e: any) => {
           const eventType = e.event_type_column || e.event_type
@@ -162,10 +163,19 @@ export default function Events() {
       setError(null)
       try {
         // Build query parameters for pagination and filtering
-        const params = new URLSearchParams({
-          page: currentPage.toString(),
-          per_page: perPage.toString(),
-        });
+        // For event_manager, organizer, organizer_admin - backend returns non-paginated array
+        // For admin/superadmin - backend returns paginated response
+        const isAdmin = user?.role === 'admin' || user?.role === 'superadmin'
+        const params = new URLSearchParams();
+
+        // Only add pagination params for admin/superadmin
+        if (isAdmin) {
+          params.append('page', currentPage.toString());
+          params.append('per_page', perPage.toString());
+        } else {
+          // For non-admin users, request all events (backend will return array)
+          params.append('per_page', '1000');
+        }
 
         if (searchTerm) {
           params.append('search', searchTerm);
@@ -181,17 +191,31 @@ export default function Events() {
 
         const res = await api.get(`/events?${params.toString()}`)
         console.log('[Events] API Response:', res.data)
+        console.log('[Events] Response type:', Array.isArray(res.data) ? 'array' : typeof res.data)
+        console.log('[Events] Response length:', Array.isArray(res.data) ? res.data.length : 'N/A')
+        console.log('[Events] Full response structure:', JSON.stringify(res.data, null, 2))
 
-        // Handle paginated response
-        if (res.data.data) {
+        // Handle paginated response (admin/superadmin get paginated response)
+        if (res.data && res.data.data && Array.isArray(res.data.data)) {
+          console.log('[Events] Using paginated response, events count:', res.data.data.length)
           setEvents(res.data.data)
           setTotalPages(res.data.last_page || 1)
           setTotalRecords(res.data.total || 0)
-        } else {
-          // Fallback for non-paginated response
+        } else if (Array.isArray(res.data)) {
+          // Non-paginated response (organizers/event_managers get array directly)
+          console.log('[Events] Using non-paginated response, events count:', res.data.length)
+          console.log('[Events] First event sample:', res.data[0])
           setEvents(res.data)
           setTotalPages(1)
           setTotalRecords(res.data.length || 0)
+          console.log('[Events] Events state set, count:', res.data.length)
+        } else {
+          // Fallback - empty array if response is unexpected format
+          console.warn('[Events] Unexpected response format:', res.data)
+          console.warn('[Events] Response keys:', res.data ? Object.keys(res.data) : 'null')
+          setEvents([])
+          setTotalPages(1)
+          setTotalRecords(0)
         }
       } catch (err: any) {
         setError(err.response?.data?.message || 'Failed to fetch events')
@@ -245,6 +269,16 @@ export default function Events() {
 
   // Since we're now using server-side pagination, we don't need client-side filtering
   const filteredEvents = events;
+  
+  // Debug logging
+  console.log('[Events] Render state:', {
+    eventsCount: events.length,
+    filteredEventsCount: filteredEvents.length,
+    loading,
+    error,
+    userRole: user?.role,
+    eventCounts
+  });
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -518,10 +552,33 @@ export default function Events() {
                 </div>
               )}
 
-              {/* Organizer/Usher Grid View */}
-              {(user?.role === 'organizer' || user?.role === 'organizer_admin' || user?.role === 'usher') ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredEvents.map((event) => {
+              {/* Organizer/Usher/Event Manager Grid View */}
+              {(hasRole(['organizer', 'organizer_admin', 'usher', 'event_manager'])) ? (
+                <>
+                  {filteredEvents.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 bg-card rounded-2xl border border-border">
+                      <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                        <Calendar className="w-8 h-8 text-muted-foreground" />
+                      </div>
+                      <div className="text-lg font-medium text-foreground mb-2">No events found</div>
+                      <div className="text-muted-foreground mb-6 text-center max-w-md">
+                        {user?.role === 'event_manager' 
+                          ? "You don't have any events assigned yet. Create your first event to get started!"
+                          : "You don't have any events yet. Create your first event to get started!"
+                        }
+                      </div>
+                      <PermissionGuard permission="events.create">
+                        <Link to="/dashboard/events/create">
+                          <Button className="bg-brand-gradient bg-brand-gradient-hover text-foreground shadow-lg">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Create Your First Event
+                          </Button>
+                        </Link>
+                      </PermissionGuard>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filteredEvents.map((event) => {
                     // Calculate registration progress
                     const attendeeCount = event.attendee_count || 0
                     const attendeeLimit = event.max_guests || 500
@@ -636,7 +693,9 @@ export default function Events() {
                       </div>
                     )
                   })}
-                </div>
+                    </div>
+                  )}
+                </>
               ) : null}
             </div>
           )}

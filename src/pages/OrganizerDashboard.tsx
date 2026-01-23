@@ -48,7 +48,6 @@ import { transformToPieChart, transformTopEvents, getChartColorPalette, getChart
 import { PieChartComponent } from '@/components/reports/PieChartComponent'
 import { BarChartComponent } from '@/components/reports/BarChartComponent'
 import { useModernAlerts } from '@/hooks/useModernAlerts'
-import { taskApi, Task } from '@/lib/taskApi'
 import { CheckCircle2, Circle, AlertCircle, ArrowRight, ExternalLink } from 'lucide-react'
 import { format, formatDistanceToNow, isPast, isToday } from 'date-fns'
 
@@ -95,12 +94,6 @@ export default function OrganizerDashboard() {
   });
   const [eventFilters, setEventFilters] = useState<string[]>([]);
 
-  // Tasks state
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [tasksLoading, setTasksLoading] = useState(false);
-  const [tasksError, setTasksError] = useState<string | null>(null);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
 
   // Recent activities state
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
@@ -200,69 +193,6 @@ export default function OrganizerDashboard() {
     fetchDashboardData()
   }, [])
 
-  // Fetch upcoming tasks
-  const fetchTasks = async () => {
-    setTasksLoading(true);
-    setTasksError(null);
-    try {
-      // Fetch both pending and in_progress tasks, then combine
-      const [pendingResponse, inProgressResponse] = await Promise.all([
-        taskApi.getTasks({
-          status: 'pending',
-          sort_by: 'due_date',
-          sort_order: 'asc',
-          per_page: 10,
-        }).catch(() => ({ data: [] })),
-        taskApi.getTasks({
-          status: 'in_progress',
-          sort_by: 'due_date',
-          sort_order: 'asc',
-          per_page: 10,
-        }).catch(() => ({ data: [] })),
-      ]);
-
-      // Handle paginated response - response.data might be the paginated object
-      const pendingTasks = pendingResponse.data?.data || pendingResponse.data || [];
-      const inProgressTasks = inProgressResponse.data?.data || inProgressResponse.data || [];
-
-      // Combine and sort all tasks
-      const allTasks = [...(Array.isArray(pendingTasks) ? pendingTasks : []), ...(Array.isArray(inProgressTasks) ? inProgressTasks : [])];
-
-      // Filter to only show tasks due in the next 30 days or overdue
-      const now = new Date();
-      const thirtyDaysFromNow = new Date();
-      thirtyDaysFromNow.setDate(now.getDate() + 30);
-
-      const upcomingTasks = allTasks.filter((task: Task) => {
-        if (!task.due_date) return true; // Include tasks without due dates
-        try {
-          const dueDate = new Date(task.due_date);
-          return dueDate <= thirtyDaysFromNow || isPast(dueDate);
-        } catch (e) {
-          return true; // Include if date parsing fails
-        }
-      }).sort((a: Task, b: Task) => {
-        // Sort by due date, with overdue tasks first
-        if (!a.due_date) return 1;
-        if (!b.due_date) return -1;
-        try {
-          const dateA = new Date(a.due_date);
-          const dateB = new Date(b.due_date);
-          return dateA.getTime() - dateB.getTime();
-        } catch {
-          return 0;
-        }
-      });
-
-      setTasks(upcomingTasks.slice(0, 5)); // Show top 5
-    } catch (err: any) {
-      console.error('Error fetching tasks:', err);
-      setTasksError(err.response?.data?.message || 'Failed to fetch tasks');
-      setTasks([]); // Set empty array on error
-    } finally {
-      setTasksLoading(false);
-    }
-  };
 
   // Fetch recent activities
   const fetchRecentActivities = async () => {
@@ -338,89 +268,11 @@ export default function OrganizerDashboard() {
 
   useEffect(() => {
     if (user) {
-      fetchTasks();
       fetchRecentActivities();
     }
   }, [user]);
 
-  // Handle task completion
-  const handleCompleteTask = async (taskId: number) => {
-    try {
-      await taskApi.completeTask(taskId);
-      showSuccess('Success', 'Task marked as completed!');
-      fetchTasks(); // Refresh tasks
-      if (selectedTask?.id === taskId) {
-        setTaskDialogOpen(false);
-      }
-    } catch (err: any) {
-      showError('Error', err.response?.data?.message || 'Failed to complete task');
-    }
-  };
 
-  // Handle task status update
-  const handleUpdateTaskStatus = async (taskId: number, status: 'pending' | 'in_progress' | 'completed' | 'cancelled') => {
-    try {
-      await taskApi.updateTask(taskId, { status });
-      showSuccess('Success', 'Task status updated!');
-      fetchTasks();
-      if (selectedTask?.id === taskId) {
-        setTaskDialogOpen(false);
-      }
-    } catch (err: any) {
-      showError('Error', err.response?.data?.message || 'Failed to update task');
-    }
-  };
-
-  // Format due date for display
-  const formatDueDate = (dueDate: string | undefined) => {
-    if (!dueDate) return 'No due date';
-    const date = new Date(dueDate);
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    const dueDateOnly = new Date(date);
-    dueDateOnly.setHours(0, 0, 0, 0);
-
-    if (isPast(date) && !isToday(date)) {
-      return `Overdue: ${format(date, 'MMM d, yyyy')}`;
-    } else if (isToday(date)) {
-      return 'Due today';
-    } else if (dueDateOnly.getTime() === tomorrow.getTime()) {
-      return 'Due tomorrow';
-    } else {
-      return formatDistanceToNow(date, { addSuffix: true });
-    }
-  };
-
-  // Get task priority color
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-        return 'bg-error/10 text-error border-error/30';
-      case 'high':
-        return 'bg-warning/10 text-warning border-warning/30';
-      case 'medium':
-        return 'bg-info/10 text-info border-info/30';
-      case 'low':
-        return 'bg-muted text-muted-foreground border-border';
-      default:
-        return 'bg-muted text-muted-foreground border-border';
-    }
-  };
-
-  // Get task status icon
-  const getTaskStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle2 className="w-4 h-4 text-success" />;
-      case 'in_progress':
-        return <Circle className="w-4 h-4 text-info" />;
-      case 'cancelled':
-        return <AlertCircle className="w-4 h-4 text-error" />;
-      default:
-        return <Circle className="w-4 h-4 text-muted-foreground" />;
-    }
-  };
 
   // Remove the useInterval for dashboard refresh
   // useInterval(() => {
@@ -1165,112 +1017,8 @@ export default function OrganizerDashboard() {
             </Tabs>
           </div>
 
-          {/* Tasks & Ushers */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-semibold text-card-foreground">Upcoming Tasks</h3>
-                  <p className="text-sm text-muted-foreground">Task management</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Link to="/dashboard/tasks">
-                    <Button variant="ghost" size="sm" className="text-xs">
-                      View All
-                      <ExternalLink className="w-3 h-3 ml-1" />
-                    </Button>
-                  </Link>
-                  <div className="w-8 h-8 bg-[hsl(var(--color-warning))] rounded-lg flex items-center justify-center">
-                    <Clock className="w-4 h-4 text-[hsl(var(--color-rich-black))]" />
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {tasksLoading && (
-                  <div className="text-center py-8">
-                    <Spinner size="sm" variant="primary" />
-                  </div>
-                )}
-                {tasksError && (
-                  <div className="text-center py-4 text-error text-sm">
-                    {tasksError}
-                  </div>
-                )}
-                {!tasksLoading && !tasksError && tasks.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Clock className="w-8 h-8 mx-auto mb-2 text-muted-foreground/50" />
-                    <span>No upcoming tasks</span>
-                    <Link to="/dashboard/tasks">
-                      <Button variant="link" size="sm" className="mt-2">
-                        Create a task
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-                {!tasksLoading && !tasksError && tasks.map((task: Task) => {
-                  const dueDate = task.due_date ? new Date(task.due_date) : null;
-                  const isOverdue = dueDate && isPast(dueDate) && !isToday(dueDate) && task.status !== 'completed';
-
-                  return (
-                    <div
-                      key={task.id}
-                      className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-border hover:bg-muted/50 cursor-pointer transition-colors group"
-                      onClick={() => {
-                        setSelectedTask(task);
-                        setTaskDialogOpen(true);
-                      }}
-                    >
-                      <div className="flex items-start gap-3 flex-1">
-                        <div className="mt-0.5">
-                          {getTaskStatusIcon(task.status)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-card-foreground group-hover:text-primary transition-colors">
-                              {task.title}
-                            </span>
-                            {task.priority && (
-                              <Badge variant="outline" className={`text-xs ${getPriorityColor(task.priority)}`}>
-                                {task.priority}
-                              </Badge>
-                            )}
-                          </div>
-                          {task.event && (
-                            <div className="text-xs text-muted-foreground mb-1">
-                              {task.event.title}
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge
-                              variant="secondary"
-                              className={`text-xs ${isOverdue ? 'bg-error/10 text-error border-error/30' : 'bg-warning/10 text-warning border-warning/30'}`}
-                            >
-                              {formatDueDate(task.due_date)}
-                            </Badge>
-                            {task.status !== 'completed' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCompleteTask(task.id);
-                                }}
-                              >
-                                <CheckCircle2 className="w-3 h-3 mr-1" />
-                                Complete
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0 ml-2" />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
+          {/* Ushers */}
+          <div className="grid grid-cols-1 gap-6">
             <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -1735,166 +1483,6 @@ export default function OrganizerDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Task Details Dialog */}
-      <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {selectedTask && getTaskStatusIcon(selectedTask.status)}
-              {selectedTask?.title || 'Task Details'}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedTask?.event && (
-                <span className="text-muted-foreground">
-                  Event: {selectedTask.event.title}
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedTask && (
-            <div className="space-y-4">
-              {/* Task Status and Priority */}
-              <div className="flex items-center gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Status</label>
-                  <div className="mt-1">
-                    <select
-                      value={selectedTask.status}
-                      onChange={(e) => handleUpdateTaskStatus(selectedTask.id, e.target.value as any)}
-                      className="dialog-select px-3 py-1.5 text-sm border rounded-md"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="in_progress">In Progress</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Priority</label>
-                  <div className="mt-1">
-                    <Badge className={getPriorityColor(selectedTask.priority)}>
-                      {selectedTask.priority}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Type</label>
-                  <div className="mt-1">
-                    <Badge variant="outline">
-                      {selectedTask.type}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              {/* Due Date */}
-              {selectedTask.due_date && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Due Date</label>
-                  <div className="mt-1 text-foreground">
-                    {format(new Date(selectedTask.due_date), 'PPP')}
-                    {(() => {
-                      const dueDate = new Date(selectedTask.due_date);
-                      if (isPast(dueDate) && !isToday(dueDate) && selectedTask.status !== 'completed') {
-                        return <span className="ml-2 text-error">(Overdue)</span>;
-                      }
-                      return null;
-                    })()}
-                  </div>
-                </div>
-              )}
-
-              {/* Description */}
-              {selectedTask.description && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Description</label>
-                  <div className="mt-1 text-foreground bg-muted/30 p-3 rounded-md">
-                    {selectedTask.description}
-                  </div>
-                </div>
-              )}
-
-              {/* Notes */}
-              {selectedTask.notes && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Notes</label>
-                  <div className="mt-1 text-foreground bg-muted/30 p-3 rounded-md">
-                    {selectedTask.notes}
-                  </div>
-                </div>
-              )}
-
-              {/* Vendor */}
-              {selectedTask.vendor && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Vendor</label>
-                  <div className="mt-1 text-foreground">
-                    {selectedTask.vendor.name}
-                    {selectedTask.vendor.contact_email && (
-                      <span className="text-muted-foreground ml-2">
-                        ({selectedTask.vendor.contact_email})
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Assigned User */}
-              {selectedTask.assignedUser && (
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Assigned To</label>
-                  <div className="mt-1 text-foreground">
-                    {selectedTask.assignedUser.name}
-                    {selectedTask.assignedUser.email && (
-                      <span className="text-muted-foreground ml-2">
-                        ({selectedTask.assignedUser.email})
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex items-center gap-2 pt-4 border-t border-border">
-                {selectedTask.event && (
-                  <Link to={`/dashboard/events/${selectedTask.event.id}`}>
-                    <Button variant="outline" size="sm">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View Event
-                    </Button>
-                  </Link>
-                )}
-                <Link to={`/dashboard/tasks/${selectedTask.id}`}>
-                  <Button variant="outline" size="sm">
-                    <Edit className="w-4 h-4 mr-2" />
-                    Edit Task
-                  </Button>
-                </Link>
-                {selectedTask.status !== 'completed' && (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => handleCompleteTask(selectedTask.id)}
-                    className="bg-success hover:bg-success/90"
-                  >
-                    <CheckCircle2 className="w-4 h-4 mr-2" />
-                    Mark Complete
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setTaskDialogOpen(false)}
-                >
-                  Close
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

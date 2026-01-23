@@ -10,6 +10,8 @@ import { ReadReceipts } from './ReadReceipts'
 import { getMessageFileUrl } from '../../lib/image-utils'
 import MessageContent from './MessageContent'
 import OptimizedImage from './OptimizedImage'
+import { cn } from '@/lib/utils'
+import { motion } from 'framer-motion'
 import type { Message } from '../../types/message'
 
 interface MessageBubbleProps {
@@ -25,16 +27,6 @@ interface MessageBubbleProps {
   onUnpin?: (messageId: number) => void
 }
 
-// Quick reaction emojis
-const QUICK_REACTIONS = [
-  { emoji: '❤️', label: 'Love' },
-  { emoji: '👍', label: 'Like' },
-  { emoji: '😂', label: 'Laugh' },
-  { emoji: '😮', label: 'Surprised' },
-  { emoji: '😢', label: 'Sad' },
-  { emoji: '👏', label: 'Clap' },
-]
-
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   currentUserId,
@@ -47,8 +39,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   onPin,
   onUnpin,
 }) => {
-  const [showReactions, setShowReactions] = useState(false)
-
   const { confirmDelete } = useModernAlerts()
   const isOwnMessage = message.sender_id === currentUserId
   const isPinned = message.is_pinned || false
@@ -58,27 +48,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
+  const getInitials = (name: string) => name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)
 
   const handleDeleteMessage = async () => {
-    await confirmDelete(
-      'Message',
-      'message',
-      async () => {
-        onDelete(message.id)
-      }
-    )
-  }
-
-  const handleReaction = async (emoji: string) => {
-    console.log('Reaction clicked:', emoji)
+    await confirmDelete('Message', 'message', async () => onDelete(message.id))
   }
 
   const renderFileAttachment = () => {
@@ -91,7 +64,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 
     if (isImage) {
       return (
-        <div className="mt-2" onClick={() => onImageClick?.(fileUrl)}>
+        <div className="mt-1" onClick={() => onImageClick?.(fileUrl)}>
           <OptimizedImage
             message={message}
             containerWidth={320}
@@ -111,113 +84,109 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         href={fileUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center space-x-2 p-2 bg-muted rounded-lg hover:bg-muted/80 transition-colors"
-      >
-        <Download className="w-5 h-5 text-muted-foreground" />
-        <span className="text-sm font-medium text-foreground truncate">{message.file_name || 'Attachment'}</span>
-        {sizeLabel && (
-          <span className="text-xs text-muted-foreground whitespace-nowrap">({sizeLabel})</span>
+        className={cn(
+          "flex items-center gap-3 p-3 rounded-2xl transition-all border",
+          isOwnMessage
+            ? "bg-white/10 border-white/20 hover:bg-white/20"
+            : "bg-muted/50 border-border/50 hover:bg-muted"
         )}
+      >
+        <div className={cn(
+          "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+          isOwnMessage ? "bg-white/20" : "bg-orange-100 dark:bg-orange-950/20"
+        )}>
+          <Download className={cn("w-5 h-5", isOwnMessage ? "text-white" : "text-orange-600 dark:text-orange-400")} />
+        </div>
+        <div className="min-w-0 pr-2">
+          <p className={cn("text-sm font-bold truncate", isOwnMessage ? "text-white" : "text-foreground")}>
+            {message.file_name || 'Attachment'}
+          </p>
+          {sizeLabel && (
+            <p className={cn("text-[10px] font-black uppercase tracking-tighter opacity-60", isOwnMessage ? "text-white/80" : "text-muted-foreground")}>
+              {sizeLabel}
+            </p>
+          )}
+        </div>
       </a>
     )
   }
 
-  const renderReactions = () => {
-    return (
-      <MessageReactions
-        message={message}
-        currentUserId={currentUserId}
-        className="mt-1"
-      />
-    )
-  }
-
   return (
-    <div className={`flex items-start space-x-3 mb-4 group ${isOwnMessage ? 'flex-row-reverse space-x-reverse' : ''}`}>
-      {/* Avatar - Slack style */}
+    <motion.div
+      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      className={cn(
+        "flex items-end gap-3 mb-6 group",
+        isOwnMessage ? "flex-row-reverse" : "flex-row"
+      )}
+    >
+      {/* Avatar - Minimalist */}
       {!isOwnMessage && (
-        <div className="flex-shrink-0">
-          <Avatar className="w-9 h-9">
-            <AvatarImage src={message.sender.profile_image} />
-            <AvatarFallback className="bg-muted text-muted-foreground text-sm font-medium">
-              {getInitials(message.sender.name)}
-            </AvatarFallback>
-          </Avatar>
-        </div>
+        <Avatar className="w-8 h-8 shrink-0 border-2 border-background shadow-sm mb-1">
+          <AvatarImage src={message.sender.profile_image} />
+          <AvatarFallback className="bg-orange-100 text-orange-600 text-[10px] font-black">
+            {getInitials(message.sender.name)}
+          </AvatarFallback>
+        </Avatar>
       )}
 
-      {/* Message Content */}
-      <div className={`flex flex-col ${isOwnMessage ? 'items-end max-w-[85%] ml-auto' : 'items-start max-w-[85%] mr-auto'}`}>
-        {/* Sender name for others */}
+      {/* Message Container */}
+      <div className={cn(
+        "flex flex-col max-w-[75%] lg:max-w-[65%]",
+        isOwnMessage ? "items-end" : "items-start"
+      )}>
+        {/* Name for Group Chats */}
         {!isOwnMessage && isGroup && (
-          <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 mb-1 px-1">
+          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-1.5 ml-2">
             {message.sender.name}
           </span>
         )}
 
-        {/* Message bubble */}
-        <div className="relative group w-full">
+        {/* Bubble */}
+        <div className="relative group/bubble">
           <div
             className={cn(
-              "relative shadow-sm transition-all duration-200",
+              "relative px-4 py-3 shadow-md transition-all duration-300",
               isOwnMessage
-                ? 'bg-primary text-white rounded-[20px] rounded-tr-[4px] shadow-primary/10'
-                : 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 text-gray-900 dark:text-gray-100 rounded-[20px] rounded-tl-[4px]'
+                ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-[24px] rounded-br-[4px] shadow-orange-500/10'
+                : 'bg-background border border-border/40 text-foreground rounded-[24px] rounded-bl-[4px] shadow-sm'
             )}
-            style={{ wordBreak: 'break-word' }}
           >
-            {/* Quoted Message (if replying) */}
+            {/* Quoted Message */}
             {message.parentMessage && (
               <div className={cn(
-                "mx-1 mt-1 px-3 py-2 border-l-3 rounded-xl mb-1",
+                "px-3 py-2 rounded-xl mb-2 flex flex-col gap-0.5 border-l-4",
                 isOwnMessage
-                  ? 'bg-black/10 border-white/30'
-                  : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'
+                  ? 'bg-black/10 border-white/30 text-white/90'
+                  : 'bg-muted/50 border-orange-200 dark:border-orange-800 text-muted-foreground'
               )}>
-                <div className="flex items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className={cn(
-                      "text-[10px] font-bold mb-0.5",
-                      isOwnMessage ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
-                    )}>
-                      {message.parentMessage.sender.name}
-                    </p>
-                    <p className={cn(
-                      "text-[11px] truncate",
-                      isOwnMessage ? 'text-white/70' : 'text-gray-600 dark:text-gray-300'
-                    )}>
-                      {(message.parentMessage.file_path || message.parentMessage.file_url) && !message.parentMessage.content
-                        ? `📎 Attachment`
-                        : message.parentMessage.content}
-                    </p>
-                  </div>
-                </div>
+                <span className="text-[10px] font-black uppercase tracking-tight opacity-70">
+                  {message.parentMessage.sender.name}
+                </span>
+                <p className="text-xs line-clamp-1 italic font-medium">
+                  {message.parentMessage.content || "📎 Attachment"}
+                </p>
               </div>
             )}
 
-            {/* Message content */}
-            <div className={cn(
-              "px-4 py-2.5",
-              message.parentMessage ? 'pt-1' : ''
-            )}>
+            {/* Main Content */}
+            <div className="text-[14px] leading-relaxed font-medium">
               <MessageContent content={message.content} />
             </div>
 
-            {/* File attachment */}
+            {/* Attachments */}
             {(message.file_path || message.file_url) && (
-              <div className="px-1 pb-1">
-                <div className="rounded-xl overflow-hidden">
-                  {renderFileAttachment()}
-                </div>
+              <div className="mt-2">
+                {renderFileAttachment()}
               </div>
             )}
 
-            {/* Timestamp and status indicator */}
+            {/* Status & Time */}
             <div className={cn(
-              "flex items-center gap-1.5 px-4 pb-2 justify-end",
-              isOwnMessage ? "text-white/60" : "text-gray-400 dark:text-gray-500"
+              "flex items-center gap-1.5 mt-1.5 justify-end",
+              isOwnMessage ? "opacity-70" : "opacity-40"
             )}>
-              <span className="text-[10px] font-medium">
+              <span className="text-[9px] font-black uppercase tracking-tighter">
                 {formatMessageTime(message.created_at)}
               </span>
               {isOwnMessage && (
@@ -228,79 +197,68 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 />
               )}
             </div>
-
-            {/* Message actions (reply, delete) - Floating over the bubble */}
-            <div className={cn(
-              "absolute top-0 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-1 z-10",
-              isOwnMessage ? "right-full mr-2" : "left-full ml-2"
-            )}>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onReply(message)}
-                className="h-8 w-8 rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-500"
-                title="Reply"
-              >
-                <Reply className="w-3.5 h-3.5" />
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-500"
-                    title="More"
-                  >
-                    <MoreVertical className="w-3.5 h-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align={isOwnMessage ? 'end' : 'start'} className="w-40 rounded-xl shadow-xl border-gray-100 dark:border-gray-800">
-                  {isPinned ? (
-                    <DropdownMenuItem onClick={() => onUnpin?.(message.id)}>
-                      <PinOff className="mr-2 h-4 w-4" />
-                      Unpin
-                    </DropdownMenuItem>
-                  ) : (
-                    <DropdownMenuItem onClick={() => onPin?.(message.id)}>
-                      <Pin className="mr-2 h-4 w-4" />
-                      Pin message
-                    </DropdownMenuItem>
-                  )}
-                  {isOwnMessage && (
-                    <DropdownMenuItem onClick={handleDeleteMessage} className="text-red-500 focus:text-red-500">
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
           </div>
 
-          {/* Pinned indicator */}
-          {isPinned && (
-            <div className={`flex items-center space-x-1 mt-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-              <Pin className="w-3 h-3 text-warning" />
-              <span className="text-xs text-warning font-medium">Pinned</span>
-            </div>
-          )}
-
-          {/* Reactions */}
-          {renderReactions()}
+          {/* Quick Actions Panel */}
+          <div className={cn(
+            "absolute top-1/2 -translate-y-1/2 opacity-0 group-hover/bubble:opacity-100 transition-all duration-300 flex items-center gap-1.5 z-20 scale-90 group-hover/bubble:scale-100",
+            isOwnMessage ? "right-full mr-3" : "left-full ml-3"
+          )}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onReply(message)}
+              className="h-9 w-9 rounded-2xl bg-background border border-border shadow-xl hover:bg-orange-50 hover:text-orange-600 transition-colors"
+            >
+              <Reply className="w-4 h-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-2xl bg-background border border-border shadow-xl hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align={isOwnMessage ? 'end' : 'start'} className="w-48 rounded-2xl shadow-2xl border-border/40 backdrop-blur-md">
+                <DropdownMenuItem onClick={() => (isPinned ? onUnpin?.(message.id) : onPin?.(message.id))} className="rounded-xl">
+                  {isPinned ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
+                  {isPinned ? 'Unpin Message' : 'Pin to Top'}
+                </DropdownMenuItem>
+                {isOwnMessage && (
+                  <DropdownMenuItem onClick={handleDeleteMessage} className="text-red-500 focus:text-red-500 rounded-xl">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Message
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
-        {/* Teams-style Collapsible Replies (below the message bubble) */}
+        {/* Reactions List */}
+        <MessageReactions
+          message={message}
+          currentUserId={currentUserId}
+          className="mt-1"
+        />
+
+        {/* Inline Thread Access */}
         {conversationId && !message.parentMessage && (
-          <MessageReplies
-            message={message}
-            currentUserId={currentUserId}
-            conversationId={conversationId}
-            onReply={onReply}
-            onDelete={onDelete}
-            onImageClick={onImageClick}
-          />
+          <div className="mt-1 ml-1">
+            <MessageReplies
+              message={message}
+              currentUserId={currentUserId}
+              conversationId={conversationId}
+              onReply={onReply}
+              onDelete={onDelete}
+              onImageClick={onImageClick}
+            />
+          </div>
         )}
       </div>
-    </div>
+    </motion.div>
   )
 }

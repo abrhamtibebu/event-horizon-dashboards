@@ -63,9 +63,9 @@ import UsherDashboard from './pages/UsherDashboard'
 import VendorManagement from './pages/VendorManagement'
 import SalespersonManagement from './pages/SalespersonManagement'
 import SalespersonRegistration from './pages/SalespersonRegistration'
-import Tasks from './pages/Tasks'
 import Marketing from './pages/Marketing'
 import { SuspendedOrganizerBanner } from './components/SuspendedOrganizerBanner'
+import { RoleProtectedRoute } from './components/RoleProtectedRoute'
 import GenerateUsherRegistrationLink from './pages/GenerateUsherRegistrationLink'
 import UsherRegister from './pages/UsherRegister'
 import UsherRegistrationSuccess from './pages/UsherRegistrationSuccess'
@@ -77,6 +77,7 @@ import SubscriptionManagement from './pages/SubscriptionManagement'
 import SubscriptionPayment from './pages/SubscriptionPayment'
 import UsageDashboard from './pages/UsageDashboard'
 import AdminSubscriptionManagement from './pages/AdminSubscriptionManagement'
+import Tasks from './pages/Tasks'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -261,65 +262,353 @@ const AppWithRealtime = () => {
               </ProtectedRoute>
             }
           >
+            {/* Dashboard - accessible to all authenticated users */}
             <Route index element={<DashboardRouter />} />
-            <Route path="events" element={<Events />} />
-            <Route path="events/create" element={<EventTypeSelection />} />
-            <Route path="events/create/ticketed" element={<CreateTicketedEvent />} />
-            <Route path="events/create/free" element={<CreateFreeEvent />} />
-            <Route path="events/:eventId" element={<EventDetails />} />
-            <Route path="team" element={<Team />} />
-            <Route path="users" element={<Users />} />
-            <Route path="organizers" element={<Organizers />} />
-            <Route path="organizers/add" element={<AddOrganizer />} />
-            <Route path="organizers/:organizerId" element={<OrganizerProfile />} />
-            <Route path="locate-badges" element={<LocateBadges />} />
-            <Route path="messages" element={<Messages />} />
-            <Route path="reports" element={<Reports />} />
+            
+            {/* Events & Tickets - based on sidebar roles */}
+            <Route 
+              path="events" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'event_manager']}>
+                  <Events />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="events/create" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'organizer', 'organizer_admin', 'event_manager']}>
+                  <EventTypeSelection />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="events/create/ticketed" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'organizer', 'organizer_admin', 'event_manager']}>
+                  <CreateTicketedEvent />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="events/create/free" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'organizer', 'organizer_admin', 'event_manager']}>
+                  <CreateFreeEvent />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="events/:eventId" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher', 'event_manager']}>
+                  <EventDetails />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="ticket-management" 
+              element={
+                <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin', 'admin', 'superadmin']}>
+                  <OrganizerTicketsPage />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="tickets" 
+              element={
+                <RoleProtectedRoute allowedRoles={['attendee']}>
+                  <MyTicketsPage />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="tickets/purchase/:eventId" 
+              element={
+                <RoleProtectedRoute allowedRoles={['attendee', 'organizer', 'organizer_admin', 'admin', 'superadmin']}>
+                  <TicketPurchasePage />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="ticket-analytics/:eventId" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin']}>
+                  <AnalyticsDashboard />
+                </RoleProtectedRoute>
+              } 
+            />
+            
+            {/* Management - based on sidebar roles */}
+            <Route 
+              path="tasks" 
+              element={
+                <ProtectedRoute>
+                  <Tasks />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="users" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <Users />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="organizers" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <Organizers />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="organizers/add" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <AddOrganizer />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="organizers/:organizerId" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <OrganizerProfile />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="guests" 
+              element={
+                <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin']}>
+                  <Guests />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="usher-management" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'user']}>
+                  <UsherManagement />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="usher-management/register" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'user']}>
+                  <GenerateUsherRegistrationLink />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="usher-management/links" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'user']}>
+                  <ShortLinkManagement />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="vendor-management" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver']}>
+                  <VendorManagement />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="salesperson-management" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <SalespersonManagement />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/subscriptions" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <AdminSubscriptionManagement />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="subscription" 
+              element={
+                <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin']}>
+                  <SubscriptionManagement />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="subscription/plans" 
+              element={
+                <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin']}>
+                  <SubscriptionPlans />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="subscription/payment" 
+              element={
+                <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin']}>
+                  <SubscriptionPayment />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="subscription/usage" 
+              element={
+                <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin']}>
+                  <UsageDashboard />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="team" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'organizer', 'organizer_admin']}>
+                  <Team />
+                </RoleProtectedRoute>
+              } 
+            />
+            
+            {/* Operations - based on sidebar roles */}
+            <Route 
+              path="check-in" 
+              element={
+                <RoleProtectedRoute allowedRoles={['usher']}>
+                  <CheckIn />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="ticket-validator" 
+              element={
+                <RoleProtectedRoute allowedRoles={['usher', 'organizer', 'organizer_admin', 'admin', 'superadmin']}>
+                  <TicketValidator />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="locate-badges" 
+              element={
+                <RoleProtectedRoute allowedRoles={['admin', 'organizer', 'organizer_admin', 'usher']}>
+                  <LocateBadges />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="usher/events" 
+              element={
+                <RoleProtectedRoute allowedRoles={['usher']}>
+                  <UsherEvents />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="usher/events/:eventId" 
+              element={
+                <RoleProtectedRoute allowedRoles={['usher']}>
+                  <UsherEventManagement />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="usher/badge-locator" 
+              element={
+                <RoleProtectedRoute allowedRoles={['usher']}>
+                  <UsherBadgeLocator />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="usher/jobs" 
+              element={
+                <RoleProtectedRoute allowedRoles={['usher']}>
+                  <UsherDashboard />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="usher/jobs/:eventId" 
+              element={
+                <RoleProtectedRoute allowedRoles={['usher']}>
+                  <UsherJobDetails />
+                </RoleProtectedRoute>
+              } 
+            />
+            
+            {/* Insights - based on sidebar roles */}
+            <Route 
+              path="reports" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'organizer', 'organizer_admin']}>
+                  <Reports />
+                </RoleProtectedRoute>
+              } 
+            />
+            
+            {/* Connect - based on sidebar roles */}
+            <Route 
+              path="messages" 
+              element={
+                <ProtectedRoute>
+                  <Messages />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="marketing" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'marketing_specialist']}>
+                  <Marketing />
+                </RoleProtectedRoute>
+              } 
+            />
+            
+            {/* System - based on sidebar roles */}
+            <Route 
+              path="audit-logs" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <AuditLogs />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="trash" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <Trash />
+                </RoleProtectedRoute>
+              } 
+            />
+            
+            {/* Common routes - accessible to all authenticated users */}
             <Route path="profile" element={<Profile />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="audit-logs" element={<AuditLogs />} />
-            <Route path="trash" element={<Trash />} />
-            <Route path="check-in" element={<CheckIn />} />
-            <Route path="tickets" element={<MyTicketsPage />} />
-            <Route path="tickets/purchase/:eventId" element={<TicketPurchasePage />} />
-            <Route path="ticket-management" element={<OrganizerTicketsPage />} />
-            <Route path="ticket-analytics/:eventId" element={<AnalyticsDashboard />} />
-            <Route path="ticket-validator" element={<TicketValidator />} />
-            <Route path="guests" element={<Guests />} />
-            <Route path="usher-management" element={<UsherManagement />} />
-            <Route path="usher-management/register" element={<GenerateUsherRegistrationLink />} />
-            <Route path="usher-management/links" element={<ShortLinkManagement />} />
-            <Route path="usher/events" element={<UsherEvents />} />
-            <Route path="usher/events/:eventId" element={<UsherEventManagement />} />
-            <Route path="usher/badge-locator" element={<UsherBadgeLocator />} />
-            <Route path="usher/jobs" element={<UsherDashboard />} />
-            <Route path="usher/jobs/:eventId" element={<UsherJobDetails />} />
-            <Route path="vendor-management" element={<VendorManagement />} />
-            <Route path="tasks" element={<Tasks />} />
-            <Route path="marketing" element={<Marketing />} />
-            <Route path="salesperson-management" element={<SalespersonManagement />} />
-            <Route path="subscription" element={<SubscriptionManagement />} />
-            <Route path="subscription/plans" element={<SubscriptionPlans />} />
-            <Route path="subscription/payment" element={<SubscriptionPayment />} />
-            <Route path="subscription/usage" element={<UsageDashboard />} />
-            <Route path="admin/subscriptions" element={<AdminSubscriptionManagement />} />
           </Route>
 
           {/* Standalone protected routes (without layout) */}
           <Route
             path="/events/:eventId/attendees/:attendeeId/badge"
             element={
-              <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'event_manager']}>
                 <BadgePage />
-              </ProtectedRoute>
+              </RoleProtectedRoute>
             }
           />
           <Route
             path="/events/:eventId/badges/batch"
             element={
-              <ProtectedRoute>
+              <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'event_manager']}>
                 <BatchBadgePage />
-              </ProtectedRoute>
+              </RoleProtectedRoute>
             }
           />
 

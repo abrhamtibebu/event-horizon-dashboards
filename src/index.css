@@ -1,4 +1,5 @@
 @import './styles/print.css';
+@import url('https://fonts.googleapis.com/css2?family=Mosk:wght@300;400;500;600;700;800;900&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -268,6 +269,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Mosk', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
     /* Smooth theme transitions */
     transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1),
       color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
@@ -642,8 +644,9 @@
 
   /* Modern Sidebar Enhancements */
   [data-sidebar="sidebar"] {
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
   }
 
   .dark [data-sidebar="sidebar"] {
@@ -684,16 +687,17 @@
 
   /* Sidebar menu item hover effect */
   [data-sidebar="menu-button"]:hover {
-    transform: translateX(2px);
+    transform: none;
   }
 
   [data-sidebar="menu-button"][data-active="true"] {
-    transform: translateX(0);
+    transform: none;
   }
 
   /* Smooth sidebar transitions */
   [data-sidebar="sidebar"] {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: hsl(var(--background)) !important;
   }
 
   /* Sidebar badge animation */

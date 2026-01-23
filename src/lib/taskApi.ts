@@ -1,529 +1,262 @@
-import { api } from './api';
-import { TaskTemplate, TaskAutomationRule } from '@/types/tasks';
+import api from './api';
+import type {
+  Task,
+  TaskFilters,
+  TaskPayload,
+  TasksResponse,
+  TaskResponse,
+  TaskStatistics,
+  TaskStatisticsResponse,
+  TaskActivityLog,
+  TaskTemplate,
+} from '@/types/tasks';
 
-export interface Task {
-  id: number;
-  event_id?: number | null;
-  organizer_id: number;
-  vendor_id?: number;
-  quotation_id?: number;
-  title: string;
-  description?: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high' | 'urgent' | 'critical';
-  type: 'deliverable' | 'milestone' | 'review' | 'payment' | 'other';
-  task_category?: 'vendor_recruitment' | 'sponsor_followup' | 'sponsor_listing' | 'event_setup' | 'post_event' | 'other' | null;
-  due_date?: string;
-  completed_date?: string;
-  notes?: string;
-  attachments?: string[];
-  assigned_to?: number;
-  created_by: number;
-  updated_by?: number;
-  created_at: string;
-  updated_at: string;
-  deleted_at?: string;
-
-  // Relations
-  event?: {
-    id: number;
-    title: string;
-    event_date: string;
-  };
-  organizer?: {
-    id: number;
-    name: string;
-  };
-  vendor?: {
-    id: number;
-    name: string;
-    contact_email: string;
-  };
-  quotation?: {
-    id: number;
-    quotation_number: string;
-    amount: number;
-    status: string;
-  };
-  assignedUser?: {
-    id: number;
-    name: string;
-    email: string;
-  };
-  creator?: {
-    id: number;
-    name: string;
-    email: string;
-  };
-  updater?: {
-    id: number;
-    name: string;
-    email: string;
-  };
-}
-
-export interface TaskFormData {
-  event_id?: number | null;
-  organizer_id?: number;
-  vendor_id?: number;
-  quotation_id?: number;
-  title: string;
-  description?: string;
-  status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority?: 'low' | 'medium' | 'high' | 'urgent' | 'critical';
-  type?: 'deliverable' | 'milestone' | 'review' | 'payment' | 'other';
-  task_category?: 'vendor_recruitment' | 'sponsor_followup' | 'sponsor_listing' | 'event_setup' | 'post_event' | 'other' | null;
-  due_date?: string;
-  completed_date?: string;
-  notes?: string;
-  attachments?: string[];
-  assigned_to?: number;
-}
-
-export interface TaskStatistics {
-  total: number;
-  pending: number;
-  in_progress: number;
-  completed: number;
-  cancelled: number;
-  overdue: number;
-  due_soon: number;
-  by_priority: {
-    low: number;
-    medium: number;
-    high: number;
-    urgent: number;
-  };
-  by_type: {
-    deliverable: number;
-    milestone: number;
-    review: number;
-    payment: number;
-    other: number;
-  };
-  by_category?: {
-    vendor_recruitment: number;
-    sponsor_followup: number;
-    sponsor_listing: number;
-    event_setup: number;
-    post_event: number;
-    other: number;
-  };
-  operational_tasks?: number;
-  event_tasks?: number;
-}
-
-export interface TaskFilters {
-  event_id?: number;
-  vendor_id?: number;
-  status?: string;
-  priority?: string;
-  type?: string;
-  task_category?: string;
-  operational?: boolean;
-  assigned_to?: number;
-  overdue?: boolean;
-  due_soon?: boolean;
-  due_soon_days?: number;
-  sort_by?: string;
-  sort_order?: 'asc' | 'desc';
-  per_page?: number;
-  page?: number;
-}
-
-class TaskApiService {
-  private baseUrl = '/tasks';
-
-  // Set a test token for development (remove in production)
-  setTestToken(): void {
-    localStorage.setItem('jwt', 'test-jwt-token-for-development');
-    localStorage.setItem('user_role', 'organizer');
-    localStorage.setItem('user_id', '6'); // Test Organizer user ID
-    localStorage.setItem('organizer_id', '1');
-  }
-
-  async getTasks(filters: TaskFilters = {}): Promise<{ data: Task[]; meta: any }> {
-    const params = new URLSearchParams();
-
+/**
+ * Fetch tasks with filters
+ */
+export const getTasks = async (filters?: TaskFilters): Promise<TasksResponse> => {
+  const params = new URLSearchParams();
+  
+  if (filters) {
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, value.toString());
+      if (value !== null && value !== undefined && value !== '') {
+        if (Array.isArray(value)) {
+          value.forEach(v => params.append(`${key}[]`, String(v)));
+        } else {
+          params.append(key, String(value));
+        }
       }
     });
-
-    try {
-      const response = await api.get(`${this.baseUrl}?${params.toString()}`);
-      return response.data;
-    } catch (error) {
-      console.warn('Task API unavailable, using offline data:', error);
-      return this.getTasksOffline(filters);
-    }
   }
 
-  async getTask(id: number): Promise<Task> {
-    const response = await api.get(`${this.baseUrl}/${id}`);
-    return response.data.data;
-  }
+  const response = await api.get<TasksResponse>(`/tasks?${params.toString()}`);
+  return response.data;
+};
 
-  async createTask(taskData: TaskFormData): Promise<Task> {
-    const response = await api.post(this.baseUrl, taskData);
-    return response.data.data;
-  }
+/**
+ * Fetch a single task by ID
+ */
+export const getTask = async (id: number): Promise<TaskResponse> => {
+  const response = await api.get<TaskResponse>(`/tasks/${id}`);
+  return response.data;
+};
 
-  async updateTask(id: number, taskData: Partial<TaskFormData>): Promise<Task> {
-    const response = await api.put(`${this.baseUrl}/${id}`, taskData);
-    return response.data.data;
-  }
+/**
+ * Create a new task
+ */
+export const createTask = async (data: TaskPayload): Promise<TaskResponse> => {
+  const response = await api.post<TaskResponse>('/tasks', data);
+  return response.data;
+};
 
-  async deleteTask(id: number): Promise<void> {
-    await api.delete(`${this.baseUrl}/${id}`);
-  }
+/**
+ * Update an existing task
+ */
+export const updateTask = async (id: number, data: Partial<TaskPayload>): Promise<TaskResponse> => {
+  const response = await api.put<TaskResponse>(`/tasks/${id}`, data);
+  return response.data;
+};
 
-  async completeTask(id: number): Promise<Task> {
-    const response = await api.post(`${this.baseUrl}/${id}/complete`);
-    return response.data.data;
-  }
+/**
+ * Delete a task
+ */
+export const deleteTask = async (id: number): Promise<{ success: boolean; message: string }> => {
+  const response = await api.delete(`/tasks/${id}`);
+  return response.data;
+};
 
-  async startTask(id: number): Promise<Task> {
-    const response = await api.post(`${this.baseUrl}/${id}/start`);
-    return response.data.data;
-  }
-
-  async cancelTask(id: number): Promise<Task> {
-    const response = await api.post(`${this.baseUrl}/${id}/cancel`);
-    return response.data.data;
-  }
-
-  async getTaskStatistics(filters: { event_id?: number } = {}): Promise<TaskStatistics> {
-    const params = new URLSearchParams();
-
+/**
+ * Get current user's tasks
+ */
+export const getMyTasks = async (filters?: TaskFilters): Promise<TasksResponse> => {
+  const params = new URLSearchParams();
+  
+  if (filters) {
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        params.append(key, value.toString());
+      if (value !== null && value !== undefined && value !== '') {
+        if (Array.isArray(value)) {
+          value.forEach(v => params.append(`${key}[]`, String(v)));
+        } else {
+          params.append(key, String(value));
+        }
       }
     });
-
-    try {
-      const response = await api.get(`${this.baseUrl}/statistics?${params.toString()}`);
-      return response.data.data;
-    } catch (error) {
-      console.warn('Task statistics API unavailable, using offline data:', error);
-      return this.getTaskStatisticsOffline(filters);
-    }
   }
 
-  // Task Conversion
-  async convertTask(taskId: number, targetEventId: number, eventPhase?: string): Promise<Task> {
-    try {
-      const response = await api.post(`${this.baseUrl}/${taskId}/convert`, {
-        event_id: targetEventId,
-        event_phase: eventPhase
-      });
-      return response.data.data;
-    } catch (error) {
-      console.error('Error converting task:', error);
-      throw error;
-    }
-  }
+  const response = await api.get<TasksResponse>(`/tasks/my-tasks?${params.toString()}`);
+  return response.data;
+};
 
-  // Multi-Event Linking
-  async linkTaskToEvents(taskId: number, eventIds: number[]): Promise<Task> {
-    try {
-      const response = await api.post(`${this.baseUrl}/${taskId}/link-events`, {
-        event_ids: eventIds
-      });
-      return response.data.data;
-    } catch (error) {
-      console.error('Error linking task to events:', error);
-      throw error;
-    }
-  }
-
-  // Task Templates
-  async getTemplates(category?: 'event' | 'general' | 'department'): Promise<TaskTemplate[]> {
-    try {
-      const params = category ? `?category=${category}` : '';
-      const response = await api.get(`${this.baseUrl}/templates${params}`);
-      return response.data.data || [];
-    } catch (error) {
-      console.warn('Templates API unavailable, returning empty array:', error);
-      return [];
-    }
-  }
-
-  async createTemplate(templateData: Omit<TaskTemplate, 'id' | 'created_at' | 'updated_at' | 'created_by'>): Promise<TaskTemplate> {
-    try {
-      const response = await api.post(`${this.baseUrl}/templates`, templateData);
-      return response.data.data;
-    } catch (error) {
-      console.error('Error creating template:', error);
-      throw error;
-    }
-  }
-
-  async applyTemplate(templateId: number, eventId?: number, customizations?: Record<string, any>): Promise<Task[]> {
-    try {
-      const response = await api.post(`${this.baseUrl}/templates/${templateId}/apply`, {
-        event_id: eventId,
-        customizations
-      });
-      return response.data.data || [];
-    } catch (error) {
-      console.error('Error applying template:', error);
-      throw error;
-    }
-  }
-
-  // Automation Rules
-  async getAutomationRules(): Promise<TaskAutomationRule[]> {
-    try {
-      const response = await api.get(`${this.baseUrl}/automation-rules`);
-      return response.data.data || [];
-    } catch (error) {
-      console.warn('Automation rules API unavailable, returning empty array:', error);
-      return [];
-    }
-  }
-
-  async createAutomationRule(ruleData: Omit<TaskAutomationRule, 'id' | 'created_at' | 'updated_at' | 'created_by'>): Promise<TaskAutomationRule> {
-    try {
-      const response = await api.post(`${this.baseUrl}/automation-rules`, ruleData);
-      return response.data.data;
-    } catch (error) {
-      console.error('Error creating automation rule:', error);
-      throw error;
-    }
-  }
-
-  async updateAutomationRule(ruleId: number, ruleData: Partial<TaskAutomationRule>): Promise<TaskAutomationRule> {
-    try {
-      const response = await api.put(`${this.baseUrl}/automation-rules/${ruleId}`, ruleData);
-      return response.data.data;
-    } catch (error) {
-      console.error('Error updating automation rule:', error);
-      throw error;
-    }
-  }
-
-  async deleteAutomationRule(ruleId: number): Promise<void> {
-    try {
-      await api.delete(`${this.baseUrl}/automation-rules/${ruleId}`);
-    } catch (error) {
-      console.error('Error deleting automation rule:', error);
-      throw error;
-    }
-  }
-
-  // Enhanced Statistics
-  async getEnhancedStatistics(filters: {
-    event_id?: number;
-    scope_type?: 'event' | 'general';
-    department?: string;
-    start_date?: string;
-    end_date?: string;
-  } = {}): Promise<TaskStatistics> {
-    const params = new URLSearchParams();
-
+/**
+ * Get tasks by role (future implementation)
+ */
+export const getTasksByRole = async (role: string, filters?: TaskFilters): Promise<TasksResponse> => {
+  // This endpoint may need to be implemented in the backend
+  const params = new URLSearchParams();
+  params.append('role', role);
+  
+  if (filters) {
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, value.toString());
+      if (value !== null && value !== undefined && value !== '') {
+        if (Array.isArray(value)) {
+          value.forEach(v => params.append(`${key}[]`, String(v)));
+        } else {
+          params.append(key, String(value));
+        }
       }
     });
-
-    try {
-      const response = await api.get(`${this.baseUrl}/statistics/enhanced?${params.toString()}`);
-      return response.data.data;
-    } catch (error) {
-      console.warn('Enhanced statistics API unavailable, using basic statistics:', error);
-      return this.getTaskStatistics(filters);
-    }
   }
 
-  // Mock data for offline functionality
-  private mockTasks: Task[] = [
-    {
-      id: 1,
-      event_id: 1,
-      organizer_id: 1,
-      vendor_id: 17,
-      quotation_id: 1,
-      title: 'Setup catering equipment',
-      description: 'Set up all catering equipment and tables for the event',
-      status: 'pending',
-      priority: 'high',
-      type: 'deliverable',
-      due_date: '2025-01-20',
-      notes: 'Ensure all equipment is tested before event',
-      assigned_to: 1,
-      created_by: 1,
-      created_at: '2025-01-15T10:00:00Z',
-      updated_at: '2025-01-15T10:00:00Z',
-      event: {
-        id: 1,
-        title: 'Corporate Annual Meeting',
-        event_date: '2025-01-20T09:00:00Z'
-      },
-      vendor: {
-        id: 17,
-        name: 'Test Vendor 1',
-        contact_email: 'vendor1@example.com'
-      },
-      quotation: {
-        id: 1,
-        quotation_number: 'QUO-2025-000001',
-        amount: 45000,
-        status: 'approved'
-      },
-      creator: {
-        id: 1,
-        name: 'John Doe',
-        email: 'john@example.com'
-      }
+  const response = await api.get<TasksResponse>(`/tasks/by-role/${role}?${params.toString()}`);
+  return response.data;
+};
+
+/**
+ * Get task statistics
+ */
+export const getTaskStatistics = async (filters?: TaskFilters): Promise<TaskStatisticsResponse> => {
+  const params = new URLSearchParams();
+  
+  if (filters) {
+    if (filters.event_id) params.append('event_id', String(filters.event_id));
+  }
+
+  const response = await api.get<TaskStatisticsResponse>(`/tasks/statistics?${params.toString()}`);
+  return response.data;
+};
+
+/**
+ * Assign watchers to a task
+ */
+export const assignWatchers = async (taskId: number, userIds: number[]): Promise<TaskResponse> => {
+  const response = await api.post<TaskResponse>(`/tasks/${taskId}/watchers`, {
+    user_ids: userIds,
+  });
+  return response.data;
+};
+
+/**
+ * Remove a watcher from a task
+ */
+export const removeWatcher = async (taskId: number, userId: number): Promise<{ success: boolean; message: string }> => {
+  const response = await api.delete(`/tasks/${taskId}/watchers/${userId}`);
+  return response.data;
+};
+
+/**
+ * Add a dependency to a task
+ */
+export const addDependency = async (taskId: number, dependsOnTaskId: number): Promise<{ success: boolean; data: any; message: string }> => {
+  const response = await api.post(`/tasks/${taskId}/dependencies`, {
+    depends_on_task_id: dependsOnTaskId,
+  });
+  return response.data;
+};
+
+/**
+ * Remove a dependency from a task
+ */
+export const removeDependency = async (taskId: number, dependencyId: number): Promise<{ success: boolean; message: string }> => {
+  const response = await api.delete(`/tasks/${taskId}/dependencies/${dependencyId}`);
+  return response.data;
+};
+
+/**
+ * Approve a task completion
+ */
+export const approveTask = async (taskId: number, notes?: string): Promise<TaskResponse> => {
+  const response = await api.post<TaskResponse>(`/tasks/${taskId}/approve`, {
+    notes,
+  });
+  return response.data;
+};
+
+/**
+ * Reject a task completion
+ */
+export const rejectTask = async (taskId: number, notes?: string): Promise<TaskResponse> => {
+  const response = await api.post<TaskResponse>(`/tasks/${taskId}/reject`, {
+    notes,
+  });
+  return response.data;
+};
+
+/**
+ * Upload proof media for a task
+ */
+export const uploadProof = async (taskId: number, files: File[]): Promise<{ success: boolean; data: string[]; message: string }> => {
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append('files[]', file);
+  });
+
+  const response = await api.post(`/tasks/${taskId}/proof`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
     },
-    {
-      id: 2,
-      event_id: 1,
-      organizer_id: 1,
-      vendor_id: 18,
-      title: 'Photography setup',
-      description: 'Set up photography equipment and lighting',
-      status: 'in_progress',
-      priority: 'medium',
-      type: 'deliverable',
-      due_date: '2025-01-19',
-      notes: 'Test all camera equipment',
-      assigned_to: 2,
-      created_by: 1,
-      created_at: '2025-01-15T11:00:00Z',
-      updated_at: '2025-01-16T14:30:00Z',
-      event: {
-        id: 1,
-        title: 'Corporate Annual Meeting',
-        event_date: '2025-01-20T09:00:00Z'
-      },
-      vendor: {
-        id: 18,
-        name: 'Test Vendor 2',
-        contact_email: 'vendor2@example.com'
-      },
-      creator: {
-        id: 1,
-        name: 'John Doe',
-        email: 'john@example.com'
-      }
-    },
-    {
-      id: 3,
-      event_id: 1,
-      organizer_id: 1,
-      title: 'Final event review',
-      description: 'Conduct final review of all event preparations',
-      status: 'completed',
-      priority: 'urgent',
-      type: 'review',
-      due_date: '2025-01-18',
-      completed_date: '2025-01-18',
-      notes: 'All preparations completed successfully',
-      assigned_to: 1,
-      created_by: 1,
-      created_at: '2025-01-15T12:00:00Z',
-      updated_at: '2025-01-18T16:00:00Z',
-      event: {
-        id: 1,
-        title: 'Corporate Annual Meeting',
-        event_date: '2025-01-20T09:00:00Z'
-      },
-      creator: {
-        id: 1,
-        name: 'John Doe',
-        email: 'john@example.com'
-      }
-    }
-  ];
+  });
+  return response.data;
+};
 
-  private mockStatistics: TaskStatistics = {
-    total: 3,
-    pending: 1,
-    in_progress: 1,
-    completed: 1,
-    cancelled: 0,
-    overdue: 0,
-    due_soon: 2,
-    by_priority: {
-      low: 0,
-      medium: 1,
-      high: 1,
-      urgent: 1
-    },
-    by_type: {
-      deliverable: 2,
-      milestone: 0,
-      review: 1,
-      payment: 0,
-      other: 0
-    }
-  };
+/**
+ * Get activity log for a task
+ */
+export const getActivityLog = async (taskId: number): Promise<{ success: boolean; data: TaskActivityLog[]; message: string }> => {
+  const response = await api.get(`/tasks/${taskId}/activity`);
+  return response.data;
+};
 
-  // Fallback methods for offline functionality
-  async getTasksOffline(filters: TaskFilters = {}): Promise<{ data: Task[]; meta: any }> {
-    let filteredTasks = [...this.mockTasks];
+/**
+ * Bulk update tasks
+ */
+export const bulkUpdate = async (taskIds: number[], updates: Partial<TaskPayload>): Promise<{ success: boolean; data: { updated_count: number }; message: string }> => {
+  const response = await api.post('/tasks/bulk-update', {
+    task_ids: taskIds,
+    updates,
+  });
+  return response.data;
+};
 
-    // Apply filters
-    if (filters.event_id) {
-      filteredTasks = filteredTasks.filter(task => task.event_id === filters.event_id);
-    }
-    if (filters.vendor_id) {
-      filteredTasks = filteredTasks.filter(task => task.vendor_id === filters.vendor_id);
-    }
-    if (filters.status) {
-      filteredTasks = filteredTasks.filter(task => task.status === filters.status);
-    }
-    if (filters.priority) {
-      filteredTasks = filteredTasks.filter(task => task.priority === filters.priority);
-    }
-    if (filters.type) {
-      filteredTasks = filteredTasks.filter(task => task.type === filters.type);
-    }
-    if (filters.assigned_to) {
-      filteredTasks = filteredTasks.filter(task => task.assigned_to === filters.assigned_to);
-    }
+/**
+ * Get task templates (future implementation)
+ */
+export const getTaskTemplates = async (): Promise<{ success: boolean; data: TaskTemplate[]; message: string }> => {
+  const response = await api.get('/tasks/templates');
+  return response.data;
+};
 
-    // Apply sorting
-    const sortBy = filters.sort_by || 'created_at';
-    const sortOrder = filters.sort_order || 'desc';
-    filteredTasks.sort((a, b) => {
-      const aValue = a[sortBy as keyof Task];
-      const bValue = b[sortBy as keyof Task];
+/**
+ * Create task from template (future implementation)
+ */
+export const createFromTemplate = async (templateId: number, data: Partial<TaskPayload>): Promise<TaskResponse> => {
+  const response = await api.post<TaskResponse>('/tasks/from-template', {
+    template_id: templateId,
+    ...data,
+  });
+  return response.data;
+};
 
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
+/**
+ * Mark task as completed
+ */
+export const completeTask = async (taskId: number): Promise<TaskResponse> => {
+  const response = await api.post<TaskResponse>(`/tasks/${taskId}/complete`);
+  return response.data;
+};
 
-    return {
-      data: filteredTasks,
-      meta: {
-        total: filteredTasks.length,
-        per_page: filters.per_page || 15,
-        current_page: filters.page || 1,
-        last_page: Math.ceil(filteredTasks.length / (filters.per_page || 15))
-      }
-    };
-  }
+/**
+ * Mark task as in progress
+ */
+export const startTask = async (taskId: number): Promise<TaskResponse> => {
+  const response = await api.post<TaskResponse>(`/tasks/${taskId}/start`);
+  return response.data;
+};
 
-  async getTaskOffline(id: number): Promise<Task> {
-    const task = this.mockTasks.find(t => t.id === id);
-    if (!task) {
-      throw new Error('Task not found');
-    }
-    return task;
-  }
+/**
+ * Cancel a task
+ */
+export const cancelTask = async (taskId: number): Promise<TaskResponse> => {
+  const response = await api.post<TaskResponse>(`/tasks/${taskId}/cancel`);
+  return response.data;
+};
 
-  async getTaskStatisticsOffline(filters: { event_id?: number } = {}): Promise<TaskStatistics> {
-    return this.mockStatistics;
-  }
-}
-
-export const taskApi = new TaskApiService();

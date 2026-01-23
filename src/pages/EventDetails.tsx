@@ -1291,6 +1291,10 @@ export default function EventDetails() {
 
       setAttendees((prevAttendees) => [...prevAttendees, newAttendee])
 
+      // Refresh event data to get updated attendee count
+      const eventRes = await api.get(`/events/${Number(eventId)}`)
+      setEventData(eventRes.data)
+
       toast.success('Attendee added successfully!')
       setAddAttendeeDialogOpen(false)
       setAddAttendeeForm({
@@ -1368,7 +1372,7 @@ export default function EventDetails() {
         }
       }
 
-      // Refresh attendees list
+      // Refresh attendees list and event data to get updated attendee count
       if (createdParticipants.length > 0) {
         const attendeesResponse = await api.get(`/events/${Number(eventId)}/attendees`)
         const data = attendeesResponse.data?.data ? attendeesResponse.data.data : attendeesResponse.data
@@ -1380,6 +1384,10 @@ export default function EventDetails() {
           return { ...a, _search: blob }
         })
         setAttendees(indexed)
+        
+        // Refresh event data to get updated attendee count
+        const eventRes = await api.get(`/events/${Number(eventId)}`)
+        setEventData(eventRes.data)
       }
 
       // Show results
@@ -1449,9 +1457,13 @@ export default function EventDetails() {
         await api.delete(`/events/${Number(eventId)}/attendees/${removeMember.id}`)
         toast.success('Attendee removed from event!')
 
-        // Refresh attendees list
+        // Refresh attendees list and event data to get updated attendee count
         const res = await api.get(`/events/${Number(eventId)}/attendees`)
         setAttendees(res.data || [])
+        
+        // Refresh event data to get updated attendee count
+        const eventRes = await api.get(`/events/${Number(eventId)}`)
+        setEventData(eventRes.data)
       } else {
         // This is a team member - check if it's a primary contact
         if (removeMember.is_primary_contact) {
@@ -2164,7 +2176,7 @@ export default function EventDetails() {
 
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-primary" />
-                    <span>{attendees.length} Registered</span>
+                    <span>{eventData?.attendee_count ?? eventData?.attendees ?? attendees.length} Registered</span>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -2445,14 +2457,18 @@ export default function EventDetails() {
                           <div>
                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Engagements</p>
                             <p className="text-lg font-bold text-foreground">
-                              {attendees.length} Registered
+                              {eventData?.attendee_count ?? eventData?.attendees ?? attendees.length} Registered
                             </p>
                           </div>
                         </div>
                         <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
                           <div
                             className="bg-primary h-full transition-all duration-500"
-                            style={{ width: eventData?.max_guests ? `${Math.min((attendees.length / eventData.max_guests) * 100, 100)}%` : '100%' }}
+                            style={{ 
+                              width: eventData?.max_guests 
+                                ? `${Math.min((((eventData?.attendee_count ?? eventData?.attendees ?? attendees.length) as number) / eventData.max_guests) * 100, 100)}%` 
+                                : '100%' 
+                            }}
                           />
                         </div>
                       </div>
@@ -2472,7 +2488,7 @@ export default function EventDetails() {
                         </div>
                         <p className="text-xs font-medium text-muted-foreground">
                           {eventData?.max_guests
-                            ? `${Math.max(eventData.max_guests - attendees.length, 0)} Left`
+                            ? `${Math.max(eventData.max_guests - ((eventData?.attendee_count ?? eventData?.attendees ?? attendees.length) as number), 0)} Left`
                             : 'Stable'}
                         </p>
                       </div>

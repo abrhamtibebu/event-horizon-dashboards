@@ -1,204 +1,303 @@
-export interface TaskComment {
-  id: number
-  task_id: number
-  user_id: number
-  comment: string
-  created_at: string
-  updated_at: string
+// Task Status Types
+export type TaskStatus = 
+  | 'pending' 
+  | 'in_progress' 
+  | 'waiting' 
+  | 'blocked' 
+  | 'review_required' 
+  | 'completed' 
+  | 'cancelled';
+
+// Task Priority Types
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent' | 'critical';
+
+// Task Type Types
+export type TaskType = 'deliverable' | 'milestone' | 'review' | 'payment' | 'other';
+
+// Task Category Types
+export type TaskCategory = 
+  | 'vendor_recruitment'
+  | 'sponsor_followup'
+  | 'sponsor_listing'
+  | 'event_setup'
+  | 'post_event'
+  | 'operations'
+  | 'logistics'
+  | 'staffing'
+  | 'marketing'
+  | 'sales'
+  | 'finance'
+  | 'technical'
+  | 'client_related'
+  | 'other';
+
+// Event Phase Types
+export type EventPhase = 'pre_event' | 'event_day' | 'post_event' | null;
+
+// Recurrence Pattern
+export interface RecurrencePattern {
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  interval: number;
+  end_date?: string;
+  days_of_week?: number[]; // 0-6, Sunday-Saturday
+  day_of_month?: number; // 1-31
+}
+
+// Task Interface
+export interface Task {
+  id: number;
+  event_id: number | null;
+  organizer_id: number;
+  vendor_id: number | null;
+  quotation_id: number | null;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  type: TaskType;
+  task_category: TaskCategory | null;
+  due_date: string | null;
+  start_date: string | null;
+  estimated_duration: number | null; // in minutes
+  recurrence_pattern: RecurrencePattern | null;
+  location: string | null;
+  gps_latitude: number | null;
+  gps_longitude: number | null;
+  event_phase: EventPhase;
+  completed_date: string | null;
+  notes: string | null;
+  completion_notes: string | null;
+  attachments: string[] | null;
+  proof_media: string[] | null;
+  supervisor_approval_required: boolean;
+  approved_by: number | null;
+  approved_at: string | null;
+  assigned_to: number | null;
+  created_by: number;
+  updated_by: number | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  
+  // Relationships
+  event?: {
+    id: number;
+    name: string;
+    start_date: string;
+    end_date: string;
+  } | null;
+  organizer?: {
+    id: number;
+    name: string;
+  } | null;
+  assignedUser?: {
+    id: number;
+    name: string;
+    email: string;
+    avatar?: string;
+  } | null;
+  creator?: {
+    id: number;
+    name: string;
+    email: string;
+  } | null;
+  approver?: {
+    id: number;
+    name: string;
+    email: string;
+  } | null;
+  watchers?: Array<{
+    id: number;
+    name: string;
+    email: string;
+    avatar?: string;
+  }>;
+  dependencies?: Array<{
+    id: number;
+    depends_on_task_id: number;
+    dependsOnTask?: Task;
+  }>;
+}
+
+// Task Dependency Interface
+export interface TaskDependency {
+  id: number;
+  task_id: number;
+  depends_on_task_id: number;
+  created_at: string;
+  updated_at: string;
+  dependsOnTask?: Task;
+}
+
+// Task Watcher Interface
+export interface TaskWatcher {
+  id: number;
+  task_id: number;
+  user_id: number;
+  created_at: string;
+  updated_at: string;
   user?: {
-    id: number
-    name: string
-    email: string
-  }
+    id: number;
+    name: string;
+    email: string;
+    avatar?: string;
+  };
 }
 
-export interface UnifiedTask {
-  id: string // Unique identifier (can be prefixed with type)
-  type: 'event_task' | 'usher_task' | 'operational_task' | 'general_task' // Keep operational_task for backward compatibility
-  scope_type?: 'event' | 'general' // Clear distinction between event and general tasks
-  source: 'api' | 'event_usher' | 'session_usher' | 'manual'
-  title: string
-  description?: string
-  status: 'pending' | 'in_progress' | 'waiting' | 'completed' | 'cancelled' // Added 'waiting' status
-  priority: 'low' | 'medium' | 'high' | 'urgent' | 'critical' // Added 'critical' priority
-  assigned_to?: number // User ID
-  assignedUser?: { id: number; name: string; email: string }
-  event_id?: number
-  event?: { id: number; title: string; start_date: string }
-  session_id?: number
-  session?: { id: number; name: string }
-  start_date?: string // Separate from due_date
-  due_date?: string
-  completed_date?: string
-  created_at: string
-  updated_at: string
-  notes?: string
-  comments?: TaskComment[]
-  attachments?: string[]
-  // Operational/General task specific
-  task_category?: 'vendor_recruitment' | 'sponsor_followup' | 'sponsor_listing' | 'event_setup' | 'post_event' | 'other'
-  department?: string // For general tasks
-  vendor_id?: number
-  vendor?: { id: number; name: string }
-  sponsor_id?: number
-  sponsor?: { id: number; name: string }
-  // Event task specific
-  event_phase?: string // For event tasks
-  // Multi-event linking
-  linked_events?: number[] // For tasks linked to multiple events
-  // Template and conversion tracking
-  template_id?: number // For template-based tasks
-  converted_from?: string // Track conversions (task ID)
-  // Original task ID from source (for updates)
-  original_id?: number
-  // Usher task specific
-  usher_id?: number
-  usher?: { id: number; name: string; email: string }
+// Task Activity Log Interface
+export interface TaskActivityLog {
+  id: number;
+  task_id: number;
+  user_id: number | null;
+  action: string;
+  old_value: string | null;
+  new_value: string | null;
+  metadata: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+  user?: {
+    id: number;
+    name: string;
+    email: string;
+    avatar?: string;
+  } | null;
 }
 
-export interface TaskFormData {
-  title: string
-  description?: string
-  task_type: 'event_task' | 'usher_task' | 'operational_task' | 'general_task'
-  scope_type?: 'event' | 'general' // Scope selection for unified flow
-  task_category?: 'vendor_recruitment' | 'sponsor_followup' | 'sponsor_listing' | 'event_setup' | 'post_event' | 'other'
-  priority: 'low' | 'medium' | 'high' | 'urgent' | 'critical'
-  assigned_to?: number
-  event_id?: number
-  session_id?: number
-  start_date?: string // Start date separate from due date
-  due_date?: string
-  notes?: string
-  vendor_id?: number
-  sponsor_id?: number
-  usher_id?: number
-  department?: string // For general tasks
-  event_phase?: string // For event tasks
-  status?: 'pending' | 'in_progress' | 'waiting' | 'completed' | 'cancelled'
-  template_id?: number // Optional template to apply
-}
-
-export interface TaskFilters {
-  status?: 'all' | 'pending' | 'in_progress' | 'waiting' | 'completed' | 'cancelled'
-  priority?: 'all' | 'low' | 'medium' | 'high' | 'urgent' | 'critical'
-  assigned_to?: 'all' | 'unassigned' | string // User ID as string
-  event_id?: 'all' | string // Event ID as string
-  task_type?: 'all' | 'event_task' | 'usher_task' | 'operational_task' | 'general_task'
-  scope_type?: 'all' | 'event' | 'general' // Filter by scope type
-  task_category?: 'all' | 'vendor_recruitment' | 'sponsor_followup' | 'sponsor_listing' | 'event_setup' | 'post_event' | 'other'
-  department?: 'all' | string // For general tasks
-  event_phase?: 'all' | string // For event tasks
-  due_date?: 'all' | 'overdue' | 'due_today' | 'due_this_week' | 'due_this_month'
-  search?: string
-  group_by?: 'none' | 'assigned_user' | 'event' | 'department' | 'task_category' | 'priority' | 'scope_type' | 'status'
-}
-
-export interface TaskStatistics {
-  total: number
-  pending: number
-  in_progress: number
-  waiting: number
-  completed: number
-  cancelled: number
-  overdue: number
-  due_soon: number
-  by_priority: {
-    low: number
-    medium: number
-    high: number
-    urgent: number
-    critical: number
-  }
-  by_type: {
-    event_task: number
-    usher_task: number
-    operational_task: number
-    general_task: number
-  }
-  by_scope: {
-    event: number
-    general: number
-  }
-  by_category: {
-    vendor_recruitment: number
-    sponsor_followup: number
-    sponsor_listing: number
-    event_setup: number
-    post_event: number
-    other: number
-  }
-  team_workload: Array<{
-    user_id: number
-    user_name: string
-    task_count: number
-  }>
-  // Enhanced metrics
-  completion_rate?: {
-    event: number
-    general: number
-    overall: number
-  }
-  on_time_delivery?: {
-    event: number
-    general: number
-    overall: number
-  }
-  department_productivity?: Array<{
-    department: string
-    completed: number
-    total: number
-    completion_rate: number
-  }>
-  vendor_performance?: Array<{
-    vendor_id: number
-    vendor_name: string
-    completed: number
-    total: number
-    on_time: number
-  }>
-}
-
-export type ViewMode = 'list' | 'kanban' | 'timeline' | 'team'
-
-// Task Template interfaces
+// Task Template Interface
 export interface TaskTemplate {
-  id: number
-  name: string
-  description?: string
-  category: 'event' | 'general' | 'department'
-  scope_type: 'event' | 'general'
-  department?: string
-  event_type?: string
-  tasks: Array<{
-    title: string
-    description?: string
-    priority: 'low' | 'medium' | 'high' | 'urgent' | 'critical'
-    task_category?: string
-    department?: string
-    estimated_duration_days?: number
-    dependencies?: number[] // Task indices within template
-  }>
-  created_at: string
-  updated_at: string
-  created_by: number
+  id: number;
+  name: string;
+  description: string | null;
+  organizer_id: number | null;
+  event_type: string | null;
+  task_data: Partial<Task>;
+  created_at: string;
+  updated_at: string;
 }
 
-// Task Automation Rule interfaces
-export interface TaskAutomationRule {
-  id: number
-  name: string
-  description?: string
-  scope_type?: 'event' | 'general' | 'all'
-  trigger_type: 'status_change' | 'due_date' | 'assignment' | 'event_phase' | 'completion'
-  trigger_conditions: Record<string, any>
-  actions: Array<{
-    type: 'notify' | 'assign' | 'change_status' | 'change_priority' | 'create_task' | 'update_field'
-    params: Record<string, any>
-  }>
-  enabled: boolean
-  created_at: string
-  updated_at: string
-  created_by: number
+// Task Filters Interface
+export interface TaskFilters {
+  event_id?: number | null;
+  vendor_id?: number | null;
+  status?: TaskStatus | TaskStatus[] | null;
+  priority?: TaskPriority | TaskPriority[] | null;
+  type?: TaskType | TaskType[] | null;
+  task_category?: TaskCategory | TaskCategory[] | null;
+  operational?: boolean | null;
+  assigned_to?: number | null;
+  overdue?: boolean | null;
+  due_soon?: boolean | null;
+  due_soon_days?: number;
+  event_phase?: EventPhase | EventPhase[] | null;
+  location?: string | null;
+  watcher_id?: number | null;
+  has_dependencies?: boolean | null;
+  search?: string | null;
+  sort_by?: 'created_at' | 'updated_at' | 'due_date' | 'start_date' | 'priority' | 'title';
+  sort_order?: 'asc' | 'desc';
+  per_page?: number;
+  page?: number;
 }
 
+// Task Statistics Interface
+export interface TaskStatistics {
+  total: number;
+  pending: number;
+  in_progress: number;
+  waiting: number;
+  blocked: number;
+  review_required: number;
+  completed: number;
+  cancelled: number;
+  overdue: number;
+  due_soon: number;
+  requiring_approval: number;
+  by_priority: {
+    low: number;
+    medium: number;
+    high: number;
+    urgent: number;
+    critical: number;
+  };
+  by_type: {
+    deliverable: number;
+    milestone: number;
+    review: number;
+    payment: number;
+    other: number;
+  };
+  by_category: {
+    vendor_recruitment: number;
+    sponsor_followup: number;
+    sponsor_listing: number;
+    event_setup: number;
+    post_event: number;
+    operations: number;
+    logistics: number;
+    staffing: number;
+    marketing: number;
+    sales: number;
+    finance: number;
+    technical: number;
+    client_related: number;
+    other: number;
+  };
+  operational_tasks: number;
+  event_tasks: number;
+}
+
+// Task Create/Update Payload
+export interface TaskPayload {
+  event_id?: number | null;
+  organizer_id?: number;
+  vendor_id?: number | null;
+  quotation_id?: number | null;
+  title: string;
+  description?: string | null;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  type?: TaskType;
+  task_category?: TaskCategory | null;
+  due_date?: string | null;
+  start_date?: string | null;
+  estimated_duration?: number | null;
+  recurrence_pattern?: RecurrencePattern | null;
+  location?: string | null;
+  gps_latitude?: number | null;
+  gps_longitude?: number | null;
+  event_phase?: EventPhase;
+  notes?: string | null;
+  completion_notes?: string | null;
+  attachments?: string[] | null;
+  proof_media?: string[] | null;
+  supervisor_approval_required?: boolean;
+  assigned_to?: number | null;
+  watcher_ids?: number[];
+  dependency_task_ids?: number[];
+}
+
+// API Response Types
+export interface TasksResponse {
+  success: boolean;
+  data: {
+    data: Task[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+  message: string;
+}
+
+export interface TaskResponse {
+  success: boolean;
+  data: Task;
+  message: string;
+}
+
+export interface TaskStatisticsResponse {
+  success: boolean;
+  data: TaskStatistics;
+  message: string;
+}
 

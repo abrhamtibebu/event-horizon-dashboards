@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
-import { Pin, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { Pin, X, ChevronDown, ChevronUp, MapPin } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 import { ScrollArea } from '../ui/scroll-area'
+import { cn } from '@/lib/utils'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { Message } from '../../types/message'
 
 interface PinnedMessagesBannerProps {
@@ -21,162 +23,110 @@ export const PinnedMessagesBanner: React.FC<PinnedMessagesBannerProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false)
 
-  if (pinnedMessages.length === 0) {
-    return null
-  }
+  if (pinnedMessages.length === 0) return null
 
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp)
-    const now = new Date()
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
-    
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-    }
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
-
-  const truncateContent = (content: string, maxLength: number = 100) => {
-    if (content.length <= maxLength) return content
-    return content.substring(0, maxLength) + '...'
-  }
+  const getInitials = (name: string) => name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)
 
   return (
-    <div className="bg-warning/10 border-b border-warning/30 shadow-sm">
-      {/* Header */}
-      <div className="px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-warning/20 rounded-full flex items-center justify-center">
-            <Pin className="w-4 h-4 text-warning" />
+    <div className="bg-orange-600 border-b border-orange-700 shadow-xl overflow-hidden relative group">
+      <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.05)_50%,transparent_75%)] bg-[length:250%_250%] animate-[shimmer_5s_infinite]" />
+
+      {/* Header Container */}
+      <div className="px-8 py-3 flex items-center justify-between relative z-10">
+        <div className="flex items-center gap-4">
+          <div className="w-9 h-9 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-md">
+            <Pin className="w-4 h-4 text-white" />
           </div>
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">
-              Pinned Messages
+          <div className="flex flex-col">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/90 leading-tight">
+              Essential Intel
             </h3>
-            <p className="text-xs text-muted-foreground">
-              {pinnedMessages.length} message{pinnedMessages.length !== 1 ? 's' : ''} pinned
+            <p className="text-[11px] font-bold text-white/60">
+              {pinnedMessages.length} message{pinnedMessages.length !== 1 ? 's' : ''} pinned to top
             </p>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="text-muted-foreground hover:text-foreground hover:bg-warning/20 rounded-lg"
-        >
-          {isExpanded ? (
-            <ChevronUp className="w-4 h-4" />
-          ) : (
-            <ChevronDown className="w-4 h-4" />
+
+        <div className="flex items-center gap-2">
+          {!isExpanded && (
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-black/10 rounded-xl border border-white/10 max-w-sm">
+              <span className="text-[10px] font-black text-white/90 truncate max-w-[200px]">
+                {pinnedMessages[0].content || "📎 Shared Asset"}
+              </span>
+            </div>
           )}
-        </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="h-9 px-3 rounded-xl text-white hover:bg-white/10 transition-colors font-black text-[10px] uppercase tracking-widest gap-2"
+          >
+            {isExpanded ? 'Collapse' : 'View All'}
+            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </Button>
+        </div>
       </div>
 
-      {/* Expanded Content */}
-      {isExpanded && (
-        <div className="border-t border-warning/30 bg-card/50">
-          <ScrollArea className="max-h-80">
-            <div className="divide-y divide-warning/20">
-              {pinnedMessages.map((message) => (
-                <div
-                  key={message.id}
-                  className="px-6 py-4 hover:bg-warning/10 transition-colors group"
-                >
-                  <div className="flex items-start space-x-3">
-                    {/* Avatar */}
-                    <Avatar className="w-10 h-10 flex-shrink-0">
-                      <AvatarImage src={message.sender.profile_image} />
-                      <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
-                        {getInitials(message.sender.name)}
-                      </AvatarFallback>
-                    </Avatar>
+      {/* Expanded Region */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="border-t border-white/10 bg-black/10 relative z-10 overflow-hidden"
+          >
+            <ScrollArea className="max-h-80">
+              <div className="divide-y divide-white/5">
+                {pinnedMessages.map((message) => (
+                  <div key={message.id} className="p-6 transition-all hover:bg-white/5 group/msg">
+                    <div className="flex items-start gap-4">
+                      <Avatar className="h-10 w-10 border-2 border-white/10 shadow-lg shrink-0">
+                        <AvatarImage src={message.sender.profile_image} />
+                        <AvatarFallback className="bg-white/10 text-white text-xs font-black">
+                          {getInitials(message.sender.name)}
+                        </AvatarFallback>
+                      </Avatar>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-semibold text-foreground">
-                            {message.sender.name}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-black uppercase tracking-widest text-white">{message.sender.name}</span>
+                          <span className="text-[9px] font-black uppercase text-white/40 tracking-tighter">
+                            {new Date(message.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                           </span>
-                          <Badge variant="outline" className="text-xs bg-warning/20 text-warning border-warning/30">
-                            <Pin className="w-3 h-3 mr-1" />
-                            Pinned
-                          </Badge>
                         </div>
-                        <span className="text-xs text-muted-foreground font-medium">
-                          {formatTimestamp(message.created_at)}
-                        </span>
-                      </div>
 
-                      <p className="text-sm text-foreground mb-2">
-                        {truncateContent(message.content)}
-                      </p>
+                        <p className="text-sm text-white/80 leading-relaxed font-medium mb-4 line-clamp-3 italic">
+                          "{message.content || "Shared Asset"}"
+                        </p>
 
-                      {/* File attachment indicator */}
-                      {(message.file_path || message.file_url) && (
-                        <div className="text-xs text-primary mb-2">
-                          📎 {message.file_name || 'Attachment'}
-                        </div>
-                      )}
-
-                      {/* Actions */}
-                      <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {onJumpToMessage && (
+                        <div className="flex items-center gap-2 opacity-0 group-hover/msg:opacity-100 transition-all transform translate-y-2 group-hover/msg:translate-y-0">
+                          {onJumpToMessage && (
+                            <Button
+                              variant="ghost"
+                              onClick={() => onJumpToMessage(message.id)}
+                              className="h-8 px-4 rounded-xl bg-white text-orange-600 hover:bg-orange-50 font-black text-[9px] uppercase tracking-widest"
+                            >
+                              Jump to Context
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
-                            size="sm"
-                            onClick={() => onJumpToMessage(message.id)}
-                            className="text-xs text-primary hover:text-primary/80 hover:bg-primary/10 h-7 px-2"
+                            onClick={() => onUnpin(message.id)}
+                            className="h-8 px-4 rounded-xl border border-white/20 text-white hover:bg-white/10 font-black text-[9px] uppercase tracking-widest"
                           >
-                            Jump to message
+                            Unpin
                           </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onUnpin(message.id)}
-                          className="text-xs text-warning hover:text-warning/80 hover:bg-warning/20 h-7 px-2"
-                        >
-                          <X className="w-3 h-3 mr-1" />
-                          Unpin
-                        </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
-      )}
-
-      {/* Compact View (when collapsed) */}
-      {!isExpanded && pinnedMessages.length > 0 && (
-        <div className="px-6 pb-3">
-          <div className="text-sm text-foreground bg-card/70 rounded-lg p-3 shadow-sm">
-            <div className="flex items-center space-x-2">
-              <Avatar className="w-6 h-6 flex-shrink-0">
-                <AvatarImage src={pinnedMessages[0].sender.profile_image} />
-                <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                  {getInitials(pinnedMessages[0].sender.name)}
-                </AvatarFallback>
-              </Avatar>
-              <span className="font-semibold">{pinnedMessages[0].sender.name}:</span>
-              <span className="truncate">{truncateContent(pinnedMessages[0].content, 60)}</span>
-            </div>
-          </div>
-        </div>
-      )}
+                ))}
+              </div>
+            </ScrollArea>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
-
