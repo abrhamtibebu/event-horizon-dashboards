@@ -66,11 +66,14 @@ const LegacyBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
 
   return (
     <div
-      className="flex flex-col items-center border rounded-lg shadow-lg bg-white relative"
+      className="flex flex-col items-center border rounded-lg shadow-lg bg-white relative printable-badge"
       style={{ 
         width: 400, // 4 inches = 400 points (100mm)
         height: 400, // 4 inches = 400 points (100mm)
-        padding: 0 
+        padding: 0,
+        pageBreakInside: 'avoid',
+        pageBreakAfter: 'avoid',
+        pageBreakBefore: 'avoid',
       }}
     >
       {/* Main content area - now uses full space */}
@@ -167,6 +170,21 @@ const Badge: React.FC<BadgeProps> = ({ attendee, template, customTemplate }) => 
   // Use custom template if provided, otherwise fall back to legacy badge
   if (customTemplate && customTemplate.length > 0) {
     return <SimpleBadge attendee={attendee} template={customTemplate} />;
+  }
+
+  // Use official badge template if provided
+  if (template && template.template_json) {
+    try {
+      const templateElements = Array.isArray(template.template_json) 
+        ? template.template_json 
+        : template.template_json.elements || [];
+      
+      if (templateElements.length > 0) {
+        return <SimpleBadge attendee={attendee} template={templateElements} />;
+      }
+    } catch (error) {
+      console.warn('Failed to parse badge template, using fallback:', error);
+    }
   }
 
   // Always use the legacy badge (basic design) as fallback

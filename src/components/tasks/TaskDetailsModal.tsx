@@ -209,19 +209,21 @@ export function TaskDetailsModal({ taskId, open, onOpenChange, onUpdate }: TaskD
                   <User className="w-4 h-4" />
                   Assigned To
                 </h3>
-                {task.assignedUser ? (
+                {task.assigned_to && task.assignedUser ? (
                   <div className="flex items-center gap-2">
                     <Avatar className="w-6 h-6">
                       <AvatarImage src={task.assignedUser.avatar} />
                       <AvatarFallback>
-                        {task.assignedUser.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                        {task.assignedUser.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="text-sm font-medium">{task.assignedUser.name}</p>
-                      <p className="text-xs text-muted-foreground">{task.assignedUser.email}</p>
+                      <p className="text-sm font-medium">{task.assignedUser.name || 'Unknown User'}</p>
+                      <p className="text-xs text-muted-foreground">{task.assignedUser.email || ''}</p>
                 </div>
                   </div>
+                ) : task.assigned_to ? (
+                  <p className="text-sm text-muted-foreground">User ID: {task.assigned_to} (Loading...)</p>
                 ) : (
                   <p className="text-sm text-muted-foreground">Unassigned</p>
                 )}
@@ -369,9 +371,26 @@ export function TaskDetailsModal({ taskId, open, onOpenChange, onUpdate }: TaskD
                 </Button>
               )}
               {['pending', 'in_progress'].includes(task.status) && (
-                <Button onClick={() => completeTask().then(onUpdate)}>
+                <Button onClick={async () => {
+                  try {
+                    await completeTask();
+                    onUpdate();
+                  } catch (error: any) {
+                    // Error handling is done in the hook
+                  }
+                }}>
                   Complete Task
+                  {task.supervisor_approval_required && task.assigned_to && task.assigned_to !== task.created_by && (
+                    <span className="ml-2 text-xs">(Requires Approval)</span>
+                  )}
                 </Button>
+              )}
+              {task.status === 'review_required' && (
+                <div className="w-full">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Task completed and awaiting approval from creator.
+                  </p>
+                </div>
               )}
               {task.status === 'waiting' && (
                 <Button variant="outline" onClick={() => updateTask({ status: 'in_progress' }).then(onUpdate)}>
@@ -389,27 +408,88 @@ export function TaskDetailsModal({ taskId, open, onOpenChange, onUpdate }: TaskD
           <TabsContent value="activity" className="space-y-4 mt-6">
             {activityLog && Array.isArray(activityLog) && activityLog.length > 0 ? (
               <div className="space-y-3">
-                {activityLog.map((activity) => (
-                  <div key={activity.id} className="border rounded-lg p-4 bg-muted/30">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="font-medium text-sm capitalize">
-                          {activity.action.replace('_', ' ')}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {activity.user?.name || 'System'} • {format(new Date(activity.created_at), 'PPP p')}
-                        </p>
-                        {activity.new_value && (
-                          <p className="text-xs text-muted-foreground mt-2 bg-background p-2 rounded">
-                            {typeof activity.new_value === 'string' 
-                              ? activity.new_value 
-                              : JSON.stringify(activity.new_value, null, 2)}
-                        </p>
-                      )}
+                {activityLog.map((activity) => {
+                  // Parse activity details
+                  let oldValue = null;
+                  let newValue = null;
+                  let metadata = null;
+                  
+                  try {
+                    if (activity.old_value) {
+                      oldValue = typeof activity.old_value === 'string' ? JSON.parse(activity.old_value) : activity.old_value;
+                    }
+                    if (activity.new_value) {
+                      newValue = typeof activity.new_value === 'string' ? JSON.parse(activity.new_value) : activity.new_value;
+                    }
+                    if (activity.metadata) {
+                      metadata = typeof activity.metadata === 'string' ? JSON.parse(activity.metadata) : activity.metadata;
+                    }
+                  } catch (e) {
+                    // If parsing fails, use as string
+                    oldValue = activity.old_value;
+                    newValue = activity.new_value;
+                    metadata = activity.metadata;
+                  }
+                  
+                  // Format activity description based on action
+                  const getActivityDescription = () => {
+                    const action = activity.action.replace('_', ' ');
+                    if (action === 'created') {
+                      return `Task was created`;
+                    } else if (action === 'status changed') {
+                      const oldStatus = oldValue?.status || 'unknown';
+                      const newStatus = newValue?.status || 'unknown';
+                      return `Status changed from ${oldStatus.replace('_', ' ')} to ${newStatus.replace('_', ' ')}`;
+                    } else if (action === 'assigned') {
+                      return `Task was assigned${newValue?.assigned_user_name ? ` to ${newValue.assigned_user_name}` : ''}`;
+                    } else if (action === 'unassigned') {
+                      return `Task was unassigned${oldValue?.assigned_user_name ? ` from ${oldValue.assigned_user_name}` : ''}`;
+                    } else if (action === 'completed') {
+                      return `Task was marked as completed`;
+                    } else if (action === 'completed awaiting approval') {
+                      return `Task completed and awaiting approval`;
+                    } else if (action === 'approved') {
+                      return `Task completion was approved`;
+                    } else if (action === 'rejected') {
+                      return `Task completion was rejected`;
+                    }
+                    return action;
+                  };
+                  
+                  return (
+                    <div key={activity.id} className="border rounded-lg p-4 bg-muted/30">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">
+                            {getActivityDescription()}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {activity.user?.name || 'System'} • {format(new Date(activity.created_at), 'PPP p')}
+                          </p>
+                          {(oldValue || newValue || metadata) && (
+                            <div className="mt-2 space-y-1">
+                              {oldValue && (
+                                <p className="text-xs text-muted-foreground bg-background p-2 rounded">
+                                  <span className="font-semibold">Previous:</span> {typeof oldValue === 'object' ? JSON.stringify(oldValue, null, 2) : oldValue}
+                                </p>
+                              )}
+                              {newValue && (
+                                <p className="text-xs text-muted-foreground bg-background p-2 rounded">
+                                  <span className="font-semibold">New:</span> {typeof newValue === 'object' ? JSON.stringify(newValue, null, 2) : newValue}
+                                </p>
+                              )}
+                              {metadata?.notes && (
+                                <p className="text-xs text-muted-foreground bg-background p-2 rounded">
+                                  <span className="font-semibold">Notes:</span> {metadata.notes}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                   </div>
                 ) : (
               <div className="text-center py-8 text-muted-foreground">
@@ -458,6 +538,31 @@ export function TaskDetailsModal({ taskId, open, onOpenChange, onUpdate }: TaskD
                       </div>
                 </div>
                 </div>
+                ) : task.status === 'review_required' ? (
+                  <div className="space-y-3">
+                    <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                        <p className="font-medium text-sm">Awaiting Approval</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        This task was completed by the assigned user and requires your approval as the creator.
+                      </p>
+                      {task.completed_date && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Completed on: {format(new Date(task.completed_date), 'PPP')}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={() => approveTask().then(onUpdate)} className="bg-green-600 hover:bg-green-700">
+                        Approve Completion
+                      </Button>
+                      <Button variant="outline" onClick={() => rejectTask().then(onUpdate)} className="border-red-300 text-red-600 hover:bg-red-50">
+                        Reject
+                      </Button>
+                </div>
+              </div>
                 ) : task.status === 'completed' ? (
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">
@@ -474,7 +579,7 @@ export function TaskDetailsModal({ taskId, open, onOpenChange, onUpdate }: TaskD
               </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Approval will be required when this task is completed.
+                    Approval will be required when this task is completed by the assigned user.
                   </p>
           )}
         </div>

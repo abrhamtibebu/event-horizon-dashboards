@@ -161,7 +161,7 @@ const CustomRegistrationSuccess: React.FC = () => {
                         <div className="flex-1">
                           <h4 className="font-bold text-foreground mb-1">Confirmation Email</h4>
                           <p className="text-sm text-muted-foreground">
-                            Check your email for a confirmation message with your registration details and e-badge.
+                            Your confirmation email with e-badge PDF has been sent to your email address. Please check your inbox (and spam folder) for the attachment.
                           </p>
                         </div>
                       </div>

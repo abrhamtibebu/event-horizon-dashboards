@@ -768,4 +768,11 @@ export const checkInByQR = (eventId: number, uuid: string) =>
 export const checkInByQRAuto = (uuid: string) =>
   api.post('/check-in/qr', { uuid })
 
+// Email management API functions
+export const resendRegistrationEmail = (eventId: number, attendeeId: number) =>
+  api.post(`/events/${eventId}/attendees/${attendeeId}/resend-email`)
+
+export const getBadgePreview = (eventId: number, attendeeId: number) =>
+  api.get(`/events/${eventId}/attendees/${attendeeId}/badge-preview`)
+
 export { api }

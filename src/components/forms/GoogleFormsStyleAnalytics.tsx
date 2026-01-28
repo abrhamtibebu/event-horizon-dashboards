@@ -109,17 +109,29 @@ export const GoogleFormsStyleAnalytics: React.FC<GoogleFormsStyleAnalyticsProps>
       const targetForms = formId ? forms.filter(f => f.id === formId) : forms;
       const allSubmissions: FormSubmission[] = [];
 
-      // Fetch submissions for each form
+      // Fetch submissions for each form - fetch all pages
       for (const form of targetForms) {
         try {
-          const response = await formSubmissionApi.getSubmissions(form.id, {
-            page: 1,
-            per_page: 1000, // Get more submissions for analytics
-            status: statusFilter === 'all' ? undefined : statusFilter,
-            search: searchTerm || undefined
-          });
-          // response.data contains the paginated response, response.data.data contains the submissions array
-          allSubmissions.push(...response.data.data);
+          let page = 1;
+          let hasMore = true;
+          
+          while (hasMore) {
+            const response = await formSubmissionApi.getSubmissions(form.id, {
+              page,
+              per_page: 100, // Fetch in smaller chunks for better performance
+              status: statusFilter === 'all' ? undefined : statusFilter,
+              search: searchTerm || undefined
+            });
+            
+            // response.data contains the paginated response, response.data.data contains the submissions array
+            const submissions = response.data.data || [];
+            allSubmissions.push(...submissions);
+            
+            // Check if there are more pages
+            const pagination = response.data;
+            hasMore = pagination.current_page < pagination.last_page;
+            page++;
+          }
         } catch (error) {
           console.error(`Failed to fetch submissions for form ${form.id}:`, error);
         }

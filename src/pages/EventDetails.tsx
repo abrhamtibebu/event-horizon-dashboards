@@ -844,76 +844,155 @@ export default function EventDetails() {
     }
   }
 
-  const handleBatchPrintBadges = async () => {
-    if (selectedAttendees.size === 0) {
+  // Optimized batch badge printing with batching and performance improvements
+  const handleBatchPrintBadges = async (customSelectedAttendees?: Set<number>) => {
+    const attendeesToPrint = customSelectedAttendees || selectedAttendees;
+    
+    if (attendeesToPrint.size === 0) {
       toast.error('No attendees selected for printing.');
       return;
     }
+    
+    const selectedCount = attendeesToPrint.size;
+    toast.info(`Generating ${selectedCount} badge${selectedCount > 1 ? 's' : ''}...`, { duration: 2000 });
+    
+    // Set selected attendees if using custom set
+    if (customSelectedAttendees) {
+      setSelectedAttendees(customSelectedAttendees);
+    }
     setPrinting(true);
-    // Wait for the badges to render in the hidden printRef
-    setTimeout(async () => {
-      if (printRef.current) {
-        const badgeElements = Array.from(printRef.current.querySelectorAll('.printable-badge-batch'));
-        if (badgeElements.length === 0) {
-          toast.error('No badges found to print.');
-          setPrinting(false);
-          return;
+    
+    // Optimized: Process badges in batches to avoid memory issues
+    const BATCH_SIZE = 10; // Process 10 badges at a time
+    const selectedAttendeesArray = Array.from(attendeesToPrint);
+    const batches = [];
+    
+    for (let i = 0; i < selectedAttendeesArray.length; i += BATCH_SIZE) {
+      batches.push(selectedAttendeesArray.slice(i, i + BATCH_SIZE));
+    }
+    
+    try {
+      // Wait for the badges to render in the hidden printRef
+      await new Promise(resolve => setTimeout(resolve, 100)); // Reduced from 150ms
+      
+      if (!printRef.current) {
+        toast.error('Print area not found.');
+        setPrinting(false);
+        return;
+      }
+      
+      const badgeElements = Array.from(printRef.current.querySelectorAll('.printable-badge-batch'));
+      if (badgeElements.length === 0) {
+        toast.error('No badges found to print.');
+        setPrinting(false);
+        if (customSelectedAttendees) {
+          setSelectedAttendees(new Set());
         }
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [400, 400] });
-        for (let i = 0; i < badgeElements.length; i++) {
-          const el = badgeElements[i] as HTMLElement;
-          const canvas = await html2canvas(el, {
+        return;
+      }
+      
+      // Optimized: Use Promise.all for parallel canvas rendering (with batching)
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [400, 400] });
+      
+      // Process badges in batches to avoid overwhelming the browser
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        const batchStartIndex = batchIndex * BATCH_SIZE;
+        
+        // Process batch in parallel
+        const canvasPromises = batch.map((_, idx) => {
+          const el = badgeElements[batchStartIndex + idx] as HTMLElement;
+          if (!el) return null;
+          
+          return html2canvas(el, {
             scale: 1.5,
             useCORS: true,
             allowTaint: true,
-            backgroundColor: '#ffffff'
+            backgroundColor: '#ffffff',
+            logging: false, // Disable logging for performance
+            removeContainer: true, // Clean up after rendering
           });
-          const imgData = canvas.toDataURL('image/jpeg', 0.9); // JPEG for smaller file size
-          if (i > 0) pdf.addPage([400, 400], 'portrait');
-          pdf.addImage(imgData, 'JPEG', 0, 0, 400, 400);
-        }
-        // We will trigger print manually via iframe to avoid auto-closing behavior
-        const blob = pdf.output('blob');
-        const blobUrl = URL.createObjectURL(blob);
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        iframe.src = blobUrl;
-        document.body.appendChild(iframe);
-        iframe.onload = () => {
-          const cleanup = () => {
-            if (iframe.parentNode) document.body.removeChild(iframe);
-            URL.revokeObjectURL(blobUrl);
-            setPrinting(false);
-            document.removeEventListener('visibilitychange', handleVisibility);
-          };
-          const handleVisibility = () => {
-            if (document.visibilityState === 'visible') {
-              setTimeout(cleanup, 300);
+        });
+        
+        const canvases = await Promise.all(canvasPromises.filter(Boolean));
+        
+        // Add canvases to PDF
+        canvases.forEach((canvas, idx) => {
+          if (canvas) {
+            const imgData = canvas.toDataURL('image/jpeg', 0.85); // Slightly lower quality for faster processing
+            if (batchStartIndex + idx > 0) {
+              pdf.addPage([400, 400], 'portrait');
             }
-          };
-          document.addEventListener('visibilitychange', handleVisibility);
-          try {
-            const cw = iframe.contentWindow;
-            cw?.focus();
-            setTimeout(() => cw?.print(), 400);
-          } catch (e) {
-            setTimeout(cleanup, 120000);
+            pdf.addImage(imgData, 'JPEG', 0, 0, 400, 400);
           }
-          setTimeout(() => {
-            document.removeEventListener('visibilitychange', handleVisibility);
-            if (iframe.parentNode) document.body.removeChild(iframe);
-            URL.revokeObjectURL(blobUrl);
-            setPrinting(false);
-          }, 120000);
-        };
-        setPrinting(false);
+        });
+        
+        // Show progress for large batches
+        if (selectedCount > 20 && batchIndex < batches.length - 1) {
+          const progress = Math.round(((batchIndex + 1) / batches.length) * 100);
+          toast.info(`Processing badges... ${progress}%`, { duration: 1000 });
+        }
       }
-    }, 150); // Reduced timeout from 300ms to 150ms for faster response
+      
+      // Trigger print
+      const blob = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(blob);
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      iframe.src = blobUrl;
+      document.body.appendChild(iframe);
+      
+      iframe.onload = () => {
+        const cleanup = () => {
+          if (iframe.parentNode) document.body.removeChild(iframe);
+          URL.revokeObjectURL(blobUrl);
+          setPrinting(false);
+          // Clear selected attendees if we used a custom set
+          if (customSelectedAttendees) {
+            setSelectedAttendees(new Set());
+          }
+          document.removeEventListener('visibilitychange', handleVisibility);
+        };
+        
+        const handleVisibility = () => {
+          if (document.visibilityState === 'visible') {
+            setTimeout(cleanup, 300);
+          }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibility);
+        
+        try {
+          const cw = iframe.contentWindow;
+          cw?.focus();
+          setTimeout(() => cw?.print(), 400);
+        } catch (e) {
+          setTimeout(cleanup, 120000);
+        }
+        
+        setTimeout(() => {
+          document.removeEventListener('visibilitychange', handleVisibility);
+          if (iframe.parentNode) document.body.removeChild(iframe);
+          URL.revokeObjectURL(blobUrl);
+          setPrinting(false);
+          // Clear selected attendees if we used a custom set
+          if (customSelectedAttendees) {
+            setSelectedAttendees(new Set());
+          }
+        }, 120000);
+      };
+      
+      toast.success(`Successfully generated ${selectedCount} badge${selectedCount > 1 ? 's' : ''}!`, { duration: 3000 });
+    } catch (error) {
+      console.error('Error generating badges:', error);
+      toast.error('Failed to generate badges. Please try again.');
+      setPrinting(false);
+    }
   };
 
   const handleImportClick = () => {
@@ -1672,11 +1751,8 @@ export default function EventDetails() {
   }, [eventId])
 
 
-  useEffect(() => {
-    if (printing && printRef.current) {
-      handleBatchPrintBadges();
-    }
-  }, [printing, printRef.current]);
+  // Removed auto-trigger - handleBatchPrintBadges is now called directly from button click
+  // This prevents double execution and improves performance
 
 
 
@@ -2191,62 +2267,60 @@ export default function EventDetails() {
             {/* Premium Dashboard Container */}
             {/* Simple Dashboard Container */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
-              <div className="flex flex-col gap-6 bg-card rounded-2xl p-6 border border-border shadow-sm">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                  <TabsList className="bg-transparent border-b border-border w-full justify-start p-0 h-auto gap-8 rounded-none">
-                    {user?.role === 'usher' ? (
-                      <>
-                        <TabsTrigger
-                          value="attendees"
-                          className="px-0 py-3 text-sm font-semibold transition-all border-b-2 border-transparent rounded-none bg-transparent shadow-none data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground hover:text-foreground"
-                        >
-                          Attendees
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="badges"
-                          className="px-0 py-3 text-sm font-semibold transition-all border-b-2 border-transparent rounded-none bg-transparent shadow-none data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground hover:text-foreground"
-                        >
-                          Badges
-                        </TabsTrigger>
-                      </>
-                    ) : (
-                      <div className="flex flex-wrap gap-x-6">
-                        {['Details', 'Attendees', 'Ushers', 'Badges', 'Bulk Badges', 'Team', 'Forms', 'Sessions', 'Invitations', 'Analytics'].map((tab) => {
-                          const val = tab.toLowerCase().replace(/ /g, '-');
-                          // Filter tabs based on role permissions
-                          if (val === 'bulk-badges' || val === 'forms' || val === 'ushers' || val === 'analytics' || val === 'invitations' || val === 'team') {
-                            if (!canManageEvent) return null;
-                          }
-                          return (
-                            <TabsTrigger
-                              key={val}
-                              value={val}
-                              className="px-0 py-3 text-sm font-semibold transition-all border-b-2 border-transparent rounded-none bg-transparent shadow-none data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground hover:text-foreground"
-                            >
-                              {tab}
-                            </TabsTrigger>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </TabsList>
+              <div className="flex flex-col gap-4 sm:gap-6 bg-card rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-border shadow-sm">
+                <div className="flex flex-col gap-4">
+                  {/* Responsive Tabs List with horizontal scroll on mobile */}
+                  <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+                    <TabsList className="bg-transparent border-b border-border w-full justify-start p-0 h-auto gap-4 sm:gap-6 md:gap-8 rounded-none min-w-max sm:min-w-0">
+                      {user?.role === 'usher' ? (
+                        <>
+                          <TabsTrigger
+                            value="attendees"
+                            className="px-2 sm:px-0 py-2 sm:py-3 text-xs sm:text-sm font-semibold transition-all border-b-2 border-transparent rounded-none bg-transparent shadow-none data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground hover:text-foreground whitespace-nowrap"
+                          >
+                            Attendees
+                          </TabsTrigger>
+                        </>
+                      ) : (
+                        <div className="flex gap-x-4 sm:gap-x-6 md:gap-x-8">
+                          {['Details', 'Attendees', 'Ushers', 'Bulk Badges', 'Team', 'Forms', 'Sessions', 'Invitations', 'Analytics'].map((tab) => {
+                            const val = tab.toLowerCase().replace(/ /g, '-');
+                            // Filter tabs based on role permissions
+                            if (val === 'bulk-badges' || val === 'forms' || val === 'ushers' || val === 'analytics' || val === 'invitations' || val === 'team') {
+                              if (!canManageEvent) return null;
+                            }
+                            return (
+                              <TabsTrigger
+                                key={val}
+                                value={val}
+                                className="px-2 sm:px-0 py-2 sm:py-3 text-xs sm:text-sm font-semibold transition-all border-b-2 border-transparent rounded-none bg-transparent shadow-none data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground hover:text-foreground whitespace-nowrap"
+                              >
+                                {tab}
+                              </TabsTrigger>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </TabsList>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 px-2">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 px-0 sm:px-2">
                   {canManageEvent && (
                     <Button
                       onClick={openEditDialog}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-10 px-6 shadow-sm transition-all"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-lg sm:rounded-xl h-9 sm:h-10 px-3 sm:px-6 shadow-sm transition-all text-xs sm:text-sm"
                     >
-                      <Pencil className="w-3.5 h-3.5 mr-2" />
-                      Edit Event
+                      <Pencil className="w-3.5 h-3.5 sm:mr-2" />
+                      <span className="hidden sm:inline">Edit Event</span>
+                      <span className="sm:hidden">Edit</span>
                     </Button>
                   )}
 
                   {canManageEvent && (
-                    <div className="flex items-center gap-2 bg-muted/50 rounded-xl border border-border px-1">
+                    <div className="flex items-center gap-2 bg-muted/50 rounded-lg sm:rounded-xl border border-border px-1">
                       <Select value={eventData.status} onValueChange={handleStatusChange} disabled={statusLoading}>
-                        <SelectTrigger className="w-32 bg-transparent border-0 focus:ring-0 text-foreground font-semibold h-10 text-xs uppercase tracking-wider">
+                        <SelectTrigger className="w-24 sm:w-32 bg-transparent border-0 focus:ring-0 text-foreground font-semibold h-9 sm:h-10 text-[10px] sm:text-xs uppercase tracking-wider">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-popover border-border text-popover-foreground rounded-xl">
@@ -2258,19 +2332,20 @@ export default function EventDetails() {
                     </div>
                   )}
 
-                  <Button variant="outline" onClick={exportCSV} className="bg-background border-border text-foreground font-semibold rounded-xl h-10 px-5 hover:bg-muted transition-all">
-                    <Download className="w-3.5 h-3.5 mr-2 text-primary" />
-                    Export
+                  <Button variant="outline" onClick={exportCSV} className="bg-background border-border text-foreground font-semibold rounded-lg sm:rounded-xl h-9 sm:h-10 px-3 sm:px-5 hover:bg-muted transition-all text-xs sm:text-sm">
+                    <Download className="w-3.5 h-3.5 sm:mr-2 text-primary" />
+                    <span className="hidden sm:inline">Export</span>
                   </Button>
 
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button variant="outline" className="bg-background border-border text-foreground font-semibold rounded-xl h-10 px-5 hover:bg-muted transition-all">
-                        <QrCode className="w-3.5 h-3.5 mr-2 text-primary" />
-                        Registration
+                      <Button variant="outline" className="bg-background border-border text-foreground font-semibold rounded-lg sm:rounded-xl h-9 sm:h-10 px-3 sm:px-5 hover:bg-muted transition-all text-xs sm:text-sm">
+                        <QrCode className="w-3.5 h-3.5 sm:mr-2 text-primary" />
+                        <span className="hidden sm:inline">Registration</span>
+                        <span className="sm:hidden">QR</span>
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-xl bg-popover border-border text-popover-foreground rounded-2xl p-6 shadow-xl">
+                    <DialogContent className="max-w-[95vw] sm:max-w-xl bg-popover border-border text-popover-foreground rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-xl font-bold">
                           <QrCode className="w-5 h-5 text-primary" />
@@ -2330,7 +2405,7 @@ export default function EventDetails() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-4 gap-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                             {[
                               { icon: Facebook, label: 'FB', platform: 'facebook' },
                               { icon: Twitter, label: 'X', platform: 'twitter' },
@@ -2344,7 +2419,7 @@ export default function EventDetails() {
                                   await trackShare(eventData.uuid, s.platform as any);
                                   toast.info(`Sharing via ${s.platform}`);
                                 }}
-                                className="flex flex-col gap-1.5 h-16 bg-background border-border hover:bg-muted"
+                                className="flex flex-col gap-1.5 h-14 sm:h-16 bg-background border-border hover:bg-muted"
                               >
                                 <s.icon className="w-4 h-4" />
                                 <span className="text-[10px] font-bold">{s.label}</span>
@@ -2369,9 +2444,9 @@ export default function EventDetails() {
                       eventId={eventData.id}
                       eventName={eventData?.name || ''}
                       trigger={
-                        <Button variant="outline" className="bg-background border-border text-foreground font-semibold rounded-xl h-10 px-5 hover:bg-muted transition-all">
-                          <UserPlus className="w-3.5 h-3.5 mr-2 text-primary" />
-                          Ushers
+                        <Button variant="outline" className="bg-background border-border text-foreground font-semibold rounded-lg sm:rounded-xl h-9 sm:h-10 px-3 sm:px-5 hover:bg-muted transition-all text-xs sm:text-sm">
+                          <UserPlus className="w-3.5 h-3.5 sm:mr-2 text-primary" />
+                          <span className="hidden sm:inline">Ushers</span>
                         </Button>
                       }
                     />
@@ -2381,9 +2456,10 @@ export default function EventDetails() {
                     <div className="ml-auto">
                       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10 font-semibold rounded-xl h-10 px-5 transition-all">
-                            <Trash2 className="w-3.5 h-3.5 mr-2" />
-                            Delete Event
+                          <Button variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10 font-semibold rounded-lg sm:rounded-xl h-9 sm:h-10 px-3 sm:px-5 transition-all text-xs sm:text-sm">
+                            <Trash2 className="w-3.5 h-3.5 sm:mr-2" />
+                            <span className="hidden sm:inline">Delete Event</span>
+                            <span className="sm:hidden">Delete</span>
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent className="bg-popover border-border text-popover-foreground rounded-2xl p-6">
@@ -2406,18 +2482,18 @@ export default function EventDetails() {
                 </div>
 
                 <TabsContent value="details" className="mt-0 outline-none">
-                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
-                    {/* Simple Overview Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-4 sm:space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                    {/* Simple Overview Cards - Responsive Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                       {/* Event Type Card */}
-                      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm group hover:border-primary/20 transition-all">
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className={`p-3 rounded-xl bg-primary/10 text-primary`}>
-                            {eventData?.event_type === 'ticketed' ? <Ticket className="w-6 h-6" /> : <PartyPopper className="w-6 h-6" />}
+                      <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm group hover:border-primary/20 transition-all">
+                        <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+                          <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl bg-primary/10 text-primary shrink-0`}>
+                            {eventData?.event_type === 'ticketed' ? <Ticket className="w-5 h-5 sm:w-6 sm:h-6" /> : <PartyPopper className="w-5 h-5 sm:w-6 sm:h-6" />}
                           </div>
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Architecture</p>
-                            <p className={`text-lg font-bold text-foreground`}>
+                            <p className={`text-base sm:text-lg font-bold text-foreground truncate`}>
                               {eventData?.event_type === 'ticketed' ? 'Ticketed' : 'Free'}
                             </p>
                           </div>
@@ -2428,19 +2504,19 @@ export default function EventDetails() {
                       </div>
 
                       {/* Status Card */}
-                      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm group hover:border-primary/20 transition-all">
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className={`p-3 rounded-xl ${eventData?.status === 'active' ? 'bg-emerald-500/10 text-emerald-500' :
+                      <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm group hover:border-primary/20 transition-all">
+                        <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+                          <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl shrink-0 ${eventData?.status === 'active' ? 'bg-emerald-500/10 text-emerald-500' :
                             eventData?.status === 'draft' ? 'bg-amber-500/10 text-amber-500' :
                               'bg-destructive/10 text-destructive'
                             }`}>
-                            {eventData?.status === 'active' ? <CheckCircle2 className="w-6 h-6" /> :
-                              eventData?.status === 'draft' ? <FileEdit className="w-6 h-6" /> :
-                                <XCircle className="w-6 h-6" />}
+                            {eventData?.status === 'active' ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" /> :
+                              eventData?.status === 'draft' ? <FileEdit className="w-5 h-5 sm:w-6 sm:h-6" /> :
+                                <XCircle className="w-5 h-5 sm:w-6 sm:h-6" />}
                           </div>
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Lifecycle</p>
-                            <p className="text-lg font-bold text-foreground capitalize">{eventData?.status || 'Active'}</p>
+                            <p className="text-base sm:text-lg font-bold text-foreground capitalize truncate">{eventData?.status || 'Active'}</p>
                           </div>
                         </div>
                         <p className="text-xs font-medium text-muted-foreground">
@@ -2449,14 +2525,14 @@ export default function EventDetails() {
                       </div>
 
                       {/* Registration Card */}
-                      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm group hover:border-primary/20 transition-all">
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className={`p-3 rounded-xl bg-primary/10 text-primary`}>
-                            <Users className="w-6 h-6" />
+                      <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm group hover:border-primary/20 transition-all">
+                        <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+                          <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl bg-primary/10 text-primary shrink-0`}>
+                            <Users className="w-5 h-5 sm:w-6 sm:h-6" />
                           </div>
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Engagements</p>
-                            <p className="text-lg font-bold text-foreground">
+                            <p className="text-base sm:text-lg font-bold text-foreground">
                               {eventData?.attendee_count ?? eventData?.attendees ?? attendees.length} Registered
                             </p>
                           </div>
@@ -2474,14 +2550,14 @@ export default function EventDetails() {
                       </div>
 
                       {/* Capacity Card */}
-                      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm group hover:border-primary/20 transition-all">
-                        <div className="flex items-center gap-4 mb-4">
-                          <div className={`p-3 rounded-xl bg-primary/10 text-primary`}>
-                            <Layers className="w-6 h-6" />
+                      <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm group hover:border-primary/20 transition-all">
+                        <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
+                          <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl bg-primary/10 text-primary shrink-0`}>
+                            <Layers className="w-5 h-5 sm:w-6 sm:h-6" />
                           </div>
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Capacity</p>
-                            <p className="text-lg font-bold text-foreground">
+                            <p className="text-base sm:text-lg font-bold text-foreground">
                               {eventData?.max_guests ? `${eventData.max_guests}` : 'Unlimited'}
                             </p>
                           </div>
@@ -2494,17 +2570,17 @@ export default function EventDetails() {
                       </div>
                     </div>
 
-                    {/* Event Details Grid */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Event Details Grid - Responsive */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                       {/* Main Event Information */}
-                      <div className="lg:col-span-2 space-y-6">
+                      <div className="lg:col-span-2 space-y-4 sm:space-y-6">
                         {/* Event Description */}
-                        <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
-                          <div className="flex items-center gap-3 mb-6">
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                              <FileText className="w-5 h-5" />
+                        <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
+                          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                              <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
                             </div>
-                            <h3 className="text-xl font-bold text-foreground">Event Description</h3>
+                            <h3 className="text-lg sm:text-xl font-bold text-foreground">Event Description</h3>
                           </div>
                           <div className="prose prose-gray max-w-none">
                             <p className="text-foreground leading-relaxed whitespace-pre-line">
@@ -2514,12 +2590,12 @@ export default function EventDetails() {
                         </div>
 
                         {/* Event Type Details */}
-                        <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
-                          <div className="flex items-center gap-3 mb-6">
-                            <div className="w-8 h-8 rounded-full bg-primary/20 text-primary dark:text-primary flex items-center justify-center">
+                        <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
+                          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary/20 text-primary dark:text-primary flex items-center justify-center shrink-0 text-lg sm:text-xl">
                               {eventData?.event_type === 'ticketed' ? '🎫' : '🎉'}
                             </div>
-                            <h3 className="text-xl font-bold text-foreground">
+                            <h3 className="text-lg sm:text-xl font-bold text-foreground">
                               {eventData?.event_type === 'ticketed' ? 'Ticket Information' : 'Guest Type Information'}
                             </h3>
                           </div>
@@ -2534,17 +2610,17 @@ export default function EventDetails() {
                                   const ticketDescription = ticket?.description || '';
 
                                   return (
-                                    <div key={index} className="bg-gradient-to-r from-primary/10 to-warning/10 border border-primary/30 rounded-xl p-6">
-                                      <div className="flex items-start justify-between mb-3">
-                                        <div>
-                                          <h4 className="font-bold text-primary dark:text-primary text-lg">{ticketName}</h4>
+                                    <div key={index} className="bg-gradient-to-r from-primary/10 to-warning/10 border border-primary/30 rounded-lg sm:rounded-xl p-4 sm:p-6">
+                                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0 mb-3">
+                                        <div className="flex-1 min-w-0">
+                                          <h4 className="font-bold text-primary dark:text-primary text-base sm:text-lg break-words">{ticketName}</h4>
                                           {ticketDescription && (
-                                            <p className="text-primary/80 dark:text-primary/70 text-sm mt-1">{ticketDescription}</p>
+                                            <p className="text-primary/80 dark:text-primary/70 text-xs sm:text-sm mt-1 break-words">{ticketDescription}</p>
                                           )}
                                         </div>
-                                        <div className="text-right">
-                                          <div className="text-2xl font-bold text-primary dark:text-primary">ETB {ticketPrice}</div>
-                                          <div className="text-sm text-primary/80 dark:text-primary/70">
+                                        <div className="text-left sm:text-right shrink-0">
+                                          <div className="text-xl sm:text-2xl font-bold text-primary dark:text-primary">ETB {ticketPrice}</div>
+                                          <div className="text-xs sm:text-sm text-primary/80 dark:text-primary/70">
                                             {ticketQuantity === 'Unlimited' ? 'Unlimited' : `${ticketQuantity} available`}
                                           </div>
                                         </div>
@@ -2581,16 +2657,16 @@ export default function EventDetails() {
                                   }
 
                                   return (
-                                    <div key={index} className="bg-primary/5 border border-primary/10 rounded-xl p-6">
-                                      <div className="flex items-start justify-between mb-3">
-                                        <div>
-                                          <h4 className="font-bold text-primary text-xl">{guestTypeName}</h4>
+                                    <div key={index} className="bg-primary/5 border border-primary/10 rounded-lg sm:rounded-xl p-4 sm:p-6">
+                                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0 mb-3">
+                                        <div className="flex-1 min-w-0">
+                                          <h4 className="font-bold text-primary text-lg sm:text-xl break-words">{guestTypeName}</h4>
                                           {guestTypeDescription && (
-                                            <p className="text-muted-foreground text-sm mt-1 font-medium">{guestTypeDescription}</p>
+                                            <p className="text-muted-foreground text-xs sm:text-sm mt-1 font-medium break-words">{guestTypeDescription}</p>
                                           )}
                                         </div>
-                                        <div className="text-right">
-                                          <div className="text-2xl font-bold text-primary">
+                                        <div className="text-left sm:text-right shrink-0">
+                                          <div className="text-xl sm:text-2xl font-bold text-primary">
                                             {guestTypePrice === '0' ? 'Free' : `ETB ${guestTypePrice}`}
                                           </div>
                                           <div className="text-[10px] font-bold uppercase tracking-wider text-primary/60">Guest Type</div>
@@ -2615,76 +2691,76 @@ export default function EventDetails() {
                       </div>
 
                       {/* Sidebar Information */}
-                      <div className="space-y-6">
+                      <div className="space-y-4 sm:space-y-6">
                         {/* Event Details */}
-                        <div className="bg-card rounded-2xl shadow-sm border border-border p-6 h-fit">
-                          <div className="flex items-center gap-3 mb-6">
-                            <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                              <CalendarDays className="w-5 h-5" />
+                        <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 h-fit">
+                          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                              <CalendarDays className="w-4 h-4 sm:w-5 sm:h-5" />
                             </div>
-                            <h3 className="text-lg font-bold text-foreground">Event Details</h3>
+                            <h3 className="text-base sm:text-lg font-bold text-foreground">Event Details</h3>
                           </div>
 
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Calendar className="w-5 h-5 text-primary" />
-                              <div>
+                          <div className="space-y-3 sm:space-y-4">
+                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
+                              <div className="min-w-0 flex-1">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Start Date</p>
-                                <p className="text-sm font-semibold text-foreground">
+                                <p className="text-xs sm:text-sm font-semibold text-foreground">
                                   {eventData?.start_date && format(parseISO(eventData.start_date), 'MMM d, yyyy')}
                                 </p>
-                                <p className="text-xs text-muted-foreground font-medium">
+                                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
                                   {eventData?.start_date && format(parseISO(eventData.start_date), 'h:mm a')}
                                 </p>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Calendar className="w-5 h-5 text-primary" />
-                              <div>
+                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
+                              <div className="min-w-0 flex-1">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">End Date</p>
-                                <p className="text-sm font-semibold text-foreground">
+                                <p className="text-xs sm:text-sm font-semibold text-foreground">
                                   {eventData?.end_date && format(parseISO(eventData.end_date), 'MMM d, yyyy')}
                                 </p>
-                                <p className="text-xs text-muted-foreground font-medium">
+                                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
                                   {eventData?.end_date && format(parseISO(eventData.end_date), 'h:mm a')}
                                 </p>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <MapPin className="w-5 h-5 text-primary" />
-                              <div>
+                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
+                              <div className="min-w-0 flex-1">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Location</p>
-                                <p className="text-sm font-semibold text-foreground">{eventData?.location}</p>
+                                <p className="text-xs sm:text-sm font-semibold text-foreground break-words">{eventData?.location}</p>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Shield className="w-5 h-5 text-primary" />
-                              <div>
+                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
+                              <div className="min-w-0 flex-1">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Organizer</p>
-                                <p className="text-sm font-semibold text-foreground">
+                                <p className="text-xs sm:text-sm font-semibold text-foreground break-words">
                                   {user?.organizer?.name || eventData?.organizer?.name}
                                 </p>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Tag className="w-5 h-5 text-primary" />
-                              <div>
+                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Tag className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
+                              <div className="min-w-0 flex-1">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Category</p>
-                                <p className="text-sm font-semibold text-foreground capitalize">
+                                <p className="text-xs sm:text-sm font-semibold text-foreground capitalize break-words">
                                   {eventData?.eventCategory?.name || 'Not specified'}
                                 </p>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Tag className="w-5 h-5 text-primary" />
-                              <div>
+                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Tag className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
+                              <div className="min-w-0 flex-1">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Type Category</p>
-                                <p className="text-sm font-semibold text-foreground capitalize">
+                                <p className="text-xs sm:text-sm font-semibold text-foreground capitalize break-words">
                                   {eventData?.eventType?.name || 'Not specified'}
                                 </p>
                               </div>
@@ -2693,36 +2769,36 @@ export default function EventDetails() {
                         </div>
 
                         {/* Registration Period */}
-                        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-                          <div className="flex items-center gap-3 mb-6">
-                            <div className="w-8 h-8 rounded-full bg-success/20 text-success dark:text-success flex items-center justify-center">
+                        <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6">
+                          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-success/20 text-success dark:text-success flex items-center justify-center shrink-0 text-base sm:text-lg">
                               ⏰
                             </div>
-                            <h3 className="text-lg font-bold text-foreground">Registration Period</h3>
+                            <h3 className="text-base sm:text-lg font-bold text-foreground">Registration Period</h3>
                           </div>
 
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Clock className="w-5 h-5 text-primary" />
-                              <div>
+                          <div className="space-y-3 sm:space-y-4">
+                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
+                              <div className="min-w-0 flex-1">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Opens</p>
-                                <p className="text-sm font-semibold text-foreground">
+                                <p className="text-xs sm:text-sm font-semibold text-foreground">
                                   {eventData?.registration_start_date && format(parseISO(eventData.registration_start_date), 'MMM d, yyyy')}
                                 </p>
-                                <p className="text-xs text-muted-foreground font-medium">
+                                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
                                   {eventData?.registration_start_date && format(parseISO(eventData.registration_start_date), 'h:mm a')}
                                 </p>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Clock className="w-5 h-5 text-primary" />
-                              <div>
+                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
+                              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
+                              <div className="min-w-0 flex-1">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Closes</p>
-                                <p className="text-sm font-semibold text-foreground">
+                                <p className="text-xs sm:text-sm font-semibold text-foreground">
                                   {eventData?.registration_end_date && format(parseISO(eventData.registration_end_date), 'MMM d, yyyy')}
                                 </p>
-                                <p className="text-xs text-muted-foreground font-medium">
+                                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
                                   {eventData?.registration_end_date && format(parseISO(eventData.registration_end_date), 'h:mm a')}
                                 </p>
                               </div>
@@ -2774,30 +2850,30 @@ export default function EventDetails() {
 
                     {/* Additional Event Details Section */}
                     {(eventData?.requirements || eventData?.agenda) && (
-                      <div className="bg-card rounded-2xl shadow-sm border border-border p-8">
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                            <Info className="w-5 h-5" />
+                      <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                            <Info className="w-4 h-4 sm:w-5 sm:h-5" />
                           </div>
-                          <h3 className="text-xl font-bold text-foreground">Additional Information</h3>
+                          <h3 className="text-lg sm:text-xl font-bold text-foreground">Additional Information</h3>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
                           {eventData?.requirements && (
-                            <div className="bg-gradient-to-br from-warning/10 to-primary/10 border border-warning/30 rounded-xl p-6">
-                              <div className="flex items-center gap-3 mb-4">
-                                <Shield className="w-5 h-5 text-warning dark:text-warning" />
-                                <h4 className="font-bold text-foreground">Requirements</h4>
+                            <div className="bg-gradient-to-br from-warning/10 to-primary/10 border border-warning/30 rounded-lg sm:rounded-xl p-4 sm:p-6">
+                              <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                                <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-warning dark:text-warning shrink-0" />
+                                <h4 className="font-bold text-foreground text-sm sm:text-base">Requirements</h4>
                               </div>
-                              <p className="text-foreground leading-relaxed whitespace-pre-line">{eventData.requirements}</p>
+                              <p className="text-sm sm:text-base text-foreground leading-relaxed whitespace-pre-line break-words">{eventData.requirements}</p>
                             </div>
                           )}
                           {eventData?.agenda && (
-                            <div className="bg-gradient-to-br from-info/10 to-primary/10 border border-info/30 rounded-xl p-6">
-                              <div className="flex items-center gap-3 mb-4">
-                                <Clock className="w-5 h-5 text-info dark:text-info" />
-                                <h4 className="font-bold text-foreground">Agenda</h4>
+                            <div className="bg-gradient-to-br from-info/10 to-primary/10 border border-info/30 rounded-lg sm:rounded-xl p-4 sm:p-6">
+                              <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-info dark:text-info shrink-0" />
+                                <h4 className="font-bold text-foreground text-sm sm:text-base">Agenda</h4>
                               </div>
-                              <p className="text-foreground leading-relaxed whitespace-pre-line">{eventData.agenda}</p>
+                              <p className="text-sm sm:text-base text-foreground leading-relaxed whitespace-pre-line break-words">{eventData.agenda}</p>
                             </div>
                           )}
                         </div>
@@ -2805,269 +2881,303 @@ export default function EventDetails() {
                     )}
                   </div>
                 </TabsContent>
-                <TabsContent value="badges">
-                  <div className="flex flex-col gap-6">
-                    {/* Header Section */}
-                    <div className="flex flex-wrap gap-4 justify-between items-start mb-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center">
-                          <Printer className="w-6 h-6 text-primary" />
+                <TabsContent value="attendees" className="w-full">
+                  <div className="flex flex-col gap-4 sm:gap-6 w-full max-w-full">
+                    {/* Page Header - Responsive */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-card rounded-lg flex items-center justify-center border border-border shrink-0">
+                          <Users className="w-5 h-5 sm:w-7 sm:h-7 text-foreground" />
                         </div>
-                        <div>
-                          <h3 className="text-2xl font-bold text-foreground">
-                            Badge Management
+                        <div className="min-w-0">
+                          <h3 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+                            Attendees List
+                            <Star className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground hidden sm:inline" />
                           </h3>
-                          <p className="text-muted-foreground text-sm">
-                            Design, preview, and print attendee badges
+                          <p className="text-xs sm:text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                            <RefreshCw className="w-3 h-3" />
+                            Auto-updates in 2 min
                           </p>
                         </div>
                       </div>
-                      <div className="flex gap-3">
-                        {/* Legacy designer removed - now using standalone Fabric.js app */}
+                      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        {selectedAttendees.size > 0 && (
+                          <Button
+                            variant="outline"
+                            onClick={handleBatchPrintBadges}
+                            disabled={selectedAttendees.size === 0}
+                            className="bg-background border-border hover:bg-accent text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
+                          >
+                            <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Print Selected ({selectedAttendees.size})</span>
+                            <span className="sm:hidden">Print ({selectedAttendees.size})</span>
+                          </Button>
+                        )}
                         <Button
-                          variant="default"
-                          onClick={handleBadgeBatchPrintBadges}
-                          disabled={badgeSelectedAttendees.size === 0}
-                          className="bg-primary text-primary-foreground shadow-sm flex items-center gap-2"
+                          variant="outline"
+                          onClick={handleImportClick}
+                          className="bg-background border-border hover:bg-accent text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
                         >
-                          <Printer className="w-4 h-4" />
-                          Print Selected ({badgeSelectedAttendees.size})
+                          <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
+                          <span className="hidden sm:inline">Import CSV</span>
+                          <span className="sm:hidden">Import</span>
+                        </Button>
+                        <Button
+                          className="bg-success hover:bg-success/90 text-white text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
+                          onClick={() => setAddAttendeeDialogOpen(true)}
+                        >
+                          <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
+                          <span className="hidden sm:inline">+ Add New Attendee</span>
+                          <span className="sm:hidden">Add</span>
                         </Button>
                       </div>
                     </div>
 
-                    {/* Statistics Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                      <div className="bg-card rounded-lg p-4 border border-border">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm text-muted-foreground">Total Attendees</p>
-                            <p className="text-2xl font-bold text-foreground">{filteredBadgesAttendees.length}</p>
-                          </div>
-                          <div className="w-10 h-10 bg-info/20 rounded-lg flex items-center justify-center">
-                            <Users className="w-5 h-5 text-info" />
-                          </div>
+                    {/* Filter and Search Bar - Responsive */}
+                    <div className="bg-card rounded-lg border border-border p-3 sm:p-4 mb-4 sm:mb-6">
+                      <div className="flex flex-col gap-3 sm:gap-4">
+                        {/* Filters - Responsive */}
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                          <Select value={guestTypeFilter} onValueChange={handleGuestTypeFilterChange}>
+                            <SelectTrigger className="w-full sm:w-[140px] bg-background border-border text-sm h-9 sm:h-10">
+                              <SelectValue placeholder="All Types" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Types</SelectItem>
+                              {guestTypes.map(type => (
+                                <SelectItem key={type.id} value={type.name.toLowerCase()}>{type.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select value={checkedInFilter} onValueChange={handleCheckedInFilterChange}>
+                            <SelectTrigger className="w-full sm:w-[120px] bg-background border-border text-sm h-9 sm:h-10">
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Status</SelectItem>
+                              <SelectItem value="checked-in">Checked In</SelectItem>
+                              <SelectItem value="not-checked-in">Not Checked In</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select>
+                            <SelectTrigger className="w-full sm:w-[120px] bg-background border-border text-sm h-9 sm:h-10">
+                              <SelectValue placeholder="Monthly" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Time</SelectItem>
+                              <SelectItem value="this-month">This Month</SelectItem>
+                              <SelectItem value="last-month">Last Month</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button variant="ghost" size="icon" className="hover:bg-accent h-9 w-9 sm:h-10 sm:w-10">
+                            <Filter className="w-4 h-4" />
+                          </Button>
                         </div>
-                      </div>
-                      <div className="bg-card rounded-lg p-4 border border-border">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm text-muted-foreground">Checked In</p>
-                            <p className="text-2xl font-bold text-success">
-                              {filteredBadgesAttendees.filter(a => a.checked_in).length}
-                            </p>
-                          </div>
-                          <div className="w-10 h-10 bg-success/20 rounded-lg flex items-center justify-center">
-                            <CheckCircle className="w-5 h-5 text-success" />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="bg-card rounded-lg p-4 border border-border">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm text-muted-foreground">Pending Check-in</p>
-                            <p className="text-2xl font-bold text-warning">
-                              {filteredBadgesAttendees.filter(a => !a.checked_in).length}
-                            </p>
-                          </div>
-                          <div className="w-10 h-10 bg-warning/20 rounded-lg flex items-center justify-center">
-                            <Clock className="w-5 h-5 text-warning" />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="bg-card rounded-lg p-4 border border-border">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm text-muted-foreground">Selected for Print</p>
-                            <p className="text-2xl font-bold text-foreground">{badgeSelectedAttendees.size}</p>
-                          </div>
-                          <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
-                            <FileText className="w-5 h-5 text-muted-foreground" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Search and Filters */}
-                    <div className="bg-card rounded-lg p-4 border border-border">
-                      <div className="flex flex-wrap gap-4 items-center">
-                        <div className="relative flex-1 max-w-md">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                          <Input
-                            placeholder="Search attendees by name, email, or company..."
-                            value={badgeSearchTerm}
-                            onChange={e => setBadgeSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 w-full"
-                          />
-                          {badgeSearchTerm && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setBadgeSearchTerm('')}
-                              className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-muted"
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          )}
-                        </div>
-                        <Select value={badgeGuestTypeFilter} onValueChange={setBadgeGuestTypeFilter}>
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="All Types" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Types</SelectItem>
-                            {guestTypes.map(type => (
-                              <SelectItem key={type.id} value={type.name.toLowerCase()}>{type.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select value={badgeCheckedInFilter} onValueChange={setBadgeCheckedInFilter}>
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="All Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="checked-in">Checked In</SelectItem>
-                            <SelectItem value="not-checked-in">Not Checked In</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setBadgeSearchTerm('');
-                            setBadgeGuestTypeFilter('all');
-                            setBadgeCheckedInFilter('all');
-                          }}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <RotateCcw className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Badge List View */}
-                    <div className="bg-card rounded-lg border border-border overflow-hidden">
-                      <div className="p-4 border-b border-border">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Checkbox
-                              checked={badgeSelectedAttendees.size === filteredBadgesAttendees.length && filteredBadgesAttendees.length > 0}
-                              onCheckedChange={handleBadgeSelectAllAttendees}
+                        {/* Search and Export - Responsive */}
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+                          <div className="relative flex-1 w-full sm:w-64">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                            <Input
+                              placeholder="Search..."
+                              value={searchTerm}
+                              onChange={e => handleSearchChange(e.target.value)}
+                              className="pl-9 bg-background border-border text-sm h-9 sm:h-10"
                             />
-                            <span className="text-sm text-muted-foreground">
-                              {badgeSelectedAttendees.size} of {filteredBadgesAttendees.length} selected
-                            </span>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 sm:gap-3">
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              onClick={() => setBadgeSelectedAttendees(new Set())}
-                              disabled={badgeSelectedAttendees.size === 0}
-                              className="text-muted-foreground hover:text-foreground"
+                              onClick={exportAttendeesToCSV}
+                              className="bg-background border-border hover:bg-accent text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4 flex-1 sm:flex-initial"
                             >
-                              Clear Selection
+                              <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
+                              <span className="hidden sm:inline">Export PDF</span>
+                              <span className="sm:hidden">PDF</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={exportAttendeesToCSV}
+                              className="bg-background border-border hover:bg-accent text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4 flex-1 sm:flex-initial"
+                            >
+                              <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
+                              <span className="hidden sm:inline">Export Excel</span>
+                              <span className="sm:hidden">Excel</span>
                             </Button>
                           </div>
                         </div>
                       </div>
+                    </div>
 
-                      {filteredBadgesAttendees.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12">
-                          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                            <FileText className="w-8 h-8 text-muted-foreground" />
-                          </div>
-                          <h3 className="text-lg font-medium text-foreground mb-2">No attendees found</h3>
-                          <p className="text-muted-foreground text-center max-w-md">
-                            {badgeSearchTerm || badgeGuestTypeFilter !== 'all' || badgeCheckedInFilter !== 'all'
-                              ? 'Try adjusting your search or filters to find attendees.'
-                              : 'No attendees have been registered for this event yet.'
-                            }
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="divide-y divide-border">
-                          {filteredBadgesAttendees.map(attendee => (
-                            <div
-                              key={attendee.id}
-                              className={`p-4 transition-all duration-200 hover:bg-muted/50 ${badgeSelectedAttendees.has(attendee.id)
-                                ? 'bg-muted/50 border-l-4 border-primary'
-                                : 'border-l-4 border-transparent'
-                                }`}
-                            >
-                              <div className="flex items-center gap-4">
-                                {/* Selection Checkbox */}
-                                <div className="flex-shrink-0">
+                    {/* Attendees Table - Responsive with horizontal scroll */}
+                    <div className="bg-card rounded-lg border border-border overflow-hidden shadow-sm">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50 border-b border-border">
+                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 w-10 sm:w-12">
+                                <Checkbox
+                                  checked={selectedAttendees.size === filteredAttendees.length && filteredAttendees.length > 0}
+                                  onCheckedChange={handleSelectAllAttendees}
+                                />
+                              </TableHead>
+                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 min-w-[150px]">Name</TableHead>
+                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 hidden md:table-cell min-w-[140px]">Company</TableHead>
+                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 hidden lg:table-cell min-w-[130px]">Job Title</TableHead>
+                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 min-w-[100px]">Date</TableHead>
+                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 hidden xl:table-cell min-w-[180px]">Email</TableHead>
+                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 hidden 2xl:table-cell min-w-[130px]">Phone</TableHead>
+                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 min-w-[120px]">Status</TableHead>
+                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 w-10 sm:w-12"></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredAttendees.length > 0 ? filteredAttendees.map(attendee => (
+                              <TableRow key={attendee.id} className="hover:bg-accent/50 transition-colors border-b border-border">
+                                <TableCell className="py-3 sm:py-4">
                                   <Checkbox
-                                    checked={badgeSelectedAttendees.has(attendee.id)}
-                                    onCheckedChange={() => handleBadgeSelectAttendee(attendee.id)}
+                                    checked={selectedAttendees.has(attendee.id)}
+                                    onCheckedChange={() => handleSelectAttendee(attendee.id)}
                                   />
-                                </div>
-
-                                {/* Badge Preview */}
-                                <div className="flex-shrink-0">
-                                  <div className="w-20 h-28 bg-muted border border-border rounded-lg flex items-center justify-center overflow-hidden">
-                                    <div style={{ transform: 'scale(0.12)', transformOrigin: 'top left', width: 400, height: 600 }}>
-                                      <BadgePrint attendee={attendee} />
+                                </TableCell>
+                                <TableCell className="py-3 sm:py-4">
+                                  <div className="flex items-center gap-2 sm:gap-3">
+                                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/10 flex items-center justify-center font-semibold text-foreground text-xs sm:text-sm shrink-0">
+                                      {attendee.guest?.name?.charAt(0)?.toUpperCase() || 'A'}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="font-semibold text-foreground text-sm sm:text-base truncate">{attendee.guest?.name}</div>
+                                      <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{(attendee.guestType || attendee.guest_type)?.name || 'General'}</div>
                                     </div>
                                   </div>
-                                </div>
-
-                                {/* Attendee Info */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-3 mb-2">
-                                    <h4 className="font-semibold text-foreground truncate">
-                                      {attendee.guest?.name || 'Unknown'}
-                                    </h4>
-                                    <Badge className={`text-xs ${getGuestTypeBadgeClasses((attendee.guestType || attendee.guest_type)?.name)}`}>
-                                      {(attendee.guestType || attendee.guest_type)?.name || 'General'}
+                                </TableCell>
+                                <TableCell className="py-3 sm:py-4 hidden md:table-cell px-2">
+                                  <div className="text-xs sm:text-sm text-foreground truncate">
+                                    {attendee.guest?.company || '-'}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-3 sm:py-4 hidden lg:table-cell px-1">
+                                  <div className="text-xs sm:text-sm text-foreground truncate">
+                                    {attendee.guest?.jobtitle || '-'}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-3 sm:py-4">
+                                  <div className="text-xs sm:text-sm text-foreground">
+                                    {attendee.created_at ? new Date(attendee.created_at).toLocaleDateString('en-GB') : '-'}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="py-3 sm:py-4 hidden xl:table-cell">
+                                  <div className="text-xs sm:text-sm text-foreground truncate">{attendee.guest?.email}</div>
+                                </TableCell>
+                                <TableCell className="py-3 sm:py-4 hidden 2xl:table-cell">
+                                  <div className="text-xs sm:text-sm text-foreground truncate">{attendee.guest?.phone || '-'}</div>
+                                </TableCell>
+                                <TableCell className="py-3 sm:py-4">
+                                  {attendee.checked_in ? (
+                                    <Badge className="bg-success/10 text-success border-success/30 text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border">
+                                      <span className="hidden sm:inline">Checked In</span>
+                                      <span className="sm:hidden">✓</span>
                                     </Badge>
-                                    {attendee.checked_in ? (
-                                      <Badge className="bg-success/10 text-success dark:text-success text-xs border border-success/30">
-                                        <CheckCircle className="w-3 h-3 mr-1" />
-                                        Checked In
-                                      </Badge>
-                                    ) : (
-                                      <Badge className="bg-warning/10 text-warning dark:text-warning text-xs border border-warning/30">
-                                        <Clock className="w-3 h-3 mr-1" />
-                                        Pending
-                                      </Badge>
+                                  ) : (
+                                    <Badge className="bg-muted/50 text-muted-foreground border-border text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border">
+                                      <span className="hidden sm:inline">Not Checked In</span>
+                                      <span className="sm:hidden">-</span>
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="py-3 sm:py-4">
+                                  <div className="flex items-center gap-0.5 sm:gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        // Use the same batch print function for single attendee
+                                        handleBatchPrintBadges(new Set([attendee.id]));
+                                      }}
+                                      className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-accent"
+                                      title="Print Badge"
+                                    >
+                                      <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-accent hidden sm:flex"
+                                      title="View Custom Fields"
+                                      disabled
+                                    >
+                                      <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => openEditAttendeeDialog(attendee)}
+                                      className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-accent"
+                                      title="Edit Guest"
+                                    >
+                                      <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleRemoveAttendee(attendee)}
+                                      className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                                      title="Delete Guest"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )) : (
+                              <TableRow>
+                                <TableCell colSpan={8} className="text-center py-8 sm:py-12 px-4">
+                                  <div className="flex flex-col items-center space-y-3">
+                                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-muted rounded-full flex items-center justify-center">
+                                      <Search className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground" />
+                                    </div>
+                                    <div className="text-base sm:text-lg font-medium text-foreground">
+                                      {searchTerm ? 'No attendees found' : 'No attendees'}
+                                    </div>
+                                    <div className="text-xs sm:text-sm text-muted-foreground max-w-md text-center px-4">
+                                      {searchTerm
+                                        ? `No attendees match your search for "${searchTerm}". Try adjusting your search terms or filters.`
+                                        : 'No attendees have been registered for this event yet.'
+                                      }
+                                    </div>
+                                    {searchTerm && (
+                                      <Button
+                                        variant="outline"
+                                        onClick={() => handleSearchChange('')}
+                                        className="mt-2 text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
+                                      >
+                                        Clear search
+                                      </Button>
                                     )}
                                   </div>
-                                  <p className="text-sm text-muted-foreground truncate">
-                                    {attendee.guest?.email || 'No email'}
-                                  </p>
-                                  {attendee.guest?.company && (
-                                    <p className="text-sm text-muted-foreground truncate">
-                                      {attendee.guest.company}
-                                    </p>
-                                  )}
-                                </div>
-
-                                {/* Actions */}
-                                <div className="flex-shrink-0 flex gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setBadgeSelectedAttendees(new Set([attendee.id]));
-                                      setPrinting(true);
-                                    }}
-                                    className="border-border text-foreground hover:bg-muted"
-                                  >
-                                    <Printer className="w-4 h-4 mr-1" />
-                                    Print
-                                  </Button>
-
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
-                    {/* Hidden print area for batch printing */}
+
+                    {/* Pagination Component - Show for all users when there are records */}
+                    {!attendeesLoading && !attendeesError && totalRecords > 0 && (
+                      <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalRecords={totalRecords}
+                        perPage={perPage}
+                        onPageChange={handlePageChange}
+                        onPerPageChange={handlePerPageChange}
+                      />
+                    )}
+
+                    {/* Hidden print area for batch badge printing - Optimized */}
                     <div
                       ref={printRef}
                       style={{
@@ -3108,300 +3218,17 @@ export default function EventDetails() {
                         }
                       `}</style>
                       <div id="badge-print-area">
-                        {printing && badgeSelectedAttendees.size > 0 ? (
-                          filteredBadgesAttendees
-                            .filter(attendee => badgeSelectedAttendees.has(attendee.id))
+                        {printing && selectedAttendees.size > 0 ? (
+                          filteredAttendees
+                            .filter(attendee => selectedAttendees.has(attendee.id))
                             .map(attendee => (
                               <div key={attendee.id} className="printable-badge-batch">
                                 <BadgePrint attendee={attendee} />
                               </div>
                             ))
-                        ) : (
-                          <div>No badges selected for printing.</div>
-                        )}
+                        ) : null}
                       </div>
                     </div>
-                  </div>
-                </TabsContent>
-                <TabsContent value="attendees">
-                  <div className="flex flex-col gap-6">
-                    {/* Page Header */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-card rounded-lg flex items-center justify-center border border-border">
-                          <Users className="w-7 h-7 text-foreground" />
-                        </div>
-                        <div>
-                          <h3 className="text-2xl font-bold text-foreground flex items-center gap-2">
-                            Attendees List
-                            <Star className="w-5 h-5 text-muted-foreground" />
-                          </h3>
-                          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                            <RefreshCw className="w-3 h-3" />
-                            Auto-updates in 2 min
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {selectedAttendees.size > 0 && (
-                          <Button
-                            variant="outline"
-                            onClick={handleBatchPrintBadges}
-                            disabled={selectedAttendees.size === 0}
-                            className="bg-background border-border hover:bg-accent"
-                          >
-                            <Printer className="w-4 h-4 mr-2" />
-                            Print Selected ({selectedAttendees.size})
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          onClick={handleImportClick}
-                          className="bg-background border-border hover:bg-accent"
-                        >
-                          <Upload className="w-4 h-4 mr-2" />
-                          Import CSV
-                        </Button>
-                        <Button
-                          className="bg-success hover:bg-success/90 text-white"
-                          onClick={() => setAddAttendeeDialogOpen(true)}
-                        >
-                          <Plus className="w-4 h-4 mr-2" /> + Add New Attendee
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Filter and Search Bar */}
-                    <div className="bg-card rounded-lg border border-border p-4 mb-6">
-                      <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-                        {/* Filters */}
-                        <div className="flex flex-wrap items-center gap-3">
-                          <Select value={guestTypeFilter} onValueChange={handleGuestTypeFilterChange}>
-                            <SelectTrigger className="w-[140px] bg-background border-border">
-                              <SelectValue placeholder="All Types" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Types</SelectItem>
-                              {guestTypes.map(type => (
-                                <SelectItem key={type.id} value={type.name.toLowerCase()}>{type.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Select value={checkedInFilter} onValueChange={handleCheckedInFilterChange}>
-                            <SelectTrigger className="w-[120px] bg-background border-border">
-                              <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Status</SelectItem>
-                              <SelectItem value="checked-in">Checked In</SelectItem>
-                              <SelectItem value="not-checked-in">Not Checked In</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Select>
-                            <SelectTrigger className="w-[120px] bg-background border-border">
-                              <SelectValue placeholder="Monthly" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Time</SelectItem>
-                              <SelectItem value="this-month">This Month</SelectItem>
-                              <SelectItem value="last-month">Last Month</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button variant="ghost" size="icon" className="hover:bg-accent">
-                            <Filter className="w-4 h-4" />
-                          </Button>
-                        </div>
-
-                        {/* Search and Export */}
-                        <div className="flex items-center gap-3 w-full lg:w-auto">
-                          <div className="relative flex-1 lg:w-64">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                              placeholder="Search..."
-                              value={searchTerm}
-                              onChange={e => handleSearchChange(e.target.value)}
-                              className="pl-9 bg-background border-border"
-                            />
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={exportAttendeesToCSV}
-                            className="bg-background border-border hover:bg-accent"
-                          >
-                            <FileText className="w-4 h-4 mr-2" />
-                            Export PDF
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={exportAttendeesToCSV}
-                            className="bg-background border-border hover:bg-accent"
-                          >
-                            <FileSpreadsheet className="w-4 h-4 mr-2" />
-                            Export Excel
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Attendees Table */}
-                    <div className="bg-card rounded-lg border border-border overflow-hidden shadow-sm">
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-muted/50 border-b border-border">
-                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4 w-12">
-                                <Checkbox
-                                  checked={selectedAttendees.size === filteredAttendees.length && filteredAttendees.length > 0}
-                                  onCheckedChange={handleSelectAllAttendees}
-                                />
-                              </TableHead>
-                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Name of Attendee</TableHead>
-                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Source</TableHead>
-                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Date</TableHead>
-                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Email</TableHead>
-                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Phone Number</TableHead>
-                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Check-in Status</TableHead>
-                              <TableHead className="font-semibold text-foreground text-xs uppercase py-4 w-12"></TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredAttendees.length > 0 ? filteredAttendees.map(attendee => (
-                              <TableRow key={attendee.id} className="hover:bg-accent/50 transition-colors border-b border-border">
-                                <TableCell className="py-4">
-                                  <Checkbox
-                                    checked={selectedAttendees.has(attendee.id)}
-                                    onCheckedChange={() => handleSelectAttendee(attendee.id)}
-                                  />
-                                </TableCell>
-                                <TableCell className="py-4">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-semibold text-foreground text-sm">
-                                      {attendee.guest?.name?.charAt(0)?.toUpperCase() || 'A'}
-                                    </div>
-                                    <div>
-                                      <div className="font-semibold text-foreground">{attendee.guest?.name}</div>
-                                      <div className="text-xs text-muted-foreground">{(attendee.guestType || attendee.guest_type)?.name || 'General'}</div>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-4">
-                                  <div className="text-sm text-foreground">
-                                    {eventData?.name || 'Event'}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-4">
-                                  <div className="text-sm text-foreground">
-                                    {attendee.created_at ? new Date(attendee.created_at).toLocaleDateString('en-GB') : '-'}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-4">
-                                  <div className="text-sm text-foreground">{attendee.guest?.email}</div>
-                                </TableCell>
-                                <TableCell className="py-4">
-                                  <div className="text-sm text-foreground">{attendee.guest?.phone || '-'}</div>
-                                </TableCell>
-                                <TableCell className="py-4">
-                                  {attendee.checked_in ? (
-                                    <Badge className="bg-success/10 text-success border-success/30 text-xs px-3 py-1 rounded-full border">
-                                      Checked In
-                                    </Badge>
-                                  ) : (
-                                    <Badge className="bg-muted/50 text-muted-foreground border-border text-xs px-3 py-1 rounded-full border">
-                                      Not Checked In
-                                    </Badge>
-                                  )}
-                                </TableCell>
-                                <TableCell className="py-4">
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setSelectedAttendees(new Set([attendee.id]));
-                                        setPrinting(true);
-                                      }}
-                                      className="h-8 w-8 p-0 hover:bg-accent"
-                                      title="Print Badge"
-                                    >
-                                      <Printer className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 w-8 p-0 hover:bg-accent"
-                                      title="View Custom Fields"
-                                      disabled
-                                    >
-                                      <FileText className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => openEditAttendeeDialog(attendee)}
-                                      className="h-8 w-8 p-0 hover:bg-accent"
-                                      title="Edit Guest"
-                                    >
-                                      <Edit className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleRemoveAttendee(attendee)}
-                                      className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                                      title="Delete Guest"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            )) : (
-                              <TableRow>
-                                <TableCell colSpan={8} className="text-center py-12">
-                                  <div className="flex flex-col items-center space-y-3">
-                                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
-                                      <Search className="w-8 h-8 text-muted-foreground" />
-                                    </div>
-                                    <div className="text-lg font-medium text-foreground">
-                                      {searchTerm ? 'No attendees found' : 'No attendees'}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground max-w-md text-center">
-                                      {searchTerm
-                                        ? `No attendees match your search for "${searchTerm}". Try adjusting your search terms or filters.`
-                                        : 'No attendees have been registered for this event yet.'
-                                      }
-                                    </div>
-                                    {searchTerm && (
-                                      <Button
-                                        variant="outline"
-                                        onClick={() => handleSearchChange('')}
-                                        className="mt-2"
-                                      >
-                                        Clear search
-                                      </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-
-                    {/* Pagination Component - Only for admin and organizer */}
-                    {!attendeesLoading && !attendeesError && isAdminOrOrganizer && totalRecords > 0 && (
-                      <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        totalRecords={totalRecords}
-                        perPage={perPage}
-                        onPageChange={handlePageChange}
-                        onPerPageChange={handlePerPageChange}
-                      />
-                    )}
                   </div>
                 </TabsContent>
                 <TabsContent value="ushers">

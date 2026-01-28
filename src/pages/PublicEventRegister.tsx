@@ -514,7 +514,7 @@ export default function PublicEventRegister() {
       } else {
         // Fallback to old success state if backend doesn't return expected data
         setSuccess(true);
-        toast.success('Registration successful! Check your email for confirmation and your e-badge.');
+        toast.success('Registration successful! Your confirmation email with e-badge is being sent. You can also view it on the confirmation page.');
       }
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Registration failed.');
@@ -1128,8 +1128,8 @@ export default function PublicEventRegister() {
           {/* Clean Footer */}
           <div className="bg-slate-50/80 dark:bg-slate-800/20 p-12 text-center backdrop-blur-sm">
             <div className="flex items-center justify-center gap-2 text-slate-400 dark:text-slate-500 text-xs font-semibold mb-8">
-              <AlertCircle className="w-4 h-4" />
-              <span>Confirmation & E-Badge will be sent via email</span>
+              <Mail className="w-4 h-4" />
+              <span>Your confirmation email with e-badge PDF will be sent automatically after registration</span>
             </div>
 
             {/* Powered by Validity Section */}

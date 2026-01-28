@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { CheckCircle, Download, ArrowLeft, Calendar, Clock, MapPin } from 'lucide-react';
+import { CheckCircle, Download, ArrowLeft, Calendar, Clock, MapPin, Mail, Loader2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import api, { resendRegistrationEmail, getBadgePreview } from '@/lib/api';
+import Badge from '@/components/Badge';
 
 export default function RegistrationSuccess() {
   const [searchParams] = useSearchParams();
@@ -15,6 +17,10 @@ export default function RegistrationSuccess() {
   const badgeCardRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
+  const [badgeData, setBadgeData] = useState<any>(null);
+  const [loadingBadge, setLoadingBadge] = useState(false);
+  const [emailSent, setEmailSent] = useState(true); // Assume email was sent on registration
 
   // Get registration data from URL params
   const attendeeId = searchParams.get('attendeeId');
@@ -42,53 +48,76 @@ export default function RegistrationSuccess() {
     }
   }, [attendeeId, eventId, eventName]);
 
+  // Load badge preview data when confirmation is shown
+  useEffect(() => {
+    if (showConfirmation && attendeeId && eventId && !badgeData && !loadingBadge) {
+      loadBadgePreview();
+    }
+  }, [showConfirmation, attendeeId, eventId]);
+
+  const loadBadgePreview = async () => {
+    if (!attendeeId || !eventId) return;
+    
+    setLoadingBadge(true);
+    try {
+      const response = await getBadgePreview(Number(eventId), Number(attendeeId));
+      setBadgeData(response.data);
+    } catch (error: any) {
+      console.error('Failed to load badge preview:', error);
+      // Don't show error toast, just use fallback badge
+    } finally {
+      setLoadingBadge(false);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    if (!attendeeId || !eventId) {
+      toast.error('Invalid registration data');
+      return;
+    }
+
+    setResendingEmail(true);
+    try {
+      await resendRegistrationEmail(Number(eventId), Number(attendeeId));
+      toast.success('Confirmation email with e-badge has been sent! Please check your inbox.');
+      setEmailSent(true);
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Failed to resend email. Please try again later.';
+      toast.error(errorMessage);
+    } finally {
+      setResendingEmail(false);
+    }
+  };
+
   const handleDownloadBadge = async () => {
-    if (!badgeCardRef.current) {
-      toast.error('Badge not ready. Please try again.');
+    if (!attendeeId || !eventId) {
+      toast.error('Invalid registration data. Please try again.');
       return;
     }
 
     setDownloading(true);
     try {
-      // Capture the badge card with high quality
-      const canvas = await html2canvas(badgeCardRef.current, {
-        scale: 3, // Higher quality for PDF
-        backgroundColor: null,
-        logging: false,
-        useCORS: true,
-        allowTaint: true,
-        width: badgeCardRef.current.scrollWidth,
-        height: badgeCardRef.current.scrollHeight,
-      });
+      // Get pre-generated badge from API
+      const response = await api.get(
+        `/events/${eventId}/attendees/${attendeeId}/badge`,
+        { responseType: 'blob' }
+      );
+      
+      // Create blob URL and trigger download
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${guestName?.replace(/\s+/g, '-') || 'event'}-confirmation-badge.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
-      // Get canvas dimensions
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      
-      // Convert to PDF with proper dimensions
-      const imgData = canvas.toDataURL('image/png', 1.0);
-      
-      // Calculate PDF dimensions to maintain aspect ratio
-      const pdfWidth = 210; // A4 width in mm
-      const pdfHeight = (canvasHeight / canvasWidth) * pdfWidth;
-      
-      // Create PDF with calculated dimensions
-      const pdf = new jsPDF({
-        orientation: pdfHeight > pdfWidth ? 'portrait' : 'landscape',
-        unit: 'mm',
-        format: [pdfWidth, pdfHeight],
-      });
-
-      // Add the badge image to fill the entire page
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      
-      // Save with guest name
-      pdf.save(`${guestName?.replace(/\s+/g, '-') || 'event'}-confirmation.pdf`);
-
-      toast.success('Confirmation downloaded successfully!');
-    } catch (error) {
-      console.error('Error downloading confirmation:', error);
-      toast.error('Failed to download confirmation. Please try again.');
+      toast.success('E-badge downloaded successfully!');
+    } catch (error: any) {
+      console.error('Error downloading badge:', error);
+      toast.error(error.response?.data?.error || 'Failed to download badge. Please try again.');
     } finally {
       setDownloading(false);
     }
@@ -132,6 +161,18 @@ export default function RegistrationSuccess() {
           <h1 className="text-2xl font-bold text-card-foreground mb-2">
             You have successfully registered for <span className="text-yellow-600">{eventName || 'the event'}</span>
           </h1>
+          
+          {/* Email Status */}
+          <div className="mt-4 mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg">
+            <div className="flex items-center gap-2 text-blue-800 dark:text-blue-300 text-sm">
+              <Mail className="w-4 h-4" />
+              <span>
+                {emailSent 
+                  ? 'Your confirmation email with e-badge has been sent!' 
+                  : 'Your confirmation email is being prepared...'}
+              </span>
+            </div>
+          </div>
 
           {/* Action Buttons */}
           <div className="space-y-3 mt-8">
@@ -181,73 +222,75 @@ export default function RegistrationSuccess() {
           className="bg-gradient-to-br from-card via-muted/50 to-yellow-500/10 dark:to-yellow-900/20 rounded-3xl shadow-2xl p-0 mb-8 border-0 overflow-hidden"
         >
           <div className="flex flex-col md:flex-row gap-0 md:gap-10 items-stretch">
-            {/* Modern Badge Preview */}
+            {/* Badge Preview - Use Badge component if data available, otherwise fallback */}
             <div
               ref={badgeRef}
-              className="flex-shrink-0 bg-gradient-to-br from-yellow-400/80 via-yellow-100 to-white border-0 rounded-2xl p-0 shadow-none relative flex flex-col items-center justify-between"
-              style={{ width: '320px', height: '380px' }}
+              className="flex-shrink-0 flex items-center justify-center p-6"
+              style={{ width: '320px', minHeight: '380px' }}
             >
-              {/* Top Bar with Logo */}
-              <div className="w-full flex justify-between items-center px-6 pt-6">
-                <img
-                  src="/evella-logo.png"
-                  alt="Evella Logo"
-                  className="w-30 h-12 object-contain"
-                />
-                <span className="inline-flex items-center justify-center bg-yellow-500/90 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm h-8">
-                  Visitor
-                </span>
-              </div>
-               {/* Event Title */}
-               <div className="w-full text-center mt-4 mb-3 px-6">
-                 <h3 className="text-2xl font-extrabold text-foreground tracking-tight uppercase">
-                   {eventName?.toUpperCase() || 'EVENT'}
-                 </h3>
-               </div>
-               {/* Guest Name */}
-               <div className="w-full text-center mb-4 px-6">
-                 <p className="text-3xl font-extrabold text-card-foreground tracking-tight">
-                   {guestName || 'Guest'}
-                 </p>
-               </div>
-              {/* Event Details Modernized */}
-              <div className="flex flex-row justify-center gap-6 mb-4 px-6">
-                {/* <div className="flex flex-col items-center">
-                  <div className="flex items-center gap-1 text-yellow-600 mb-1">
-                    <Calendar className="w-4 h-4" />
-                    <span className="text-xs font-medium">Date</span>
+              {loadingBadge ? (
+                <div className="flex flex-col items-center justify-center h-full">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+                  <p className="text-sm text-muted-foreground">Loading badge...</p>
+                </div>
+              ) : badgeData?.badge ? (
+                <div className="transform scale-75 origin-center">
+                  <Badge 
+                    attendee={{
+                      id: Number(attendeeId),
+                      guest: {
+                        name: badgeData.badge?.name || badgeData.attendee?.guest_name || guestName || '',
+                        email: badgeData.attendee?.guest_email || guestEmail || '',
+                        company: badgeData.badge?.company || guestCompany || '',
+                        jobtitle: badgeData.badge?.jobTitle || guestJobTitle || '',
+                        uuid: badgeData.badge?.uuid || guestUuid || '',
+                      },
+                      guest_type: {
+                        name: badgeData.badge?.guestType || badgeData.attendee?.guest_type || guestTypeName || 'Visitor'
+                      }
+                    } as any}
+                  />
+                </div>
+              ) : (
+                // Fallback badge preview
+                <div className="flex-shrink-0 bg-gradient-to-br from-yellow-400/80 via-yellow-100 to-white border-0 rounded-2xl p-0 shadow-none relative flex flex-col items-center justify-between w-full h-full">
+                  <div className="w-full flex justify-between items-center px-6 pt-6">
+                    <img
+                      src="/evella-logo.png"
+                      alt="Evella Logo"
+                      className="w-30 h-12 object-contain"
+                    />
+                    <span className="inline-flex items-center justify-center bg-yellow-500/90 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm h-8">
+                      {guestTypeName || 'Visitor'}
+                    </span>
                   </div>
-                  <p className="text-base font-semibold text-card-foreground">
-                    {formatDate(eventDate)}
-                  </p>
-                </div> */}
-                {/* <div className="flex flex-col items-center">
-                  <div className="flex items-center gap-1 text-yellow-600 mb-1">
-                    <Clock className="w-4 h-4" />
-                    <span className="text-xs font-medium">Time</span>
+                  <div className="w-full text-center mt-4 mb-3 px-6">
+                    <h3 className="text-2xl font-extrabold text-foreground tracking-tight uppercase">
+                      {eventName?.toUpperCase() || 'EVENT'}
+                    </h3>
                   </div>
-                  <p className="text-base font-semibold text-card-foreground">
-                    {formatTime(eventTime)}
-                  </p>
-                </div> */}
-              </div>
-               {/* QR Code Modern */}
-               <div className="flex justify-center w-full mb-4">
-                 <div className="bg-card/90 dark:bg-card/80 p-3 rounded-xl shadow-lg border border-yellow-200 dark:border-yellow-700/50">
-                   <QRCodeSVG
-                     value={guestUuid || attendeeId || 'NO-DATA'}
-                     size={100}
-                     level="M"
-                     marginSize={0}
-                   />
-                 </div>
-               </div>
-              {/* Attendee ID Footer */}
-              <div className="w-full text-center pb-4 px-6">
-                <span className="text-xs text-muted-foreground tracking-widest font-mono">
-                  #{attendeeId}
-                </span>
-              </div>
+                  <div className="w-full text-center mb-4 px-6">
+                    <p className="text-3xl font-extrabold text-card-foreground tracking-tight">
+                      {guestName || 'Guest'}
+                    </p>
+                  </div>
+                  <div className="flex justify-center w-full mb-4">
+                    <div className="bg-card/90 dark:bg-card/80 p-3 rounded-xl shadow-lg border border-yellow-200 dark:border-yellow-700/50">
+                      <QRCodeSVG
+                        value={guestUuid || attendeeId || 'NO-DATA'}
+                        size={100}
+                        level="M"
+                        marginSize={0}
+                      />
+                    </div>
+                  </div>
+                  <div className="w-full text-center pb-4 px-6">
+                    <span className="text-xs text-muted-foreground tracking-widest font-mono">
+                      #{attendeeId}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Modern Event Info */}
@@ -367,32 +410,68 @@ export default function RegistrationSuccess() {
           </div>
         </Card>
 
-        {/* Download Button */}
-        <div className="text-center">
-          <Button
-            onClick={handleDownloadBadge}
-            disabled={downloading}
-            className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-8 rounded-lg text-base inline-flex items-center gap-2"
-          >
-            {downloading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Downloading...
-              </>
-            ) : (
-              <>
-                <Download className="w-5 h-5" />
-                DOWNLOAD CONFIRMATION
-              </>
-            )}
-          </Button>
+        {/* Action Buttons */}
+        <div className="text-center space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button
+              onClick={handleDownloadBadge}
+              disabled={downloading}
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-8 rounded-lg text-base inline-flex items-center gap-2 shadow-lg hover:shadow-xl transition-all"
+            >
+              {downloading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download className="w-5 h-5" />
+                  Download e-Badge
+                </>
+              )}
+            </Button>
+            
+            <Button
+              onClick={handleResendEmail}
+              disabled={resendingEmail}
+              variant="outline"
+              className="border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground font-semibold py-3 px-8 rounded-lg text-base inline-flex items-center gap-2"
+            >
+              {resendingEmail ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="w-5 h-5" />
+                  RESEND EMAIL
+                </>
+              )}
+            </Button>
+          </div>
+          
+          {emailSent && (
+            <p className="text-sm text-muted-foreground flex items-center justify-center gap-2">
+              <Mail className="w-4 h-4" />
+              Check your email ({guestEmail}) for the confirmation with e-badge attachment
+            </p>
+          )}
         </div>
 
         {/* Info Box */}
-        <div className="mt-8 bg-blue-500/10 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg p-4 text-center">
-          <p className="text-blue-800 dark:text-blue-300 text-sm">
-            <strong>E-Badge Ready!</strong> Download your digital visitor badge above for easy access during the event.
-          </p>
+        <div className="mt-8 bg-blue-500/10 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-blue-800 dark:text-blue-300 text-sm font-semibold mb-1">
+                E-Badge Ready!
+              </p>
+              <p className="text-blue-700 dark:text-blue-400 text-sm">
+                Your digital visitor badge has been generated and sent to your email. You can download it above or check your inbox for the PDF attachment. The badge includes a QR code for seamless check-in at the event.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Back Button */}

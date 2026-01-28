@@ -17,6 +17,8 @@ import {
   Calendar as CalendarIcon2,
   LayoutGrid,
   List,
+  Send,
+  BarChart3,
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { MetricCard } from '@/components/MetricCard'
@@ -50,6 +52,7 @@ import { BarChartComponent } from '@/components/reports/BarChartComponent'
 import { useModernAlerts } from '@/hooks/useModernAlerts'
 import { CheckCircle2, Circle, AlertCircle, ArrowRight, ExternalLink } from 'lucide-react'
 import { format, formatDistanceToNow, isPast, isToday } from 'date-fns'
+import { useUnreadCount } from '@/hooks/use-messages'
 
 export default function OrganizerDashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null)
@@ -72,6 +75,8 @@ export default function OrganizerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { showError, showSuccess, showWarning } = useModernAlerts();
+  const { data: unreadData } = useUnreadCount();
+  const unreadCount = unreadData?.unread_count || 0;
 
   // Real-time chart data state
   const [guestTypeDistribution, setGuestTypeDistribution] = useState<Array<{ name: string; value: number; color: string }>>([]);
@@ -602,73 +607,126 @@ export default function OrganizerDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="flex gap-3 mt-6">
+        <div className="flex flex-wrap gap-3 mt-6">
           <Link to="/dashboard/events/create">
             <Button className="bg-brand-gradient bg-brand-gradient-hover text-foreground shadow-lg">
               <UserPlus className="w-4 h-4 mr-2" />
               Create New Event
             </Button>
           </Link>
+          <Link to="/dashboard/guests">
+            <Button variant="outline" className="shadow-sm">
+              <Users className="w-4 h-4 mr-2" />
+              Manage Guests
+            </Button>
+          </Link>
+          <Link to="/dashboard/marketing">
+            <Button variant="outline" className="shadow-sm">
+              <Send className="w-4 h-4 mr-2" />
+              Marketing
+            </Button>
+          </Link>
+          <Link to="/dashboard/reports">
+            <Button variant="outline" className="shadow-sm">
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Analytics
+            </Button>
+          </Link>
         </div>
       </div>
 
-      {/* Key Metrics */}
+      {/* Key Metrics - Clickable Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
-          <div className="absolute top-0 right-0 w-20 h-20 rounded-full -translate-y-10 translate-x-10 bg-[hsl(var(--primary))]/10"></div>
+        <Link 
+          to="/dashboard/events" 
+          className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg hover:border-primary/50 transition-all duration-300 cursor-pointer"
+        >
+          <div className="absolute top-0 right-0 w-20 h-20 rounded-full -translate-y-10 translate-x-10 bg-primary/10"></div>
           <div className="relative">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-                <CalendarIcon className="w-5 h-5 text-[hsl(var(--color-rich-black))]" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+                  <CalendarIcon className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <div className="text-sm font-medium text-muted-foreground">My Events</div>
               </div>
-              <div className="text-sm font-medium text-muted-foreground">My Events</div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
             </div>
-            <div className="text-3xl font-bold text-card-foreground mb-1">{keyMetrics?.myEvents?.value || 'N/A'}</div>
+            <div className="text-3xl font-bold text-card-foreground mb-1">{allEvents.length || keyMetrics?.myEvents?.value || 0}</div>
             <div className="text-xs text-muted-foreground/70">Organized events</div>
           </div>
-        </div>
+        </Link>
 
-        <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
+        <div 
+          onClick={() => navigate('/dashboard/reports')}
+          className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg hover:border-success/50 transition-all duration-300 cursor-pointer"
+        >
           <div className="absolute top-0 right-0 w-20 h-20 rounded-full -translate-y-10 translate-x-10 bg-success/10"></div>
           <div className="relative">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-success rounded-xl flex items-center justify-center">
-                <Users className="w-5 h-5 text-[hsl(var(--color-rich-black))]" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-success rounded-xl flex items-center justify-center">
+                  <Users className="w-5 h-5 text-success-foreground" />
+                </div>
+                <div className="text-sm font-medium text-muted-foreground">Total Attendance</div>
               </div>
-              <div className="text-sm font-medium text-muted-foreground">Total Attendees</div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-success group-hover:translate-x-1 transition-all" />
             </div>
-            <div className="text-3xl font-bold text-card-foreground mb-1">{keyMetrics?.totalAttendees?.value || 'N/A'}</div>
+            <div className="text-3xl font-bold text-card-foreground mb-1">{keyMetrics?.totalAttendees?.value || reportMetrics?.total_attendees || 0}</div>
             <div className="text-xs text-muted-foreground/70">All participants</div>
           </div>
         </div>
 
-        <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
-          <div className="absolute top-0 right-0 w-20 h-20 rounded-full -translate-y-10 translate-x-10 bg-[hsl(var(--primary))]/10"></div>
+        <div 
+          onClick={() => navigate('/dashboard/reports')}
+          className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg hover:border-primary/50 transition-all duration-300 cursor-pointer"
+        >
+          <div className="absolute top-0 right-0 w-20 h-20 rounded-full -translate-y-10 translate-x-10 bg-primary/10"></div>
           <div className="relative">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-[hsl(var(--color-rich-black))]" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <div className="text-sm font-medium text-muted-foreground">Total Revenue</div>
               </div>
-              <div className="text-sm font-medium text-muted-foreground">Total Revenue</div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
             </div>
-            <div className="text-3xl font-bold text-card-foreground mb-1">{keyMetrics?.totalRevenue?.value || 'N/A'}</div>
+            <div className="text-3xl font-bold text-card-foreground mb-1">
+              {keyMetrics?.totalRevenue?.value 
+                ? `${keyMetrics.totalRevenue.value} ETB` 
+                : reportMetrics?.total_revenue 
+                ? `${reportMetrics.total_revenue.toLocaleString()} ETB`
+                : '0 ETB'}
+            </div>
             <div className="text-xs text-muted-foreground/70">Event earnings</div>
           </div>
         </div>
 
-        <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
-          <div className="absolute top-0 right-0 w-20 h-20 rounded-full -translate-y-10 translate-x-10 bg-[hsl(var(--color-warning))]/10"></div>
+        <Link 
+          to="/dashboard/messages" 
+          className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg hover:border-warning/50 transition-all duration-300 cursor-pointer"
+        >
+          <div className="absolute top-0 right-0 w-20 h-20 rounded-full -translate-y-10 translate-x-10 bg-warning/10"></div>
           <div className="relative">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-[hsl(var(--color-warning))] rounded-xl flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-[hsl(var(--color-rich-black))]" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-warning rounded-xl flex items-center justify-center relative">
+                  <MessageSquare className="w-5 h-5 text-warning-foreground" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center text-xs font-bold text-destructive-foreground">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm font-medium text-muted-foreground">Unread Messages</div>
               </div>
-              <div className="text-sm font-medium text-muted-foreground">Unread Messages</div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-warning group-hover:translate-x-1 transition-all" />
             </div>
-            <div className="text-3xl font-bold text-card-foreground mb-1">{keyMetrics?.unreadMessages?.value || 'N/A'}</div>
+            <div className="text-3xl font-bold text-card-foreground mb-1">{unreadCount || 0}</div>
             <div className="text-xs text-muted-foreground/70">Pending messages</div>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Main content grid */}

@@ -497,7 +497,7 @@ const AppWithRealtime = () => {
             <Route 
               path="locate-badges" 
               element={
-                <RoleProtectedRoute allowedRoles={['admin', 'organizer', 'organizer_admin', 'usher']}>
+                <RoleProtectedRoute allowedRoles={['admin', 'organizer', 'organizer_admin', 'event_manager', 'usher']}>
                   <LocateBadges />
                 </RoleProtectedRoute>
               } 

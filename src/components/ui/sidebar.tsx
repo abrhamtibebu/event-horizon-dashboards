@@ -19,8 +19,8 @@ import {
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "16rem"
-const SIDEBAR_WIDTH_MOBILE = "16rem"
+const SIDEBAR_WIDTH = "14rem"
+const SIDEBAR_WIDTH_MOBILE = "14rem"
 const SIDEBAR_WIDTH_ICON = "4rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
@@ -32,6 +32,8 @@ type SidebarContext = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  isHovered: boolean
+  setIsHovered: (hovered: boolean) => void
 }
 
 const SidebarContext = React.createContext<SidebarContext | null>(null)
@@ -55,7 +57,7 @@ const SidebarProvider = React.forwardRef<
 >(
   (
     {
-      defaultOpen = true,
+      defaultOpen = false, // Changed to false - collapsed by default
       open: openProp,
       onOpenChange: setOpenProp,
       className,
@@ -67,11 +69,20 @@ const SidebarProvider = React.forwardRef<
   ) => {
     const isMobile = useIsMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
+    const [isHovered, setIsHovered] = React.useState(false)
 
     // This is the internal state of the sidebar.
     // We use openProp and setOpenProp for control from outside the component.
     const [_open, _setOpen] = React.useState(defaultOpen)
-    const open = openProp ?? _open
+    
+    // On desktop, use hover state; on mobile or when controlled externally, use openProp
+    const open = React.useMemo(() => {
+      if (isMobile) return openMobile
+      if (openProp !== undefined) return openProp
+      // On desktop, expand on hover, otherwise use internal state
+      return isHovered || _open
+    }, [isMobile, openMobile, openProp, isHovered, _open])
+    
     const setOpen = React.useCallback(
       (value: boolean | ((value: boolean) => boolean)) => {
         const openState = typeof value === "function" ? value(open) : value
@@ -81,10 +92,12 @@ const SidebarProvider = React.forwardRef<
           _setOpen(openState)
         }
 
-        // This sets the cookie to keep the sidebar state.
-        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+        // This sets the cookie to keep the sidebar state (only for manual toggles, not hover)
+        if (!isMobile && !isHovered) {
+          document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+        }
       },
-      [setOpenProp, open]
+      [setOpenProp, open, isMobile, isHovered]
     )
 
     // Helper to toggle the sidebar.
@@ -93,6 +106,19 @@ const SidebarProvider = React.forwardRef<
         ? setOpenMobile((open) => !open)
         : setOpen((open) => !open)
     }, [isMobile, setOpen, setOpenMobile])
+
+    // Expose hover handlers
+    const handleMouseEnter = React.useCallback(() => {
+      if (!isMobile) {
+        setIsHovered(true)
+      }
+    }, [isMobile])
+
+    const handleMouseLeave = React.useCallback(() => {
+      if (!isMobile) {
+        setIsHovered(false)
+      }
+    }, [isMobile])
 
     // Adds a keyboard shortcut to toggle the sidebar.
     React.useEffect(() => {
@@ -123,8 +149,10 @@ const SidebarProvider = React.forwardRef<
         openMobile,
         setOpenMobile,
         toggleSidebar,
+        isHovered,
+        setIsHovered,
       }),
-      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, isHovered, setIsHovered]
     )
 
     return (
@@ -173,7 +201,20 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    const { isMobile, state, openMobile, setOpenMobile, setIsHovered } = useSidebar()
+
+    // Handle hover events for desktop
+    const handleMouseEnter = React.useCallback(() => {
+      if (!isMobile) {
+        setIsHovered(true)
+      }
+    }, [isMobile, setIsHovered])
+
+    const handleMouseLeave = React.useCallback(() => {
+      if (!isMobile) {
+        setIsHovered(false)
+      }
+    }, [isMobile, setIsHovered])
 
     if (collapsible === "none") {
       return (
@@ -218,11 +259,13 @@ const Sidebar = React.forwardRef<
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}
         data-side={side}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {/* This is what handles the sidebar gap on desktop */}
         <div
           className={cn(
-            "duration-200 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-linear",
+            "duration-300 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-in-out",
             "group-data-[collapsible=offcanvas]:w-0",
             "group-data-[side=right]:rotate-180",
             variant === "floating" || variant === "inset"
@@ -232,7 +275,7 @@ const Sidebar = React.forwardRef<
         />
         <div
           className={cn(
-            "duration-200 fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] transition-[left,right,width] ease-linear md:flex",
+            "duration-300 fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] transition-[left,right,width] ease-in-out md:flex",
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
