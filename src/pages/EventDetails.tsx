@@ -847,40 +847,40 @@ export default function EventDetails() {
   // Optimized batch badge printing with batching and performance improvements
   const handleBatchPrintBadges = async (customSelectedAttendees?: Set<number>) => {
     const attendeesToPrint = customSelectedAttendees || selectedAttendees;
-    
+
     if (attendeesToPrint.size === 0) {
       toast.error('No attendees selected for printing.');
       return;
     }
-    
+
     const selectedCount = attendeesToPrint.size;
     toast.info(`Generating ${selectedCount} badge${selectedCount > 1 ? 's' : ''}...`, { duration: 2000 });
-    
+
     // Set selected attendees if using custom set
     if (customSelectedAttendees) {
       setSelectedAttendees(customSelectedAttendees);
     }
     setPrinting(true);
-    
+
     // Optimized: Process badges in batches to avoid memory issues
     const BATCH_SIZE = 10; // Process 10 badges at a time
     const selectedAttendeesArray = Array.from(attendeesToPrint);
     const batches = [];
-    
+
     for (let i = 0; i < selectedAttendeesArray.length; i += BATCH_SIZE) {
       batches.push(selectedAttendeesArray.slice(i, i + BATCH_SIZE));
     }
-    
+
     try {
       // Wait for the badges to render in the hidden printRef
       await new Promise(resolve => setTimeout(resolve, 100)); // Reduced from 150ms
-      
+
       if (!printRef.current) {
         toast.error('Print area not found.');
         setPrinting(false);
         return;
       }
-      
+
       const badgeElements = Array.from(printRef.current.querySelectorAll('.printable-badge-batch'));
       if (badgeElements.length === 0) {
         toast.error('No badges found to print.');
@@ -890,20 +890,20 @@ export default function EventDetails() {
         }
         return;
       }
-      
+
       // Optimized: Use Promise.all for parallel canvas rendering (with batching)
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [400, 400] });
-      
+
       // Process badges in batches to avoid overwhelming the browser
       for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
         const batch = batches[batchIndex];
         const batchStartIndex = batchIndex * BATCH_SIZE;
-        
+
         // Process batch in parallel
         const canvasPromises = batch.map((_, idx) => {
           const el = badgeElements[batchStartIndex + idx] as HTMLElement;
           if (!el) return null;
-          
+
           return html2canvas(el, {
             scale: 1.5,
             useCORS: true,
@@ -913,9 +913,9 @@ export default function EventDetails() {
             removeContainer: true, // Clean up after rendering
           });
         });
-        
+
         const canvases = await Promise.all(canvasPromises.filter(Boolean));
-        
+
         // Add canvases to PDF
         canvases.forEach((canvas, idx) => {
           if (canvas) {
@@ -926,14 +926,14 @@ export default function EventDetails() {
             pdf.addImage(imgData, 'JPEG', 0, 0, 400, 400);
           }
         });
-        
+
         // Show progress for large batches
         if (selectedCount > 20 && batchIndex < batches.length - 1) {
           const progress = Math.round(((batchIndex + 1) / batches.length) * 100);
           toast.info(`Processing badges... ${progress}%`, { duration: 1000 });
         }
       }
-      
+
       // Trigger print
       const blob = pdf.output('blob');
       const blobUrl = URL.createObjectURL(blob);
@@ -946,7 +946,7 @@ export default function EventDetails() {
       iframe.style.border = '0';
       iframe.src = blobUrl;
       document.body.appendChild(iframe);
-      
+
       iframe.onload = () => {
         const cleanup = () => {
           if (iframe.parentNode) document.body.removeChild(iframe);
@@ -958,15 +958,15 @@ export default function EventDetails() {
           }
           document.removeEventListener('visibilitychange', handleVisibility);
         };
-        
+
         const handleVisibility = () => {
           if (document.visibilityState === 'visible') {
             setTimeout(cleanup, 300);
           }
         };
-        
+
         document.addEventListener('visibilitychange', handleVisibility);
-        
+
         try {
           const cw = iframe.contentWindow;
           cw?.focus();
@@ -974,7 +974,7 @@ export default function EventDetails() {
         } catch (e) {
           setTimeout(cleanup, 120000);
         }
-        
+
         setTimeout(() => {
           document.removeEventListener('visibilitychange', handleVisibility);
           if (iframe.parentNode) document.body.removeChild(iframe);
@@ -986,7 +986,7 @@ export default function EventDetails() {
           }
         }, 120000);
       };
-      
+
       toast.success(`Successfully generated ${selectedCount} badge${selectedCount > 1 ? 's' : ''}!`, { duration: 3000 });
     } catch (error) {
       console.error('Error generating badges:', error);
@@ -1463,7 +1463,7 @@ export default function EventDetails() {
           return { ...a, _search: blob }
         })
         setAttendees(indexed)
-        
+
         // Refresh event data to get updated attendee count
         const eventRes = await api.get(`/events/${Number(eventId)}`)
         setEventData(eventRes.data)
@@ -1539,7 +1539,7 @@ export default function EventDetails() {
         // Refresh attendees list and event data to get updated attendee count
         const res = await api.get(`/events/${Number(eventId)}/attendees`)
         setAttendees(res.data || [])
-        
+
         // Refresh event data to get updated attendee count
         const eventRes = await api.get(`/events/${Number(eventId)}`)
         setEventData(eventRes.data)
@@ -2540,10 +2540,10 @@ export default function EventDetails() {
                         <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
                           <div
                             className="bg-primary h-full transition-all duration-500"
-                            style={{ 
-                              width: eventData?.max_guests 
-                                ? `${Math.min((((eventData?.attendee_count ?? eventData?.attendees ?? attendees.length) as number) / eventData.max_guests) * 100, 100)}%` 
-                                : '100%' 
+                            style={{
+                              width: eventData?.max_guests
+                                ? `${Math.min((((eventData?.attendee_count ?? eventData?.attendees ?? attendees.length) as number) / eventData.max_guests) * 100, 100)}%`
+                                : '100%'
                             }}
                           />
                         </div>
@@ -3011,152 +3011,130 @@ export default function EventDetails() {
                       </div>
                     </div>
 
-                    {/* Attendees Table - Responsive with horizontal scroll */}
+                    {/* Attendees Table - No horizontal scroll */}
                     <div className="bg-card rounded-lg border border-border overflow-hidden shadow-sm">
-                      <div className="overflow-x-auto">
-                        <Table>
+                      <div className="overflow-x-hidden">
+                        <Table className="table-fixed w-full">
                           <TableHeader>
                             <TableRow className="bg-muted/50 border-b border-border">
-                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 w-10 sm:w-12">
+                              <TableHead className="w-10 sm:w-12">
                                 <Checkbox
                                   checked={selectedAttendees.size === filteredAttendees.length && filteredAttendees.length > 0}
                                   onCheckedChange={handleSelectAllAttendees}
                                 />
                               </TableHead>
-                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 min-w-[150px]">Name</TableHead>
-                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 hidden md:table-cell min-w-[140px]">Company</TableHead>
-                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 hidden lg:table-cell min-w-[130px]">Job Title</TableHead>
-                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 min-w-[100px]">Date</TableHead>
-                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 hidden xl:table-cell min-w-[180px]">Email</TableHead>
-                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 hidden 2xl:table-cell min-w-[130px]">Phone</TableHead>
-                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 min-w-[120px]">Status</TableHead>
-                              <TableHead className="font-semibold text-foreground text-[10px] sm:text-xs uppercase py-3 sm:py-4 w-10 sm:w-12"></TableHead>
+
+                              <TableHead>Name</TableHead>
+                              <TableHead className="hidden md:table-cell">Company</TableHead>
+                              <TableHead className="hidden lg:table-cell">Job Title</TableHead>
+                              <TableHead>Date</TableHead>
+                              <TableHead className="hidden xl:table-cell">Email</TableHead>
+                              <TableHead className="hidden 2xl:table-cell">Phone</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead className="w-10 sm:w-12" />
                             </TableRow>
                           </TableHeader>
+
                           <TableBody>
-                            {filteredAttendees.length > 0 ? filteredAttendees.map(attendee => (
-                              <TableRow key={attendee.id} className="hover:bg-accent/50 transition-colors border-b border-border">
-                                <TableCell className="py-3 sm:py-4">
-                                  <Checkbox
-                                    checked={selectedAttendees.has(attendee.id)}
-                                    onCheckedChange={() => handleSelectAttendee(attendee.id)}
-                                  />
-                                </TableCell>
-                                <TableCell className="py-3 sm:py-4">
-                                  <div className="flex items-center gap-2 sm:gap-3">
-                                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/10 flex items-center justify-center font-semibold text-foreground text-xs sm:text-sm shrink-0">
-                                      {attendee.guest?.name?.charAt(0)?.toUpperCase() || 'A'}
+                            {filteredAttendees.length > 0 ? (
+                              filteredAttendees.map(attendee => (
+                                <TableRow
+                                  key={attendee.id}
+                                  className="hover:bg-accent/50 transition-colors border-b border-border"
+                                >
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={selectedAttendees.has(attendee.id)}
+                                      onCheckedChange={() => handleSelectAttendee(attendee.id)}
+                                    />
+                                  </TableCell>
+
+                                  <TableCell className="max-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold shrink-0">
+                                        {attendee.guest?.name?.charAt(0)?.toUpperCase() || 'A'}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="font-semibold truncate">
+                                          {attendee.guest?.name}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground truncate">
+                                          {(attendee.guestType || attendee.guest_type)?.name || 'General'}
+                                        </div>
+                                      </div>
                                     </div>
-                                    <div className="min-w-0">
-                                      <div className="font-semibold text-foreground text-sm sm:text-base truncate">{attendee.guest?.name}</div>
-                                      <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{(attendee.guestType || attendee.guest_type)?.name || 'General'}</div>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-3 sm:py-4 hidden md:table-cell px-2">
-                                  <div className="text-xs sm:text-sm text-foreground truncate">
+                                  </TableCell>
+
+                                  <TableCell className="hidden md:table-cell max-w-0 truncate">
                                     {attendee.guest?.company || '-'}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-3 sm:py-4 hidden lg:table-cell px-1">
-                                  <div className="text-xs sm:text-sm text-foreground truncate">
+                                  </TableCell>
+
+                                  <TableCell className="hidden lg:table-cell max-w-0 truncate">
                                     {attendee.guest?.jobtitle || '-'}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-3 sm:py-4">
-                                  <div className="text-xs sm:text-sm text-foreground">
-                                    {attendee.created_at ? new Date(attendee.created_at).toLocaleDateString('en-GB') : '-'}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-3 sm:py-4 hidden xl:table-cell">
-                                  <div className="text-xs sm:text-sm text-foreground truncate">{attendee.guest?.email}</div>
-                                </TableCell>
-                                <TableCell className="py-3 sm:py-4 hidden 2xl:table-cell">
-                                  <div className="text-xs sm:text-sm text-foreground truncate">{attendee.guest?.phone || '-'}</div>
-                                </TableCell>
-                                <TableCell className="py-3 sm:py-4">
-                                  {attendee.checked_in ? (
-                                    <Badge className="bg-success/10 text-success border-success/30 text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border">
-                                      <span className="hidden sm:inline">Checked In</span>
-                                      <span className="sm:hidden">✓</span>
-                                    </Badge>
-                                  ) : (
-                                    <Badge className="bg-muted/50 text-muted-foreground border-border text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 rounded-full border">
-                                      <span className="hidden sm:inline">Not Checked In</span>
-                                      <span className="sm:hidden">-</span>
-                                    </Badge>
-                                  )}
-                                </TableCell>
-                                <TableCell className="py-3 sm:py-4">
-                                  <div className="flex items-center gap-0.5 sm:gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        // Use the same batch print function for single attendee
-                                        handleBatchPrintBadges(new Set([attendee.id]));
-                                      }}
-                                      className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-accent"
-                                      title="Print Badge"
-                                    >
-                                      <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-accent hidden sm:flex"
-                                      title="View Custom Fields"
-                                      disabled
-                                    >
-                                      <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => openEditAttendeeDialog(attendee)}
-                                      className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-accent"
-                                      title="Edit Guest"
-                                    >
-                                      <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleRemoveAttendee(attendee)}
-                                      className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                                      title="Delete Guest"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            )) : (
-                              <TableRow>
-                                <TableCell colSpan={8} className="text-center py-8 sm:py-12 px-4">
-                                  <div className="flex flex-col items-center space-y-3">
-                                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-muted rounded-full flex items-center justify-center">
-                                      <Search className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground" />
-                                    </div>
-                                    <div className="text-base sm:text-lg font-medium text-foreground">
-                                      {searchTerm ? 'No attendees found' : 'No attendees'}
-                                    </div>
-                                    <div className="text-xs sm:text-sm text-muted-foreground max-w-md text-center px-4">
-                                      {searchTerm
-                                        ? `No attendees match your search for "${searchTerm}". Try adjusting your search terms or filters.`
-                                        : 'No attendees have been registered for this event yet.'
-                                      }
-                                    </div>
-                                    {searchTerm && (
-                                      <Button
-                                        variant="outline"
-                                        onClick={() => handleSearchChange('')}
-                                        className="mt-2 text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
-                                      >
-                                        Clear search
-                                      </Button>
+                                  </TableCell>
+
+                                  <TableCell className="truncate">
+                                    {attendee.created_at
+                                      ? new Date(attendee.created_at).toLocaleDateString('en-GB')
+                                      : '-'}
+                                  </TableCell>
+
+                                  <TableCell className="hidden xl:table-cell max-w-0 truncate">
+                                    {attendee.guest?.email || '-'}
+                                  </TableCell>
+
+                                  <TableCell className="hidden 2xl:table-cell max-w-0 truncate">
+                                    {attendee.guest?.phone || '-'}
+                                  </TableCell>
+
+                                  <TableCell>
+                                    {attendee.checked_in ? (
+                                      <Badge className="bg-success/10 text-success border-success/30 text-xs px-2 py-0.5 rounded-full border">
+                                        ✓ Checked In
+                                      </Badge>
+                                    ) : (
+                                      <Badge className="bg-muted/50 text-muted-foreground border-border text-xs px-2 py-0.5 rounded-full border">
+                                        Not Checked In
+                                      </Badge>
                                     )}
-                                  </div>
+                                  </TableCell>
+
+                                  <TableCell>
+                                    <div className="flex gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleBatchPrintBadges(new Set([attendee.id]))}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Printer className="w-4 h-4" />
+                                      </Button>
+
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => openEditAttendeeDialog(attendee)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </Button>
+
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRemoveAttendee(attendee)}
+                                        className="h-8 w-8 p-0 hover:text-destructive"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            ) : (
+                              <TableRow>
+                                <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
+                                  No attendees found
                                 </TableCell>
                               </TableRow>
                             )}
@@ -3164,6 +3142,7 @@ export default function EventDetails() {
                         </Table>
                       </div>
                     </div>
+
 
                     {/* Pagination Component - Show for all users when there are records */}
                     {!attendeesLoading && !attendeesError && totalRecords > 0 && (
