@@ -502,7 +502,7 @@ export function AppSidebar() {
         "mt-auto p-3 border-t border-border/40 bg-background",
       )}>
         {user && (
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <div className={cn(
                 "flex items-center gap-3 rounded-lg transition-all duration-200 group cursor-pointer",
