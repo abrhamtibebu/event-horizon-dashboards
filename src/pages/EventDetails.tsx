@@ -279,6 +279,11 @@ export default function EventDetails() {
   const [guestTypes, setGuestTypes] = useState<any[]>([])
   const [ticketTypes, setTicketTypes] = useState<any[]>([])
 
+  // Lightweight attendee stats for the Attendees tab UI
+  const totalAttendeeCount = totalRecords
+  const checkedInCount = attendees.filter((attendee) => attendee.checked_in).length
+  const notCheckedInCount = Math.max(totalAttendeeCount - checkedInCount, 0)
+
   // Badge template state
   const [badgeTemplate, setBadgeTemplate] = useState<BadgeTemplate | null>(null)
   const [badgeTemplateLoading, setBadgeTemplateLoading] = useState(false)
@@ -2884,7 +2889,7 @@ export default function EventDetails() {
                 <TabsContent value="attendees" className="w-full">
                   <div className="flex flex-col gap-4 sm:gap-6 w-full max-w-full">
                     {/* Page Header - Responsive */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-2 sm:mb-4">
                       <div className="flex items-center gap-3 sm:gap-4">
                         <div className="w-10 h-10 sm:w-12 sm:h-12 bg-card rounded-lg flex items-center justify-center border border-border shrink-0">
                           <Users className="w-5 h-5 sm:w-7 sm:h-7 text-foreground" />
@@ -2933,45 +2938,101 @@ export default function EventDetails() {
                       </div>
                     </div>
 
-                    {/* Filter and Search Bar - Responsive */}
-                    <div className="bg-card rounded-lg border border-border p-3 sm:p-4 mb-4 sm:mb-6">
+                    {/* Attendees overview + filters */}
+                    <div className="bg-card rounded-lg border border-border p-3 sm:p-4 mb-4 sm:mb-6 space-y-4">
+                      {/* Quick stats */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 sm:px-4 sm:py-3">
+                          <div>
+                            <p className="text-[11px] sm:text-xs uppercase tracking-wide text-muted-foreground">
+                              Total attendees
+                            </p>
+                            <p className="text-lg sm:text-xl font-semibold text-foreground">
+                              {totalAttendeeCount}
+                            </p>
+                          </div>
+                          <div className="rounded-full bg-primary/10 text-primary p-2 sm:p-2.5">
+                            <Ticket className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 sm:px-4 sm:py-3">
+                          <div>
+                            <p className="text-[11px] sm:text-xs uppercase tracking-wide text-muted-foreground">
+                              Checked in
+                            </p>
+                            <p className="text-lg sm:text-xl font-semibold text-foreground">
+                              {checkedInCount}
+                            </p>
+                          </div>
+                          <div className="rounded-full bg-success/10 text-success p-2 sm:p-2.5">
+                            <UserCheck className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 sm:px-4 sm:py-3">
+                          <div>
+                            <p className="text-[11px] sm:text-xs uppercase tracking-wide text-muted-foreground">
+                              Not checked in
+                            </p>
+                            <p className="text-lg sm:text-xl font-semibold text-foreground">
+                              {notCheckedInCount}
+                            </p>
+                          </div>
+                          <div className="rounded-full bg-muted text-muted-foreground p-2 sm:p-2.5">
+                            <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Filters, search & export */}
                       <div className="flex flex-col gap-3 sm:gap-4">
                         {/* Filters - Responsive */}
-                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                          <Select value={guestTypeFilter} onValueChange={handleGuestTypeFilterChange}>
-                            <SelectTrigger className="w-full sm:w-[140px] bg-background border-border text-sm h-9 sm:h-10">
-                              <SelectValue placeholder="All Types" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Types</SelectItem>
-                              {guestTypes.map(type => (
-                                <SelectItem key={type.id} value={type.name.toLowerCase()}>{type.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Select value={checkedInFilter} onValueChange={handleCheckedInFilterChange}>
-                            <SelectTrigger className="w-full sm:w-[120px] bg-background border-border text-sm h-9 sm:h-10">
-                              <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Status</SelectItem>
-                              <SelectItem value="checked-in">Checked In</SelectItem>
-                              <SelectItem value="not-checked-in">Not Checked In</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Select>
-                            <SelectTrigger className="w-full sm:w-[120px] bg-background border-border text-sm h-9 sm:h-10">
-                              <SelectValue placeholder="Monthly" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Time</SelectItem>
-                              <SelectItem value="this-month">This Month</SelectItem>
-                              <SelectItem value="last-month">Last Month</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button variant="ghost" size="icon" className="hover:bg-accent h-9 w-9 sm:h-10 sm:w-10">
-                            <Filter className="w-4 h-4" />
-                          </Button>
+                        <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                            <Select value={guestTypeFilter} onValueChange={handleGuestTypeFilterChange}>
+                              <SelectTrigger className="w-full sm:w-[160px] bg-background border-border text-sm h-9 sm:h-10">
+                                <SelectValue placeholder="All types" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All types</SelectItem>
+                                {guestTypes.map((type) => (
+                                  <SelectItem key={type.id} value={type.name.toLowerCase()}>
+                                    {type.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Status pills */}
+                          <div className="inline-flex rounded-full bg-muted/60 p-1 w-full sm:w-auto">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={checkedInFilter === 'all' ? 'default' : 'ghost'}
+                              className="flex-1 sm:flex-none rounded-full text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
+                              onClick={() => handleCheckedInFilterChange('all')}
+                            >
+                              All
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={checkedInFilter === 'checked-in' ? 'default' : 'ghost'}
+                              className="flex-1 sm:flex-none rounded-full text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
+                              onClick={() => handleCheckedInFilterChange('checked-in')}
+                            >
+                              Checked in
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={checkedInFilter === 'not-checked-in' ? 'default' : 'ghost'}
+                              className="flex-1 sm:flex-none rounded-full text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
+                              onClick={() => handleCheckedInFilterChange('not-checked-in')}
+                            >
+                              Not checked in
+                            </Button>
+                          </div>
                         </div>
 
                         {/* Search and Export - Responsive */}
@@ -2979,9 +3040,9 @@ export default function EventDetails() {
                           <div className="relative flex-1 w-full sm:w-64">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                             <Input
-                              placeholder="Search..."
+                              placeholder="Search attendees by name, email or company..."
                               value={searchTerm}
-                              onChange={e => handleSearchChange(e.target.value)}
+                              onChange={(e) => handleSearchChange(e.target.value)}
                               className="pl-9 bg-background border-border text-sm h-9 sm:h-10"
                             />
                           </div>
@@ -5649,7 +5710,7 @@ export default function EventDetails() {
                             </Button>
                           </div>
                         </div>
-                        <div className="max-h-64 overflow-auto rounded border border-border bg-background">
+                        <div className="max-h-64 min-w-0 overflow-x-auto overflow-y-auto rounded border border-border bg-background" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
                           <table className="min-w-full text-xs">
                             <thead className="bg-muted/50 sticky top-0">
                               <tr>

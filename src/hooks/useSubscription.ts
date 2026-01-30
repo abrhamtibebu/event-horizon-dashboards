@@ -1,10 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { subscriptionsApi, type Subscription, type SubscriptionPlan } from '@/lib/api/subscriptions'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/use-auth'
 
 export function useSubscription() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+
+  // Only fetch subscription for organizers (backend /subscriptions is for organizer context)
+  const isOrganizer = user?.role === 'organizer' || user?.role === 'organizer_admin'
 
   const {
     data: subscription,
@@ -14,7 +19,8 @@ export function useSubscription() {
   } = useQuery<Subscription | null>({
     queryKey: ['subscription'],
     queryFn: () => subscriptionsApi.getCurrentSubscription(),
-    retry: 1,
+    enabled: !!user && isOrganizer,
+    retry: (failureCount, error: any) => failureCount < 1 && error?.response?.status !== 404,
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 

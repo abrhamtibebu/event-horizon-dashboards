@@ -15,6 +15,7 @@ import CreateTicketedEvent from './pages/CreateTicketedEvent'
 import CreateFreeEvent from './pages/CreateFreeEvent'
 import EventTypeSelection from './pages/EventTypeSelection'
 import Users from './pages/Users'
+import AddUser from './pages/AddUser'
 import Organizers from './pages/Organizers'
 import AddOrganizer from './pages/AddOrganizer'
 import Messages from './pages/MessagesSimple'
@@ -42,6 +43,8 @@ import TicketPurchaseSuccess from './pages/tickets/TicketPurchaseSuccess'
 import TicketValidator from './pages/checkin/TicketValidator'
 import AnalyticsDashboard from './pages/tickets/AnalyticsDashboard'
 import OrganizerProfile from './pages/OrganizerProfile'
+import OrganizerSuspend from './pages/OrganizerSuspend'
+import OrganizerContacts from './pages/OrganizerContacts'
 import { useAuth } from './hooks/use-auth'
 import { useRealtimeMessages } from './hooks/use-realtime-messages'
 import BadgePage from './pages/BadgePage'
@@ -78,6 +81,22 @@ import SubscriptionPayment from './pages/SubscriptionPayment'
 import UsageDashboard from './pages/UsageDashboard'
 import AdminSubscriptionManagement from './pages/AdminSubscriptionManagement'
 import Tasks from './pages/Tasks'
+import SystemHealth from './pages/SystemHealth'
+import FinancialDashboard from './pages/FinancialDashboard'
+import ContentModeration from './pages/ContentModeration'
+import AdvancedAnalytics from './pages/AdvancedAnalytics'
+import SystemSettings from './pages/SystemSettings'
+import SecurityAudit from './pages/SecurityAudit'
+import DataManagement from './pages/DataManagement'
+import APIManagement from './pages/APIManagement'
+import IntegrationManagement from './pages/IntegrationManagement'
+import PerformanceOptimization from './pages/PerformanceOptimization'
+import SystemLogs from './pages/SystemLogs'
+import AutomationWorkflows from './pages/AutomationWorkflows'
+import AdvancedSecurity from './pages/AdvancedSecurity'
+import ComplianceAudit from './pages/ComplianceAudit'
+import NotificationTemplates from './pages/NotificationTemplates'
+import RolePermissions from './pages/RolePermissions'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -92,11 +111,8 @@ const queryClient = new QueryClient({
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { isAuthenticated, isLoading } = useAuth()
 
-  console.log('[ProtectedRoute] isAuthenticated:', isAuthenticated, 'isLoading:', isLoading)
-
   // Show loading spinner while checking authentication
   if (isLoading) {
-    console.log('[ProtectedRoute] Showing loading spinner')
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Spinner size="md" text="Loading..." />
@@ -105,22 +121,17 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   }
 
   if (!isAuthenticated) {
-    console.log('[ProtectedRoute] Not authenticated, redirecting to /')
     return <Navigate to="/" replace />
   }
 
-  console.log('[ProtectedRoute] Authenticated, showing children')
   return children
 }
 
 const UnauthenticatedRoute = ({ children }: { children: JSX.Element }) => {
   const { isAuthenticated, isLoading } = useAuth()
 
-  console.log('[UnauthenticatedRoute] isAuthenticated:', isAuthenticated, 'isLoading:', isLoading)
-
   // Show loading spinner while checking authentication
   if (isLoading) {
-    console.log('[UnauthenticatedRoute] Showing loading spinner')
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Spinner size="md" text="Loading..." />
@@ -129,11 +140,9 @@ const UnauthenticatedRoute = ({ children }: { children: JSX.Element }) => {
   }
 
   if (isAuthenticated) {
-    console.log('[UnauthenticatedRoute] Authenticated, redirecting to /dashboard')
     return <Navigate to="/dashboard" replace />
   }
 
-  console.log('[UnauthenticatedRoute] Not authenticated, showing children')
   return children
 }
 
@@ -357,6 +366,22 @@ const AppWithRealtime = () => {
               } 
             />
             <Route 
+              path="users/add" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <AddUser />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="users/edit/:id" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <AddUser />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
               path="organizers" 
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
@@ -369,6 +394,30 @@ const AppWithRealtime = () => {
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <AddOrganizer />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="organizers/:organizerId/suspend" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <OrganizerSuspend />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="organizers/:organizerId/contacts" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <OrganizerContacts />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="organizers/:organizerId/edit" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <OrganizerProfile />
                 </RoleProtectedRoute>
               } 
             />
@@ -433,6 +482,134 @@ const AppWithRealtime = () => {
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <AdminSubscriptionManagement />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/system-health" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <SystemHealth />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/financials" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <FinancialDashboard />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/moderation" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <ContentModeration />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/analytics" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <AdvancedAnalytics />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/settings" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <SystemSettings />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/security" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <SecurityAudit />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/data" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <DataManagement />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/api" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <APIManagement />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/integrations" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <IntegrationManagement />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/performance" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <PerformanceOptimization />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/logs" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <SystemLogs />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/automation" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <AutomationWorkflows />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/advanced-security" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <AdvancedSecurity />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/compliance" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <ComplianceAudit />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/notification-templates" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <NotificationTemplates />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/roles" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <RolePermissions />
                 </RoleProtectedRoute>
               } 
             />

@@ -75,13 +75,12 @@ const SidebarProvider = React.forwardRef<
     // We use openProp and setOpenProp for control from outside the component.
     const [_open, _setOpen] = React.useState(defaultOpen)
     
-    // On desktop, use hover state; on mobile or when controlled externally, use openProp
+    // On desktop, use internal/cookie state only (no auto-collapse on mouse leave)
     const open = React.useMemo(() => {
       if (isMobile) return openMobile
       if (openProp !== undefined) return openProp
-      // On desktop, expand on hover, otherwise use internal state
-      return isHovered || _open
-    }, [isMobile, openMobile, openProp, isHovered, _open])
+      return _open
+    }, [isMobile, openMobile, openProp, _open])
     
     const setOpen = React.useCallback(
       (value: boolean | ((value: boolean) => boolean)) => {
@@ -92,12 +91,12 @@ const SidebarProvider = React.forwardRef<
           _setOpen(openState)
         }
 
-        // This sets the cookie to keep the sidebar state (only for manual toggles, not hover)
-        if (!isMobile && !isHovered) {
+        // Persist sidebar state in cookie on desktop
+        if (!isMobile) {
           document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
         }
       },
-      [setOpenProp, open, isMobile, isHovered]
+      [setOpenProp, open, isMobile]
     )
 
     // Helper to toggle the sidebar.

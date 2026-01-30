@@ -95,8 +95,13 @@ export const subscriptionsApi = {
 
   // Subscriptions
   async getCurrentSubscription(): Promise<Subscription | null> {
-    const response = await api.get('/subscriptions')
-    return response.data.data
+    try {
+      const response = await api.get('/subscriptions')
+      return response.data?.data ?? null
+    } catch (err: any) {
+      if (err?.response?.status === 404) return null
+      throw err
+    }
   },
 
   async createSubscription(data: {

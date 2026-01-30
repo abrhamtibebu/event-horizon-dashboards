@@ -29,30 +29,21 @@ export const useConversations = () => {
   const { isAuthenticated } = useAuth()
   const refetchInterval = isAuthenticated ? getPollingInterval(3000) : false
   
+  const isDev = import.meta.env.DEV
   return useQuery({
     queryKey: ['conversations'],
     queryFn: async () => {
-      const timestamp = new Date().toISOString()
-      console.log(`[${timestamp}] [useConversations] Fetching conversations list...`)
-      
       try {
         const response = await getConversations()
         const conversations = response.data
-        const conversationCount = Array.isArray(conversations) ? conversations.length : 
-                                   Array.isArray(conversations?.data) ? conversations.data.length : 0
-        
-        console.log(`[${timestamp}] [useConversations] Received ${conversationCount} conversations`)
-        
-        // Log each conversation's last message if available
-        const conversationsList = Array.isArray(conversations) ? conversations : 
-                                    Array.isArray(conversations?.data) ? conversations.data : []
-        conversationsList.forEach((conv: any) => {
-          console.log(`[${timestamp}] [useConversations] Conversation ${conv.id}: last message at ${conv.lastMessage?.created_at || 'N/A'}, unread: ${conv.unreadCount || 0}`)
-        })
-        
+        if (isDev) {
+          const conversationCount = Array.isArray(conversations) ? conversations.length : 
+                                     Array.isArray(conversations?.data) ? conversations.data.length : 0
+          console.log(`[useConversations] Received ${conversationCount} conversations`)
+        }
         return response.data
       } catch (error) {
-        console.error(`[${timestamp}] [useConversations] Error fetching conversations:`, error)
+        console.error('[useConversations] Error fetching conversations:', error)
         throw error
       }
     },

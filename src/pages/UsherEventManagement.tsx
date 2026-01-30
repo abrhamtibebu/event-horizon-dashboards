@@ -1104,7 +1104,7 @@ export default function UsherEventManagement() {
               </div>
 
               {/* Attendees Table */}
-              <div className="rounded-md border">
+              <div className="rounded-md border min-w-0 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

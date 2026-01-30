@@ -89,9 +89,6 @@ export default function Events() {
     resetPagination
   } = usePagination({ defaultPerPage: 10, searchParamPrefix: 'events' });
 
-  // Debug logging
-  console.log('Events component rendered, user:', user?.id)
-
   // Fetch event counts for statistics
   useEffect(() => {
     const fetchEventCounts = async () => {
@@ -157,7 +154,6 @@ export default function Events() {
   }, [user?.id])
 
   useEffect(() => {
-    console.log('Events useEffect triggered, user?.id:', user?.id)
     const fetchEvents = async () => {
       setLoading(true)
       setError(null)
@@ -190,29 +186,19 @@ export default function Events() {
         }
 
         const res = await api.get(`/events?${params.toString()}`)
-        console.log('[Events] API Response:', res.data)
-        console.log('[Events] Response type:', Array.isArray(res.data) ? 'array' : typeof res.data)
-        console.log('[Events] Response length:', Array.isArray(res.data) ? res.data.length : 'N/A')
-        console.log('[Events] Full response structure:', JSON.stringify(res.data, null, 2))
 
         // Handle paginated response (admin/superadmin get paginated response)
         if (res.data && res.data.data && Array.isArray(res.data.data)) {
-          console.log('[Events] Using paginated response, events count:', res.data.data.length)
           setEvents(res.data.data)
           setTotalPages(res.data.last_page || 1)
           setTotalRecords(res.data.total || 0)
         } else if (Array.isArray(res.data)) {
           // Non-paginated response (organizers/event_managers get array directly)
-          console.log('[Events] Using non-paginated response, events count:', res.data.length)
-          console.log('[Events] First event sample:', res.data[0])
           setEvents(res.data)
           setTotalPages(1)
           setTotalRecords(res.data.length || 0)
-          console.log('[Events] Events state set, count:', res.data.length)
         } else {
           // Fallback - empty array if response is unexpected format
-          console.warn('[Events] Unexpected response format:', res.data)
-          console.warn('[Events] Response keys:', res.data ? Object.keys(res.data) : 'null')
           setEvents([])
           setTotalPages(1)
           setTotalRecords(0)
@@ -269,16 +255,6 @@ export default function Events() {
 
   // Since we're now using server-side pagination, we don't need client-side filtering
   const filteredEvents = events;
-  
-  // Debug logging
-  console.log('[Events] Render state:', {
-    eventsCount: events.length,
-    filteredEventsCount: filteredEvents.length,
-    loading,
-    error,
-    userRole: user?.role,
-    eventCounts
-  });
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -469,7 +445,7 @@ export default function Events() {
             <div className="mt-6">
               {/* Admin Table View */}
               {(user?.role === 'admin' || user?.role === 'superadmin') && (
-                <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+                <div className="bg-card rounded-2xl shadow-sm border border-border min-w-0 overflow-x-auto overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">

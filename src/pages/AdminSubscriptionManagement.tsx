@@ -214,7 +214,7 @@ export default function AdminSubscriptionManagement() {
           </div>
 
           {/* Table */}
-          <div className="rounded-xl border border-white/5 overflow-hidden">
+          <div className="rounded-xl border border-white/5 min-w-0 overflow-x-auto overflow-hidden">
             <Table>
               <TableHeader className="bg-background/40">
                 <TableRow className="hover:bg-transparent border-white/5">

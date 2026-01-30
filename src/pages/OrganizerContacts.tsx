@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   User,
@@ -11,6 +11,7 @@ import {
   Trash2,
   Edit,
   Crown,
+  Search,
 } from 'lucide-react'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { Button } from '@/components/ui/button'
@@ -75,11 +76,25 @@ export default function OrganizerContacts() {
   const [assigning, setAssigning] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState<string>('')
+  const [contactSearchTerm, setContactSearchTerm] = useState('')
 
   useEffect(() => {
     fetchContacts()
     fetchAvailableUsers()
   }, [organizerId])
+
+  const contactSearchLower = contactSearchTerm.trim().toLowerCase()
+  const filteredAvailableUsers = useMemo(
+    () =>
+      !contactSearchLower
+        ? availableUsers
+        : availableUsers.filter(
+            (u) =>
+              (u.name ?? '').toLowerCase().includes(contactSearchLower) ||
+              (u.email ?? '').toLowerCase().includes(contactSearchLower)
+          ),
+    [availableUsers, contactSearchLower]
+  )
 
   const fetchContacts = async () => {
     try {
@@ -96,11 +111,22 @@ export default function OrganizerContacts() {
 
   const fetchAvailableUsers = async () => {
     try {
-      // Get all users that could be assigned as contacts
-      const response = await api.get('/users')
-      // Filter out users who are already contacts of this organizer
+      const perPage = 100
+      let list: any[] = []
+      let page = 1
+      let total = 0
+      do {
+        const response = await api.get('/users', {
+          params: { role: 'organizer_admin', page, per_page: perPage },
+        })
+        const raw = response.data
+        const items = Array.isArray(raw) ? raw : (raw?.data ?? [])
+        list = list.concat(items)
+        total = typeof raw?.total === 'number' ? raw.total : list.length
+        page++
+      } while (list.length < total && list.length > 0)
       const existingContactIds = contacts.map(c => c.id)
-      const available = response.data.filter((u: any) => !existingContactIds.includes(u.id))
+      const available = list.filter((u: any) => !existingContactIds.includes(u.id))
       setAvailableUsers(available)
     } catch (error) {
       console.error('Failed to fetch available users:', error)
@@ -110,11 +136,18 @@ export default function OrganizerContacts() {
   const handleAssignContact = async () => {
     if (!selectedUserId) return
 
+    const userId = parseInt(selectedUserId, 10)
+    const hasPrimary = contacts.some((c) => c.is_primary_contact)
+    const payload: { user_ids: number[]; primary_contact_id?: number } = {
+      user_ids: [userId],
+    }
+    if (!hasPrimary) {
+      payload.primary_contact_id = userId
+    }
+
     try {
       setAssigning(true)
-      await api.post(`/organizers/${organizerId}/contacts`, {
-        user_id: parseInt(selectedUserId)
-      })
+      await api.post(`/organizers/${organizerId}/contacts`, payload)
 
       toast.success('Contact assigned successfully!')
       setIsAddDialogOpen(false)
@@ -122,7 +155,11 @@ export default function OrganizerContacts() {
       await fetchContacts()
       await fetchAvailableUsers()
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to assign contact')
+      const msg = error.response?.data?.message
+        ?? error.response?.data?.error
+        ?? (typeof error.response?.data === 'object' ? Object.values(error.response?.data).flat().join(' ') : null)
+        ?? 'Failed to assign contact'
+      toast.error(msg)
     } finally {
       setAssigning(false)
     }
@@ -188,7 +225,13 @@ export default function OrganizerContacts() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <Dialog
+            open={isAddDialogOpen}
+            onOpenChange={(open) => {
+              setIsAddDialogOpen(open)
+              if (!open) setContactSearchTerm('')
+            }}
+          >
             <DialogTrigger asChild>
               <Button className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
                 <Plus className="w-4 h-4 mr-2" />
@@ -204,19 +247,37 @@ export default function OrganizerContacts() {
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
+                  <Label htmlFor="contact-search">Search users</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      id="contact-search"
+                      type="search"
+                      placeholder="Search by name or email..."
+                      value={contactSearchTerm}
+                      onChange={(e) => setContactSearchTerm(e.target.value)}
+                      className="pl-9 bg-background border-border"
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="user">Select User</Label>
                   <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a user to assign" />
+                    <SelectTrigger id="user">
+                      <SelectValue placeholder={filteredAvailableUsers.length === 0 ? 'No users match search' : 'Choose a user to assign'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableUsers.map((user) => (
+                      {filteredAvailableUsers.map((user) => (
                         <SelectItem key={user.id} value={user.id.toString()}>
-                          {user.name} ({user.email}) - {user.role}
+                          {user.name} ({user.email}) — {user.role}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {contactSearchLower && filteredAvailableUsers.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No users match your search.</p>
+                  )}
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button
@@ -329,7 +390,7 @@ export default function OrganizerContacts() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-lg border border-white/5 overflow-hidden">
+          <div className="rounded-lg border border-white/5 min-w-0 overflow-x-auto overflow-hidden">
             <Table>
               <TableHeader className="bg-background/40">
                 <TableRow className="hover:bg-transparent border-white/5">

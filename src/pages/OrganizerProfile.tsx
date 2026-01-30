@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import api from '@/lib/api'
-import { Star, Trash2, ArrowLeft, Pencil, Eye, X, Edit } from 'lucide-react'
+import { Star, Trash2, ArrowLeft, Pencil, Eye, X, Edit, Mail, Phone, MapPin, Building2, Calendar, User } from 'lucide-react'
 import { format } from 'date-fns'
 import {
   Dialog,
@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAuth } from '@/hooks/use-auth'
+import { Badge } from '@/components/ui/badge'
 
 export default function OrganizerProfile() {
   const { organizerId } = useParams()
@@ -73,10 +74,10 @@ export default function OrganizerProfile() {
     const fetchData = async () => {
       setLoading(true)
       try {
-        const orgRes = await api.get(`/organizers`)
-        const org = orgRes.data.find(
-          (o: any) => String(o.id) === String(organizerId)
-        )
+        // Admin list: may be paginated (data.data) or array (data)
+        const orgRes = await api.get(`/admin/organizers`, { params: { per_page: 1000 } })
+        const list = Array.isArray(orgRes.data) ? orgRes.data : orgRes.data?.data ?? []
+        const org = list.find((o: any) => String(o.id) === String(organizerId))
         setOrganizer(org)
         const contactsRes = await api.get(`/organizers/${organizerId}/contacts`)
         setContacts(contactsRes.data)
@@ -380,10 +381,9 @@ export default function OrganizerProfile() {
       await api.put(`/organizers/${organizerId}`, editOrganizerForm)
       toast.success('Organizer updated successfully!')
       setEditOrganizerDialogOpen(false)
-      const orgRes = await api.get(`/organizers`)
-      const org = orgRes.data.find(
-        (o: any) => String(o.id) === String(organizerId)
-      )
+      const orgRes = await api.get(`/admin/organizers`, { params: { per_page: 1000 } })
+      const list = Array.isArray(orgRes.data) ? orgRes.data : orgRes.data?.data ?? []
+      const org = list.find((o: any) => String(o.id) === String(organizerId))
       setOrganizer(org)
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to update organizer')
@@ -397,118 +397,188 @@ export default function OrganizerProfile() {
     setEditOrganizerDialogOpen(true)
   }
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>
-  if (!organizer)
+  if (loading) {
     return (
-      <div className="p-8 text-center text-red-500">Organizer not found.</div>
+      <div className="min-h-[40vh] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <span className="text-sm">Loading organizer…</span>
+        </div>
+      </div>
     )
+  }
+  if (!organizer) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Card className="p-8 text-center">
+          <p className="text-muted-foreground">Organizer not found.</p>
+          <Button variant="outline" className="mt-4" onClick={() => navigate('/dashboard/organizers')}>
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Organizers
+          </Button>
+        </Card>
+      </div>
+    )
+  }
+
+  const logoUrl = organizer.logo?.startsWith('http') ? organizer.logo : `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace(/\/api\/?$/, '')}/storage/${organizer.logo}`
+
+  const DetailRow = ({ icon: Icon, label, value }: { icon?: React.ElementType; label: string; value: React.ReactNode }) => (
+    <div className="flex items-start gap-3 py-2">
+      {Icon && <Icon className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />}
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
+        <p className="text-sm text-foreground mt-0.5">{value ?? '—'}</p>
+      </div>
+    </div>
+  )
 
   return (
-    <div className="max-w-3xl mx-auto p-4 sm:p-8 w-full">
-      {/* Breadcrumbs */}
-      <Breadcrumbs 
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+      <Breadcrumbs
         items={[
           { label: 'Organizers', href: '/dashboard/organizers' },
-          { label: organizer?.name || 'Organizer Profile' }
+          { label: organizer.name || 'Profile' },
         ]}
-        className="mb-4"
+        className="mb-2"
       />
-      <Card className="p-4 sm:p-6 mb-6">
-        <div className="flex justify-between items-start">
-          <h2 className="text-2xl font-bold mb-2">{organizer.name}</h2>
-          {user?.role === 'admin' && (
-            <Button variant="outline" onClick={openEditOrganizerDialog}>
-              <Edit className="w-4 h-4 mr-2" /> Edit Organizer
-            </Button>
-          )}
+
+      {/* Header */}
+      <Card className="overflow-hidden border-0 shadow-sm bg-card">
+        <div className="p-6 sm:p-8">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-6">
+            {organizer.logo && (
+              <div className="shrink-0">
+                <img
+                  src={logoUrl}
+                  alt=""
+                  className="h-20 w-20 sm:h-24 sm:w-24 rounded-xl object-cover border border-border bg-muted"
+                />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground">{organizer.name}</h1>
+                <Badge variant={organizer.status === 'active' ? 'default' : 'secondary'} className="capitalize">
+                  {organizer.status ?? 'active'}
+                </Badge>
+                {organizer.active != null && !organizer.active && (
+                  <Badge variant="outline" className="text-muted-foreground">Inactive</Badge>
+                )}
+              </div>
+              {(user?.role === 'admin' || user?.role === 'superadmin') && (
+                <Button variant="outline" size="sm" className="mt-3" onClick={openEditOrganizerDialog}>
+                  <Edit className="w-4 h-4 mr-2" /> Edit
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <div>
-            <Label>Email</Label>
-            <div>{organizer.email}</div>
-          </div>
-          <div>
-            <Label>Phone</Label>
-            <div>{organizer.phone_number}</div>
-          </div>
-          <div>
-            <Label>Location</Label>
-            <div>{organizer.location}</div>
-          </div>
-          <div>
-            <Label>TIN Number</Label>
-            <div>{organizer.tin_number}</div>
-          </div>
-          <div>
-            <Label>Status</Label>
-            <div>{organizer.status || 'active'}</div>
-          </div>
-        </div>
-        {organizer.logo && (
-          <div className="mb-4">
-            <Label>Logo</Label>
-            <img
-              src={organizer.logo}
-              alt="Logo"
-              className="h-16 rounded shadow border mt-2"
+      </Card>
+
+      {/* Details grid */}
+      <div className="grid gap-6 sm:grid-cols-2">
+        <Card className="p-6 border-0 shadow-sm">
+          <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-muted-foreground" /> Business
+          </h2>
+          <div className="space-y-0 divide-y divide-border/60">
+            <DetailRow icon={Mail} label="Email" value={organizer.email} />
+            <DetailRow icon={Phone} label="Phone" value={organizer.phone_number} />
+            <DetailRow icon={MapPin} label="Location" value={organizer.location} />
+            <DetailRow icon={Building2} label="TIN Number" value={organizer.tin_number} />
+            <DetailRow label="Billing Email" value={organizer.billing_email} />
+            <DetailRow label="Subscription ID" value={organizer.subscription_id} />
+            <DetailRow
+              label="Trial ends"
+              value={organizer.trial_ends_at ? format(new Date(organizer.trial_ends_at), 'PP') : null}
             />
           </div>
-        )}
-      </Card>
-      <Card className="p-4 sm:p-6">
-        <h3 className="text-xl font-semibold mb-4">Contacts</h3>
+        </Card>
+
+        <Card className="p-6 border-0 shadow-sm">
+          <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-muted-foreground" /> Timeline
+          </h2>
+          <div className="space-y-0 divide-y divide-border/60">
+            <DetailRow
+              label="Created"
+              value={organizer.created_at ? format(new Date(organizer.created_at), 'PP') : null}
+            />
+            <DetailRow
+              label="Updated"
+              value={organizer.updated_at ? format(new Date(organizer.updated_at), 'PP') : null}
+            />
+          </div>
+        </Card>
+      </div>
+
+      {(organizer.suspended_at || organizer.suspended_reason) && (
+        <Card className="p-6 border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20">
+          <h2 className="text-sm font-semibold text-foreground mb-3">Suspension</h2>
+          <div className="grid gap-3 sm:grid-cols-2 text-sm">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Suspended at</p>
+              <p className="text-foreground mt-0.5">
+                {organizer.suspended_at ? format(new Date(organizer.suspended_at), 'PPpp') : '—'}
+              </p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Reason</p>
+              <p className="text-foreground mt-0.5">{organizer.suspended_reason ?? '—'}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Contacts */}
+      <Card className="p-6 border-0 shadow-sm">
+        <h2 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+          <User className="w-4 h-4 text-muted-foreground" /> Contacts
+        </h2>
         {contacts.length === 0 ? (
-          <div className="text-muted-foreground/70">No contacts assigned.</div>
+          <p className="text-sm text-muted-foreground py-4">No contacts assigned.</p>
         ) : (
-          <div className="flex flex-col gap-2">
+          <ul className="space-y-2">
             {contacts.map((contact) => (
-              <div
+              <li
                 key={contact.id}
-                className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
+                className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-muted/30 px-4 py-3"
               >
-                <span
-                  className={
-                    contact.is_primary_contact
-                      ? 'font-bold text-info'
-                      : ''
-                  }
-                >
-                  {contact.name} ({contact.email})
-                  {contact.is_primary_contact ? ' (Primary)' : ''}
-                </span>
-                <div className="flex gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground truncate">
+                    {contact.name}
+                    {contact.is_primary_contact && (
+                      <Badge variant="secondary" className="ml-2 text-xs">Primary</Badge>
+                    )}
+                  </p>
+                  <p className="text-sm text-muted-foreground truncate">{contact.email}</p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
                   {!contact.is_primary_contact && (
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => handleSetPrimary(contact.id)}
-                    >
-                      <Star className="w-4 h-4 text-yellow-500" /> Set Primary
+                    <Button size="sm" variant="ghost" onClick={() => handleSetPrimary(contact.id)} title="Set as primary">
+                      <Star className="w-4 h-4" />
                     </Button>
                   )}
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => handleRemoveContact(contact.id)}
-                  >
-                    <Trash2 className="w-4 h-4 text-red-500" />
+                  <Button size="sm" variant="ghost" onClick={() => handleRemoveContact(contact.id)} title="Remove">
+                    <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </Card>
-      <Card className="p-4 sm:p-6 mt-6">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
-          <h3 className="text-xl font-semibold">Events Managed</h3>
-          {user?.role === 'admin' && (
+
+      {/* Events */}
+      <Card className="p-6 border-0 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-muted-foreground" /> Events managed
+          </h2>
+          {(user?.role === 'admin' || user?.role === 'superadmin') && (
             <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button
-                  onClick={() => setCreateDialogOpen(true)}
-                  variant="outline"
-                >
+                <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
                   Create Event
                 </Button>
               </DialogTrigger>
@@ -659,76 +729,59 @@ export default function OrganizerProfile() {
             </Dialog>
           )}
         </div>
-        {user?.role === 'admin' &&
+        {(user?.role === 'admin' || user?.role === 'superadmin') &&
           (events.length === 0 ? (
-            <div className="text-muted-foreground/70">
+            <p className="text-sm text-muted-foreground py-6 text-center rounded-lg border border-dashed border-border">
               No events managed by this organizer.
-            </div>
+            </p>
           ) : (
-            <div className="flex flex-col gap-2">
+            <ul className="space-y-2">
               {events.map((event) => (
-                <div
+                <li
                   key={event.id}
-                  className="flex flex-col sm:flex-row md:items-center md:gap-4 border-b last:border-b-0 py-2"
+                  className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 rounded-lg border border-border/60 bg-muted/20 px-4 py-3"
                 >
-                  <span className="font-semibold text-card-foreground">
-                    {event.name}
-                  </span>
-                  <span className="text-muted-foreground">{event.location}</span>
-                  <span className="text-muted-foreground/70">
-                    {event.start_date} - {event.end_date}
-                  </span>
-                  <div className="flex gap-2 mt-2 sm:mt-0">
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => openViewDialog(event)}
-                    >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">{event.name}</p>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {event.location} · {event.start_date && format(new Date(event.start_date), 'PP')} – {event.end_date && format(new Date(event.end_date), 'PP')}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button size="sm" variant="ghost" onClick={() => openViewDialog(event)} title="View">
                       <Eye className="w-4 h-4" />
                     </Button>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => openEditDialog(event)}
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => openEditDialog(event)} title="Edit">
                       <Pencil className="w-4 h-4" />
                     </Button>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => openDeleteDialog(event)}
-                    >
-                      <Trash2 className="w-4 h-4 text-red-500" />
+                    <Button size="sm" variant="ghost" onClick={() => openDeleteDialog(event)} title="Delete">
+                      <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
                   </div>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           ))}
       </Card>
-      <Card className="p-4 sm:p-6 mt-6">
-        <h3 className="text-xl font-semibold mb-4">Audit Log</h3>
+      <Card className="p-6 border-0 shadow-sm">
+        <h2 className="text-sm font-semibold text-foreground mb-4">Audit log</h2>
         {auditLogs.length === 0 ? (
-          <div className="text-muted-foreground/70">No audit log entries.</div>
+          <p className="text-sm text-muted-foreground py-4">No audit log entries.</p>
         ) : (
-          <div className="flex flex-col gap-2">
+          <ul className="space-y-2">
             {auditLogs.map((log) => (
-              <div
+              <li
                 key={log.id}
-                className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border/60 bg-muted/20 px-4 py-2 text-sm"
               >
-                <span className="font-mono text-muted-foreground/70">
+                <span className="font-mono text-muted-foreground text-xs">
                   {format(new Date(log.created_at), 'yyyy-MM-dd HH:mm')}
                 </span>
-                <span className="font-semibold text-card-foreground">
-                  {log.action}
-                </span>
-                <span className="text-muted-foreground">
-                  by {log.user?.name || 'System'}
-                </span>
-              </div>
+                <span className="font-medium text-foreground">{log.action}</span>
+                <span className="text-muted-foreground">by {log.user?.name || 'System'}</span>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </Card>
       {/* View Event Dialog */}

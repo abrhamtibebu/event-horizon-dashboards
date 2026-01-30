@@ -25,6 +25,18 @@ import {
   LayoutDashboard,
   Fingerprint,
   CheckSquare,
+  Activity,
+  DollarSign,
+  Flag,
+  Database,
+  Key,
+  Shield,
+  Plug,
+  Zap,
+  FileText,
+  Workflow,
+  FileCheck,
+  Mail,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -70,6 +82,16 @@ const getInitials = (name?: string) => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
+// Sidebar items hidden for admin/superadmin
+const ADMIN_SIDEBAR_HIDDEN_TITLES = [
+  'Create Event',
+  'Vendors',
+  'Ticket Sales',
+  'My Tickets',
+  'Tasks',
+  'Ushers',
+]
+
 // Organized navigation items by category
 const navigationCategories = [
   {
@@ -105,7 +127,7 @@ const navigationCategories = [
         title: 'Ticket Sales',
         url: '/dashboard/ticket-management',
         icon: Ticket,
-        roles: ['organizer', 'organizer_admin', 'admin', 'superadmin'],
+        roles: ['organizer', 'organizer_admin'],
         permission: 'tickets.manage',
       },
       {
@@ -123,7 +145,7 @@ const navigationCategories = [
         title: 'Tasks',
         url: '/dashboard/tasks',
         icon: CheckSquare,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'attendee', 'sales'],
+        roles: ['organizer', 'organizer_admin', 'usher', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'attendee', 'sales'],
         accessibleToAll: true,
         permission: 'tasks.view',
       },
@@ -150,14 +172,14 @@ const navigationCategories = [
         title: 'Ushers',
         url: '/dashboard/usher-management',
         icon: UserPlus2,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'user'],
+        roles: ['organizer', 'organizer_admin', 'user'],
         permission: 'ushers.manage',
       },
       {
         title: 'Vendors',
         url: '/dashboard/vendor-management',
         icon: Briefcase,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver'],
+        roles: ['organizer', 'organizer_admin', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver'],
         permission: 'vendors.any',
       },
       {
@@ -173,6 +195,102 @@ const navigationCategories = [
         roles: ['superadmin', 'admin'],
       },
       {
+        title: 'System Health',
+        url: '/dashboard/admin/system-health',
+        icon: Activity,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Financials',
+        url: '/dashboard/admin/financials',
+        icon: DollarSign,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Moderation',
+        url: '/dashboard/admin/moderation',
+        icon: Flag,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Advanced Analytics',
+        url: '/dashboard/admin/analytics',
+        icon: BarChart3,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'System Settings',
+        url: '/dashboard/admin/settings',
+        icon: Settings,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Security & Audit',
+        url: '/dashboard/admin/security',
+        icon: Shield,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Data Management',
+        url: '/dashboard/admin/data',
+        icon: Database,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'API Management',
+        url: '/dashboard/admin/api',
+        icon: Key,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Integrations',
+        url: '/dashboard/admin/integrations',
+        icon: Plug,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Performance',
+        url: '/dashboard/admin/performance',
+        icon: Zap,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'System Logs',
+        url: '/dashboard/admin/logs',
+        icon: FileText,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Automation',
+        url: '/dashboard/admin/automation',
+        icon: Workflow,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Advanced Security',
+        url: '/dashboard/admin/advanced-security',
+        icon: Shield,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Compliance',
+        url: '/dashboard/admin/compliance',
+        icon: FileCheck,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Notification Templates',
+        url: '/dashboard/admin/notification-templates',
+        icon: Mail,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Roles & Permissions',
+        url: '/dashboard/admin/roles',
+        icon: Shield,
+        roles: ['superadmin', 'admin'],
+      },
+      {
         title: 'Subscription',
         url: '/dashboard/subscription',
         icon: ShieldCheck,
@@ -183,7 +301,7 @@ const navigationCategories = [
         title: 'Team',
         url: '/dashboard/team',
         icon: Users2,
-        roles: ['superadmin', 'organizer', 'organizer_admin'],
+        roles: ['organizer', 'organizer_admin'],
         permission: 'team.manage',
       },
     ],
@@ -220,7 +338,7 @@ const navigationCategories = [
         title: 'Analytics',
         url: '/dashboard/reports',
         icon: BarChart3,
-        roles: ['superadmin', 'organizer', 'organizer_admin'],
+        roles: ['organizer', 'organizer_admin'],
         permission: 'reports.view',
       },
     ],
@@ -240,7 +358,7 @@ const navigationCategories = [
         title: 'Marketing',
         url: '/dashboard/marketing',
         icon: Send,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'marketing_specialist'],
+        roles: ['organizer', 'organizer_admin', 'marketing_specialist'],
         permission: 'marketing.manage',
       },
     ],
@@ -303,7 +421,12 @@ export function AppSidebar() {
           return false
         }
 
-        // System admins see everything (they have all roles)
+        // Hide specific items from admin/superadmin sidebar
+        if ((user.role === 'admin' || user.role === 'superadmin') && ADMIN_SIDEBAR_HIDDEN_TITLES.includes(item.title)) {
+          return false
+        }
+
+        // System admins see everything (they have all roles) except items above
         if (user.role === 'admin' || user.role === 'superadmin') {
           return true
         }

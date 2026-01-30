@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Camera, Mail, Phone, MapPin, Calendar, Briefcase, Save } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Camera, Mail, Phone, MapPin, Calendar, Briefcase, Save, Lock, Eye, EyeOff } from 'lucide-react'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { SpinnerInline } from '@/components/ui/spinner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,7 +14,7 @@ import { useModernAlerts } from '@/hooks/useModernAlerts'
 import api from '@/lib/api'
 
 export default function Profile() {
-  const { user, setUser } = useAuth()
+  const { user, setUser, logout } = useAuth()
   const { showSuccess, showError } = useModernAlerts()
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -28,6 +28,28 @@ export default function Profile() {
     bio: user?.bio || '',
     organization: user?.organization || '',
   })
+  const [passwordData, setPasswordData] = useState({
+    current_password: '',
+    new_password: '',
+    new_password_confirmation: '',
+  })
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+
+  // Sync form when user loads or updates
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user?.name || '',
+        email: user?.email || '',
+        phone: user?.phone || '',
+        location: user?.location || '',
+        bio: user?.bio || '',
+        organization: user?.organization || '',
+      })
+    }
+  }, [user])
 
   const getInitials = (name?: string) => {
     if (!name) return 'U'
@@ -82,14 +104,39 @@ export default function Profile() {
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      const response = await api.put('/user/profile', formData)
-      setUser({ ...user, ...response.data.user } as any)
+      const payload = { ...formData, company: formData.organization }
+      const response = await api.put('/user/profile', payload)
+      const updated = response.data?.user ?? response.data
+      setUser({ ...user, ...updated } as any)
       showSuccess('Profile updated successfully!')
       setIsEditing(false)
     } catch (error: any) {
       showError(error.response?.data?.message || 'Failed to update profile')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (passwordData.new_password !== passwordData.new_password_confirmation) {
+      showError('New passwords do not match')
+      return
+    }
+    setIsChangingPassword(true)
+    try {
+      const response = await api.put('/user/password', {
+        current_password: passwordData.current_password,
+        new_password: passwordData.new_password,
+        new_password_confirmation: passwordData.new_password_confirmation,
+      })
+      showSuccess(response.data?.message ?? 'Password updated. Please log in again.')
+      setPasswordData({ current_password: '', new_password: '', new_password_confirmation: '' })
+      setTimeout(() => logout(), 1500)
+    } catch (error: any) {
+      showError(error.response?.data?.error ?? error.response?.data?.message ?? 'Failed to update password')
+    } finally {
+      setIsChangingPassword(false)
     }
   }
 
@@ -135,7 +182,7 @@ export default function Profile() {
               </Avatar>
               <label
                 htmlFor="profile-image-upload"
-                className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hidden"
+                className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
               >
                 {isUploadingImage ? (
                   <SpinnerInline size="md" />
@@ -294,6 +341,91 @@ export default function Profile() {
               placeholder="Tell us a bit about yourself..."
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Change Password */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="w-5 h-5" />
+            Change Password
+          </CardTitle>
+          <CardDescription>Update your password. You will be logged out and must sign in again after changing it.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+            <div>
+              <Label htmlFor="current_password">Current Password</Label>
+              <div className="relative">
+                <Input
+                  id="current_password"
+                  name="current_password"
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  value={passwordData.current_password}
+                  onChange={(e) => setPasswordData((p) => ({ ...p, current_password: e.target.value }))}
+                  className="pr-10"
+                  placeholder="Enter current password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword((s) => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                >
+                  {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="new_password">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="new_password"
+                  name="new_password"
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={passwordData.new_password}
+                  onChange={(e) => setPasswordData((p) => ({ ...p, new_password: e.target.value }))}
+                  className="pr-10"
+                  placeholder="Enter new password"
+                  required
+                  minLength={8}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((s) => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                >
+                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="new_password_confirmation">Confirm New Password</Label>
+              <Input
+                id="new_password_confirmation"
+                name="new_password_confirmation"
+                type="password"
+                value={passwordData.new_password_confirmation}
+                onChange={(e) => setPasswordData((p) => ({ ...p, new_password_confirmation: e.target.value }))}
+                placeholder="Confirm new password"
+                required
+                minLength={8}
+              />
+            </div>
+            <Button type="submit" disabled={isChangingPassword} className="bg-brand-gradient">
+              {isChangingPassword ? (
+                <>
+                  <SpinnerInline className="mr-2" />
+                  Updating...
+                </>
+              ) : (
+                'Update Password'
+              )}
+            </Button>
+          </form>
         </CardContent>
       </Card>
 

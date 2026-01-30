@@ -32,6 +32,7 @@ interface User {
 interface AuthContextType {
   isAuthenticated: boolean
   user: User | null
+  setUser: React.Dispatch<React.SetStateAction<User | null>>
   login: (
     credentials: { email: string; password: string },
     remember?: boolean
@@ -41,6 +42,8 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+const isDev = import.meta.env.DEV
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
@@ -55,7 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Check if refresh period has expired (7 days)
     if (isRefreshPeriodExpired(token)) {
-      console.log('[Auth] Refresh period expired, logging out')
+      if (isDev) console.log('[Auth] Refresh period expired, logging out')
       // Clear tokens and logout
       localStorage.removeItem('jwt')
       sessionStorage.removeItem('jwt')
@@ -74,7 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Check if token is expiring soon (within 5 minutes)
     if (isTokenExpiringSoon(token, 5)) {
       try {
-        console.log('[Auth] Token expiring soon, refreshing proactively')
+        if (isDev) console.log('[Auth] Token expiring soon, refreshing proactively')
         const response = await api.post('/refresh', {}, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -98,7 +101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(userData)
         }
 
-        console.log('[Auth] Token refreshed successfully')
+        if (isDev) console.log('[Auth] Token refreshed successfully')
       } catch (error) {
         console.error('[Auth] Proactive token refresh failed:', error)
         // Refresh failed - logout user
@@ -126,7 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (token) {
         // Check if token is valid format (not a mock token)
         if (token === 'dev-token' || token.length < 20) {
-          console.log('[Auth] Invalid/mock token found, clearing...')
+          if (isDev) console.log('[Auth] Invalid/mock token found, clearing...')
           localStorage.removeItem('jwt')
           sessionStorage.removeItem('jwt')
           localStorage.removeItem('token_expires_at')
@@ -140,7 +143,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         // Check if refresh period has expired
         if (isRefreshPeriodExpired(token)) {
-          console.log('[Auth] Refresh period expired on init')
+          if (isDev) console.log('[Auth] Refresh period expired on init')
           localStorage.removeItem('jwt')
           sessionStorage.removeItem('jwt')
           localStorage.removeItem('token_expires_at')
@@ -177,10 +180,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } else {
         // No token found, user is not authenticated
-        console.log('[Auth] No token found, user not authenticated')
+        if (isDev) console.log('[Auth] No token found, user not authenticated')
         setUser(null)
       }
-      console.log('[Auth] Setting isLoading to false')
+      if (isDev) console.log('[Auth] Setting isLoading to false')
       setIsLoading(false)
     }
     checkLoggedIn()
@@ -267,7 +270,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  const value = { isAuthenticated: !!user, user, login, logout, isLoading }
+  const value = { isAuthenticated: !!user, user, setUser, login, logout, isLoading }
 
   return (
     <AuthContext.Provider value={value}>

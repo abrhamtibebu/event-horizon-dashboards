@@ -5,6 +5,27 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Generates a strong password: 16 chars, uppercase, lowercase, numbers, symbols.
+ * Suitable for system-generated default passwords.
+ */
+export function generateStrongPassword(length = 16): string {
+  const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+  const lowercase = 'abcdefghjkmnpqrstuvwxyz'
+  const numbers = '23456789'
+  const symbols = '!@#$%&*'
+  const all = uppercase + lowercase + numbers + symbols
+  const getRandom = (str: string) => str[Math.floor(Math.random() * str.length)]
+  const password = [
+    getRandom(uppercase),
+    getRandom(lowercase),
+    getRandom(numbers),
+    getRandom(symbols),
+    ...Array.from({ length: length - 4 }, () => getRandom(all)),
+  ]
+  return password.sort(() => Math.random() - 0.5).join('')
+}
+
 // Guest Type Color Coding Utility with Dark Mode Support
 export const GUEST_TYPE_COLORS: Record<string, { bg: string; text: string; border?: string; darkBg?: string; darkText?: string; darkBorder?: string }> = {
   'VIP': { 

@@ -421,7 +421,7 @@ export default function ShortLinkManagement() {
               )}
             </div>
           ) : (
-            <div className="border border-border rounded-xl overflow-hidden">
+            <div className="border border-border rounded-xl min-w-0 overflow-x-auto overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted">

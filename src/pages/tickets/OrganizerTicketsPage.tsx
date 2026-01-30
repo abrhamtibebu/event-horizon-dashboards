@@ -299,7 +299,7 @@ export default function OrganizerTicketsPage() {
                   )}
                 </div>
               ) : (
-                <div className="border rounded-lg">
+                <div className="border rounded-lg min-w-0 overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
