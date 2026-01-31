@@ -15,9 +15,7 @@ import CreateTicketedEvent from './pages/CreateTicketedEvent'
 import CreateFreeEvent from './pages/CreateFreeEvent'
 import EventTypeSelection from './pages/EventTypeSelection'
 import Users from './pages/Users'
-import AddUser from './pages/AddUser'
 import Organizers from './pages/Organizers'
-import AddOrganizer from './pages/AddOrganizer'
 import Messages from './pages/MessagesSimple'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
@@ -80,6 +78,7 @@ import SubscriptionManagement from './pages/SubscriptionManagement'
 import SubscriptionPayment from './pages/SubscriptionPayment'
 import UsageDashboard from './pages/UsageDashboard'
 import AdminSubscriptionManagement from './pages/AdminSubscriptionManagement'
+import PlanManagement from './pages/PlanManagement'
 import Tasks from './pages/Tasks'
 import SystemHealth from './pages/SystemHealth'
 import FinancialDashboard from './pages/FinancialDashboard'
@@ -365,22 +364,8 @@ const AppWithRealtime = () => {
                 </RoleProtectedRoute>
               } 
             />
-            <Route 
-              path="users/add" 
-              element={
-                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
-                  <AddUser />
-                </RoleProtectedRoute>
-              } 
-            />
-            <Route 
-              path="users/edit/:id" 
-              element={
-                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
-                  <AddUser />
-                </RoleProtectedRoute>
-              } 
-            />
+            <Route path="users/add" element={<Navigate to="/dashboard/users" replace />} />
+            <Route path="users/edit/:id" element={<Navigate to="/dashboard/users" replace />} />
             <Route 
               path="organizers" 
               element={
@@ -389,14 +374,7 @@ const AppWithRealtime = () => {
                 </RoleProtectedRoute>
               } 
             />
-            <Route 
-              path="organizers/add" 
-              element={
-                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
-                  <AddOrganizer />
-                </RoleProtectedRoute>
-              } 
-            />
+            <Route path="organizers/add" element={<Navigate to="/dashboard/organizers" replace />} />
             <Route 
               path="organizers/:organizerId/suspend" 
               element={
@@ -413,14 +391,7 @@ const AppWithRealtime = () => {
                 </RoleProtectedRoute>
               } 
             />
-            <Route 
-              path="organizers/:organizerId/edit" 
-              element={
-                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
-                  <OrganizerProfile />
-                </RoleProtectedRoute>
-              } 
-            />
+            <Route path="organizers/:organizerId/edit" element={<Navigate to="/dashboard/organizers" replace />} />
             <Route 
               path="organizers/:organizerId" 
               element={
@@ -482,6 +453,14 @@ const AppWithRealtime = () => {
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <AdminSubscriptionManagement />
+                </RoleProtectedRoute>
+              } 
+            />
+            <Route 
+              path="admin/plans" 
+              element={
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                  <PlanManagement />
                 </RoleProtectedRoute>
               } 
             />

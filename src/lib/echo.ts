@@ -1,5 +1,6 @@
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
+import { getApiBaseURL } from '@/config/env'
 
 // Extend Window interface to include Pusher
 declare global {
@@ -18,7 +19,7 @@ export const echo = new Echo({
   key: import.meta.env.VITE_PUSHER_APP_KEY || 'your-pusher-key',
   cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER || 'mt1',
   forceTLS: true,
-  authEndpoint: `${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/broadcasting/auth`,
+  authEndpoint: `${getApiBaseURL()}/broadcasting/auth`,
   auth: {
     headers: {
       Authorization: `Bearer ${localStorage.getItem('jwt') || sessionStorage.getItem('jwt') || ''}`,

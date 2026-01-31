@@ -51,6 +51,7 @@ import {
 import api from '@/lib/api'
 import { toast } from 'sonner'
 import { Spinner } from '@/components/ui/spinner'
+import { UserFormDialog } from '@/components/dialogs/UserFormDialog'
 import { usePagination } from '@/hooks/usePagination'
 import Pagination from '@/components/Pagination'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -68,6 +69,8 @@ export default function Users() {
   const [userActivity, setUserActivity] = useState<any[]>([])
   const [activityUser, setActivityUser] = useState<{ id: number; name: string } | null>(null)
   const [activityOpen, setActivityOpen] = useState(false)
+  const [userDialogOpen, setUserDialogOpen] = useState(false)
+  const [userEditId, setUserEditId] = useState<number | null>(null)
 
   const {
     currentPage,
@@ -115,6 +118,22 @@ export default function Users() {
       ])
       setActivityUser({ id: userId, name: userName })
       setActivityOpen(true)
+    }
+  }
+
+  const handleDeleteUser = async (userId: number, userName?: string) => {
+    if (!window.confirm(`Delete user ${userName ? `"${userName}"` : userId}? This cannot be undone.`)) return
+    try {
+      await api.delete(`/admin/users/${userId}`)
+      toast.success('User deleted successfully')
+      setSelectedUsers((prev) => {
+        const next = new Set(prev)
+        next.delete(userId)
+        return next
+      })
+      fetchUsers()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to delete user')
     }
   }
 
@@ -193,7 +212,7 @@ export default function Users() {
         </div>
         <Button
           className="bg-primary hover:bg-primary/90 text-primary-foreground"
-          onClick={() => navigate('/dashboard/users/add')}
+          onClick={() => { setUserEditId(null); setUserDialogOpen(true); }}
         >
           <Plus className="w-4 h-4 mr-2" />
           Add Agent / Admin
@@ -408,7 +427,7 @@ export default function Users() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => navigate(`/dashboard/users/edit/${user.id}`)}
+                        onClick={() => { setUserEditId(user.id); setUserDialogOpen(true); }}
                         title="Edit user"
                       >
                         <Pencil className="w-4 h-4" />
@@ -429,7 +448,7 @@ export default function Users() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="border-border bg-card">
-                          <DropdownMenuItem onClick={() => navigate(`/dashboard/users/edit/${user.id}`)}>
+                          <DropdownMenuItem onClick={() => { setUserEditId(user.id); setUserDialogOpen(true); }}>
                             <Pencil className="w-4 h-4 mr-2" />
                             Edit user
                           </DropdownMenuItem>
@@ -450,10 +469,7 @@ export default function Users() {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
-                            onClick={() => {
-                              setSelectedUsers(new Set([user.id]))
-                              handleBulkAction('delete')
-                            }}
+                            onClick={() => handleDeleteUser(user.id, user.name)}
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
                             Delete
@@ -468,6 +484,14 @@ export default function Users() {
           </TableBody>
         </Table>
       </div>
+
+      {/* User create/edit dialog */}
+      <UserFormDialog
+        open={userDialogOpen}
+        onOpenChange={setUserDialogOpen}
+        editId={userEditId}
+        onSuccess={fetchUsers}
+      />
 
       {/* Activity Dialog */}
       <Dialog open={activityOpen} onOpenChange={setActivityOpen}>
@@ -495,11 +519,11 @@ export default function Users() {
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <p className="font-medium text-foreground">{activity.description || activity.action}</p>
                         <span className="text-xs text-muted-foreground shrink-0">
-                          {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                          {formatDistanceToNow(new Date(activity.timestamp || activity.created_at), { addSuffix: true })}
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {format(new Date(activity.timestamp), 'MMM d, yyyy HH:mm:ss')}
+                        {format(new Date(activity.timestamp || activity.created_at), 'MMM d, yyyy HH:mm:ss')}
                       </p>
                     </div>
                   </div>

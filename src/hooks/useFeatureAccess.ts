@@ -12,8 +12,14 @@ export function useFeatureAccess() {
   } = useQuery<UsageStatistics>({
     queryKey: ['subscription-usage'],
     queryFn: () => subscriptionsApi.getUsageStatistics(),
-    retry: 1,
+    retry: false, // Don't retry if endpoint doesn't exist
     staleTime: 2 * 60 * 1000, // 2 minutes
+    onError: (error: any) => {
+      // Silently handle 404 errors (endpoint might not be implemented yet)
+      if (error?.response?.status !== 404) {
+        console.error('Failed to fetch usage statistics:', error)
+      }
+    },
   })
 
   const hasFeature = (feature: string): boolean => {

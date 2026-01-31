@@ -1,4 +1,5 @@
 import { apiCall } from './api';
+import { getApiBaseURL } from '@/config/env';
 
 export interface Payment {
   id: number;
@@ -87,7 +88,7 @@ export interface PaymentStatistics {
 }
 
 class PaymentApiService {
-  private baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  private baseURL = getApiBaseURL();
 
   // Set a test token for development (remove in production)
   setTestToken(): void {

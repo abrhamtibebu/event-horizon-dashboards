@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select'
 import { useAuth } from '@/hooks/use-auth'
 import { Badge } from '@/components/ui/badge'
+import { getApiBaseURLForStorage } from '@/config/env'
 
 export default function OrganizerProfile() {
   const { organizerId } = useParams()
@@ -420,7 +421,7 @@ export default function OrganizerProfile() {
     )
   }
 
-  const logoUrl = organizer.logo?.startsWith('http') ? organizer.logo : `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace(/\/api\/?$/, '')}/storage/${organizer.logo}`
+  const logoUrl = organizer.logo?.startsWith('http') ? organizer.logo : `${getApiBaseURLForStorage()}/storage/${organizer.logo}`
 
   const DetailRow = ({ icon: Icon, label, value }: { icon?: React.ElementType; label: string; value: React.ReactNode }) => (
     <div className="flex items-start gap-3 py-2">

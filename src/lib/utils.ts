@@ -212,10 +212,7 @@ export const getImageUrl = (imagePath: string | null | undefined): string => {
   
   // If it starts with /storage/, construct the proper URL
   if (imagePath.startsWith('/storage/')) {
-    const baseUrl = import.meta.env.VITE_API_URL || 'https://api.validity.et/api'
-    // Remove /api from the base URL for storage access
-    const storageBaseUrl = baseUrl.replace('/api', '')
-    return `${storageBaseUrl}${imagePath}`
+    return `${getApiBaseURLForStorage()}${imagePath}`
   }
   
   // If it's a relative path, assume it's from the public folder

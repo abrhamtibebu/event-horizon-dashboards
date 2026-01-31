@@ -1,15 +1,14 @@
 // Authentication helper for development/testing
 // This file should be removed in production
 
-// import { paymentApi } from './paymentApi';
+import { getApiBaseURL } from '@/config/env'
 
 export const setupTestAuth = async () => {
   console.log('🔧 Setting up test authentication...');
-  
-  // Instead of setting a fake token, try to login with test credentials
-  // This will get a real JWT token from the backend
+
+  const apiBase = getApiBaseURL()
   try {
-    const response = await fetch('http://localhost:8000/api/login', {
+    const response = await fetch(`${apiBase}/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -43,7 +43,7 @@ export default function SignIn() {
       console.error('[SignIn] Login error details:', err)
 
       if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
-        setError({ message: 'Cannot connect to the server. Please make sure the backend is running on http://localhost:8000' })
+        setError({ message: 'Cannot connect to the server. Please check your connection and that the API URL is set correctly in .env (VITE_API_URL).' })
         return
       }
 
@@ -153,7 +153,7 @@ export default function SignIn() {
               Welcome Back
             </h1>
             <p className="text-gray-400 text-sm font-medium">
-              Manage your event horizon with style.
+              Manage your event with style.
             </p>
           </div>
 

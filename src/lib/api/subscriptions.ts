@@ -10,8 +10,11 @@ export interface SubscriptionPlan {
   currency: string
   features: string[]
   limits: Record<string, number>
-  is_active: boolean
+  is_active?: boolean
+  status?: 'active' | 'inactive'
   sort_order: number
+  duration_days?: number | null
+  is_recurring?: boolean
   created_at: string
   updated_at: string
 }
@@ -28,7 +31,9 @@ export interface Subscription {
   id: number
   organizer_id: number
   subscription_plan_id: number
-  status: 'active' | 'cancelled' | 'expired' | 'past_due' | 'pending'
+  requested_plan_id?: number | null
+  scheduled_plan_id?: number | null
+  status: 'active' | 'cancelled' | 'expired' | 'past_due' | 'pending' | 'trial' | 'pending_upgrade' | 'pending_downgrade' | 'grace_period'
   billing_cycle: 'monthly' | 'yearly'
   starts_at: string | null
   ends_at: string | null
@@ -38,8 +43,34 @@ export interface Subscription {
   current_period_end: string | null
   payment_method: 'telebirr' | 'cbe_birr' | null
   metadata: Record<string, any> | null
+  approved_by_admin?: boolean
+  is_trial?: boolean
+  trial_days?: number | null
+  current_plan_snapshot?: Record<string, any> | null
+  grace_days?: number
+  grace_ends_at?: string | null
   plan?: SubscriptionPlan
+  requestedPlan?: SubscriptionPlan
+  scheduledPlan?: SubscriptionPlan
   organizer?: Organizer
+  created_at: string
+  updated_at: string
+}
+
+export interface SubscriptionHistory {
+  id: number
+  subscription_id: number
+  action: string
+  old_plan_id: number | null
+  new_plan_id: number | null
+  performed_by: 'admin' | 'system' | 'organizer'
+  admin_id: number | null
+  ip_address: string | null
+  user_agent: string | null
+  metadata: Record<string, any> | null
+  oldPlan?: SubscriptionPlan | null
+  newPlan?: SubscriptionPlan | null
+  admin?: any | null
   created_at: string
   updated_at: string
 }
@@ -191,6 +222,108 @@ export const subscriptionsApi = {
 
   async getUpcomingPayment(): Promise<SubscriptionPayment | null> {
     const response = await api.get('/subscription-payments/upcoming')
+    return response.data.data
+  },
+
+  // Organizer subscription management
+  async getOrganizerPlans(): Promise<SubscriptionPlan[]> {
+    const response = await api.get('/organizer/plans')
+    return response.data.data
+  },
+
+  async requestUpgrade(planId: number): Promise<Subscription> {
+    const response = await api.post('/organizer/subscription/request-upgrade', {
+      plan_id: planId,
+    })
+    return response.data.data
+  },
+
+  async requestDowngrade(planId: number): Promise<Subscription> {
+    const response = await api.post('/organizer/subscription/request-downgrade', {
+      plan_id: planId,
+    })
+    return response.data.data
+  },
+
+  async getSubscriptionHistory(): Promise<SubscriptionHistory[]> {
+    const response = await api.get('/organizer/subscription/history')
+    return response.data.data
+  },
+
+  // Admin subscription management
+  async getAdminSubscriptions(params?: {
+    status?: string
+    plan?: string
+    organizer_id?: number
+    per_page?: number
+  }): Promise<{ data: Subscription[] | { data: Subscription[]; [key: string]: any }; meta?: any }> {
+    const response = await api.get('/admin/subscriptions', { params })
+    // Backend returns { success: true, data: { data: [...], current_page, ... } } for paginated
+    // or { success: true, data: [...] } for direct array
+    return response.data
+  },
+
+  async getPendingApprovals(): Promise<Subscription[]> {
+    const response = await api.get('/admin/subscriptions/pending-approvals')
+    return response.data.data
+  },
+
+  async approveUpgrade(subscriptionId: number): Promise<Subscription> {
+    const response = await api.post(`/admin/subscriptions/${subscriptionId}/approve-upgrade`)
+    return response.data.data
+  },
+
+  async approveDowngrade(subscriptionId: number): Promise<Subscription> {
+    const response = await api.post(`/admin/subscriptions/${subscriptionId}/approve-downgrade`)
+    return response.data.data
+  },
+
+  async rejectRequest(subscriptionId: number, reason?: string): Promise<Subscription> {
+    const response = await api.post(`/admin/subscriptions/${subscriptionId}/reject-request`, {
+      reason,
+    })
+    return response.data.data
+  },
+
+  async modifyTrial(subscriptionId: number, days: number): Promise<Subscription> {
+    const response = await api.post(`/admin/subscriptions/${subscriptionId}/modify-trial`, {
+      days,
+    })
+    return response.data.data
+  },
+
+  async assignPlan(data: {
+    organizer_id: number
+    plan_id: number
+    trial_days?: number
+  }): Promise<Subscription> {
+    const response = await api.post('/admin/subscriptions/assign-plan', data)
+    return response.data.data
+  },
+
+  async extendSubscription(subscriptionId: number, days: number): Promise<Subscription> {
+    const response = await api.post(`/admin/subscriptions/${subscriptionId}/extend`, {
+      days,
+    })
+    return response.data.data
+  },
+
+  async cancelSubscriptionAdmin(subscriptionId: number, immediate: boolean = false): Promise<Subscription> {
+    const response = await api.post(`/admin/subscriptions/${subscriptionId}/cancel`, {
+      immediate,
+    })
+    return response.data.data
+  },
+
+  async getSubscriptionHistoryAdmin(subscriptionId: number): Promise<SubscriptionHistory[]> {
+    const response = await api.get(`/admin/subscriptions/${subscriptionId}/history`)
+    return response.data.data
+  },
+
+  async reactivateTrial(subscriptionId: number, days?: number): Promise<Subscription> {
+    const response = await api.post(`/admin/subscriptions/${subscriptionId}/reactivate-trial`, {
+      days,
+    })
     return response.data.data
   },
 }

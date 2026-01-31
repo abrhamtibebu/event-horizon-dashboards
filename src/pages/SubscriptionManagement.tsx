@@ -1,6 +1,8 @@
+import { useQuery } from '@tanstack/react-query'
 import { useSubscription } from '@/hooks/useSubscription'
 import { useFeatureAccess } from '@/hooks/useFeatureAccess'
 import { SubscriptionStatusBadge } from '@/components/subscription/SubscriptionStatusBadge'
+import { SubscriptionHistoryTimeline } from '@/components/subscription/SubscriptionHistoryTimeline'
 import { UsageMeter } from '@/components/subscription/UsageMeter'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,13 +10,22 @@ import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { useNavigate } from 'react-router-dom'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { Calendar, CreditCard, AlertCircle, CheckCircle2, TrendingUp, Zap, Shield, ArrowRight, Sparkles } from 'lucide-react'
+import { Calendar, CreditCard, AlertCircle, CheckCircle2, TrendingUp, Zap, Shield, ArrowRight, Sparkles, Clock, History } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { subscriptionsApi } from '@/lib/api/subscriptions'
 
 export default function SubscriptionManagement() {
   const { subscription, isLoading, cancelSubscription, resumeSubscription, isCancelling, isResuming } = useSubscription()
   const { usage } = useFeatureAccess()
   const navigate = useNavigate()
+
+  // Fetch subscription history
+  const { data: history = [], isLoading: isHistoryLoading } = useQuery({
+    queryKey: ['subscription-history'],
+    queryFn: () => subscriptionsApi.getSubscriptionHistory(),
+    enabled: !!subscription,
+  })
 
   if (isLoading) {
     return (
@@ -122,6 +133,33 @@ export default function SubscriptionManagement() {
                   </div>
                 )}
 
+                {/* Pending Upgrade/Downgrade Requests */}
+                {(subscription.status === 'pending_upgrade' || subscription.status === 'pending_downgrade') && (
+                  <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950 dark:border-amber-800">
+                    <div className="flex items-start gap-3">
+                      <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-sm mb-1 text-amber-900 dark:text-amber-100">
+                          {subscription.status === 'pending_upgrade' ? 'Upgrade Request Pending' : 'Downgrade Request Pending'}
+                        </p>
+                        <p className="text-sm text-amber-800 dark:text-amber-200">
+                          Your {subscription.status === 'pending_upgrade' ? 'upgrade' : 'downgrade'} request is waiting for admin approval.
+                          {subscription.requestedPlan && (
+                            <span className="block mt-1">
+                              Requested plan: <span className="font-semibold">{subscription.requestedPlan.name}</span>
+                            </span>
+                          )}
+                          {subscription.scheduledPlan && (
+                            <span className="block mt-1">
+                              Scheduled plan: <span className="font-semibold">{subscription.scheduledPlan.name}</span>
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Next Billing */}
                 {periodEndsAt && (
                   <div className="space-y-2">
@@ -196,46 +234,69 @@ export default function SubscriptionManagement() {
         </Card>
       </div>
 
-      {/* Usage Statistics */}
-      {usage && Object.keys(usage.usage).length > 0 && (
-        <Card className="mt-6 border-2">
-          <CardHeader>
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="w-5 h-5 text-primary" />
-              <CardTitle>Usage Statistics</CardTitle>
-            </div>
-            <CardDescription>Track your usage across different features</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {usage.usage.events && (
-                <UsageMeter
-                  label="Events This Month"
-                  current={usage.usage.events.current}
-                  limit={usage.usage.events.limit}
-                  unlimited={usage.usage.events.unlimited}
-                />
-              )}
-              {usage.usage.vendors && (
-                <UsageMeter
-                  label="Vendors"
-                  current={usage.usage.vendors.current}
-                  limit={usage.usage.vendors.limit}
-                  unlimited={usage.usage.vendors.unlimited}
-                />
-              )}
-              {usage.usage.marketing_campaigns && (
-                <UsageMeter
-                  label="Marketing Campaigns"
-                  current={usage.usage.marketing_campaigns.current}
-                  limit={usage.usage.marketing_campaigns.limit}
-                  unlimited={usage.usage.marketing_campaigns.unlimited}
-                />
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Usage Statistics & History Tabs */}
+      <Tabs defaultValue="usage" className="mt-6">
+        <TabsList>
+          <TabsTrigger value="usage">Usage Statistics</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="usage">
+          {usage && Object.keys(usage.usage).length > 0 && (
+            <Card className="border-2">
+              <CardHeader>
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="w-5 h-5 text-primary" />
+                  <CardTitle>Usage Statistics</CardTitle>
+                </div>
+                <CardDescription>Track your usage across different features</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {usage.usage.events && (
+                    <UsageMeter
+                      label="Events This Month"
+                      current={usage.usage.events.current}
+                      limit={usage.usage.events.limit}
+                      unlimited={usage.usage.events.unlimited}
+                    />
+                  )}
+                  {usage.usage.vendors && (
+                    <UsageMeter
+                      label="Vendors"
+                      current={usage.usage.vendors.current}
+                      limit={usage.usage.vendors.limit}
+                      unlimited={usage.usage.vendors.unlimited}
+                    />
+                  )}
+                  {usage.usage.marketing_campaigns && (
+                    <UsageMeter
+                      label="Marketing Campaigns"
+                      current={usage.usage.marketing_campaigns.current}
+                      limit={usage.usage.marketing_campaigns.limit}
+                      unlimited={usage.usage.marketing_campaigns.unlimited}
+                    />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="history">
+          {isHistoryLoading ? (
+            <Card className="border-2">
+              <CardContent className="py-8">
+                <div className="flex items-center justify-center">
+                  <Spinner size="md" text="Loading history..." />
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <SubscriptionHistoryTimeline history={history} />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

@@ -1,12 +1,9 @@
 import type { Message } from '../types/message'
+import { getApiBaseURLForStorage } from '@/config/env'
 
 export type ImageSize = 'thumbnail' | 'medium' | 'original'
 
-const getStorageBaseUrl = () => {
-  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
-  const withoutApi = apiBase.replace(/\/api\/?$/, '')
-  return withoutApi.replace(/\/$/, '')
-}
+const getStorageBaseUrl = () => getApiBaseURLForStorage()
 
 const buildStorageUrl = (path?: string) => {
   if (!path) return ''

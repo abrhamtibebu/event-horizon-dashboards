@@ -55,6 +55,7 @@ import {
 import api from '@/lib/api'
 import { toast } from 'sonner'
 import { Spinner } from '@/components/ui/spinner'
+import { OrganizerFormDialog } from '@/components/dialogs/OrganizerFormDialog'
 import { usePagination } from '@/hooks/usePagination'
 import Pagination from '@/components/Pagination'
 import { cn } from '@/lib/utils'
@@ -68,6 +69,8 @@ export default function Organizers() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [deleteDialog, setDeleteDialog] = useState<{ id: number; name: string } | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
+  const [organizerDialogOpen, setOrganizerDialogOpen] = useState(false)
+  const [organizerEditId, setOrganizerEditId] = useState<number | null>(null)
 
   const {
     currentPage,
@@ -204,7 +207,7 @@ export default function Organizers() {
         </div>
         <Button
           className="bg-primary hover:bg-primary/90 text-primary-foreground"
-          onClick={() => navigate('/dashboard/organizers/add')}
+          onClick={() => { setOrganizerEditId(null); setOrganizerDialogOpen(true); }}
         >
           <Plus className="w-4 h-4 mr-2" />
           Add Organizer
@@ -400,7 +403,7 @@ export default function Organizers() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => navigate(`/dashboard/organizers/${org.id}/edit`)}
+                        onClick={() => { setOrganizerEditId(org.id); setOrganizerDialogOpen(true); }}
                         title="Edit"
                       >
                         <Edit className="w-4 h-4" />
@@ -507,6 +510,14 @@ export default function Organizers() {
           onPerPageChange={setPerPage}
         />
       </div>
+
+      {/* Organizer create/edit dialog */}
+      <OrganizerFormDialog
+        open={organizerDialogOpen}
+        onOpenChange={setOrganizerDialogOpen}
+        editId={organizerEditId}
+        onSuccess={fetchOrganizers}
+      />
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>

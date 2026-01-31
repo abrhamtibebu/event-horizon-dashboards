@@ -102,6 +102,42 @@ export function useSubscription() {
     },
   })
 
+  const requestUpgradeMutation = useMutation({
+    mutationFn: (planId: number) => subscriptionsApi.requestUpgrade(planId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscription'] })
+      toast({
+        title: 'Upgrade requested',
+        description: 'Your upgrade request has been submitted and is pending admin approval.',
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to request upgrade',
+        variant: 'destructive',
+      })
+    },
+  })
+
+  const requestDowngradeMutation = useMutation({
+    mutationFn: (planId: number) => subscriptionsApi.requestDowngrade(planId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscription'] })
+      toast({
+        title: 'Downgrade requested',
+        description: 'Your downgrade request has been submitted and is pending admin approval.',
+      })
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to request downgrade',
+        variant: 'destructive',
+      })
+    },
+  })
+
   return {
     subscription,
     isLoading,
@@ -111,10 +147,14 @@ export function useSubscription() {
     updateSubscription: updateMutation.mutate,
     cancelSubscription: cancelMutation.mutate,
     resumeSubscription: resumeMutation.mutate,
+    requestUpgrade: requestUpgradeMutation.mutate,
+    requestDowngrade: requestDowngradeMutation.mutate,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isCancelling: cancelMutation.isPending,
     isResuming: resumeMutation.isPending,
+    isRequestingUpgrade: requestUpgradeMutation.isPending,
+    isRequestingDowngrade: requestDowngradeMutation.isPending,
   }
 }
 

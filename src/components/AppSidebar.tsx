@@ -37,6 +37,10 @@ import {
   Workflow,
   FileCheck,
   Mail,
+  CreditCard,
+  Package,
+  Clock,
+  History,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -189,27 +193,9 @@ const navigationCategories = [
         roles: ['superadmin', 'admin'],
       },
       {
-        title: 'Admin Subs',
-        url: '/dashboard/admin/subscriptions',
-        icon: ShieldCheck,
-        roles: ['superadmin', 'admin'],
-      },
-      {
-        title: 'System Health',
-        url: '/dashboard/admin/system-health',
-        icon: Activity,
-        roles: ['superadmin', 'admin'],
-      },
-      {
         title: 'Financials',
         url: '/dashboard/admin/financials',
         icon: DollarSign,
-        roles: ['superadmin', 'admin'],
-      },
-      {
-        title: 'Moderation',
-        url: '/dashboard/admin/moderation',
-        icon: Flag,
         roles: ['superadmin', 'admin'],
       },
       {
@@ -225,33 +211,9 @@ const navigationCategories = [
         roles: ['superadmin', 'admin'],
       },
       {
-        title: 'Security & Audit',
-        url: '/dashboard/admin/security',
-        icon: Shield,
-        roles: ['superadmin', 'admin'],
-      },
-      {
-        title: 'Data Management',
-        url: '/dashboard/admin/data',
-        icon: Database,
-        roles: ['superadmin', 'admin'],
-      },
-      {
         title: 'API Management',
         url: '/dashboard/admin/api',
         icon: Key,
-        roles: ['superadmin', 'admin'],
-      },
-      {
-        title: 'Integrations',
-        url: '/dashboard/admin/integrations',
-        icon: Plug,
-        roles: ['superadmin', 'admin'],
-      },
-      {
-        title: 'Performance',
-        url: '/dashboard/admin/performance',
-        icon: Zap,
         roles: ['superadmin', 'admin'],
       },
       {
@@ -261,41 +223,10 @@ const navigationCategories = [
         roles: ['superadmin', 'admin'],
       },
       {
-        title: 'Automation',
-        url: '/dashboard/admin/automation',
-        icon: Workflow,
-        roles: ['superadmin', 'admin'],
-      },
-      {
-        title: 'Advanced Security',
-        url: '/dashboard/admin/advanced-security',
-        icon: Shield,
-        roles: ['superadmin', 'admin'],
-      },
-      {
-        title: 'Compliance',
-        url: '/dashboard/admin/compliance',
-        icon: FileCheck,
-        roles: ['superadmin', 'admin'],
-      },
-      {
-        title: 'Notification Templates',
-        url: '/dashboard/admin/notification-templates',
-        icon: Mail,
-        roles: ['superadmin', 'admin'],
-      },
-      {
         title: 'Roles & Permissions',
         url: '/dashboard/admin/roles',
         icon: Shield,
         roles: ['superadmin', 'admin'],
-      },
-      {
-        title: 'Subscription',
-        url: '/dashboard/subscription',
-        icon: ShieldCheck,
-        roles: ['organizer', 'organizer_admin'],
-        permission: 'subscription.view',
       },
       {
         title: 'Team',
@@ -344,6 +275,40 @@ const navigationCategories = [
     ],
   },
   {
+    label: 'Subscription',
+    items: [
+      {
+        title: 'My Subscription',
+        url: '/dashboard/subscription',
+        icon: CreditCard,
+        roles: ['organizer', 'organizer_admin'],
+      },
+      {
+        title: 'Plans',
+        url: '/dashboard/subscription/plans',
+        icon: Package,
+        roles: ['organizer', 'organizer_admin'],
+      },
+    ],
+  },
+  {
+    label: 'Subscription Management',
+    items: [
+      {
+        title: 'Subscriptions',
+        url: '/dashboard/admin/subscriptions',
+        icon: CreditCard,
+        roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Plan Management',
+        url: '/dashboard/admin/plans',
+        icon: Package,
+        roles: ['superadmin', 'admin'],
+      },
+    ],
+  },
+  {
     label: 'Connect',
     items: [
       {
@@ -353,13 +318,6 @@ const navigationCategories = [
         roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'attendee', 'sales'],
         accessibleToAll: true,
         permission: 'messages.manage',
-      },
-      {
-        title: 'Marketing',
-        url: '/dashboard/marketing',
-        icon: Send,
-        roles: ['organizer', 'organizer_admin', 'marketing_specialist'],
-        permission: 'marketing.manage',
       },
     ],
   },

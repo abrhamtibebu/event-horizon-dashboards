@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+import { getApiBaseURL } from '@/config/env';
+const baseURL = getApiBaseURL();
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt');

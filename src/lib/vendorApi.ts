@@ -1,8 +1,9 @@
 import axios from 'axios';
+import { getApiBaseURL } from '@/config/env';
 
 // Enhanced API service with offline support and fallback data
 class VendorApiService {
-  private baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  private baseURL = getApiBaseURL();
   private isOnline = navigator.onLine;
   private cache = new Map();
 

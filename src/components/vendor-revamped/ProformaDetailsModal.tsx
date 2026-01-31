@@ -23,6 +23,7 @@ import { format } from 'date-fns';
 import { usePermissionCheck } from '@/hooks/use-permission-check';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getApiBaseURLForStorage } from '@/config/env';
 
 interface ProformaDetailsModalProps {
     isOpen: boolean;
@@ -145,7 +146,7 @@ export default function ProformaDetailsModal({ isOpen, onClose, proforma }: Prof
                                         proforma.file_paths.map((path: string, idx: number) => (
                                             <a
                                                 key={idx}
-                                                href={`${import.meta.env.VITE_API_URL.replace(/\/api$/, '')}/storage/${path}`}
+                                                href={`${getApiBaseURLForStorage()}/storage/${path}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="flex items-center gap-3 px-4 py-3 bg-card border border-border rounded-xl hover:border-primary/50 hover:bg-muted/50 transition-all group"

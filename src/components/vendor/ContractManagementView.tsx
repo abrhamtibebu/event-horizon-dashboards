@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import vendorContractApi from '@/lib/vendorContractApi';
 import { usePermissionCheck } from '@/hooks/use-permission-check';
+import { getApiBaseURLForStorage } from '@/config/env';
 import { ProtectedButton } from '@/components/ProtectedButton';
 import MilestonePaymentSetup from './MilestonePaymentSetup';
 import CreateContractDialog from './CreateContractDialog';
@@ -112,7 +113,7 @@ export default function ContractManagementView() {
                               asChild
                             >
                               <a 
-                                href={contract.po_file_url || `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000'}/storage/${contract.po_file_path}`} 
+                                href={contract.po_file_url || `${getApiBaseURLForStorage()}/storage/${contract.po_file_path}`} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
                               >

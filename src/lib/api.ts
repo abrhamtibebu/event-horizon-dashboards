@@ -1,18 +1,8 @@
 import axios from 'axios'
-
-// Ensure baseURL always includes /api suffix
-const getBaseURL = () => {
-  const envURL = import.meta.env.VITE_API_URL;
-  if (envURL) {
-    // If VITE_API_URL is provided, ensure it ends with /api
-    return envURL.endsWith('/api') ? envURL : `${envURL.replace(/\/$/, '')}/api`;
-  }
-  // Default to localhost for development
-  return 'http://localhost:8000/api';
-};
+import { getApiBaseURL } from '@/config/env'
 
 const api = axios.create({
-  baseURL: getBaseURL(),
+  baseURL: getApiBaseURL(),
   timeout: 60000, // 60 seconds timeout for long-running operations like campaign sending
   headers: {
     'Content-Type': 'application/json',
