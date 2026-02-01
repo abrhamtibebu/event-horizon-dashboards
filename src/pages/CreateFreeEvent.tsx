@@ -73,7 +73,7 @@ interface GuestType {
 export default function CreateFreeEvent() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -89,17 +89,21 @@ export default function CreateFreeEvent() {
     visibility: 'public' as 'public' | 'private',
   })
 
-  const [eventRange, setEventRange] = useState([{
+  const [eventRange, setEventRange] = useState<any[]>([{
     startDate: new Date(),
     endDate: new Date(),
     key: 'selection',
   }])
+  const [eventStartTime, setEventStartTime] = useState('09:00')
+  const [eventEndTime, setEventEndTime] = useState('17:00')
 
-  const [regRange, setRegRange] = useState([{
+  const [regRange, setRegRange] = useState<any[]>([{
     startDate: new Date(),
     endDate: new Date(),
     key: 'selection',
   }])
+  const [regStartTime, setRegStartTime] = useState('09:00')
+  const [regEndTime, setRegEndTime] = useState('17:00')
 
   // Single day event state
   const [isSingleDayEvent, setIsSingleDayEvent] = useState(false)
@@ -139,12 +143,12 @@ export default function CreateFreeEvent() {
 
     fetchData('/event-types', setEventTypes, 'eventTypes')
     fetchData('/event-categories', setEventCategories, 'eventCategories')
-    
+
     // Pre-select organizer for organizers and organizer_admins
     if (user && (user.role === 'organizer' || user.role === 'organizer_admin') && user.organizer_id) {
       setFormData(prev => ({ ...prev, organizer_id: String(user.organizer_id) }))
     }
-    
+
     if (user?.role !== 'organizer' && user?.role !== 'organizer_admin') {
       fetchData('/organizers', setOrganizers, 'organizers')
     } else {
@@ -154,7 +158,7 @@ export default function CreateFreeEvent() {
 
 
   const toggleGuestType = (guestTypeName: string) => {
-    setSelectedGuestTypes(prev => 
+    setSelectedGuestTypes(prev =>
       prev.includes(guestTypeName)
         ? prev.filter(name => name !== guestTypeName)
         : [...prev, guestTypeName]
@@ -171,7 +175,7 @@ export default function CreateFreeEvent() {
   }
 
   const updateCustomGuestType = (index: number, field: string, value: any) => {
-    setCustomGuestTypes(prev => prev.map((type, i) => 
+    setCustomGuestTypes(prev => prev.map((type, i) =>
       i === index ? { ...type, [field]: value } : type
     ))
   }
@@ -184,7 +188,7 @@ export default function CreateFreeEvent() {
   const calculateProgress = () => {
     let completed = 0
     const total = 7
-    
+
     if (formData.name) completed++
     if (formData.event_type_id) completed++
     if (formData.event_category_id) completed++
@@ -192,13 +196,13 @@ export default function CreateFreeEvent() {
     if (formData.max_guests) completed++
     if (selectedGuestTypes.length > 0 || customGuestTypes.filter(gt => gt.name.trim()).length > 0) completed++
     if (eventRange[0].startDate && regRange[0].startDate) completed++
-    
+
     return Math.round((completed / total) * 100)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     const validCustomGuestTypes = customGuestTypes.filter(gt => gt.name.trim())
     const allGuestTypes = [
       ...selectedGuestTypes.map(name => {
@@ -211,7 +215,7 @@ export default function CreateFreeEvent() {
       }),
       ...validCustomGuestTypes
     ]
-    
+
     if (allGuestTypes.length === 0) {
       showErrorToast('Please select at least one guest type.')
       return
@@ -277,14 +281,26 @@ export default function CreateFreeEvent() {
     }
 
     setIsSubmitting(true)
-    
+
     try {
+      // Combine Date and Time
+      const formatDateTime = (date: Date, time: string) => {
+        const [hours, minutes] = time.split(':').map(Number)
+        const newDate = new Date(date)
+        newDate.setHours(hours, minutes, 0, 0)
+        return newDate.toISOString()
+      }
+
       const processedFormData = {
         ...formData,
-        start_date: eventRange[0].startDate.toISOString(),
-        end_date: eventRange[0].endDate.toISOString(),
-        registration_start_date: regRange[0].startDate.toISOString(),
-        registration_end_date: regRange[0].endDate.toISOString(),
+        start_date: formatDateTime(eventRange[0].startDate, eventStartTime),
+        end_date: eventRange[0].endDate
+          ? formatDateTime(eventRange[0].endDate, eventEndTime)
+          : formatDateTime(eventRange[0].startDate, eventEndTime),
+        registration_start_date: formatDateTime(regRange[0].startDate, regStartTime),
+        registration_end_date: regRange[0].endDate
+          ? formatDateTime(regRange[0].endDate, regEndTime)
+          : formatDateTime(regRange[0].startDate, regEndTime),
         location: formData.city && formData.venue ? `${formData.city}, ${formData.venue}` : formData.venue || formData.city || '',
         max_guests: maxGuests,
         // Only include organizer_id if not an organizer or organizer_admin (backend sets it for them)
@@ -295,7 +311,7 @@ export default function CreateFreeEvent() {
       // Handle FormData for guest_types array
       let payload: any
       let headers = {}
-      
+
       if (allGuestTypes.length > 0) {
         payload = new FormData()
         Object.entries(processedFormData).forEach(([key, value]) => {
@@ -324,7 +340,7 @@ export default function CreateFreeEvent() {
       }
 
       const response = await api.post('/events/free/add', payload, { headers })
-      
+
       showSuccessToast('Free event created successfully!')
       navigate('/dashboard/events')
     } catch (error: any) {
@@ -647,14 +663,14 @@ export default function CreateFreeEvent() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* Header Section */}
         <div className="mb-8">
-          <Breadcrumbs 
+          <Breadcrumbs
             items={[
               { label: 'Events', href: '/dashboard/events' },
               { label: 'Create Free Event' }
             ]}
             className="mb-6"
           />
-          
+
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div className="space-y-2">
               <div className="flex items-center gap-3">
@@ -726,7 +742,7 @@ export default function CreateFreeEvent() {
                     className="h-11 border-border focus:border-blue-500 focus:ring-blue-500/20"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="organizer_id" className="text-sm font-semibold">
                     Organizer <span className="text-destructive">*</span>
@@ -759,7 +775,7 @@ export default function CreateFreeEvent() {
                   )}
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="description" className="text-sm font-semibold">
                   Description
@@ -773,7 +789,7 @@ export default function CreateFreeEvent() {
                   className="border-border focus:border-blue-500 focus:ring-blue-500/20 resize-none"
                 />
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="event_type_id" className="text-sm font-semibold">
@@ -797,7 +813,7 @@ export default function CreateFreeEvent() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="event_category_id" className="text-sm font-semibold">
                     Event Category <span className="text-destructive">*</span>
@@ -970,7 +986,7 @@ export default function CreateFreeEvent() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="venue" className="text-sm font-semibold">
                     Venue <span className="text-destructive">*</span>
@@ -985,7 +1001,7 @@ export default function CreateFreeEvent() {
                   />
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="max_guests" className="text-sm font-semibold">
                   Maximum Guests <span className="text-destructive">*</span>
@@ -1129,14 +1145,14 @@ export default function CreateFreeEvent() {
                         const firstDay = monthStart.getDay();
                         const day = index - firstDay + 1;
                         const currentDate = new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth(), day);
-                        
+
                         // Normalize dates to midnight for comparison
                         const normalizeDate = (date: Date) => {
                           const normalized = new Date(date);
                           normalized.setHours(0, 0, 0, 0);
                           return normalized;
                         };
-                        
+
                         const normalizedCurrent = normalizeDate(currentDate);
                         const normalizedStart = eventRange[0].startDate ? normalizeDate(eventRange[0].startDate) : null;
                         const normalizedEnd = eventRange[0].endDate ? normalizeDate(eventRange[0].endDate) : null;
@@ -1145,21 +1161,20 @@ export default function CreateFreeEvent() {
                         const isCurrentMonth = currentDate.getMonth() === eventRange[0].startDate.getMonth();
                         const isToday = normalizedCurrent.getTime() === normalizedToday.getTime();
                         const isSelected = (normalizedStart && normalizedStart.getTime() === normalizedCurrent.getTime()) ||
-                                         (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
+                          (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
                         const isInRange = normalizedStart && normalizedEnd &&
-                                        normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
+                          normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
                         const isDisabled = normalizedCurrent < normalizedToday;
 
                         return (
                           <div
                             key={index}
-                            className={`day-cell ${
-                              !isCurrentMonth ? 'other-month' :
+                            className={`day-cell ${!isCurrentMonth ? 'other-month' :
                               isDisabled ? 'disabled' :
-                              isSelected ? 'selected' :
-                              isInRange ? 'in-range' :
-                              isToday ? 'today' : ''
-                            }`}
+                                isSelected ? 'selected' :
+                                  isInRange ? 'in-range' :
+                                    isToday ? 'today' : ''
+                              }`}
                             onClick={() => {
                               if (isDisabled) return;
                               const newRange = { ...eventRange[0] };
@@ -1211,6 +1226,28 @@ export default function CreateFreeEvent() {
                       >
                         Clear
                       </button>
+                    </div>
+                  </div>
+
+                  {/* Event Time Selectors */}
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Start Time</Label>
+                      <Input
+                        type="time"
+                        value={eventStartTime}
+                        onChange={(e) => setEventStartTime(e.target.value)}
+                        className="rounded-xl border-gray-300"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">End Time</Label>
+                      <Input
+                        type="time"
+                        value={eventEndTime}
+                        onChange={(e) => setEventEndTime(e.target.value)}
+                        className="rounded-xl border-gray-300"
+                      />
                     </div>
                   </div>
                 </div>
@@ -1297,14 +1334,14 @@ export default function CreateFreeEvent() {
                         const firstDay = monthStart.getDay();
                         const day = index - firstDay + 1;
                         const currentDate = new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth(), day);
-                        
+
                         // Normalize dates to midnight for comparison
                         const normalizeDate = (date: Date) => {
                           const normalized = new Date(date);
                           normalized.setHours(0, 0, 0, 0);
                           return normalized;
                         };
-                        
+
                         const normalizedCurrent = normalizeDate(currentDate);
                         const normalizedStart = regRange[0].startDate ? normalizeDate(regRange[0].startDate) : null;
                         const normalizedEnd = regRange[0].endDate ? normalizeDate(regRange[0].endDate) : null;
@@ -1313,21 +1350,20 @@ export default function CreateFreeEvent() {
                         const isCurrentMonth = currentDate.getMonth() === regRange[0].startDate.getMonth();
                         const isToday = normalizedCurrent.getTime() === normalizedToday.getTime();
                         const isSelected = (normalizedStart && normalizedStart.getTime() === normalizedCurrent.getTime()) ||
-                                         (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
+                          (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
                         const isInRange = normalizedStart && normalizedEnd &&
-                                        normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
+                          normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
                         const isDisabled = normalizedCurrent < normalizedToday;
 
                         return (
                           <div
                             key={index}
-                            className={`day-cell ${
-                              !isCurrentMonth ? 'other-month' :
+                            className={`day-cell ${!isCurrentMonth ? 'other-month' :
                               isDisabled ? 'disabled' :
-                              isSelected ? 'selected' :
-                              isInRange ? 'in-range' :
-                              isToday ? 'today' : ''
-                            }`}
+                                isSelected ? 'selected' :
+                                  isInRange ? 'in-range' :
+                                    isToday ? 'today' : ''
+                              }`}
                             onClick={() => {
                               if (isDisabled) return;
                               const newRange = { ...regRange[0] };
@@ -1381,6 +1417,28 @@ export default function CreateFreeEvent() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Registration Time Selectors */}
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Start Time</Label>
+                      <Input
+                        type="time"
+                        value={regStartTime}
+                        onChange={(e) => setRegStartTime(e.target.value)}
+                        className="rounded-xl border-gray-300"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">End Time</Label>
+                      <Input
+                        type="time"
+                        value={regEndTime}
+                        onChange={(e) => setRegEndTime(e.target.value)}
+                        className="rounded-xl border-gray-300"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -1397,7 +1455,7 @@ export default function CreateFreeEvent() {
                   <div>
                     <CardTitle className="text-xl">Guest Types</CardTitle>
                     <CardDescription>
-                      {totalSelectedGuestTypes > 0 
+                      {totalSelectedGuestTypes > 0
                         ? `${totalSelectedGuestTypes} type${totalSelectedGuestTypes > 1 ? 's' : ''} selected`
                         : 'Choose guest types for your event'
                       }
@@ -1428,11 +1486,10 @@ export default function CreateFreeEvent() {
                         type="button"
                         variant={isSelected ? 'default' : 'outline'}
                         size="sm"
-                        className={`h-auto py-2.5 px-3 transition-all ${
-                          isSelected 
-                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/30' 
-                            : 'hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10'
-                        }`}
+                        className={`h-auto py-2.5 px-3 transition-all ${isSelected
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/30'
+                          : 'hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10'
+                          }`}
                         onClick={() => toggleGuestType(guestType.name)}
                       >
                         {isSelected && <CheckCircle2 className="w-4 h-4 mr-1.5" />}

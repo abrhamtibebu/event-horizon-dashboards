@@ -2247,7 +2247,14 @@ export default function EventDetails() {
                 <div className="flex flex-wrap items-center gap-6 text-muted-foreground text-sm font-medium">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-primary" />
-                    <span>{eventData.start_date && format(parseISO(eventData.start_date), 'MMM d, h:mm a')}</span>
+                    <div className="flex flex-col">
+                      <span>{eventData.start_date && format(parseISO(eventData.start_date), 'MMM d, yyyy h:mm a')}</span>
+                      {eventData.end_date && (
+                        <span className="text-xs opacity-80">
+                          to {format(parseISO(eventData.end_date), 'MMM d, yyyy h:mm a')}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2">

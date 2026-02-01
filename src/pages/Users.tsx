@@ -15,7 +15,9 @@ import {
   Activity,
   MoreHorizontal,
   Pencil,
+  Key,
 } from 'lucide-react'
+import { PasswordResetDialog } from '@/components/dialogs/PasswordResetDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -71,6 +73,9 @@ export default function Users() {
   const [activityOpen, setActivityOpen] = useState(false)
   const [userDialogOpen, setUserDialogOpen] = useState(false)
   const [userEditId, setUserEditId] = useState<number | null>(null)
+
+  const [passwordResetOpen, setPasswordResetOpen] = useState(false)
+  const [passwordResetUser, setPasswordResetUser] = useState<{ id: number; name: string } | null>(null)
 
   const {
     currentPage,
@@ -452,6 +457,13 @@ export default function Users() {
                             <Pencil className="w-4 h-4 mr-2" />
                             Edit user
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            setPasswordResetUser({ id: user.id, name: user.name })
+                            setPasswordResetOpen(true)
+                          }}>
+                            <Key className="w-4 h-4 mr-2" />
+                            Reset Password
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => fetchUserActivity(user.id, user.name)}>
                             <Activity className="w-4 h-4 mr-2" />
                             View activity
@@ -491,6 +503,13 @@ export default function Users() {
         onOpenChange={setUserDialogOpen}
         editId={userEditId}
         onSuccess={fetchUsers}
+      />
+
+      <PasswordResetDialog
+        open={passwordResetOpen}
+        onOpenChange={setPasswordResetOpen}
+        userId={passwordResetUser?.id || null}
+        userName={passwordResetUser?.name}
       />
 
       {/* Activity Dialog */}
