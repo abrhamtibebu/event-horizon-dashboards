@@ -250,7 +250,7 @@ export default function CreateTicketedEvent() {
         // Only include organizer_id if not an organizer or organizer_admin (backend sets it for them)
         ...(user?.role !== 'organizer' && user?.role !== 'organizer_admin' && { organizer_id: formData.organizer_id }),
 
-        const payload = processedFormData
+      }
       const headers = {}
 
       const response = await api.post('/events/ticketed/add', payload, { headers })
