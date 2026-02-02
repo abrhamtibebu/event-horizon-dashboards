@@ -281,7 +281,7 @@ export default function EventDetails() {
 
   // Lightweight attendee stats for the Attendees tab UI
   const totalAttendeeCount = totalRecords
-  const checkedInCount = attendees.filter((attendee) => attendee.checked_in).length
+  const checkedInCount = Array.isArray(attendees) ? attendees.filter((attendee) => attendee.checked_in).length : 0
   const notCheckedInCount = Math.max(totalAttendeeCount - checkedInCount, 0)
 
   // Badge template state
@@ -289,7 +289,7 @@ export default function EventDetails() {
   const [badgeTemplateLoading, setBadgeTemplateLoading] = useState(false)
 
   const { user } = useAuth()
-  const { hasPermission, hasRole } = usePermissionCheck()
+  const { hasPermission, hasRole, checkPermission } = usePermissionCheck()
 
   // Check if user has management permissions
   const canManageEvent = hasPermission('events.manage')
@@ -451,21 +451,34 @@ export default function EventDetails() {
       .then((res) => {
         console.log('Attendees response:', res.data)
 
-        // Handle paginated response (only for admin/organizer)
-        if (isAdminOrOrganizer && res.data.data) {
-          setAttendees(res.data.data)
-          setTotalPages(res.data.last_page || 1)
-          setTotalRecords(res.data.total || 0)
-        } else {
-          // For ushers or non-paginated response, get all data
-          const attendeesData = res.data.data || res.data || []
-          setAttendees(attendeesData)
+        let attendeesData: any[] = []
+
+        // Handle paginated response structure
+        if (res.data && res.data.data && Array.isArray(res.data.data)) {
+          attendeesData = res.data.data
+          if (isAdminOrOrganizer) {
+            setTotalPages(res.data.last_page || 1)
+            setTotalRecords(res.data.total || 0)
+          } else {
+            setTotalPages(1)
+            setTotalRecords(res.data.data.length || 0)
+          }
+        } else if (Array.isArray(res.data)) {
+          // Handle flat array response
+          attendeesData = res.data
           setTotalPages(1)
-          setTotalRecords(attendeesData.length || 0)
+          setTotalRecords(res.data.length || 0)
+        } else {
+          // Unexpected structure
+          console.warn('Unexpected attendees response structure:', res.data)
+          attendeesData = []
+          setTotalPages(1)
+          setTotalRecords(0)
         }
 
+        setAttendees(attendeesData)
+
         // Log first attendee structure for debugging
-        const attendeesData = res.data.data || res.data || []
         if (attendeesData.length > 0) {
           console.log('First attendee structure:', {
             id: attendeesData[0].id,
@@ -2210,9 +2223,9 @@ export default function EventDetails() {
             {/* Fancy Hero Banner */}
             {/* Simplified Hero Header */}
             <div className="relative w-full h-[300px] rounded-3xl overflow-hidden mb-8 shadow-lg border border-border">
-              {eventData.event_image ? (
+              {(eventData.event_image || eventData.image_url || eventData.image) ? (
                 <img
-                  src={getImageUrl(eventData.event_image)}
+                  src={getImageUrl(eventData.image_url || eventData.event_image || eventData.image)}
                   alt={eventData.name}
                   className="object-cover w-full h-full transition-transform duration-700"
                 />
@@ -3047,7 +3060,7 @@ export default function EventDetails() {
                           <div className="relative flex-1 w-full sm:w-64">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                             <Input
-                              placeholder="Search attendees by name, email or company..."
+                              placeholder="Search by name, email, phone, company or job title..."
                               value={searchTerm}
                               onChange={(e) => handleSearchChange(e.target.value)}
                               className="pl-9 bg-background border-border text-sm h-9 sm:h-10"
@@ -3079,27 +3092,25 @@ export default function EventDetails() {
                       </div>
                     </div>
 
-                    {/* Attendees Table - No horizontal scroll */}
+                    {/* Attendees Table - Fully Responsive */}
                     <div className="bg-card rounded-lg border border-border overflow-hidden shadow-sm">
-                      <div className="overflow-x-hidden">
-                        <Table className="table-fixed w-full">
+                      <div className="overflow-x-auto">
+                        <Table className="w-full">
                           <TableHeader>
                             <TableRow className="bg-muted/50 border-b border-border">
-                              <TableHead className="w-10 sm:w-12">
+                              <TableHead className="w-10 sm:w-12 px-2">
                                 <Checkbox
                                   checked={selectedAttendees.size === filteredAttendees.length && filteredAttendees.length > 0}
                                   onCheckedChange={handleSelectAllAttendees}
                                 />
                               </TableHead>
 
-                              <TableHead>Name</TableHead>
-                              <TableHead className="hidden md:table-cell">Company</TableHead>
-                              <TableHead className="hidden lg:table-cell">Job Title</TableHead>
-                              <TableHead>Date</TableHead>
-                              <TableHead className="hidden xl:table-cell">Email</TableHead>
-                              <TableHead className="hidden 2xl:table-cell">Phone</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead className="w-10 sm:w-12" />
+                              <TableHead className="px-3">Name</TableHead>
+                              <TableHead className="hidden md:table-cell px-3">Company / Job Title</TableHead>
+                              <TableHead className="w-[140px] px-2">Phone</TableHead>
+                              <TableHead className="hidden xl:table-cell w-[200px] px-2">Email</TableHead>
+                              <TableHead className="w-[130px] px-2">Status</TableHead>
+                              <TableHead className="w-[100px] px-2 text-right">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
 
@@ -3110,90 +3121,87 @@ export default function EventDetails() {
                                   key={attendee.id}
                                   className="hover:bg-accent/50 transition-colors border-b border-border"
                                 >
-                                  <TableCell>
+                                  <TableCell className="px-2">
                                     <Checkbox
                                       checked={selectedAttendees.has(attendee.id)}
                                       onCheckedChange={() => handleSelectAttendee(attendee.id)}
                                     />
                                   </TableCell>
 
-                                  <TableCell className="max-w-0">
+                                  <TableCell className="max-w-xs px-3">
                                     <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold shrink-0">
+                                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-semibold shrink-0">
                                         {attendee.guest?.name?.charAt(0)?.toUpperCase() || 'A'}
                                       </div>
                                       <div className="min-w-0">
-                                        <div className="font-semibold truncate">
+                                        <div className="font-semibold truncate text-sm">
                                           {attendee.guest?.name}
                                         </div>
-                                        <div className="text-xs text-muted-foreground truncate">
+                                        <div className="text-[10px] text-muted-foreground truncate">
                                           {(attendee.guestType || attendee.guest_type)?.name || 'General'}
                                         </div>
                                       </div>
                                     </div>
                                   </TableCell>
 
-                                  <TableCell className="hidden md:table-cell max-w-0 truncate">
-                                    {attendee.guest?.company || '-'}
+                                  <TableCell className="hidden md:table-cell max-w-[200px] px-3">
+                                    <div className="flex flex-col min-w-0">
+                                      <div className="font-bold truncate text-sm">
+                                        {attendee.guest?.company || '-'}
+                                      </div>
+                                      <div className="text-[11px] text-muted-foreground truncate">
+                                        {attendee.guest?.jobtitle || '-'}
+                                      </div>
+                                    </div>
                                   </TableCell>
 
-                                  <TableCell className="hidden lg:table-cell max-w-0 truncate">
-                                    {attendee.guest?.jobtitle || '-'}
-                                  </TableCell>
-
-                                  <TableCell className="truncate">
-                                    {attendee.created_at
-                                      ? new Date(attendee.created_at).toLocaleDateString('en-GB')
-                                      : '-'}
-                                  </TableCell>
-
-                                  <TableCell className="hidden xl:table-cell max-w-0 truncate">
-                                    {attendee.guest?.email || '-'}
-                                  </TableCell>
-
-                                  <TableCell className="hidden 2xl:table-cell max-w-0 truncate">
+                                  <TableCell className="truncate px-2 text-sm w-[140px]">
                                     {attendee.guest?.phone || '-'}
                                   </TableCell>
 
-                                  <TableCell>
+                                  <TableCell className="hidden xl:table-cell max-w-[180px] truncate px-2 text-sm">
+                                    {attendee.guest?.email || '-'}
+                                  </TableCell>
+
+                                  <TableCell className="px-2 w-[130px]">
                                     {attendee.checked_in ? (
-                                      <Badge className="bg-success/10 text-success border-success/30 text-xs px-2 py-0.5 rounded-full border">
+                                      <Badge className="bg-success/10 text-success border-success/30 text-[10px] px-1.5 py-0 rounded-full border whitespace-nowrap">
                                         ✓ Checked In
                                       </Badge>
                                     ) : (
-                                      <Badge className="bg-muted/50 text-muted-foreground border-border text-xs px-2 py-0.5 rounded-full border">
+                                      <Badge className="bg-muted/50 text-muted-foreground border-border text-[10px] px-1.5 py-0 rounded-full border whitespace-nowrap">
                                         Not Checked In
                                       </Badge>
                                     )}
                                   </TableCell>
 
-                                  <TableCell>
-                                    <div className="flex gap-1">
+                                  <TableCell className="px-2 w-[100px] text-right">
+                                    <div className="flex justify-end gap-0.5">
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => handleBatchPrintBadges(new Set([attendee.id]))}
-                                        className="h-8 w-8 p-0"
+                                        className="h-7 w-7 p-0 hover:bg-primary/10 hover:text-primary"
                                       >
-                                        <Printer className="w-4 h-4" />
+                                        <Printer className="w-3.5 h-3.5" />
                                       </Button>
 
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => openEditAttendeeDialog(attendee)}
-                                        className="h-8 w-8 p-0"
+                                        className="h-7 w-7 p-0 hover:bg-info/10 hover:text-info"
                                       >
-                                        <Edit className="w-4 h-4" />
+                                        <Edit className="w-3.5 h-3.5" />
                                       </Button>
 
                                       <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => handleRemoveAttendee(attendee)}
-                                        className="h-8 w-8 p-0 hover:text-destructive"
+                                        className="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive"
                                       >
-                                        <Trash2 className="w-4 h-4" />
+                                        <Trash2 className="w-3.5 h-3.5" />
                                       </Button>
                                     </div>
                                   </TableCell>

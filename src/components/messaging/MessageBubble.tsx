@@ -93,9 +93,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       >
         <div className={cn(
           "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-          isOwnMessage ? "bg-white/20" : "bg-orange-100 dark:bg-orange-950/20"
+          isOwnMessage ? "bg-white/20" : "bg-primary/10 dark:bg-primary/20"
         )}>
-          <Download className={cn("w-5 h-5", isOwnMessage ? "text-white" : "text-orange-600 dark:text-orange-400")} />
+          <Download className={cn("w-5 h-5", isOwnMessage ? "text-white" : "text-primary")} />
         </div>
         <div className="min-w-0 pr-2">
           <p className={cn("text-sm font-bold truncate", isOwnMessage ? "text-white" : "text-foreground")}>
@@ -124,7 +124,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       {!isOwnMessage && (
         <Avatar className="w-8 h-8 shrink-0 border-2 border-background shadow-sm mb-1">
           <AvatarImage src={message.sender.profile_image} />
-          <AvatarFallback className="bg-orange-100 text-orange-600 text-[10px] font-black">
+          <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-black">
             {getInitials(message.sender.name)}
           </AvatarFallback>
         </Avatar>
@@ -148,7 +148,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             className={cn(
               "relative px-4 py-3 shadow-md transition-all duration-300",
               isOwnMessage
-                ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-[24px] rounded-br-[4px] shadow-orange-500/10'
+                ? 'bg-primary text-primary-foreground rounded-[24px] rounded-br-[4px] shadow-primary/10'
                 : 'bg-background border border-border/40 text-foreground rounded-[24px] rounded-bl-[4px] shadow-sm'
             )}
           >
@@ -158,7 +158,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 "px-3 py-2 rounded-xl mb-2 flex flex-col gap-0.5 border-l-4",
                 isOwnMessage
                   ? 'bg-black/10 border-white/30 text-white/90'
-                  : 'bg-muted/50 border-orange-200 dark:border-orange-800 text-muted-foreground'
+                  : 'bg-muted/50 border-primary/20 text-muted-foreground'
               )}>
                 <span className="text-[10px] font-black uppercase tracking-tight opacity-70">
                   {message.parentMessage.sender.name}
@@ -208,7 +208,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               variant="ghost"
               size="icon"
               onClick={() => onReply(message)}
-              className="h-9 w-9 rounded-2xl bg-background border border-border shadow-xl hover:bg-orange-50 hover:text-orange-600 transition-colors"
+              className="h-9 w-9 rounded-2xl bg-background border border-border shadow-xl hover:bg-primary/10 hover:text-primary transition-colors"
             >
               <Reply className="w-4 h-4" />
             </Button>
@@ -217,7 +217,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-2xl bg-background border border-border shadow-xl hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                  className="h-9 w-9 rounded-2xl bg-background border border-border shadow-xl hover:bg-primary/10 hover:text-primary transition-colors"
                 >
                   <MoreVertical className="w-4 h-4" />
                 </Button>

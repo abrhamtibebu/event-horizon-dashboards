@@ -36,7 +36,7 @@ export default function Messages() {
   const [isConversationSearchOpen, setIsConversationSearchOpen] = useState(false)
   const [activeFilter, setActiveFilter] = useState<'all' | 'direct' | 'event' | 'unread' | 'pinned'>('all')
   const [conversationSearch, setConversationSearch] = useState('')
-  const [isInspectorOpen, setIsInspectorOpen] = useState(true)
+
   const hasMarkedAsRead = useRef<string | null>(null)
 
   const { data: conversationsData = [], isLoading: loadingConversations } = useConversations()
@@ -209,58 +209,58 @@ export default function Messages() {
         key={conversation.id}
         onClick={() => handleSelectConversation(conversation.id)}
         className={cn(
-          'group relative w-full flex items-center gap-4 p-4 transition-all duration-300',
+          'group relative w-full flex items-center gap-3 px-5 py-3 transition-colors',
           isActive
-            ? 'bg-orange-50/50 dark:bg-orange-950/10'
+            ? 'bg-muted/50'
             : 'hover:bg-muted/30'
         )}
       >
         {isActive && (
           <motion.div
             layoutId="active-indicator"
-            className="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-600 rounded-r-full"
+            className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary"
           />
         )}
 
         <div className="relative shrink-0">
-          <Avatar className="h-12 w-12 border-2 border-background shadow-md">
+          <Avatar className="h-11 w-11 border border-border/50">
             <AvatarImage src={conversation.avatar} />
-            <AvatarFallback className="bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400 text-xs font-black">
+            <AvatarFallback className="bg-muted text-foreground text-sm font-medium">
               {getInitials(conversation.name || 'C')}
             </AvatarFallback>
           </Avatar>
           {conversation.type === 'direct' && isDirectOnline && (
-            <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background bg-emerald-500 shadow-sm" />
+            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background bg-emerald-500" />
           )}
           {conversation.type === 'event' && (
-            <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-blue-600 flex items-center justify-center border-2 border-background shadow-sm">
-              <Calendar className="h-2.5 w-2.5 text-white" />
+            <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-blue-500 flex items-center justify-center border-2 border-background">
+              <Calendar className="h-2 w-2 text-white" />
             </div>
           )}
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center justify-between mb-0.5">
             <h4 className={cn(
-              "text-sm tracking-tight truncate transition-colors",
-              isActive ? "font-bold text-orange-600" : "font-semibold text-foreground/90",
-              conversation.unreadCount > 0 && !isActive && "text-foreground font-black"
+              "text-sm truncate transition-colors",
+              isActive ? "font-semibold text-foreground" : "font-medium text-foreground/90",
+              conversation.unreadCount > 0 && !isActive && "font-semibold text-foreground"
             )}>
               {conversation.name}
             </h4>
-            <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-tighter">
+            <span className="text-[11px] text-muted-foreground/60 ml-2">
               {formatLastActivity(conversation.lastMessage?.created_at)}
             </span>
           </div>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-2">
             <p className={cn(
               "text-xs line-clamp-1 transition-colors",
-              conversation.unreadCount > 0 ? "text-foreground font-bold" : "text-muted-foreground/80"
+              conversation.unreadCount > 0 ? "text-foreground/80 font-medium" : "text-muted-foreground"
             )}>
               {conversation.lastMessage?.content || 'New conversation'}
             </p>
             {conversation.unreadCount > 0 && (
-              <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-orange-600 text-[10px] font-black text-white flex items-center justify-center shadow-sm shadow-orange-600/20">
+              <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-primary text-[10px] font-semibold text-primary-foreground flex items-center justify-center">
                 {conversation.unreadCount}
               </span>
             )}
@@ -271,7 +271,7 @@ export default function Messages() {
   }
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-[100dvh] bg-background overflow-hidden">
       {/* Sidebar Overlay */}
       <AnimatePresence>
         {showSidebar && window.innerWidth < 1024 && (
@@ -288,60 +288,55 @@ export default function Messages() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-[360px] flex flex-col border-r border-border/40 bg-background transition-all duration-300 ease-in-out lg:relative lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 w-80 flex flex-col bg-background border-r border-border/50 transition-all duration-300 ease-in-out lg:relative lg:translate-x-0',
           showSidebar ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Sidebar Header */}
-        <div className="p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-2xl bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
-                <MessageCircle className="h-5 w-5 text-white" />
-              </div>
-              <h1 className="text-xl font-bold tracking-tight">Inbox</h1>
-            </div>
+        <div className="px-5 py-6 border-b border-border/50">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-lg font-semibold tracking-tight">Messages</h1>
             <Button
               variant="ghost"
               size="icon"
               onClick={handleStartNewConversation}
-              className="rounded-full h-10 w-10 hover:bg-orange-50 hover:text-orange-600"
+              className="h-9 w-9 rounded-lg hover:bg-muted"
             >
-              <Plus className="h-5 w-5" />
+              <Plus className="h-4 w-4" />
             </Button>
           </div>
 
-          {/* Unified Search Bar */}
-          <div className="relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-orange-500 transition-colors" />
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={conversationSearch}
               onChange={(e) => setConversationSearch(e.target.value)}
-              placeholder="Search people or events..."
-              className="pl-11 h-12 bg-muted/30 border-transparent rounded-2xl focus-visible:ring-1 focus-visible:ring-orange-500/20 transition-all font-medium text-sm"
+              placeholder="Search conversations..."
+              className="pl-9 h-10 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/20 rounded-lg"
             />
           </div>
+        </div>
 
-          {/* Minimalist Filters */}
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
+        {/* Filters */}
+        <div className="px-5 py-3 border-b border-border/50">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
             {[
-              { id: 'all', label: 'All', icon: <MessageCircle className="h-3 w-3" /> },
-              { id: 'direct', label: '1:1', icon: <Users className="h-3 w-3" /> },
-              { id: 'event', label: 'Events', icon: <Calendar className="h-3 w-3" /> },
-              { id: 'unread', label: 'Unread', icon: <Bell className="h-3 w-3" /> },
-              { id: 'pinned', label: 'Pinned', icon: <Pin className="h-3 w-3" /> },
+              { id: 'all', label: 'All' },
+              { id: 'direct', label: 'Direct' },
+              { id: 'event', label: 'Events' },
+              { id: 'unread', label: 'Unread' },
             ].map(filter => (
               <button
                 key={filter.id}
                 onClick={() => setActiveFilter(filter.id as any)}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border",
+                  "px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap",
                   activeFilter === filter.id
-                    ? "bg-orange-600 text-white border-orange-600 shadow-md shadow-orange-600/20"
-                    : "bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/50"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 )}
               >
-                {filter.icon}
                 {filter.label}
               </button>
             ))}
@@ -349,185 +344,124 @@ export default function Messages() {
         </div>
 
         {/* Conversation List */}
-        <div className="flex-1 overflow-y-auto scrollbar-none pb-6">
+        <div className="flex-1 overflow-y-auto">
           {filteredConversations.length > 0 ? (
-            <div className="divide-y divide-border/5">
+            <div>
               {filteredConversations.map(renderConversationCard)}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center p-12 text-center opacity-40">
-              <SearchX className="h-10 w-10 mb-4" />
-              <p className="text-xs font-bold uppercase tracking-widest">No conversations</p>
+            <div className="flex flex-col items-center justify-center p-12 text-center">
+              <SearchX className="h-8 w-8 text-muted-foreground/40 mb-3" />
+              <p className="text-sm text-muted-foreground">No conversations found</p>
             </div>
           )}
         </div>
       </aside>
 
       {/* Main Chat Area */}
-      <main className="flex-1 flex flex-col bg-card/30 relative min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <AnimatePresence mode="wait">
           {selectedConversationId ? (
             <motion.div
               key={selectedConversationId}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="flex flex-col h-full"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col h-full overflow-hidden"
             >
-              {/* Premium Navbar */}
-              <header className="h-20 flex items-center justify-between px-8 border-b border-border/40 bg-background/50 backdrop-blur-md sticky top-0 z-30">
-                <div className="flex items-center gap-4 min-w-0">
+              {/* Header */}
+              <header className="shrink-0 h-16 flex items-center justify-between px-6 border-b border-border/50 bg-background">
+                <div className="flex items-center gap-3 min-w-0">
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => setShowSidebar(true)}
-                    className="lg:hidden h-10 w-10 -ml-2 rounded-xl"
+                    className="lg:hidden h-9 w-9 rounded-lg"
                   >
-                    <Menu className="h-5 w-5" />
+                    <Menu className="h-4 w-4" />
                   </Button>
-                  <Avatar className="h-11 w-11 border-2 border-background shadow-lg">
+                  <Avatar className="h-10 w-10 border border-border/50">
                     <AvatarImage src={getConversationAvatar() || undefined} />
-                    <AvatarFallback className="bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400 font-black">
+                    <AvatarFallback className="bg-muted text-foreground font-medium">
                       {getInitials(getConversationTitle())}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <h2 className="text-base font-bold tracking-tight truncate leading-none mb-1.5">
+                    <h2 className="text-sm font-semibold truncate">
                       {getConversationTitle()}
                     </h2>
                     <div className="flex items-center gap-1.5">
                       {selectedConversation?.type === 'direct' ? (
                         <>
                           <span className={cn(
-                            "w-2 h-2 rounded-full",
-                            onlineStatus?.is_online ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-muted-foreground/40"
+                            "w-1.5 h-1.5 rounded-full",
+                            onlineStatus?.is_online ? "bg-emerald-500" : "bg-muted-foreground/40"
                           )} />
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                            {onlineStatus?.is_online ? 'Active' : onlineStatus?.last_seen_text || 'Offline'}
+                          <span className="text-[11px] text-muted-foreground">
+                            {onlineStatus?.is_online ? 'Active now' : onlineStatus?.last_seen_text || 'Offline'}
                           </span>
                         </>
                       ) : (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full uppercase tracking-widest">
-                            Group Event
-                          </span>
-                          <span className="w-1 h-1 rounded-full bg-border" />
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                            {selectedConversation?.participants?.length || 0} participants
-                          </span>
-                        </div>
+                        <span className="text-[11px] text-muted-foreground">
+                          {selectedConversation?.participants?.length || 0} participants
+                        </span>
                       )}
                     </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 hover:bg-orange-50 hover:text-orange-600" onClick={() => setIsConversationSearchOpen(!isConversationSearchOpen)}>
-                    <Search className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={cn(
-                      "rounded-xl h-10 w-10 transition-colors",
-                      isInspectorOpen ? "bg-orange-100 text-orange-600 hover:bg-orange-200" : "hover:bg-orange-50 hover:text-orange-600"
-                    )}
-                    onClick={() => setIsInspectorOpen(!isInspectorOpen)}
-                  >
-                    <Info className="h-5 w-5" />
-                  </Button>
-                </div>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg" onClick={() => setIsConversationSearchOpen(!isConversationSearchOpen)}>
+                  <Search className="h-4 w-4" />
+                </Button>
               </header>
 
-              <div className="flex-1 flex overflow-hidden">
-                <div className="flex-1 flex flex-col min-w-0">
-                  {/* Search Overlay */}
-                  <AnimatePresence>
-                    {isConversationSearchOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="bg-background border-b border-border/40 overflow-hidden px-8 py-3"
-                      >
-                        <ConversationSearch
-                          conversationId={selectedConversationId}
-                          conversationName={getConversationTitle()}
-                          onClose={() => setIsConversationSearchOpen(false)}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Messages Feed */}
-                  <div className="flex-1 min-h-0">
-                    <MessageThread
-                      conversationId={selectedConversationId}
-                      currentUserId={user?.id || 1}
-                      onReply={setReplyingTo}
-                      onOpenThread={handleOpenThread}
-                    />
-                  </div>
-
-                  {/* Elegant Input Bar */}
-                  <div className="p-6 lg:px-12 bg-background/50 backdrop-blur-md">
-                    <MessageInput
-                      conversationId={selectedConversationId}
-                      recipientId={selectedUser?.id}
-                      replyingTo={replyingTo}
-                      onCancelReply={() => setReplyingTo(null)}
-                      isGroup={selectedConversationId?.startsWith('event_')}
-                    />
-                  </div>
-                </div>
-
-                {/* Information Sidebar */}
+              {/* Main content area */}
+              <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                {/* Search Overlay */}
                 <AnimatePresence>
-                  {isInspectorOpen && (
-                    <motion.aside
-                      initial={{ width: 0, opacity: 0 }}
-                      animate={{ width: 380, opacity: 1 }}
-                      exit={{ width: 0, opacity: 0 }}
-                      className="border-l border-border/40 bg-background flex flex-col overflow-hidden"
+                  {isConversationSearchOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="shrink-0 bg-background border-b border-border/50 overflow-hidden px-6 py-3"
                     >
-                      {threadMessage ? (
-                        <MessageThreadPanel
-                          parentMessage={threadMessage}
-                          replies={threadReplies}
-                          isLoading={isLoadingThreadReplies}
-                          onClose={() => setThreadMessage(null)}
-                          onReply={handleSendReply}
-                          conversationId={selectedConversationId || ''}
-                        />
-                      ) : (
-                        <div className="flex flex-col h-full p-6">
-                          <div className="flex items-center justify-between mb-8">
-                            <h3 className="font-bold uppercase tracking-widest text-[10px] text-muted-foreground">Analytics & Context</h3>
-                            <Button variant="ghost" size="icon" onClick={() => setIsInspectorOpen(false)} className="h-8 w-8 rounded-full">
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
-                          </div>
-
-                          <div className="flex-1 overflow-y-auto scrollbar-none">
-                            <ConversationInfoPanel
-                              conversation={selectedConversation}
-                              onClose={() => setIsInspectorOpen(false)}
-                              messages={[]}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </motion.aside>
+                      <ConversationSearch
+                        conversationId={selectedConversationId}
+                        conversationName={getConversationTitle()}
+                        onClose={() => setIsConversationSearchOpen(false)}
+                      />
+                    </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* Messages Area - Scrollable */}
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <MessageThread
+                    conversationId={selectedConversationId}
+                    currentUserId={user?.id || 1}
+                    onReply={setReplyingTo}
+                    onOpenThread={handleOpenThread}
+                  />
+                </div>
+
+                {/* Message Input - Sticky at bottom */}
+                <div className="shrink-0 p-4 border-t border-border/50 bg-background">
+                  <MessageInput
+                    conversationId={selectedConversationId}
+                    recipientId={selectedUser?.id}
+                    replyingTo={replyingTo}
+                    onCancelReply={() => setReplyingTo(null)}
+                    isGroup={selectedConversationId?.startsWith('event_')}
+                  />
+                </div>
               </div>
             </motion.div>
           ) : (
             /* Empty State */
-            <div className="flex flex-1 flex-col items-center justify-center p-12 text-center animate-in fade-in zoom-in duration-500">
-              <div className="w-24 h-24 bg-orange-100 dark:bg-orange-950/20 rounded-[2.5rem] flex items-center justify-center mb-8 border border-orange-200/50 dark:border-orange-800/50 relative">
-                <div className="absolute inset-0 bg-orange-500 rounded-[2.5rem] blur-2xl opacity-10 animate-pulse" />
-                <MessageCircle className="h-10 w-10 text-orange-600 dark:text-orange-400 relative z-10" />
+            <div className="flex flex-1 flex-col items-center justify-center p-12 text-center animate-in fade-in duration-500">
+              <div className="w-24 h-24 bg-primary/10 dark:bg-primary/20 rounded-[2.5rem] flex items-center justify-center mb-8 border border-primary/20 dark:border-primary/20">
+                <MessageCircle className="h-10 w-10 text-primary" />
               </div>
               <h2 className="text-3xl font-black tracking-tight mb-4">Your Intelligent Network</h2>
               <p className="text-muted-foreground max-w-sm mb-10 text-sm font-medium leading-relaxed">
@@ -535,7 +469,7 @@ export default function Messages() {
               </p>
               <Button
                 onClick={handleStartNewConversation}
-                className="bg-orange-600 hover:bg-orange-700 text-white rounded-2xl px-10 h-14 font-black text-sm uppercase tracking-widest shadow-xl shadow-orange-600/20 transition-all hover:scale-105 active:scale-95"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl px-10 h-14 font-black text-sm uppercase tracking-widest shadow-sm transition-all hover:scale-105 active:scale-95"
               >
                 Start New Thread
               </Button>

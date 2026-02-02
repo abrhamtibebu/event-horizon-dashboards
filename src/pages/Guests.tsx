@@ -41,6 +41,7 @@ interface Guest {
   company?: string;
   jobtitle?: string;
   gender?: string;
+  age?: string;
   country?: string;
   guest_type?: { name: string };
   checked_in?: boolean;
@@ -50,6 +51,7 @@ interface Guest {
 export default function Guests() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [filter, setFilter] = useState('');
+  const [debouncedFilter, setDebouncedFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -88,45 +90,46 @@ export default function Guests() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    const fetchGuestsForOrganizer = async () => {
+    const fetchGuestsForOrganizer = async (page = 1, limit = perPage) => {
       try {
         setLoading(true);
         setError(null);
-        const eventsRes = await getMyEvents('active,upcoming,completed');
-        // Handle paginated response structure
-        const events = eventsRes.data.data || eventsRes.data || [];
-        const allAttendees: any[] = [];
-        const guestEventMap: Record<string, string[]> = {};
-        for (const event of events) {
-          try {
-            const attendeesRes = await api.get(`/events/${event.id}/attendees`);
-            // Handle paginated response structure
-            const attendees = attendeesRes.data.data || attendeesRes.data || [];
-            if (Array.isArray(attendees)) {
-              attendees.forEach(att => {
-                if (att.guest && att.guest.id) {
-                  if (!guestEventMap[att.guest.id]) guestEventMap[att.guest.id] = [];
-                  guestEventMap[att.guest.id].push(event.name);
-                }
-              });
-              allAttendees.push(...attendees);
-            }
-          } catch (e) {
-            console.error(`Failed to fetch attendees for event ${event.id}:`, e);
-          }
-        }
-        const guestMap: Record<string, Guest> = {};
-        allAttendees.forEach(att => {
-          if (att.guest && att.guest.id) {
-            guestMap[att.guest.id] = {
-              ...att.guest,
-            };
+
+        // Fetch guests for the organizer using the dedicated endpoint with filters
+        const response = await api.get('/guests', {
+          params: {
+            page,
+            per_page: limit,
+            search: debouncedFilter || undefined,
+            event: eventFilter !== 'all' ? eventFilter : undefined,
+            job_title: jobTitleFilter !== 'all' ? jobTitleFilter : undefined,
+            company: companyFilter !== 'all' ? companyFilter : undefined,
+            country: countryFilter !== 'all' ? countryFilter : undefined,
+            gender: genderFilter !== 'all' ? genderFilter : undefined,
+            guest_type: guestTypeFilter !== 'all' ? guestTypeFilter : undefined,
           }
         });
-        setGuests(Object.values(guestMap));
+
+        const guestData = response.data;
+        const guestsList = guestData.data || [];
+
+        // Map attendee data to get unique event names for each guest 
+        // Note: The backend index might need further updates to include event names efficiently.
+        // For now, if we want to keep the "Source" column working as before, we'd need to fetch event names.
+        // However, the request is to "display every guest for that event organizer", 
+        // and fetching them all at once via the new endpoint is the most efficient way.
+
+        const guestEventMap: Record<string, string[]> = {};
+        guestsList.forEach((guest: any) => {
+          if (guest.id && guest.event_names) {
+            guestEventMap[guest.id] = guest.event_names;
+          }
+        });
+
+        setGuests(guestsList);
         setGuestEvents(guestEventMap);
-        setTotalPages(1);
-        setTotalRecords(Object.values(guestMap).length);
+        setTotalPages(guestData.last_page || 1);
+        setTotalRecords(guestData.total || guestsList.length);
       } catch (err) {
         console.error('Failed to fetch guests:', err);
         setError('Failed to fetch guests.');
@@ -197,13 +200,24 @@ export default function Guests() {
 
     // Only organizers can access guests list
     if (user?.role === 'organizer' || user?.role === 'organizer_admin') {
-      fetchGuestsForOrganizer();
+      fetchGuestsForOrganizer(currentPage, perPage);
     } else {
       // Redirect or show error for non-organizers
       setError('Access denied: Only organizers can view guests list.');
       setLoading(false);
     }
-  }, [user]);
+  }, [user, currentPage, perPage, debouncedFilter, eventFilter, jobTitleFilter, companyFilter, countryFilter, genderFilter, guestTypeFilter]);
+
+  // Debouncing logic for search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedFilter(filter);
+    }, 500);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [filter]);
 
   // Handle search and filter changes with pagination reset
   const handleSearchChange = (value: string) => {
@@ -241,74 +255,11 @@ export default function Guests() {
     resetPagination();
   };
 
-  // Apply client-side filtering and pagination
-  const filteredGuests = guests.filter(guest => {
-    // Apply search filter
-    if (filter && !guest.name?.toLowerCase().includes(filter.toLowerCase()) &&
-      !guest.email?.toLowerCase().includes(filter.toLowerCase()) &&
-      !guest.company?.toLowerCase().includes(filter.toLowerCase())) {
-      return false;
-    }
-
-    // Apply event filter
-    if (eventFilter !== 'all') {
-      const guestEventNames = guestEvents[guest.id] || [];
-      if (!guestEventNames.includes(eventFilter)) {
-        return false;
-      }
-    }
-
-    // Apply job title filter
-    if (jobTitleFilter !== 'all' && guest.jobtitle !== jobTitleFilter) {
-      return false;
-    }
-
-    // Apply company filter
-    if (companyFilter !== 'all' && guest.company !== companyFilter) {
-      return false;
-    }
-
-    // Apply country filter
-    if (countryFilter !== 'all' && guest.country !== countryFilter) {
-      return false;
-    }
-
-    // Apply gender filter
-    if (genderFilter !== 'all' && guest.gender !== genderFilter) {
-      return false;
-    }
-
-    // Apply guest type filter
-    if (guestTypeFilter !== 'all' && guest.guest_type?.name !== guestTypeFilter) {
-      return false;
-    }
-
-    return true;
-  });
-
-  // Calculate pagination for filtered results
-  const totalFiltered = filteredGuests.length;
-  const totalPagesForFiltered = Math.ceil(totalFiltered / perPage);
-
-  // Update pagination totals based on filtered results
-  useEffect(() => {
-    if (isAdminOrOrganizer) {
-      const calculatedTotalPages = Math.ceil(totalFiltered / perPage) || 1;
-      setTotalPages(calculatedTotalPages);
-      setTotalRecords(totalFiltered);
-
-      // Reset to page 1 if current page is beyond total pages
-      if (currentPage > calculatedTotalPages && calculatedTotalPages > 0) {
-        handlePageChange(1);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalFiltered, perPage, isAdminOrOrganizer, currentPage]);
-
-  // Apply pagination - only show 15 records per page for admin/organizer
-  const paginatedGuests = isAdminOrOrganizer
-    ? filteredGuests.slice((currentPage - 1) * perPage, currentPage * perPage)
-    : filteredGuests;
+  // Since we're now using server-side pagination and filtering, 
+  // the 'guests' state already contains only the current page's records 
+  // that match the active filters.
+  const filteredGuests = guests;
+  const paginatedGuests = guests;
 
   // Helper functions to get unique values for filters
   const getUniqueJobTitles = () => {
@@ -402,6 +353,7 @@ export default function Guests() {
         'Company': guest.company || 'N/A',
         'Job Title': guest.jobtitle || 'N/A',
         'Gender': guest.gender || 'N/A',
+        'Age': guest.age || 'N/A',
         'Country': guest.country || 'N/A',
         'Guest Type': guest.guest_type?.name || 'N/A',
         'Events Attended': (guestEvents[guest.id] || []).join(', ') || 'N/A',
@@ -515,7 +467,7 @@ export default function Guests() {
             <div className="relative flex-1 lg:w-64">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
-                placeholder="Search..."
+                placeholder="Search by name, email, company, title, phone, or event..."
                 value={filter}
                 onChange={e => handleSearchChange(e.target.value)}
                 className="pl-9 bg-background border-border"
@@ -723,6 +675,8 @@ export default function Guests() {
                   <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Name of Guest</TableHead>
                   <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Company</TableHead>
                   <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Title</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Gender</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Age</TableHead>
                   <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Email</TableHead>
                   <TableHead className="font-semibold text-foreground text-xs uppercase py-4">Phone Number</TableHead>
                   <TableHead className="font-semibold text-foreground text-xs uppercase py-4 text-right">Source</TableHead>
@@ -769,6 +723,12 @@ export default function Guests() {
                         <div className="text-sm text-foreground">{guest.jobtitle || '-'}</div>
                       </TableCell>
                       <TableCell className="py-4">
+                        <div className="text-sm text-foreground">{guest.gender || '-'}</div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <div className="text-sm text-foreground">{guest.age || '-'}</div>
+                      </TableCell>
+                      <TableCell className="py-4">
                         <div className="text-sm text-foreground">{guest.email}</div>
                       </TableCell>
                       <TableCell className="py-4">
@@ -776,7 +736,7 @@ export default function Guests() {
                       </TableCell>
                       <TableCell className="py-4 text-right">
                         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                          {(guestEvents[guest.id] || []).length > 0 ? (guestEvents[guest.id] || [])[0] : 'Direct'}
+                          {(guestEvents[guest.id] || []).length > 0 ? (guestEvents[guest.id] || []).join(', ') : 'Direct'}
                         </div>
                       </TableCell>
                       <TableCell className="py-4">

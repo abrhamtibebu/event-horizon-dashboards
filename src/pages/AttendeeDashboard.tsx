@@ -191,9 +191,9 @@ export default function AttendeeDashboard() {
               className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow"
             >
               <div className="h-48 bg-gradient-to-r from-[hsl(var(--color-warning))]/20 to-[hsl(var(--primary))]/20 overflow-hidden">
-                {event.event_image ? (
+                {(event.event_image || event.image_url || event.image) ? (
                   <img
-                    src={getImageUrl(event.event_image)}
+                    src={getImageUrl(event.image_url || event.event_image || event.image)}
                     alt={event.name}
                     className="w-full h-full object-cover"
                   />

@@ -359,6 +359,11 @@ export default function PublicEventRegister() {
         return !value.trim() ? 'Please enter your job title' : '';
       case 'gender':
         return !value.trim() ? 'Please select your gender' : '';
+      case 'age':
+        if (!value.toString().trim()) return 'Please enter your age';
+        const ageNum = parseInt(value);
+        if (isNaN(ageNum) || ageNum < 1 || ageNum > 120) return 'Please enter a valid age';
+        return '';
       case 'country':
         return !value.trim() ? 'Please select your country' : '';
       case 'agree':
@@ -372,7 +377,7 @@ export default function PublicEventRegister() {
     const errors: Record<string, string> = {};
 
     // Validate all required fields including email
-    const requiredFields = ['name', 'email', 'phone', 'company', 'job_title', 'gender', 'country', 'agree'];
+    const requiredFields = ['name', 'email', 'phone', 'company', 'job_title', 'gender', 'age', 'country', 'agree'];
     requiredFields.forEach(field => {
       const error = validateField(field, form[field as keyof typeof form]);
       if (error) {
@@ -390,7 +395,7 @@ export default function PublicEventRegister() {
     // Validate form
     if (!validateForm()) {
       // Mark all fields as touched to show errors
-      const allFields = ['name', 'email', 'phone', 'company', 'job_title', 'gender', 'country', 'agree'];
+      const allFields = ['name', 'email', 'phone', 'company', 'job_title', 'gender', 'age', 'country', 'agree'];
       setTouchedFields(prev => {
         const newTouched = { ...prev };
         allFields.forEach(field => {
@@ -494,6 +499,7 @@ export default function PublicEventRegister() {
         const params = new URLSearchParams({
           attendeeId: response.data.attendee.id.toString(),
           eventId: response.data.event.id.toString(),
+          eventUuid: response.data.event.uuid,
           eventName: response.data.event.name,
           eventDate: response.data.event.start_date || '',
           eventTime: response.data.event.start_date || '',
@@ -794,9 +800,9 @@ export default function PublicEventRegister() {
         <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 dark:border-slate-800 shadow-2xl rounded-3xl overflow-hidden animate-scale-in transition-all duration-500">
           {/* Event Banner */}
           <div className="relative h-48 sm:h-80 overflow-hidden">
-            {event.event_image ? (
+            {(event.event_image || event.image_url || event.image) ? (
               <img
-                src={getImageUrl(event.event_image)}
+                src={getImageUrl(event.image_url || event.event_image || event.image)}
                 alt={event.name}
                 className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700"
               />
@@ -951,38 +957,7 @@ export default function PublicEventRegister() {
                   {/* Free Event View */}
                   {!isTicketedEvent && (
                     <div className="animate-fade-in space-y-8 sm:space-y-12">
-                      {/* Guest Type Selector */}
-                      {guestTypes.length > 0 && (
-                        <div className="space-y-4 sm:space-y-6">
-                          <p className="text-[10px] sm:text-xs font-bold text-slate-500 text-center uppercase tracking-[0.2em]">
-                            Joining as
-                          </p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 px-2 sm:px-0">
-                            {guestTypes.map((gt) => (
-                              <button
-                                key={gt.id}
-                                type="button"
-                                onClick={async () => {
-                                  setSelectedGuestTypeId(gt.id);
-                                  try {
-                                    const res = await api.get(`/events/${event.id}/forms/by-guest-type/${gt.id}`);
-                                    setUseCustomForm(res.data?.status === 'active');
-                                  } catch {
-                                    setUseCustomForm(false);
-                                  }
-                                }}
-                                className={`px-4 py-4 rounded-xl sm:rounded-2xl text-sm font-bold border-2 transition-all duration-300 flex items-center justify-center text-center ${selectedGuestTypeId === gt.id
-                                  ? 'bg-primary border-primary text-white shadow-xl shadow-primary/30 -translate-y-1'
-                                  : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-primary/40'
-                                  }`}
-                              >
-                                {gt.name}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
+                      {/* Registration Header */}
                       <div className="text-center px-4">
                         <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Secure Your Spot</h2>
                         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2">Registration is fast and takes less than a minute</p>
@@ -1075,6 +1050,40 @@ export default function PublicEventRegister() {
                         </div>
 
                         <div className="space-y-2">
+                          <Label htmlFor="gender" className="text-xs font-bold uppercase tracking-wider text-slate-500">Gender</Label>
+                          <Select value={form.gender} onValueChange={(v) => handleFieldChange('gender', v)}>
+                            <SelectTrigger className={`h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:ring-4 focus:ring-primary/10 transition-all ${touchedFields.gender && fieldErrors.gender ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''}`}>
+                              <div className="flex items-center gap-3">
+                                <Users className="w-4 h-4 text-slate-400" />
+                                <SelectValue placeholder="Select Gender" />
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl border-slate-100 dark:border-slate-800">
+                              {genderOptions.map(opt => (
+                                <SelectItem key={opt} value={opt} className="rounded-xl focus:bg-primary/5">{opt}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="age" className="text-xs font-bold uppercase tracking-wider text-slate-500">Age</Label>
+                          <div className="relative group">
+                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                            <Input
+                              id="age"
+                              type="number"
+                              min="1"
+                              max="120"
+                              value={form.age}
+                              onChange={(e) => handleFieldChange('age', e.target.value)}
+                              className={`pl-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all ${touchedFields.age && fieldErrors.age ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''}`}
+                              placeholder="Years"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
                           <Label htmlFor="country" className="text-xs font-bold uppercase tracking-wider text-slate-500">Country</Label>
                           <Select value={form.country} onValueChange={(v) => handleFieldChange('country', v)}>
                             <SelectTrigger className="h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:ring-4 focus:ring-primary/10 transition-all">
@@ -1095,7 +1104,7 @@ export default function PublicEventRegister() {
                               className="mt-1 rounded-md border-slate-300"
                             />
                             <Label htmlFor="agree" className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed cursor-pointer select-none">
-                              I certify that all information provided is accurate and I agree to the <a href="/terms" className="text-primary font-bold hover:underline">Terms of Service</a> and <a href="/privacy" className="text-primary font-bold hover:underline">Privacy Policy</a>.
+                              I certify that all information provided is accurate and I agree to the <Link to={`/terms?returnUrl=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="text-primary font-bold hover:underline">Terms of Service</Link> and <Link to={`/privacy?returnUrl=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="text-primary font-bold hover:underline">Privacy Policy</Link>.
                             </Label>
                           </div>
                           {touchedFields.agree && fieldErrors.agree && (
@@ -1137,15 +1146,17 @@ export default function PublicEventRegister() {
               <div className="flex flex-col items-center gap-3">
                 <span className="text-[10px] text-slate-400 uppercase tracking-[0.3em] font-bold">Powered by</span>
                 <div className="flex items-center gap-4">
-                  <img
-                    src="/Validity_logo.png"
-                    alt="Validity logo"
-                    className="h-10 object-contain grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-500"
-                  />
+                  <a href="https://validity.et" target="_blank" rel="noopener noreferrer" className="transition-all duration-500 hover:scale-105">
+                    <img
+                      src="/Validity_logo.png"
+                      alt="Validity logo"
+                      className="h-10 object-contain grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-500"
+                    />
+                  </a>
                   <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
-                  <span className="text-sm font-bold text-slate-500 dark:text-slate-400 tracking-tight">
+                  <a href="https://validity.et" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-slate-500 dark:text-slate-400 tracking-tight hover:text-primary transition-colors">
                     Validity Event and Marketing
-                  </span>
+                  </a>
                 </div>
               </div>
               <p className="text-[10px] text-slate-400/40 uppercase tracking-widest font-bold mt-4">

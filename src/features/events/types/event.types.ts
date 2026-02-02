@@ -11,6 +11,8 @@ export interface Event {
   event_type: 'free' | 'ticketed'
   status: string
   event_image?: string | null
+  image_url?: string | null
+  image?: string | null
   organizer_id?: number
   organizer?: {
     id: number

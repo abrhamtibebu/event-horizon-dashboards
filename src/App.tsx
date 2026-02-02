@@ -16,7 +16,7 @@ import CreateFreeEvent from './pages/CreateFreeEvent'
 import EventTypeSelection from './pages/EventTypeSelection'
 import Users from './pages/Users'
 import Organizers from './pages/Organizers'
-import Messages from './pages/MessagesSimple'
+import Messages from './pages/Messages'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Profile from './pages/Profile'
@@ -272,479 +272,479 @@ const AppWithRealtime = () => {
           >
             {/* Dashboard - accessible to all authenticated users */}
             <Route index element={<DashboardRouter />} />
-            
+
             {/* Events & Tickets - based on sidebar roles */}
-            <Route 
-              path="events" 
+            <Route
+              path="events"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'event_manager']}>
                   <Events />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="events/create" 
+            <Route
+              path="events/create"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'organizer', 'organizer_admin', 'event_manager']}>
                   <EventTypeSelection />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="events/create/ticketed" 
+            <Route
+              path="events/create/ticketed"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'organizer', 'organizer_admin', 'event_manager']}>
                   <CreateTicketedEvent />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="events/create/free" 
+            <Route
+              path="events/create/free"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'organizer', 'organizer_admin', 'event_manager']}>
                   <CreateFreeEvent />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="events/:eventId" 
+            <Route
+              path="events/:eventId"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher', 'event_manager']}>
                   <EventDetails />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="ticket-management" 
+            <Route
+              path="ticket-management"
               element={
                 <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin', 'admin', 'superadmin']}>
                   <OrganizerTicketsPage />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="tickets" 
+            <Route
+              path="tickets"
               element={
                 <RoleProtectedRoute allowedRoles={['attendee']}>
                   <MyTicketsPage />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="tickets/purchase/:eventId" 
+            <Route
+              path="tickets/purchase/:eventId"
               element={
                 <RoleProtectedRoute allowedRoles={['attendee', 'organizer', 'organizer_admin', 'admin', 'superadmin']}>
                   <TicketPurchasePage />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="ticket-analytics/:eventId" 
+            <Route
+              path="ticket-analytics/:eventId"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin']}>
                   <AnalyticsDashboard />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            
+
             {/* Management - based on sidebar roles */}
-            <Route 
-              path="tasks" 
+            <Route
+              path="tasks"
               element={
                 <ProtectedRoute>
                   <Tasks />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="users" 
+            <Route
+              path="users"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <Users />
                 </RoleProtectedRoute>
-              } 
+              }
             />
             <Route path="users/add" element={<Navigate to="/dashboard/users" replace />} />
             <Route path="users/edit/:id" element={<Navigate to="/dashboard/users" replace />} />
-            <Route 
-              path="organizers" 
+            <Route
+              path="organizers"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <Organizers />
                 </RoleProtectedRoute>
-              } 
+              }
             />
             <Route path="organizers/add" element={<Navigate to="/dashboard/organizers" replace />} />
-            <Route 
-              path="organizers/:organizerId/suspend" 
+            <Route
+              path="organizers/:organizerId/suspend"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <OrganizerSuspend />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="organizers/:organizerId/contacts" 
+            <Route
+              path="organizers/:organizerId/contacts"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <OrganizerContacts />
                 </RoleProtectedRoute>
-              } 
+              }
             />
             <Route path="organizers/:organizerId/edit" element={<Navigate to="/dashboard/organizers" replace />} />
-            <Route 
-              path="organizers/:organizerId" 
+            <Route
+              path="organizers/:organizerId"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <OrganizerProfile />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="guests" 
+            <Route
+              path="guests"
               element={
                 <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin']}>
                   <Guests />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="usher-management" 
+            <Route
+              path="usher-management"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'user']}>
                   <UsherManagement />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="usher-management/register" 
+            <Route
+              path="usher-management/register"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'user']}>
                   <GenerateUsherRegistrationLink />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="usher-management/links" 
+            <Route
+              path="usher-management/links"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'user']}>
                   <ShortLinkManagement />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="vendor-management" 
+            <Route
+              path="vendor-management"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver']}>
                   <VendorManagement />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="salesperson-management" 
+            <Route
+              path="salesperson-management"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <SalespersonManagement />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/subscriptions" 
+            <Route
+              path="admin/subscriptions"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <AdminSubscriptionManagement />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/plans" 
+            <Route
+              path="admin/plans"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <PlanManagement />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/system-health" 
+            <Route
+              path="admin/system-health"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <SystemHealth />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/financials" 
+            <Route
+              path="admin/financials"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <FinancialDashboard />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/moderation" 
+            <Route
+              path="admin/moderation"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <ContentModeration />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/analytics" 
+            <Route
+              path="admin/analytics"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <AdvancedAnalytics />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/settings" 
+            <Route
+              path="admin/settings"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <SystemSettings />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/security" 
+            <Route
+              path="admin/security"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <SecurityAudit />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/data" 
+            <Route
+              path="admin/data"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <DataManagement />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/api" 
+            <Route
+              path="admin/api"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <APIManagement />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/integrations" 
+            <Route
+              path="admin/integrations"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <IntegrationManagement />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/performance" 
+            <Route
+              path="admin/performance"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <PerformanceOptimization />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/logs" 
+            <Route
+              path="admin/logs"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <SystemLogs />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/automation" 
+            <Route
+              path="admin/automation"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <AutomationWorkflows />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/advanced-security" 
+            <Route
+              path="admin/advanced-security"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <AdvancedSecurity />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/compliance" 
+            <Route
+              path="admin/compliance"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <ComplianceAudit />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/notification-templates" 
+            <Route
+              path="admin/notification-templates"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <NotificationTemplates />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="admin/roles" 
+            <Route
+              path="admin/roles"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <RolePermissions />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="subscription" 
+            <Route
+              path="subscription"
               element={
                 <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin']}>
                   <SubscriptionManagement />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="subscription/plans" 
+            <Route
+              path="subscription/plans"
               element={
                 <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin']}>
                   <SubscriptionPlans />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="subscription/payment" 
+            <Route
+              path="subscription/payment"
               element={
                 <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin']}>
                   <SubscriptionPayment />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="subscription/usage" 
+            <Route
+              path="subscription/usage"
               element={
                 <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin']}>
                   <UsageDashboard />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="team" 
+            <Route
+              path="team"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'organizer', 'organizer_admin']}>
                   <Team />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            
+
             {/* Operations - based on sidebar roles */}
-            <Route 
-              path="check-in" 
+            <Route
+              path="check-in"
               element={
                 <RoleProtectedRoute allowedRoles={['usher']}>
                   <CheckIn />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="ticket-validator" 
+            <Route
+              path="ticket-validator"
               element={
                 <RoleProtectedRoute allowedRoles={['usher', 'organizer', 'organizer_admin', 'admin', 'superadmin']}>
                   <TicketValidator />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="locate-badges" 
+            <Route
+              path="locate-badges"
               element={
                 <RoleProtectedRoute allowedRoles={['admin', 'organizer', 'organizer_admin', 'event_manager', 'usher']}>
                   <LocateBadges />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="usher/events" 
+            <Route
+              path="usher/events"
               element={
                 <RoleProtectedRoute allowedRoles={['usher']}>
                   <UsherEvents />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="usher/events/:eventId" 
+            <Route
+              path="usher/events/:eventId"
               element={
                 <RoleProtectedRoute allowedRoles={['usher']}>
                   <UsherEventManagement />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="usher/badge-locator" 
+            <Route
+              path="usher/badge-locator"
               element={
                 <RoleProtectedRoute allowedRoles={['usher']}>
                   <UsherBadgeLocator />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="usher/jobs" 
+            <Route
+              path="usher/jobs"
               element={
                 <RoleProtectedRoute allowedRoles={['usher']}>
                   <UsherDashboard />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="usher/jobs/:eventId" 
+            <Route
+              path="usher/jobs/:eventId"
               element={
                 <RoleProtectedRoute allowedRoles={['usher']}>
                   <UsherJobDetails />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            
+
             {/* Insights - based on sidebar roles */}
-            <Route 
-              path="reports" 
+            <Route
+              path="reports"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'organizer', 'organizer_admin']}>
                   <Reports />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            
+
             {/* Connect - based on sidebar roles */}
-            <Route 
-              path="messages" 
+            <Route
+              path="messages"
               element={
                 <ProtectedRoute>
                   <Messages />
                 </ProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="marketing" 
+            <Route
+              path="marketing"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'marketing_specialist']}>
                   <Marketing />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            
+
             {/* System - based on sidebar roles */}
-            <Route 
-              path="audit-logs" 
+            <Route
+              path="audit-logs"
               element={
                 <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <AuditLogs />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            <Route 
-              path="trash" 
+            <Route
+              path="trash"
               element={
-                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin']}>
                   <Trash />
                 </RoleProtectedRoute>
-              } 
+              }
             />
-            
+
             {/* Common routes - accessible to all authenticated users */}
             <Route path="profile" element={<Profile />} />
             <Route path="settings" element={<Settings />} />

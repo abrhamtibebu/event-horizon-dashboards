@@ -108,6 +108,7 @@ api.interceptors.request.use(
       config.url?.includes('/register') ||
       config.url?.includes('/guest-types') ||
       config.url?.startsWith('/forms/') || // Public form access
+      config.url?.includes('/attendees/') && (config.url?.includes('/badge') || config.url?.includes('/resend-email')) || // Public attendee resources
       config.url === '/login' ||
       config.url === '/register' ||
       config.url === '/forgot-password' ||
@@ -760,9 +761,9 @@ export const checkInByQRAuto = (uuid: string) =>
 
 // Email management API functions
 export const resendRegistrationEmail = (eventId: number, attendeeId: number) =>
-  api.post(`/events/${eventId}/attendees/${attendeeId}/resend-email`)
+  api.post(`/public/events/${eventId}/attendees/${attendeeId}/resend-email`)
 
 export const getBadgePreview = (eventId: number, attendeeId: number) =>
-  api.get(`/events/${eventId}/attendees/${attendeeId}/badge-preview`)
+  api.get(`/public/events/${eventId}/attendees/${attendeeId}/badge-preview`)
 
 export { api }

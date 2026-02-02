@@ -106,7 +106,7 @@ function AnalyticsTab({ eventId }: { eventId: string }) {
 export default function EventDetails() {
   const { eventId } = useParams()
   const { user } = useAuth()
-  const { hasPermission } = usePermissionCheck()
+  const { hasPermission, checkPermission } = usePermissionCheck()
   const [activeTab, setActiveTab] = useState('details')
 
   // Check permissions

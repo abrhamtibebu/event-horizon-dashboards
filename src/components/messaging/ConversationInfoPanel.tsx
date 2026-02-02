@@ -68,10 +68,9 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
                 animate={{ scale: 1, opacity: 1 }}
                 className="relative"
               >
-                <div className="absolute inset-0 bg-orange-500 blur-3xl opacity-10 rounded-full" />
                 <Avatar className="w-28 h-28 border-4 border-background shadow-2xl relative z-10">
                   <AvatarImage src={conversation.avatar} />
-                  <AvatarFallback className="text-3xl font-black bg-orange-100 text-orange-600 dark:bg-orange-900/30">
+                  <AvatarFallback className="text-3xl font-black bg-primary/10 text-primary dark:bg-primary/30">
                     {getInitials(conversation.name)}
                   </AvatarFallback>
                 </Avatar>
@@ -90,7 +89,7 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
                 </div>
               )}
               {isEventConversation && (
-                <Badge variant="outline" className="bg-orange-50/50 border-orange-200 text-orange-600 text-[10px] font-black uppercase tracking-widest px-3 py-1">
+                <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest px-3 py-1">
                   <Calendar className="w-3 h-3 mr-1.5" />
                   Event Collaboration
                 </Badge>
@@ -104,7 +103,7 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
                 onClick={() => setIsMuted(!isMuted)}
                 className={cn(
                   "flex-col h-16 gap-1 rounded-2xl border-border/40 transition-all",
-                  isMuted ? "bg-muted text-muted-foreground" : "hover:bg-orange-50 hover:border-orange-200 hover:text-orange-600"
+                  isMuted ? "bg-muted text-muted-foreground" : "hover:bg-primary/10 hover:border-primary/20 hover:text-primary"
                 )}
               >
                 {isMuted ? <BellOff className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
@@ -115,7 +114,7 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
                 onClick={() => setIsStarred(!isStarred)}
                 className={cn(
                   "flex-col h-16 gap-1 rounded-2xl border-border/40 transition-all",
-                  isStarred ? "bg-orange-600 text-white border-orange-600" : "hover:bg-orange-50 hover:border-orange-200 hover:text-orange-600"
+                  isStarred ? "bg-primary text-primary-foreground border-primary" : "hover:bg-primary/10 hover:border-primary/20 hover:text-primary"
                 )}
               >
                 <Star className={cn("w-4 h-4", isStarred && "fill-current")} />
@@ -123,7 +122,7 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="flex-col h-16 gap-1 rounded-2xl border-border/40 hover:bg-orange-50 hover:border-orange-200 hover:text-orange-600">
+                  <Button variant="outline" className="flex-col h-16 gap-1 rounded-2xl border-border/40 hover:bg-primary/10 hover:border-primary/20 hover:text-primary">
                     <MoreVertical className="w-4 h-4" />
                     <span className="text-[9px] font-black uppercase tracking-tighter">More</span>
                   </Button>
@@ -198,7 +197,7 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
                   {documentFiles.length > 0 ? (
                     documentFiles.slice(0, 5).map((msg) => (
                       <div key={msg.id} className="flex items-center gap-4 p-3 rounded-2xl bg-muted/30 border border-border/20 hover:bg-muted/50 transition-colors group">
-                        <div className="w-10 h-10 bg-orange-100 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 rounded-xl flex items-center justify-center shrink-0">
+                        <div className="w-10 h-10 bg-primary/10 dark:bg-primary/20 text-primary rounded-xl flex items-center justify-center shrink-0">
                           <FileText className="w-5 h-5" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -221,14 +220,14 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
             </div>
 
             {/* Security Notice */}
-            <div className="p-6 rounded-[2rem] bg-orange-600/5 border border-orange-600/10 relative overflow-hidden group">
-              <Shield className="absolute -right-4 -bottom-4 w-24 h-24 text-orange-600/5 rotate-12 group-hover:rotate-0 transition-transform duration-700" />
+            <div className="p-6 rounded-[2rem] bg-primary/5 border border-primary/10 relative overflow-hidden group">
+              <Shield className="absolute -right-4 -bottom-4 w-24 h-24 text-primary/5 rotate-12 group-hover:rotate-0 transition-transform duration-700" />
               <div className="relative z-10 flex gap-4">
-                <div className="w-10 h-10 rounded-2xl bg-orange-600 flex items-center justify-center shrink-0 shadow-lg shadow-orange-600/30">
+                <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center shrink-0 shadow-lg shadow-primary/30">
                   <Lock className="w-5 h-5 text-white" />
                 </div>
                 <div className="space-y-1 pr-4">
-                  <h4 className="text-[11px] font-black uppercase tracking-wider text-orange-600">Privacy Secure</h4>
+                  <h4 className="text-[11px] font-black uppercase tracking-wider text-primary">Privacy Secure</h4>
                   <p className="text-[10px] font-medium leading-relaxed text-muted-foreground/90">
                     Advanced end-to-end encryption active for this channel.
                   </p>

@@ -75,16 +75,16 @@ export default function PublicFormRegistration() {
 
   // Submit form mutation
   const submitMutation = useMutation({
-    mutationFn: (data: FormSubmissionRequest) => 
+    mutationFn: (data: FormSubmissionRequest) =>
       formSubmissionApi.submitForm(parseInt(formId!), data),
     onSuccess: (response) => {
       toast.success('Registration submitted successfully!');
-      
+
       // Extract attendee and guest data from response
       const attendee = response.data?.attendee || response.attendee;
       const guest = attendee?.guest || response.data?.guest || response.guest;
       const submission = response.data?.submission || response.submission;
-      
+
       // Build success page URL with attendee data
       const params = new URLSearchParams();
       if (attendee?.id) params.set('attendeeId', attendee.id.toString());
@@ -99,7 +99,7 @@ export default function PublicFormRegistration() {
       if (guest?.country) params.set('guestCountry', guest.country);
       if (form?.guest_type?.name) params.set('guestTypeName', form.guest_type.name);
       if (form?.guest_type?.price !== undefined) params.set('guestTypePrice', form.guest_type.price.toString());
-      
+
       navigate(`/form/register/${formId}/success?${params.toString()}`);
     },
     onError: (error: any) => {
@@ -139,7 +139,7 @@ export default function PublicFormRegistration() {
     setFormData(prev => {
       const currentValue = prev[fieldKey] || [];
       const valueArray = Array.isArray(currentValue) ? currentValue : [];
-      
+
       if (checked) {
         return {
           ...prev,
@@ -165,9 +165,9 @@ export default function PublicFormRegistration() {
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 overflow-hidden bg-background">
-                    <img 
-                      src="/evella-logo.png" 
-                      alt="Evella Logo" 
+                    <img
+                      src="/evella-logo.png"
+                      alt="Evella Logo"
                       className="w-full h-full object-contain p-2"
                       onError={(e) => {
                         // Fallback to text if image fails to load
@@ -205,9 +205,9 @@ export default function PublicFormRegistration() {
                 <div className="flex flex-col items-center justify-center space-y-4 sm:space-y-6">
                   <div className="relative">
                     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center shadow-lg bg-background overflow-hidden">
-                      <img 
-                        src="/evella-logo.png" 
-                        alt="Evella Logo" 
+                      <img
+                        src="/evella-logo.png"
+                        alt="Evella Logo"
                         className="w-full h-full object-contain p-3 animate-pulse"
                         onError={(e) => {
                           // Fallback to text if image fails to load
@@ -232,7 +232,7 @@ export default function PublicFormRegistration() {
                   {/* Loading Progress Bar */}
                   <div className="w-full max-w-xs">
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-primary to-warning rounded-full animate-pulse" style={{width: '60%'}}></div>
+                      <div className="h-full bg-gradient-to-r from-primary to-warning rounded-full animate-pulse" style={{ width: '60%' }}></div>
                     </div>
                   </div>
                 </div>
@@ -326,7 +326,7 @@ export default function PublicFormRegistration() {
   const endDate = event?.end_date ? new Date(event.end_date) : null;
   const organizerName = event?.organizer?.name || 'Event Organizer';
   const organizerLogo = event?.organizer?.logo ? getImageUrl(event.organizer.logo) : null;
-  const eventImage = event?.event_image ? getImageUrl(event.event_image) : null;
+  const eventImage = (event?.event_image || event?.image_url) ? getImageUrl(event.event_image || event.image_url) : null;
 
   if (form.status !== 'active') {
     return (
@@ -417,9 +417,9 @@ export default function PublicFormRegistration() {
             <div className="flex items-center gap-2 sm:gap-4 group flex-shrink-0">
               <div className="relative">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 group-hover:shadow-primary/30 transition-all duration-300 bg-background overflow-hidden">
-                  <img 
-                    src="/evella-logo.png" 
-                    alt="Evella Logo" 
+                  <img
+                    src="/evella-logo.png"
+                    alt="Evella Logo"
                     className="w-full h-full object-contain p-2"
                     onError={(e) => {
                       // Fallback to text if image fails to load
@@ -599,9 +599,9 @@ export default function PublicFormRegistration() {
               <div className="flex items-center gap-3 sm:gap-4">
                 <div className="relative flex-shrink-0">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shadow-lg bg-background overflow-hidden">
-                    <img 
-                      src="/evella-logo.png" 
-                      alt="Evella Logo" 
+                    <img
+                      src="/evella-logo.png"
+                      alt="Evella Logo"
                       className="w-full h-full object-contain p-3"
                       onError={(e) => {
                         // Fallback to text if image fails to load
@@ -748,9 +748,9 @@ export default function PublicFormRegistration() {
         <div className="mt-12 sm:mt-16 text-center space-y-4 px-4 sm:px-0">
           <div className="flex items-center justify-center gap-2 text-muted-foreground">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center bg-background overflow-hidden">
-              <img 
-                src="/evella-logo.png" 
-                alt="Evella Logo" 
+              <img
+                src="/evella-logo.png"
+                alt="Evella Logo"
                 className="w-full h-full object-contain p-1.5"
                 onError={(e) => {
                   // Fallback to text if image fails to load

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import {
   Trash2,
-  RotateCcw,
+  RefreshCw,
   Search,
-  MoreHorizontal,
   Calendar,
   Building,
   Users,
@@ -12,29 +11,19 @@ import {
   Folder,
   UserCheck,
   UserCheck2,
-  X,
-  RefreshCw,
-  Trash,
-  Eye,
   ArrowLeft,
-  AlertTriangle,
-  CheckCircle,
+  Trash,
   Clock,
-  FileText,
-  Settings,
-  Shield,
+  Archive,
+  MoreVertical,
+  RotateCcw,
+  Check
 } from 'lucide-react'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,7 +43,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 import api from '@/lib/api'
 import { format, formatDistanceToNow } from 'date-fns'
@@ -64,6 +52,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
+import { AnimatePresence, motion } from 'framer-motion'
 
 interface TrashItem {
   id: number
@@ -94,11 +84,6 @@ interface TrashCategory {
   count: number
 }
 
-interface TrashData {
-  categories: TrashCategory[]
-  total_items: number
-}
-
 const iconMap: Record<string, React.ReactNode> = {
   calendar: <Calendar className="h-5 w-5" />,
   building: <Building className="h-5 w-5" />,
@@ -110,150 +95,134 @@ const iconMap: Record<string, React.ReactNode> = {
   'user-tag': <UserCheck2 className="h-5 w-5" />,
 }
 
-// PAGE 1: Category Selection View
+// Helper for consistent date formatting
+const formatDate = (dateString: string) => {
+  try {
+    return format(new Date(dateString), 'MMM d, yyyy h:mm a')
+  } catch (e) {
+    return 'Invalid Date'
+  }
+}
+
+// PAGE 1: Category Selection View (Theme Aware & Cleaner)
 function TrashCategoryList({
   categories,
   totalItems,
   onSelectCategory,
+  loading: listLoading
 }: {
   categories: TrashCategory[]
   totalItems: number
   onSelectCategory: (category: string) => void
+  loading: boolean
 }) {
   return (
-    <TooltipProvider>
-      <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 py-8 px-2 sm:px-6 lg:px-12">
-        {/* Breadcrumbs */}
-        <Breadcrumbs 
-          items={[
-            { label: 'Trash', href: '/dashboard/trash' }
-          ]}
-          className="mb-4"
-        />
-        
+    <div className="min-h-screen w-full bg-background p-6 md:p-8 transition-colors duration-300">
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Trash Management</h1>
-            <p className="text-gray-600 mt-2">Recover or permanently delete items from the system</p>
+            <Breadcrumbs
+              items={[{ label: 'Trash', href: '/dashboard/trash' }]}
+              className="mb-2"
+            />
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Trash</h1>
+            <p className="text-muted-foreground mt-1">Manage deleted items and recovery</p>
           </div>
-          <div className="flex gap-3">
-            <Button variant="outline" size="lg">
-              <RefreshCw className="h-5 w-5 mr-2" />
+
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+              <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="lg">
-                  <Trash2 className="h-5 w-5 mr-2" />
-                  Empty Trash ({totalItems})
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Empty Trash</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently delete all items in the trash. This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction className="bg-red-600 hover:bg-red-700">
-                    Empty Trash
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 text-center">
-            <CardHeader>
-              <CardTitle className="text-gray-700 text-lg font-semibold">Total Items</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{totalItems}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 text-center">
-            <CardHeader>
-              <CardTitle className="text-gray-700 text-lg font-semibold">Categories</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">{categories.length}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 text-center">
-            <CardHeader>
-              <CardTitle className="text-gray-700 text-lg font-semibold">Events</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {categories.find(cat => cat.key === 'events')?.count || 0}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 text-center">
-            <CardHeader>
-              <CardTitle className="text-gray-700 text-lg font-semibold">Users</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {categories.find(cat => cat.key === 'users')?.count || 0}
-              </div>
-            </CardContent>
-          </Card>
+            {totalItems > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Empty Trash
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Empty Trash</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to permanently delete all {totalItems} items? This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Empty Trash
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
 
         {/* Categories Grid */}
-        {categories.length === 0 ? (
-          <Card className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 max-w-md mx-auto">
-            <CardContent className="p-12 text-center">
-              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="h-8 w-8 text-gray-400" />
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                Trash is Empty
-              </h3>
-              <p className="text-gray-600">No deleted items found in the system.</p>
-            </CardContent>
-          </Card>
+        {listLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-40 bg-muted/50 rounded-xl animate-pulse" />
+            ))}
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-card rounded-2xl border border-border border-dashed">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+              <Archive className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-semibold text-foreground">Trash is Correctly Empty</h3>
+            <p className="text-muted-foreground max-w-sm text-center mt-2">
+              There are no deleted items to display. Great job keeping things clean!
+            </p>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {categories.map((cat) => (
-              <Card
+              <div
                 key={cat.key}
-                className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 cursor-pointer hover:shadow-xl transition-all duration-200 hover:border-blue-300"
                 onClick={() => onSelectCategory(cat.key)}
+                className="group relative bg-card p-6 rounded-2xl border border-border shadow-sm hover:shadow-md hover:border-primary/50 transition-all cursor-pointer overflow-hidden"
               >
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
-                      {iconMap[cat.icon] || <Trash2 className="h-6 w-6 text-gray-600" />}
+                <div className="absolute top-0 right-0 p-4 opacity-[0.03] dark:opacity-[0.08] group-hover:opacity-[0.08] dark:group-hover:opacity-[0.12] transition-opacity">
+                  {/* Background Icon Decoration */}
+                  {React.cloneElement(iconMap[cat.icon] as React.ReactElement, { className: "w-24 h-24 text-foreground" })}
+                </div>
+
+                <div className="relative z-10 flex flex-col h-full justify-between gap-4">
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-muted/50 flex items-center justify-center text-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors duration-300">
+                      {iconMap[cat.icon] || <Trash2 className="h-6 w-6" />}
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 text-lg">
-                        {cat.title}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        {cat.count} item{cat.count !== 1 ? 's' : ''}
-                      </p>
-                    </div>
-                    <ArrowLeft className="h-5 w-5 text-gray-400 rotate-180" />
+                    <Badge variant="secondary" className="bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                      {cat.count}
+                    </Badge>
                   </div>
-                </CardContent>
-              </Card>
+
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
+                      {cat.title}
+                    </h3>
+                    <div className="flex items-center text-sm text-muted-foreground mt-1 group-hover:translate-x-1 transition-transform">
+                      <span>View Items</span>
+                      <ArrowLeft className="w-3 h-3 ml-1 rotate-180" />
+                    </div>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         )}
       </div>
-    </TooltipProvider>
+    </div>
   )
 }
 
-// PAGE 2: Category Details View
+// PAGE 2: Category Details View (Theme Aware & Cleaner)
 function TrashCategoryDetails({
   selectedCategory,
   onBack,
@@ -268,12 +237,10 @@ function TrashCategoryDetails({
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
 
-  // Only show the action bar if we are inside a category (selectedCategory is truthy)
-  const showActionBar = !!selectedCategory && selectedItems.length > 0
+  const showActionBar = selectedItems.length > 0
 
   useEffect(() => {
     fetchCategoryItems()
-    // eslint-disable-next-line
   }, [selectedCategory, search])
 
   async function fetchCategoryItems() {
@@ -314,17 +281,18 @@ function TrashCategoryDetails({
   async function handleBulkRestore() {
     try {
       await api.post(`/trash/${selectedCategory}/bulk-restore`, { ids: selectedItems })
-      toast({ title: 'Success', description: `${selectedItems.length} items restored.` })
+      toast({ title: 'Restored', description: `Successfully restored ${selectedItems.length} items.` })
       fetchCategoryItems()
       clearSelection()
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to restore items.', variant: 'destructive' })
     }
   }
+
   async function handleBulkDelete() {
     try {
       await api.post(`/trash/${selectedCategory}/bulk-force-delete`, { ids: selectedItems })
-      toast({ title: 'Success', description: `${selectedItems.length} items permanently deleted.` })
+      toast({ title: 'Deleted', description: `Permanently deleted ${selectedItems.length} items.` })
       fetchCategoryItems()
       clearSelection()
     } catch (error) {
@@ -334,181 +302,173 @@ function TrashCategoryDetails({
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 py-8 px-2 sm:px-6 lg:px-12">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <div className="flex items-center gap-4">
+      <div className="min-h-screen w-full bg-background p-6 md:p-8 transition-colors duration-300">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex flex-col gap-6">
             <Button
-              variant="outline"
-              size="lg"
+              variant="ghost"
+              size="sm"
               onClick={onBack}
+              className="w-fit -ml-2 text-muted-foreground hover:text-foreground"
             >
-              <ArrowLeft className="h-5 w-5 mr-2" />
+              <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Categories
             </Button>
-            <Separator orientation="vertical" className="h-8" />
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center">
-                {iconMap[categoryInfo?.icon || ''] || (
-                  <Trash2 className="h-6 w-6 text-gray-600" />
-                )}
+
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-card border border-border flex items-center justify-center shadow-sm text-foreground">
+                  {iconMap[categoryInfo?.icon || ''] || <Trash2 className="h-7 w-7 text-muted-foreground" />}
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-foreground tracking-tight">{categoryInfo?.title}</h1>
+                  <p className="text-muted-foreground">
+                    {categoryInfo?.count} items deleted
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {categoryInfo?.title}
-                </h1>
-                <p className="text-gray-600">
-                  {categoryInfo?.count} items in this category
-                </p>
+
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Search deleted items..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 bg-card border-border focus-visible:ring-primary"
+                />
               </div>
             </div>
           </div>
-          <div className="w-full sm:w-80">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <Input
-                placeholder="Search items..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10 py-3 rounded-lg text-base"
-              />
+
+          {/* Wrapper for Card and Bulk Actions */}
+          <div className="relative">
+            {/* Bulk Actions Bar - Floating Overlay */}
+            <AnimatePresence>
+              {showActionBar && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className="fixed bottom-8 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none"
+                >
+                  <div className="bg-foreground text-background dark:bg-zinc-800 dark:text-zinc-100 p-2 pl-4 rounded-full shadow-xl flex items-center justify-between pointer-events-auto min-w-[350px] max-w-lg border border-border/10">
+                    <div className="flex items-center gap-3 mr-4">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-background text-foreground text-xs font-bold">
+                        {selectedItems.length}
+                      </span>
+                      <span className="text-sm font-medium">selected</span>
+                      <div className="h-4 w-px bg-current/20 mx-1" />
+                      <button
+                        onClick={clearSelection}
+                        className="text-xs opacity-70 hover:opacity-100 transition-opacity font-medium hover:underline"
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleBulkRestore}
+                        className="hover:bg-background/20 hover:text-current h-9 rounded-full px-4"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                        Restore
+                      </Button>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            className="bg-red-600 hover:bg-red-700 text-white h-9 rounded-full px-4 shadow-sm border-0"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-2" />
+                            Delete
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Permanently?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently remove {selectedItems.length} items from the database. This action is irreversible.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                              Delete Forever
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted/50 border-b border-border text-xs uppercase text-muted-foreground font-medium">
+                    <tr>
+                      <th className="p-4 w-14">
+                        <Checkbox
+                          checked={items.length > 0 && selectedItems.length === items.length}
+                          onCheckedChange={handleSelectAll}
+                          className="translate-y-[2px]"
+                        />
+                      </th>
+                      <th className="py-3 px-4">Item Details</th>
+                      <th className="py-3 px-4">Deleted</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={4} className="py-20 text-center">
+                          <div className="flex flex-col items-center justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+                            <p className="text-muted-foreground mt-2 text-sm">Loading items...</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : items.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-20 text-center">
+                          <div className="flex flex-col items-center justify-center max-w-sm mx-auto">
+                            <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-3">
+                              <Search className="w-6 h-6 text-muted-foreground" />
+                            </div>
+                            <h3 className="text-lg font-medium text-foreground">No items found</h3>
+                            <p className="text-muted-foreground text-sm mt-1">
+                              {search ? `No matches for "${search}"` : 'This category is empty'}
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      items.map((item) => (
+                        <ItemRow
+                          key={item.id}
+                          item={item}
+                          isSelected={selectedItems.includes(item.id)}
+                          onSelect={() => handleSelectItem(item.id)}
+                          category={selectedCategory}
+                          onActionComplete={fetchCategoryItems}
+                          icon={iconMap[categoryInfo?.icon || '']}
+                        />
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Selection Action Bar */}
-        {showActionBar && (
-          <Card className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-blue-200 p-4 mb-8">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">{selectedItems.length}</span>
-                </div>
-                <span className="font-semibold text-blue-800">
-                  {selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} selected
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearSelection}
-                  className="text-blue-700 hover:text-blue-900"
-                >
-                  Clear Selection
-                </Button>
-              </div>
-              <div className="flex items-center gap-3">
-                <Button 
-                  variant="outline" 
-                  size="lg" 
-                  onClick={handleBulkRestore} 
-                  disabled={selectedItems.length === 0}
-                >
-                  <RefreshCw className="h-5 w-5 mr-2" />
-                  Restore ({selectedItems.length})
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button 
-                      variant="destructive" 
-                      size="lg" 
-                      disabled={selectedItems.length === 0}
-                    >
-                      <Trash className="h-5 w-5 mr-2" />
-                      Delete Permanently ({selectedItems.length})
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the selected items from our servers.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleBulkDelete} className="bg-red-600 hover:bg-red-700">
-                        Continue
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Main Content */}
-        <Card className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="p-6">
-                      <Checkbox
-                        checked={
-                          items.length > 0 && selectedItems.length === items.length
-                        }
-                        onCheckedChange={handleSelectAll}
-                      />
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider"
-                    >
-                      Item Details
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider"
-                    >
-                      Deleted Date
-                    </th>
-                    <th scope="col" className="relative px-6 py-4">
-                      <span className="sr-only">Actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={4} className="p-12 text-center">
-                        <div className="flex justify-center items-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-                          <span className="ml-3 text-gray-500">Loading items...</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : items.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="p-12 text-center">
-                        <div className="text-center">
-                          <Trash2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                          <h3 className="text-lg font-medium text-gray-900 mb-2">
-                            No items found
-                          </h3>
-                          <p className="text-gray-600">
-                            {search ? 'Try adjusting your search criteria' : 'No items in this category'}
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    items.map((item) => (
-                      <ItemRow
-                        key={item.id}
-                        item={item}
-                        isSelected={selectedItems.includes(item.id)}
-                        onSelect={() => handleSelectItem(item.id)}
-                        category={selectedCategory}
-                      />
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </TooltipProvider>
   )
@@ -519,20 +479,25 @@ function ItemRow({
   isSelected,
   onSelect,
   category,
+  onActionComplete,
+  icon
 }: {
   item: TrashItem
   isSelected: boolean
   onSelect: () => void
   category: string
+  onActionComplete: () => void
+  icon: React.ReactNode
 }) {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const { toast } = useToast()
 
-  const handleRestore = async () => {
+  const handleRestore = async (e: React.MouseEvent) => {
+    e.stopPropagation()
     try {
       await api.post(`/trash/${category}/${item.id}/restore`)
       toast({ title: 'Success', description: 'Item restored successfully.' })
-      // Here you would typically refetch the list
+      onActionComplete()
     } catch (error) {
       toast({
         title: 'Error',
@@ -542,11 +507,12 @@ function ItemRow({
     }
   }
 
-  const handleDelete = async () => {
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation()
     try {
       await api.delete(`/trash/${category}/${item.id}`)
       toast({ title: 'Success', description: 'Item permanently deleted.' })
-      // Here you would typically refetch the list
+      onActionComplete()
     } catch (error) {
       toast({
         title: 'Error',
@@ -556,126 +522,151 @@ function ItemRow({
     }
   }
 
+  // Improved Logic for Displaying Item Text
   const getItemPrimaryText = (item: TrashItem) => {
-    return (
-      item.name ||
-      item.email ||
-      item.company ||
-      item.description ||
-      `Item #${item.id}`
-    )
+    if (item.guest?.name) return item.guest.name
+    if (item.name) return item.name
+    if (item.email) return item.email
+    if (item.company) return item.company
+    if (item.description) return item.description
+    return `Item #${item.id}`
   }
 
   const getItemSecondaryText = (item: TrashItem) => {
-    if (item.email && item.name) return item.email
+    if ((item.guest || item.email) && item.event?.name) {
+      return (
+        <span className="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-700/10 dark:ring-blue-400/20">
+          <Calendar className="mr-1 h-3 w-3" />
+          {item.event.name}
+        </span>
+      )
+    }
+
+    if (item.event?.name) return `Event: ${item.event.name}`
+    if (item.company) return item.company
+    if (item.email) return item.email
     if (item.location) return item.location
-    if (item.start_date)
-      return `${format(new Date(item.start_date), 'PP')} - ${format(
-        new Date(item.end_date as string),
-        'PP'
-      )}`
-    if (item.phone) return item.phone
+    if (item.start_date) return `${formatDate(item.start_date)}`
+
     return ''
   }
 
   return (
     <>
-      <tr className={`hover:bg-gray-50 transition ${isSelected ? 'bg-blue-50' : ''}`}>
-        <td className="p-6">
+      <tr
+        className={cn(
+          "group bg-card hover:bg-muted/50 transition-colors cursor-pointer border-b border-border last:border-0",
+          isSelected && "bg-muted hover:bg-muted"
+        )}
+        onClick={() => setIsDetailsOpen(true)}
+      >
+        <td className="p-4" onClick={(e) => e.stopPropagation()}>
           <Checkbox checked={isSelected} onCheckedChange={onSelect} />
         </td>
-        <td className="px-6 py-4 whitespace-nowrap">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 text-sm font-semibold">
-              {getItemPrimaryText(item)?.[0] || 'I'}
+        <td className="p-4">
+          <div className="flex items-center gap-4">
+            <div className={cn(
+              "w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 transition-colors border border-border",
+              isSelected ? "bg-primary/10 text-primary border-primary/20" : "bg-muted/30 text-muted-foreground"
+            )}>
+              {icon || <Trash2 className="h-4 w-4" />}
             </div>
-            <div>
-              <div className="font-semibold text-gray-900">
+            <div className="min-w-0 flex flex-col gap-1.5">
+              <span className="font-semibold text-foreground truncate max-w-[200px] md:max-w-xs block">
                 {getItemPrimaryText(item)}
-              </div>
-              <div className="text-sm text-gray-500">
+              </span>
+              <div className="text-muted-foreground flex">
                 {getItemSecondaryText(item)}
               </div>
             </div>
           </div>
         </td>
-        <td className="px-6 py-4 whitespace-nowrap">
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-600">
-              {formatDistanceToNow(new Date(item.deleted_at), { addSuffix: true })}
-            </span>
+        <td className="p-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {/* Uses opacity for cleaner look, plain text */}
+            <span className="tabular-nums">{formatDistanceToNow(new Date(item.deleted_at), { addSuffix: true })}</span>
           </div>
         </td>
-        <td className="px-6 py-4 whitespace-nowrap text-right">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsDetailsOpen(true)}>
-                <Eye className="mr-2 h-4 w-4" /> View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleRestore}>
-                <RefreshCw className="mr-2 h-4 w-4" /> Restore
-              </DropdownMenuItem>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <DropdownMenuItem
-                    onSelect={(e) => e.preventDefault()}
-                    className="text-red-600"
-                  >
-                    <Trash className="mr-2 h-4 w-4" /> Delete Permanently
-                  </DropdownMenuItem>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete
-                      the item from our servers.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-                      Continue
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <td className="p-4 text-right">
+          {/* Always visible actions as requested */}
+          <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  onClick={handleRestore}
+                  className="h-8 w-8 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 border border-green-200 dark:border-green-900/50 shadow-sm"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Restore Item</TooltipContent>
+            </Tooltip>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  className="h-8 w-8 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-900/50 shadow-sm"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Permanently?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    To maintain database integrity, this record will be permanently wiped. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Delete Forever
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </td>
       </tr>
+
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-lg bg-card border-border text-foreground">
           <DialogHeader>
             <DialogTitle>Item Details</DialogTitle>
-            <DialogDescription>
-              Detailed information about the deleted item
+            <DialogDescription className="text-muted-foreground">
+              Snapshot of deleted record data
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-96 overflow-y-auto">
-            {Object.entries(item).map(([key, value]) => (
-              <div key={key} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 text-xs font-semibold flex-shrink-0">
-                  {key[0].toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-gray-900 capitalize">
-                    {key.replace(/_/g, ' ')}
+          <div className="mt-4 space-y-4">
+            <div className="bg-muted/30 rounded-lg p-4 border border-border max-h-[60vh] overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-border">
+              {Object.entries(item).map(([key, value]) => {
+                if (['id', 'deleted_at', 'organizer_id'].includes(key)) return null;
+                return (
+                  <div key={key} className="grid grid-cols-3 gap-2 text-sm border-b border-border/50 last:border-0 pb-2 last:pb-0">
+                    <span className="font-medium text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</span>
+                    <span className="col-span-2 text-foreground break-words font-medium">
+                      {typeof value === 'object' && value !== null
+                        ? JSON.stringify(value).replace(/[{"}]/g, '').replace(/:/g, ': ').replace(/,/g, ', ')
+                        : value?.toString() || '-'}
+                    </span>
                   </div>
-                  <div className="text-sm text-gray-600 break-words">
-                    {typeof value === 'object' && value !== null
-                      ? JSON.stringify(value, null, 2)
-                      : value?.toString() || 'N/A'}
-                  </div>
-                </div>
-              </div>
-            ))}
+                )
+              })}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>Close</Button>
+              <Button
+                onClick={(e) => { handleRestore(e); setIsDetailsOpen(false); }}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Restore Item
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -694,7 +685,6 @@ const Trash: React.FC = () => {
     if (!selectedCategory) {
       fetchCategories()
     }
-    // eslint-disable-next-line
   }, [selectedCategory])
 
   async function fetchCategories() {
@@ -725,6 +715,7 @@ const Trash: React.FC = () => {
       categories={categories}
       totalItems={totalItems}
       onSelectCategory={setSelectedCategory}
+      loading={loading}
     />
   )
 }

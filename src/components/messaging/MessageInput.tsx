@@ -142,15 +142,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30">
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-primary/5 dark:bg-primary/10 border border-primary/10 dark:border-primary/20">
               <div className="flex-1 min-w-0 flex items-center gap-3">
-                <div className="w-1 bg-orange-500 h-8 rounded-full shrink-0" />
+                <div className="w-1 bg-primary h-8 rounded-full shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-orange-600 mb-0.5">Replying to {replyingTo.sender.name}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-0.5">Replying to {replyingTo.sender.name}</p>
                   <p className="text-xs text-muted-foreground truncate italic">{replyingTo.content || "📎 Shared Asset"}</p>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={onCancelReply} className="h-7 w-7 rounded-full text-orange-600">
+              <Button variant="ghost" size="icon" onClick={onCancelReply} className="h-7 w-7 rounded-full text-primary">
                 <X className="w-4 h-4" />
               </Button>
             </div>
@@ -159,13 +159,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       </AnimatePresence>
 
       {/* Main Input Controls */}
-      <div className="flex items-end gap-3 p-2 bg-muted/30 dark:bg-muted/10 rounded-[2.5rem] border border-border/40 focus-within:border-orange-500/30 transition-all duration-500 shadow-sm focus-within:shadow-orange-500/5">
+      <div className="flex items-end gap-3 p-2 bg-muted/30 dark:bg-muted/10 rounded-[2.5rem] border border-border/40 focus-within:border-primary/30 transition-all duration-500 shadow-sm focus-within:shadow-primary/5">
         <div className="flex items-center gap-1 pl-1">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => fileInputRef.current?.click()}
-            className="h-11 w-11 rounded-full text-muted-foreground hover:text-orange-600 hover:bg-orange-50 transition-colors"
+            className="h-11 w-11 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
           >
             <Plus className="h-5 w-5" />
           </Button>
@@ -176,7 +176,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-11 w-11 rounded-full text-muted-foreground hover:text-orange-600 hover:bg-orange-50 transition-colors"
+                className="h-11 w-11 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
               >
                 <Smile className="h-5 w-5" />
               </Button>
@@ -191,8 +191,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           {selectedFile && (
             <div className="mb-2 p-2 rounded-2xl bg-background border border-border/40 flex items-center justify-between">
               <div className="flex items-center gap-2 pr-4">
-                <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
-                  <ImageIcon className="h-4 w-4 text-orange-600" />
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <ImageIcon className="h-4 w-4 text-primary" />
                 </div>
                 <span className="text-xs font-bold truncate max-w-[150px]">{selectedFile.name}</span>
               </div>
@@ -218,7 +218,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
         <div className="pr-1.5 pb-1.5 flex items-center gap-2">
           {content.trim() && (
-            <div className="hidden sm:flex text-[9px] font-black uppercase tracking-[0.2em] text-orange-600/40 mr-2 items-center gap-1">
+            <div className="hidden sm:flex text-[9px] font-black uppercase tracking-[0.2em] text-primary/40 mr-2 items-center gap-1">
               <Zap className="h-3 w-3 fill-current" />
               Hit Enter
             </div>
@@ -229,7 +229,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             className={cn(
               "h-11 w-11 rounded-full shadow-xl transition-all duration-500",
               canSend
-                ? "bg-orange-600 text-white hover:bg-orange-700 hover:scale-105 shadow-orange-600/20"
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 shadow-primary/20"
                 : "bg-muted text-muted-foreground/40 shadow-none scale-95"
             )}
           >

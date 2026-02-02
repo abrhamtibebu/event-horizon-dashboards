@@ -6,7 +6,7 @@ import { useAuth } from './use-auth'
  * Permission check hook - Updated to handle multi-role check
  */
 export function usePermissionCheck() {
-    const { user } = useAuth()
+    const { user, isLoading } = useAuth()
 
     /**
      * Check if user has a specific role or any of the roles in an array
@@ -111,5 +111,6 @@ export function usePermissionCheck() {
         hasRole,
         hasPermission,
         checkPermission,
+        isLoading,
     }
 }

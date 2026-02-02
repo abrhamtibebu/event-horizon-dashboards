@@ -13,9 +13,9 @@ interface EventDetailsHeaderProps {
 export function EventDetailsHeader({ event, attendeeCount, organizerName }: EventDetailsHeaderProps) {
   return (
     <div className="relative w-full h-[300px] rounded-3xl overflow-hidden mb-8 shadow-lg border border-border">
-      {event.event_image ? (
+      {(event.event_image || event.image_url || event.image) ? (
         <img
-          src={getImageUrl(event.event_image)}
+          src={getImageUrl(event.image_url || event.event_image || event.image)}
           alt={event.name}
           className="object-cover w-full h-full transition-transform duration-700"
         />

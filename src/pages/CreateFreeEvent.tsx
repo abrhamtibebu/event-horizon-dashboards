@@ -122,6 +122,10 @@ export default function CreateFreeEvent() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeStep, setActiveStep] = useState(1)
 
+  // Image upload state
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
@@ -182,6 +186,40 @@ export default function CreateFreeEvent() {
 
   const removeCustomGuestType = (index: number) => {
     setCustomGuestTypes(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // Handle image file selection
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+      if (!validTypes.includes(file.type)) {
+        showErrorToast('Please select a valid image file (JPG, PNG, GIF, or WEBP)')
+        return
+      }
+
+      // Validate file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        showErrorToast('Image size must be less than 2MB')
+        return
+      }
+
+      setImageFile(file)
+
+      // Create preview
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  // Remove selected image
+  const removeImage = () => {
+    setImageFile(null)
+    setImagePreview(null)
   }
 
   // Calculate form completion progress
@@ -327,6 +365,12 @@ export default function CreateFreeEvent() {
             }
           }
         })
+
+        // Add image file if selected
+        if (imageFile) {
+          payload.append('event_image', imageFile)
+        }
+
         headers = { 'Content-Type': 'multipart/form-data' }
       } else {
         payload = Object.fromEntries(
@@ -749,7 +793,7 @@ export default function CreateFreeEvent() {
                   </Label>
                   {(user?.role === 'organizer' || user?.role === 'organizer_admin') ? (
                     <Input
-                      value={user.organizer?.name || 'Loading organizer...'}
+                      value={(user.organizer?.name || 'Loading organizer...').replace(/&amp;/g, '&')}
                       disabled
                       className="h-11 bg-muted/50 cursor-not-allowed"
                       placeholder="Your organization"
@@ -767,7 +811,7 @@ export default function CreateFreeEvent() {
                       <SelectContent>
                         {organizers.map((org: any) => (
                           <SelectItem key={org.id} value={String(org.id)}>
-                            {org.name}
+                            {org.name.replace(/&amp;/g, '&')}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -788,6 +832,60 @@ export default function CreateFreeEvent() {
                   rows={4}
                   className="border-border focus:border-blue-500 focus:ring-blue-500/20 resize-none"
                 />
+              </div>
+
+              {/* Event Image Upload */}
+              <div className="space-y-2">
+                <Label htmlFor="event_image" className="text-sm font-semibold">
+                  Event Image
+                </Label>
+                <div className="space-y-4">
+                  {imagePreview ? (
+                    <div className="relative group">
+                      <img
+                        src={imagePreview}
+                        alt="Event preview"
+                        className="w-full h-64 object-cover rounded-xl border-2 border-border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={removeImage}
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-blue-500 transition-colors">
+                      <input
+                        type="file"
+                        id="event_image"
+                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                        onChange={handleImageChange}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="event_image"
+                        className="cursor-pointer flex flex-col items-center gap-2"
+                      >
+                        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                          <FileText className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            Click to upload event image
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            JPG, PNG, GIF or WEBP (max 2MB)
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1257,6 +1355,13 @@ export default function CreateFreeEvent() {
                     <Calendar className="w-4 h-4 text-blue-500" />
                     Registration Period
                   </Label>
+
+                  {/* Spacer to align with Single Day toggle in the first column */}
+                  <div className="flex items-center gap-2 opacity-0 pointer-events-none select-none h-[22px]">
+                    <div className="w-4 h-4" />
+                    <span className="text-sm">Alignment Spacer</span>
+                  </div>
+
                   <div className="modern-date-picker border border-border rounded-2xl overflow-hidden shadow-lg bg-card">
                     <div className="date-picker-header">
                       <div className="date-picker-title">

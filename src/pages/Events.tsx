@@ -9,6 +9,7 @@ import {
   Eye,
   DollarSign,
   Settings as SettingsIcon,
+  Image as ImageIcon,
 } from 'lucide-react'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { Button } from '@/components/ui/button'
@@ -61,7 +62,7 @@ export default function Events() {
   })
 
   const { user } = useAuth()
-  const { hasPermission, hasRole } = usePermissionCheck()
+  const { hasPermission, hasRole, checkPermission } = usePermissionCheck()
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Toggle featured status for admin
@@ -116,7 +117,7 @@ export default function Events() {
         } else {
           allEvents = []
         }
-        
+
         // Count events by type - handle both event_type_column and event_type
         const ticketedCount = allEvents.filter((e: any) => {
           const eventType = e.event_type_column || e.event_type
@@ -538,7 +539,7 @@ export default function Events() {
                       </div>
                       <div className="text-lg font-medium text-foreground mb-2">No events found</div>
                       <div className="text-muted-foreground mb-6 text-center max-w-md">
-                        {user?.role === 'event_manager' 
+                        {user?.role === 'event_manager'
                           ? "You don't have any events assigned yet. Create your first event to get started!"
                           : "You don't have any events yet. Create your first event to get started!"
                         }
@@ -555,120 +556,118 @@ export default function Events() {
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                       {filteredEvents.map((event) => {
-                    // Calculate registration progress
-                    const attendeeCount = event.attendee_count || 0
-                    const attendeeLimit = event.max_guests || 500
-                    const registrationProgress = Math.min(
-                      Math.round((attendeeCount / attendeeLimit) * 100),
-                      100
-                    )
-                    return (
-                      <div key={event.id} className="group">
-                        <div className="bg-card rounded-2xl shadow-sm border border-border h-full flex flex-col overflow-hidden hover:shadow-lg transition-all duration-300">
-                          {/* Event Image */}
-                          <div className="relative h-48 w-full overflow-hidden">
-                            {event.event_image ? (
-                              <img
-                                src={getImageUrl(event.event_image)}
-                                alt={event.name}
-                                className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
-                              />
-                            ) : (
-                              <div className="flex items-center justify-center w-full h-full bg-gradient-to-br from-[hsl(var(--primary))]/10 via-[hsl(var(--color-warning))]/10 to-[hsl(var(--primary))]/10">
-                                <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center">
-                                  <Calendar className="w-8 h-8 text-foreground dark:text-white" />
+                        // Calculate registration progress
+                        const attendeeCount = event.attendee_count || 0
+                        const attendeeLimit = event.max_guests || 500
+                        const registrationProgress = Math.min(
+                          Math.round((attendeeCount / attendeeLimit) * 100),
+                          100
+                        )
+                        return (
+                          <div key={event.id} className="group">
+                            <div className="bg-card rounded-2xl shadow-sm border border-border h-full flex flex-col overflow-hidden hover:shadow-lg transition-all duration-300">
+                              {/* Event Image */}
+                              <div className="relative h-48 w-full overflow-hidden">
+                                {(event.event_image || event.image_url || event.image) ? (
+                                  <img
+                                    src={getImageUrl(event.image_url || event.event_image || event.image)}
+                                    alt={event.name}
+                                    className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-muted flex items-center justify-center">
+                                    <ImageIcon className="w-16 h-16 text-muted-foreground/20" />
+                                  </div>
+                                )}
+                                {/* Status Badge */}
+                                <div className="absolute top-3 right-3">
+                                  <span className={`${getStatusColor(event.status)} px-3 py-1 rounded-full text-xs font-semibold shadow-sm`}>
+                                    {event.status}
+                                  </span>
                                 </div>
                               </div>
-                            )}
-                            {/* Status Badge */}
-                            <div className="absolute top-3 right-3">
-                              <span className={`${getStatusColor(event.status)} px-3 py-1 rounded-full text-xs font-semibold shadow-sm`}>
-                                {event.status}
-                              </span>
-                            </div>
-                          </div>
 
-                          <div className="flex flex-col flex-1 p-6">
-                            {/* Event Name */}
-                            <h3 className="text-lg font-bold text-card-foreground mb-2 line-clamp-2" title={event.name}>
-                              {event.name}
-                            </h3>
+                              <div className="flex flex-col flex-1 p-6">
+                                {/* Event Name */}
+                                <h3 className="text-lg font-bold text-card-foreground mb-2 line-clamp-2" title={event.name}>
+                                  {event.name}
+                                </h3>
 
-                            {/* Description */}
-                            <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
-                              {event.description}
-                            </p>
+                                {/* Description */}
+                                <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
+                                  {event.description}
+                                </p>
 
-                            {/* Event Details */}
-                            <div className="space-y-3 mb-4">
-                              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                <div className="w-8 h-8 bg-info/15 rounded-lg flex items-center justify-center">
-                                  <Calendar className="w-4 h-4 text-info" />
-                                </div>
-                                <span>{event.date} {event.time}</span>
-                              </div>
-                              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                                  <MapPin className="w-4 h-4 text-green-600" />
-                                </div>
-                                <span className="truncate" title={event.location || 'Convention Center'}>
-                                  {event.location || 'Convention Center'}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                <div className="w-8 h-8 bg-info/15 rounded-lg flex items-center justify-center">
-                                  <Users className="w-4 h-4 text-info" />
-                                </div>
-                                <span>{attendeeCount}/{attendeeLimit} attendees</span>
-                              </div>
-                            </div>
-
-                            {/* Registration Progress */}
-                            <div className="mb-4">
-                              <div className="flex justify-between text-sm text-muted-foreground mb-2">
-                                <span>Registration Progress</span>
-                                <span className="font-semibold">{registrationProgress}%</span>
-                              </div>
-                              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                                <div
-                                  className="h-2 bg-[hsl(var(--primary))] rounded-full transition-all duration-300"
-                                  style={{ width: `${registrationProgress}%` }}
-                                ></div>
-                              </div>
-                            </div>
-
-                            {/* Usher Tasks */}
-                            {user?.role === 'usher' && event.pivot?.tasks && (
-                              <div className="mb-4 p-3 bg-info/10 rounded-lg">
-                                <div className="text-sm font-semibold text-info mb-2">Your Tasks:</div>
-                                <div className="space-y-1">
-                                  {JSON.parse(event.pivot.tasks).map((task: string, index: number) => (
-                                    <div key={index} className="text-sm text-info flex items-center gap-2">
-                                      <div className="w-1.5 h-1.5 bg-info rounded-full"></div>
-                                      {task}
+                                {/* Event Details */}
+                                <div className="space-y-3 mb-4">
+                                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                    <div className="w-8 h-8 bg-info/15 rounded-lg flex items-center justify-center">
+                                      <Calendar className="w-4 h-4 text-info" />
                                     </div>
-                                  ))}
+                                    <span>{event.date} {event.time}</span>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                                      <MapPin className="w-4 h-4 text-green-600" />
+                                    </div>
+                                    <span className="truncate" title={event.location || 'Convention Center'}>
+                                      {event.location || 'Convention Center'}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                    <div className="w-8 h-8 bg-info/15 rounded-lg flex items-center justify-center">
+                                      <Users className="w-4 h-4 text-info" />
+                                    </div>
+                                    <span>{attendeeCount}/{attendeeLimit} attendees</span>
+                                  </div>
+                                </div>
+
+                                {/* Registration Progress */}
+                                <div className="mb-4">
+                                  <div className="flex justify-between text-sm text-muted-foreground mb-2">
+                                    <span>Registration Progress</span>
+                                    <span className="font-semibold">{registrationProgress}%</span>
+                                  </div>
+                                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                                    <div
+                                      className="h-2 bg-[hsl(var(--primary))] rounded-full transition-all duration-300"
+                                      style={{ width: `${registrationProgress}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+
+                                {/* Usher Tasks */}
+                                {user?.role === 'usher' && event.pivot?.tasks && (
+                                  <div className="mb-4 p-3 bg-info/10 rounded-lg">
+                                    <div className="text-sm font-semibold text-info mb-2">Your Tasks:</div>
+                                    <div className="space-y-1">
+                                      {JSON.parse(event.pivot.tasks).map((task: string, index: number) => (
+                                        <div key={index} className="text-sm text-info flex items-center gap-2">
+                                          <div className="w-1.5 h-1.5 bg-info rounded-full"></div>
+                                          {task}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Action Button */}
+                                <div className="mt-auto">
+                                  <Link to={`/dashboard/events/${event.id}`} className="block">
+                                    <Button
+                                      variant="outline"
+                                      className="w-full bg-card border-border hover:bg-accent hover:border-border transition-all duration-200"
+                                    >
+                                      <Eye className="w-4 h-4 mr-2" />
+                                      {user?.role === 'usher' ? 'Manage Event' : 'View Details'}
+                                    </Button>
+                                  </Link>
                                 </div>
                               </div>
-                            )}
-
-                            {/* Action Button */}
-                            <div className="mt-auto">
-                              <Link to={`/dashboard/events/${event.id}`} className="block">
-                                <Button
-                                  variant="outline"
-                                  className="w-full bg-card border-border hover:bg-accent hover:border-border transition-all duration-200"
-                                >
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  {user?.role === 'usher' ? 'Manage Event' : 'View Details'}
-                                </Button>
-                              </Link>
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    )
-                  })}
+                        )
+                      })}
                     </div>
                   )}
                 </>

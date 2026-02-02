@@ -111,6 +111,10 @@ export default function CreateTicketedEvent() {
   })
   const [isAddingTicketType, setIsAddingTicketType] = useState(false)
 
+  // Image upload state
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
@@ -157,6 +161,40 @@ export default function CreateTicketedEvent() {
       setLoading(prev => ({ ...prev, organizers: false }))
     }
   }, [user?.role, user?.organizer_id])
+
+  // Handle image file selection
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+      if (!validTypes.includes(file.type)) {
+        showErrorToast('Please select a valid image file (JPG, PNG, GIF, or WEBP)')
+        return
+      }
+
+      // Validate file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        showErrorToast('Image size must be less than 2MB')
+        return
+      }
+
+      setImageFile(file)
+
+      // Create preview
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  // Remove selected image
+  const removeImage = () => {
+    setImageFile(null)
+    setImagePreview(null)
+  }
 
 
 
@@ -253,86 +291,98 @@ export default function CreateTicketedEvent() {
       }
       const headers = {}
 
-      const response = await api.post('/events/ticketed/add', payload, { headers })
+      // Use FormData if image is selected
+      let finalPayload: any = payload
+      if (imageFile) {
+        finalPayload = new FormData()
+        Object.entries(payload).forEach(([key, value]) => {
+          if (value !== null && value !== undefined) {
+            finalPayload.append(key, value as any)
+          }
+        })
+        finalPayload.append('event_image', imageFile)
+      }
+
+      const response = await api.post('/events/ticketed/add', finalPayload, { headers })
 
       // Store the created event ID and show ticket type dialog
       const eventId = response.data.event?.id || response.data.data?.id || response.data.id
-      if(!eventId) {
-          console.error('Event creation response:', response.data)
-          showErrorToast('Event created but unable to retrieve event ID. Please refresh the page.')
-          return
-        }
+      if (!eventId) {
+        console.error('Event creation response:', response.data)
+        showErrorToast('Event created but unable to retrieve event ID. Please refresh the page.')
+        return
+      }
 
       setCreatedEventId(eventId)
       setShowTicketTypeDialog(true)
-      } catch (error: any) {
-        showErrorToast(error.response?.data?.message || 'Failed to create ticketed event.')
-      } finally {
-        setIsSubmitting(false)
-      }
+    } catch (error: any) {
+      showErrorToast(error.response?.data?.message || 'Failed to create ticketed event.')
+    } finally {
+      setIsSubmitting(false)
     }
+  }
 
   // Handle ticket type creation
   const handleAddTicketType = async () => {
-      if (!currentTicketType.name.trim() || !currentTicketType.price) {
-        showErrorToast('Please fill in ticket name and price.')
-        return
-      }
-
-      if (!createdEventId) {
-        showErrorToast('Event ID not found. Please try creating the event again.')
-        return
-      }
-
-      setIsAddingTicketType(true)
-      try {
-        const payload = {
-          name: currentTicketType.name,
-          description: currentTicketType.description,
-          price: parseFloat(currentTicketType.price),
-          quantity: currentTicketType.quantity ? parseInt(currentTicketType.quantity) : null,
-          sales_end_date: currentTicketType.sales_end_date?.toISOString(),
-          benefits: currentTicketType.benefits,
-          min_group_size: currentTicketType.min_group_size ? parseInt(currentTicketType.min_group_size) : null,
-          max_group_size: currentTicketType.max_group_size ? parseInt(currentTicketType.max_group_size) : null,
-        }
-
-        const response = await api.post(`/events/${createdEventId}/ticket-types`, payload)
-
-        setTicketTypes(prev => [...prev, response.data.data])
-        showSuccessToast('Ticket type added successfully!')
-
-        // Reset form
-        setCurrentTicketType({
-          name: '',
-          description: '',
-          price: '',
-          quantity: '',
-          sales_end_date: null,
-          benefits: [],
-          min_group_size: '',
-          max_group_size: '',
-        })
-      } catch (error: any) {
-        showErrorToast(error.response?.data?.message || 'Failed to add ticket type.')
-      } finally {
-        setIsAddingTicketType(false)
-      }
+    if (!currentTicketType.name.trim() || !currentTicketType.price) {
+      showErrorToast('Please fill in ticket name and price.')
+      return
     }
 
-    // Handle navigation to event details or ticket management
-    const handleContinueToEvent = () => {
-      if (createdEventId) {
-        navigate(`/dashboard/events/${createdEventId}`)
+    if (!createdEventId) {
+      showErrorToast('Event ID not found. Please try creating the event again.')
+      return
+    }
+
+    setIsAddingTicketType(true)
+    try {
+      const payload = {
+        name: currentTicketType.name,
+        description: currentTicketType.description,
+        price: parseFloat(currentTicketType.price),
+        quantity: currentTicketType.quantity ? parseInt(currentTicketType.quantity) : null,
+        sales_end_date: currentTicketType.sales_end_date?.toISOString(),
+        benefits: currentTicketType.benefits,
+        min_group_size: currentTicketType.min_group_size ? parseInt(currentTicketType.min_group_size) : null,
+        max_group_size: currentTicketType.max_group_size ? parseInt(currentTicketType.max_group_size) : null,
       }
-    }
 
-    const handleGoToTicketManagement = () => {
-      navigate('/dashboard/ticket-management')
-    }
+      const response = await api.post(`/events/${createdEventId}/ticket-types`, payload)
 
-    // Modern elegant date picker styles
-    const modernDatePickerStyles = `
+      setTicketTypes(prev => [...prev, response.data.data])
+      showSuccessToast('Ticket type added successfully!')
+
+      // Reset form
+      setCurrentTicketType({
+        name: '',
+        description: '',
+        price: '',
+        quantity: '',
+        sales_end_date: null,
+        benefits: [],
+        min_group_size: '',
+        max_group_size: '',
+      })
+    } catch (error: any) {
+      showErrorToast(error.response?.data?.message || 'Failed to add ticket type.')
+    } finally {
+      setIsAddingTicketType(false)
+    }
+  }
+
+  // Handle navigation to event details or ticket management
+  const handleContinueToEvent = () => {
+    if (createdEventId) {
+      navigate(`/dashboard/events/${createdEventId}`)
+    }
+  }
+
+  const handleGoToTicketManagement = () => {
+    navigate('/dashboard/ticket-management')
+  }
+
+  // Modern elegant date picker styles
+  const modernDatePickerStyles = `
     /* Modern Date Picker Styles */
     :root {
       --dropdown-arrow: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='hsl(215.4%2016.3%2046.9%)' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
@@ -634,962 +684,1023 @@ export default function CreateTicketedEvent() {
     }
   `
 
-    return (
-      <div className="min-h-screen bg-background">
-        <style>{modernDatePickerStyles}</style>
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          {/* Breadcrumbs */}
-          <Breadcrumbs
-            items={[
-              { label: 'Events', href: '/dashboard/events' },
-              { label: 'Create Ticketed Event' }
-            ]}
-            className="mb-4"
-          />
+  return (
+    <div className="min-h-screen bg-background">
+      <style>{modernDatePickerStyles}</style>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Breadcrumbs */}
+        <Breadcrumbs
+          items={[
+            { label: 'Events', href: '/dashboard/events' },
+            { label: 'Create Ticketed Event' }
+          ]}
+          className="mb-4"
+        />
 
-          <div className="mb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-foreground">Create Ticketed Event</h1>
-                <p className="text-muted-foreground mt-2">
-                  Set up a paid event with multiple ticket tiers and revenue tracking
-                </p>
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Create Ticketed Event</h1>
+              <p className="text-muted-foreground mt-2">
+                Set up a paid event with multiple ticket tiers and revenue tracking
+              </p>
+            </div>
+            <Button
+              onClick={() => navigate('/dashboard/events')}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <X className="w-4 h-4" />
+              Cancel
+            </Button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Event Information */}
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <style>{modernDatePickerStyles}</style>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                <Ticket className="w-5 h-5 text-white" />
               </div>
-              <Button
-                onClick={() => navigate('/dashboard/events')}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <X className="w-4 h-4" />
-                Cancel
-              </Button>
+              <div>
+                <h3 className="text-xl font-bold text-card-foreground">Ticketed Event</h3>
+                <p className="text-muted-foreground text-sm">Paid tickets with multiple tiers</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <Label htmlFor="name" className="flex items-center gap-2 text-foreground font-medium">
+                  <Tag className="w-4 h-4 text-blue-500" /> Event Name
+                </Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  placeholder="Enter event name"
+                  required
+                  className="mt-2 h-12 border-border focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="organizer_id" className="flex items-center gap-2 text-foreground font-medium">
+                  <Tag className="w-4 h-4 text-green-500" /> Organizer
+                </Label>
+                {(user?.role === 'organizer' || user?.role === 'organizer_admin') ? (
+                  <Input
+                    value={(user.organizer?.name || 'Loading organizer...').replace(/&amp;/g, '&')}
+                    disabled
+                    className="mt-2 h-12 border-border bg-muted rounded-xl cursor-not-allowed"
+                    placeholder="Your organization"
+                  />
+                ) : (
+                  <Select
+                    value={formData.organizer_id}
+                    onValueChange={(value) => handleInputChange('organizer_id', value)}
+                    disabled={loading.organizers}
+                    required
+                  >
+                    <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
+                      <SelectValue placeholder="Select an organizer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.isArray(organizers) && organizers.map((org: any) => (
+                        <SelectItem key={org.id} value={String(org.id)}>
+                          {org.name.replace(/&amp;/g, '&')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="lg:col-span-2">
+                <Label htmlFor="description" className="flex items-center gap-2 text-foreground font-medium">
+                  <FileText className="w-4 h-4 text-purple-500" /> Description
+                </Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  placeholder="Describe your ticketed event..."
+                  rows={4}
+                  className="mt-2 border-border focus:border-purple-500 focus:ring-purple-500 rounded-xl resize-none"
+                />
+              </div>
+
+              {/* Event Image Upload */}
+              <div className="lg:col-span-2">
+                <Label htmlFor="event_image" className="flex items-center gap-2 text-foreground font-medium">
+                  <FileText className="w-4 h-4 text-pink-500" /> Event Image
+                </Label>
+                <div className="mt-2">
+                  {imagePreview ? (
+                    <div className="relative group">
+                      <img
+                        src={imagePreview}
+                        alt="Event preview"
+                        className="w-full h-64 object-cover rounded-xl border-2 border-border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={removeImage}
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-purple-500 transition-colors">
+                      <input
+                        type="file"
+                        id="event_image"
+                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                        onChange={handleImageChange}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="event_image"
+                        className="cursor-pointer flex flex-col items-center gap-2"
+                      >
+                        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                          <FileText className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            Click to upload event image
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            JPG, PNG, GIF or WEBP (max 2MB)
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="event_type_id" className="flex items-center gap-2 text-foreground font-medium">
+                  <Tag className="w-4 h-4 text-orange-500" /> Event Type
+                </Label>
+                <Select
+                  value={formData.event_type_id}
+                  onValueChange={(value) => handleInputChange('event_type_id', value)}
+                  disabled={loading.eventTypes}
+                  required
+                >
+                  <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
+                    <SelectValue placeholder="Select event type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {eventTypes.map((type: any) => (
+                      <SelectItem key={type.id} value={String(type.id)}>
+                        {type.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="event_category_id" className="flex items-center gap-2 text-foreground font-medium">
+                  <Tag className="w-4 h-4 text-indigo-500" /> Event Category
+                </Label>
+                <Select
+                  value={formData.event_category_id}
+                  onValueChange={(value) => handleInputChange('event_category_id', value)}
+                  disabled={loading.eventCategories}
+                  required
+                >
+                  <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
+                    <SelectValue placeholder="Select event category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {eventCategories.map((cat: any) => (
+                      <SelectItem key={cat.id} value={String(cat.id)}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="city" className="flex items-center gap-2 text-foreground font-medium">
+                  <MapPin className="w-4 h-4 text-blue-500" /> City
+                </Label>
+                <Select
+                  value={formData.city}
+                  onValueChange={(value) => handleInputChange('city', value)}
+                  required
+                >
+                  <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
+                    <SelectValue placeholder="Select a city" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ETHIOPIAN_CITIES.map((city) => (
+                      <SelectItem key={city} value={city}>
+                        {city}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="venue" className="flex items-center gap-2 text-foreground font-medium">
+                  <MapPin className="w-4 h-4 text-green-500" /> Venue
+                </Label>
+                <Input
+                  id="venue"
+                  value={formData.venue}
+                  onChange={(e) => handleInputChange('venue', e.target.value)}
+                  placeholder="Enter venue name"
+                  required
+                  className="mt-2 h-12 border-border focus:border-green-500 focus:ring-green-500 rounded-xl"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="max_guests" className="flex items-center gap-2 text-foreground font-medium">
+                  <Users className="w-4 h-4 text-teal-500" /> Max Guests
+                </Label>
+                <Input
+                  id="max_guests"
+                  type="number"
+                  value={formData.max_guests}
+                  onChange={(e) => handleInputChange('max_guests', e.target.value)}
+                  placeholder="e.g. 500"
+                  className="mt-2 h-12 border-gray-300 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                />
+              </div>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Event Information */}
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-              <style>{modernDatePickerStyles}</style>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                  <Ticket className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-card-foreground">Ticketed Event</h3>
-                  <p className="text-muted-foreground text-sm">Paid tickets with multiple tiers</p>
-                </div>
+          {/* Event Visibility */}
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Eye className="w-5 h-5 text-white" />
               </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="name" className="flex items-center gap-2 text-foreground font-medium">
-                    <Tag className="w-4 h-4 text-blue-500" /> Event Name
-                  </Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    placeholder="Enter event name"
-                    required
-                    className="mt-2 h-12 border-border focus:border-blue-500 focus:ring-blue-500 rounded-xl"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="organizer_id" className="flex items-center gap-2 text-foreground font-medium">
-                    <Tag className="w-4 h-4 text-green-500" /> Organizer
-                  </Label>
-                  {(user?.role === 'organizer' || user?.role === 'organizer_admin') ? (
-                    <Input
-                      value={user.organizer?.name || 'Loading organizer...'}
-                      disabled
-                      className="mt-2 h-12 border-border bg-muted rounded-xl cursor-not-allowed"
-                      placeholder="Your organization"
-                    />
-                  ) : (
-                    <Select
-                      value={formData.organizer_id}
-                      onValueChange={(value) => handleInputChange('organizer_id', value)}
-                      disabled={loading.organizers}
-                      required
-                    >
-                      <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
-                        <SelectValue placeholder="Select an organizer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.isArray(organizers) && organizers.map((org: any) => (
-                          <SelectItem key={org.id} value={String(org.id)}>
-                            {org.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-
-                <div className="lg:col-span-2">
-                  <Label htmlFor="description" className="flex items-center gap-2 text-foreground font-medium">
-                    <FileText className="w-4 h-4 text-purple-500" /> Description
-                  </Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    placeholder="Describe your ticketed event..."
-                    rows={4}
-                    className="mt-2 border-border focus:border-purple-500 focus:ring-purple-500 rounded-xl resize-none"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="event_type_id" className="flex items-center gap-2 text-foreground font-medium">
-                    <Tag className="w-4 h-4 text-orange-500" /> Event Type
-                  </Label>
-                  <Select
-                    value={formData.event_type_id}
-                    onValueChange={(value) => handleInputChange('event_type_id', value)}
-                    disabled={loading.eventTypes}
-                    required
-                  >
-                    <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
-                      <SelectValue placeholder="Select event type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {eventTypes.map((type: any) => (
-                        <SelectItem key={type.id} value={String(type.id)}>
-                          {type.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="event_category_id" className="flex items-center gap-2 text-foreground font-medium">
-                    <Tag className="w-4 h-4 text-indigo-500" /> Event Category
-                  </Label>
-                  <Select
-                    value={formData.event_category_id}
-                    onValueChange={(value) => handleInputChange('event_category_id', value)}
-                    disabled={loading.eventCategories}
-                    required
-                  >
-                    <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
-                      <SelectValue placeholder="Select event category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {eventCategories.map((cat: any) => (
-                        <SelectItem key={cat.id} value={String(cat.id)}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="city" className="flex items-center gap-2 text-foreground font-medium">
-                    <MapPin className="w-4 h-4 text-blue-500" /> City
-                  </Label>
-                  <Select
-                    value={formData.city}
-                    onValueChange={(value) => handleInputChange('city', value)}
-                    required
-                  >
-                    <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
-                      <SelectValue placeholder="Select a city" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ETHIOPIAN_CITIES.map((city) => (
-                        <SelectItem key={city} value={city}>
-                          {city}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="venue" className="flex items-center gap-2 text-foreground font-medium">
-                    <MapPin className="w-4 h-4 text-green-500" /> Venue
-                  </Label>
-                  <Input
-                    id="venue"
-                    value={formData.venue}
-                    onChange={(e) => handleInputChange('venue', e.target.value)}
-                    placeholder="Enter venue name"
-                    required
-                    className="mt-2 h-12 border-border focus:border-green-500 focus:ring-green-500 rounded-xl"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="max_guests" className="flex items-center gap-2 text-foreground font-medium">
-                    <Users className="w-4 h-4 text-teal-500" /> Max Guests
-                  </Label>
-                  <Input
-                    id="max_guests"
-                    type="number"
-                    value={formData.max_guests}
-                    onChange={(e) => handleInputChange('max_guests', e.target.value)}
-                    placeholder="e.g. 500"
-                    className="mt-2 h-12 border-gray-300 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
-                  />
-                </div>
+              <div>
+                <h3 className="text-xl font-bold text-foreground">
+                  Event Visibility
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  Control who can discover and register for your event
+                </p>
               </div>
             </div>
 
-            {/* Event Visibility */}
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Eye className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-foreground">
-                    Event Visibility
-                  </h3>
-                  <p className="text-muted-foreground text-sm">
-                    Control who can discover and register for your event
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Public Event Option */}
-                <label className="relative cursor-pointer group">
-                  <input
-                    type="radio"
-                    name="visibility"
-                    value="public"
-                    checked={formData.visibility === 'public'}
-                    onChange={(e) => handleInputChange('visibility', e.target.value)}
-                    className="peer sr-only"
-                  />
-                  <div className="relative p-5 border-2 border-border rounded-2xl transition-all duration-300 group-hover:border-primary/50 peer-checked:border-primary peer-checked:bg-primary/5 dark:peer-checked:bg-primary/10">
-                    {/* Selected indicator */}
-                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center opacity-0 peer-checked:opacity-100 transition-opacity duration-300 shadow-lg">
-                      <div className="w-2 h-2 bg-white rounded-full"></div>
-                    </div>
-
-                    <div className="flex items-start gap-4 mb-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                        <Users className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-base font-bold text-foreground mb-1">Public Event</h4>
-                        <p className="text-muted-foreground text-sm">Discoverable by everyone</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3 text-sm">
-                        <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
-                        <span className="text-muted-foreground">Visible on Evella platform</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-sm">
-                        <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
-                        <span className="text-muted-foreground">Paid ticket registration</span>
-                      </div>
-                    </div>
-                  </div>
-                </label>
-
-                {/* Private Event Option */}
-                <label className="relative cursor-pointer group">
-                  <input
-                    type="radio"
-                    name="visibility"
-                    value="private"
-                    checked={formData.visibility === 'private'}
-                    onChange={(e) => handleInputChange('visibility', e.target.value)}
-                    className="peer sr-only"
-                  />
-                  <div className="relative p-5 border-2 border-border rounded-2xl transition-all duration-300 group-hover:border-muted-foreground/50 peer-checked:border-muted-foreground peer-checked:bg-muted/5 dark:peer-checked:bg-muted/10">
-                    {/* Selected indicator */}
-                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-muted-foreground rounded-full flex items-center justify-center opacity-0 peer-checked:opacity-100 transition-opacity duration-300 shadow-lg">
-                      <div className="w-2 h-2 bg-white rounded-full"></div>
-                    </div>
-
-                    <div className="flex items-start gap-4 mb-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-                        <Lock className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-base font-bold text-foreground mb-1">Private Event</h4>
-                        <p className="text-muted-foreground text-sm">Invite-only access</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3 text-sm">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
-                        <span className="text-muted-foreground">Hidden from public discovery</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-sm">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
-                        <span className="text-muted-foreground">Exclusive ticket access</span>
-                      </div>
-                    </div>
-                  </div>
-                </label>
-              </div>
-
-              {/* Additional Info */}
-              <div className="mt-6 p-4 bg-muted/30 rounded-xl border border-border">
-                <div className="flex items-start gap-3">
-                  <div className="text-info mt-0.5">ℹ️</div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground mb-1">Visibility Settings</p>
-                    <p className="text-sm text-muted-foreground">
-                      Public events can be discovered on the Evella platform and have open ticket registration.
-                      Private events require direct invitations and are not visible in public searches.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Date & Time */}
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-brand-gradient rounded-xl flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-primary-foreground" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-foreground">Date & Time</h3>
-                  <p className="text-muted-foreground text-sm">Event schedule and registration period</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                  <Label className="flex items-center gap-2 text-foreground font-medium mb-4">
-                    <Calendar className="w-4 h-4 text-warning" /> Event Date Range
-                  </Label>
-
-                  {/* Single Day Toggle */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <input
-                      type="checkbox"
-                      id="single-day-event-ticketed"
-                      checked={isSingleDayEvent}
-                      onChange={(e) => {
-                        setIsSingleDayEvent(e.target.checked)
-                        if (e.target.checked && selectedEventDate) {
-                          // For single day events, set both start and end to same date
-                          setEventRange([{
-                            ...eventRange[0],
-                            startDate: selectedEventDate,
-                            endDate: selectedEventDate
-                          }])
-                        }
-                      }}
-                      className="rounded border-gray-300"
-                    />
-                    <label htmlFor="single-day-event-ticketed" className="text-sm text-muted-foreground">
-                      Single day event
-                    </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Public Event Option */}
+              <label className="relative cursor-pointer group">
+                <input
+                  type="radio"
+                  name="visibility"
+                  value="public"
+                  checked={formData.visibility === 'public'}
+                  onChange={(e) => handleInputChange('visibility', e.target.value)}
+                  className="peer sr-only"
+                />
+                <div className="relative p-5 border-2 border-border rounded-2xl transition-all duration-300 group-hover:border-primary/50 peer-checked:border-primary peer-checked:bg-primary/5 dark:peer-checked:bg-primary/10">
+                  {/* Selected indicator */}
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center opacity-0 peer-checked:opacity-100 transition-opacity duration-300 shadow-lg">
+                    <div className="w-2 h-2 bg-white rounded-full"></div>
                   </div>
 
-                  <div className="modern-date-picker border border-border rounded-2xl overflow-hidden shadow-lg bg-card">
-                    <div className="date-picker-header">
-                      <div className="date-picker-title">
-                        <Calendar className="w-5 h-5" />
-                        Select Event Dates
-                      </div>
-                      <div className="date-picker-nav">
-                        <button type="button" className="nav-btn" onClick={() => {
-                          const newDate = new Date(eventRange[0].startDate);
-                          newDate.setMonth(newDate.getMonth() - 1);
-                          setEventRange([{
-                            ...eventRange[0],
-                            startDate: newDate
-                          }]);
-                        }}>
-                          ←
-                        </button>
-                        <button type="button" className="nav-btn" onClick={() => {
-                          const newDate = new Date(eventRange[0].startDate);
-                          newDate.setMonth(newDate.getMonth() + 1);
-                          setEventRange([{
-                            ...eventRange[0],
-                            startDate: newDate
-                          }]);
-                        }}>
-                          →
-                        </button>
-                      </div>
+                  <div className="flex items-start gap-4 mb-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+                      <Users className="w-5 h-5 text-white" />
                     </div>
-                    <div className="month-year-selector">
-                      <select
-                        className="month-selector"
-                        value={eventRange[0].startDate.getMonth()}
-                        onChange={(e) => {
-                          const newDate = new Date(eventRange[0].startDate);
-                          newDate.setMonth(parseInt(e.target.value));
-                          setEventRange([{
-                            ...eventRange[0],
-                            startDate: newDate
-                          }]);
-                        }}
-                      >
-                        {[
-                          'January', 'February', 'March', 'April', 'May', 'June',
-                          'July', 'August', 'September', 'October', 'November', 'December'
-                        ].map((month, index) => (
-                          <option key={month} value={index}>{month}</option>
-                        ))}
-                      </select>
-                      <select
-                        className="year-selector"
-                        value={eventRange[0].startDate.getFullYear()}
-                        onChange={(e) => {
-                          const newDate = new Date(eventRange[0].startDate);
-                          newDate.setFullYear(parseInt(e.target.value));
-                          setEventRange([{
-                            ...eventRange[0],
-                            startDate: newDate
-                          }]);
-                        }}
-                      >
-                        {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
-                          <option key={year} value={year}>{year}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="weekdays-grid">
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} className="weekday">{day}</div>
-                      ))}
-                    </div>
-                    <div className="days-grid">
-                      {Array.from({ length: 42 }, (_, index) => {
-                        const monthStart = new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth(), 1);
-                        const firstDay = monthStart.getDay();
-                        const day = index - firstDay + 1;
-                        const currentDate = new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth(), day);
-
-                        // Normalize dates to midnight for comparison
-                        const normalizeDate = (date: Date) => {
-                          const normalized = new Date(date);
-                          normalized.setHours(0, 0, 0, 0);
-                          return normalized;
-                        };
-
-                        const normalizedCurrent = normalizeDate(currentDate);
-                        const normalizedStart = eventRange[0].startDate ? normalizeDate(eventRange[0].startDate) : null;
-                        const normalizedEnd = eventRange[0].endDate ? normalizeDate(eventRange[0].endDate) : null;
-                        const normalizedToday = normalizeDate(new Date());
-
-                        const isCurrentMonth = currentDate.getMonth() === eventRange[0].startDate.getMonth();
-                        const isToday = normalizedCurrent.getTime() === normalizedToday.getTime();
-                        const isSelected = (normalizedStart && normalizedStart.getTime() === normalizedCurrent.getTime()) ||
-                          (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
-                        const isInRange = normalizedStart && normalizedEnd &&
-                          normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
-                        const isDisabled = normalizedCurrent < normalizedToday;
-
-                        return (
-                          <div
-                            key={index}
-                            className={`day-cell ${!isCurrentMonth ? 'other-month' :
-                              isDisabled ? 'disabled' :
-                                isSelected ? 'selected' :
-                                  isInRange ? 'in-range' :
-                                    isToday ? 'today' : ''
-                              }`}
-                            onClick={() => {
-                              if (isDisabled) return;
-                              const newRange = { ...eventRange[0] };
-                              // If both dates are set or neither is set, start a new selection
-                              if ((newRange.startDate && newRange.endDate) || (!newRange.startDate && !newRange.endDate)) {
-                                newRange.startDate = normalizeDate(currentDate);
-                                newRange.endDate = undefined;
-                              } else if (newRange.startDate && normalizedCurrent < normalizeDate(newRange.startDate)) {
-                                // If clicking before start date, make it the new start
-                                newRange.startDate = normalizeDate(currentDate);
-                                newRange.endDate = undefined;
-                              } else if (newRange.startDate) {
-                                // Set end date
-                                newRange.endDate = normalizeDate(currentDate);
-                              }
-                              setEventRange([newRange]);
-                            }}
-                          >
-                            {isCurrentMonth && day > 0 && day <= new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth() + 1, 0).getDate() ? day : ''}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="date-picker-actions">
-                      <button
-                        type="button"
-                        className="action-btn today"
-                        onClick={() => {
-                          const today = new Date();
-                          setEventRange([{
-                            startDate: today,
-                            endDate: today,
-                            key: 'selection'
-                          }]);
-                        }}
-                      >
-                        Today
-                      </button>
-                      <button
-                        type="button"
-                        className="action-btn"
-                        onClick={() => {
-                          setEventRange([{
-                            startDate: new Date(),
-                            endDate: undefined,
-                            key: 'selection'
-                          }]);
-                        }}
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Event Time Selectors */}
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <Label className="text-sm font-medium mb-2 block">Start Time</Label>
-                      <Input
-                        type="time"
-                        value={eventStartTime}
-                        onChange={(e) => setEventStartTime(e.target.value)}
-                        className="rounded-xl border-gray-300"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium mb-2 block">End Time</Label>
-                      <Input
-                        type="time"
-                        value={eventEndTime}
-                        onChange={(e) => setEventEndTime(e.target.value)}
-                        className="rounded-xl border-gray-300"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="flex items-center gap-2 text-foreground font-medium mb-4">
-                    <Calendar className="w-4 h-4 text-success" /> Registration Period
-                  </Label>
-                  <div className="modern-date-picker border border-border rounded-2xl overflow-hidden shadow-lg bg-card">
-                    <div className="date-picker-header">
-                      <div className="date-picker-title">
-                        <Calendar className="w-5 h-5" />
-                        Select Registration Dates
-                      </div>
-                      <div className="date-picker-nav">
-                        <button type="button" className="nav-btn" onClick={() => {
-                          const newDate = new Date(regRange[0].startDate);
-                          newDate.setMonth(newDate.getMonth() - 1);
-                          setRegRange([{
-                            ...regRange[0],
-                            startDate: newDate
-                          }]);
-                        }}>
-                          ←
-                        </button>
-                        <button type="button" className="nav-btn" onClick={() => {
-                          const newDate = new Date(regRange[0].startDate);
-                          newDate.setMonth(newDate.getMonth() + 1);
-                          setRegRange([{
-                            ...regRange[0],
-                            startDate: newDate
-                          }]);
-                        }}>
-                          →
-                        </button>
-                      </div>
-                    </div>
-                    <div className="month-year-selector">
-                      <select
-                        className="month-selector"
-                        value={regRange[0].startDate.getMonth()}
-                        onChange={(e) => {
-                          const newDate = new Date(regRange[0].startDate);
-                          newDate.setMonth(parseInt(e.target.value));
-                          setRegRange([{
-                            ...regRange[0],
-                            startDate: newDate
-                          }]);
-                        }}
-                      >
-                        {[
-                          'January', 'February', 'March', 'April', 'May', 'June',
-                          'July', 'August', 'September', 'October', 'November', 'December'
-                        ].map((month, index) => (
-                          <option key={month} value={index}>{month}</option>
-                        ))}
-                      </select>
-                      <select
-                        className="year-selector"
-                        value={regRange[0].startDate.getFullYear()}
-                        onChange={(e) => {
-                          const newDate = new Date(regRange[0].startDate);
-                          newDate.setFullYear(parseInt(e.target.value));
-                          setRegRange([{
-                            ...regRange[0],
-                            startDate: newDate
-                          }]);
-                        }}
-                      >
-                        {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
-                          <option key={year} value={year}>{year}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="weekdays-grid">
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} className="weekday">{day}</div>
-                      ))}
-                    </div>
-                    <div className="days-grid">
-                      {Array.from({ length: 42 }, (_, index) => {
-                        const monthStart = new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth(), 1);
-                        const firstDay = monthStart.getDay();
-                        const day = index - firstDay + 1;
-                        const currentDate = new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth(), day);
-
-                        // Normalize dates to midnight for comparison
-                        const normalizeDate = (date: Date) => {
-                          const normalized = new Date(date);
-                          normalized.setHours(0, 0, 0, 0);
-                          return normalized;
-                        };
-
-                        const normalizedCurrent = normalizeDate(currentDate);
-                        const normalizedStart = regRange[0].startDate ? normalizeDate(regRange[0].startDate) : null;
-                        const normalizedEnd = regRange[0].endDate ? normalizeDate(regRange[0].endDate) : null;
-                        const normalizedToday = normalizeDate(new Date());
-
-                        const isCurrentMonth = currentDate.getMonth() === regRange[0].startDate.getMonth();
-                        const isToday = normalizedCurrent.getTime() === normalizedToday.getTime();
-                        const isSelected = (normalizedStart && normalizedStart.getTime() === normalizedCurrent.getTime()) ||
-                          (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
-                        const isInRange = normalizedStart && normalizedEnd &&
-                          normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
-                        const isDisabled = normalizedCurrent < normalizedToday;
-
-                        return (
-                          <div
-                            key={index}
-                            className={`day-cell ${!isCurrentMonth ? 'other-month' :
-                              isDisabled ? 'disabled' :
-                                isSelected ? 'selected' :
-                                  isInRange ? 'in-range' :
-                                    isToday ? 'today' : ''
-                              }`}
-                            onClick={() => {
-                              if (isDisabled) return;
-                              const newRange = { ...regRange[0] };
-                              // If both dates are set or neither is set, start a new selection
-                              if ((newRange.startDate && newRange.endDate) || (!newRange.startDate && !newRange.endDate)) {
-                                newRange.startDate = normalizeDate(currentDate);
-                                newRange.endDate = undefined;
-                              } else if (newRange.startDate && normalizedCurrent < normalizeDate(newRange.startDate)) {
-                                // If clicking before start date, make it the new start
-                                newRange.startDate = normalizeDate(currentDate);
-                                newRange.endDate = undefined;
-                              } else if (newRange.startDate) {
-                                // Set end date
-                                newRange.endDate = normalizeDate(currentDate);
-                              }
-                              setRegRange([newRange]);
-                            }}
-                          >
-                            {isCurrentMonth && day > 0 && day <= new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth() + 1, 0).getDate() ? day : ''}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="date-picker-actions">
-                      <button
-                        type="button"
-                        className="action-btn today"
-                        onClick={() => {
-                          const today = new Date();
-                          setRegRange([{
-                            startDate: today,
-                            endDate: today,
-                            key: 'selection'
-                          }]);
-                        }}
-                      >
-                        Today
-                      </button>
-                      <button
-                        type="button"
-                        className="action-btn"
-                        onClick={() => {
-                          setRegRange([{
-                            startDate: new Date(),
-                            endDate: undefined,
-                            key: 'selection'
-                          }]);
-                        }}
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Registration Time Selectors */}
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div>
-                      <Label className="text-sm font-medium mb-2 block">Start Time</Label>
-                      <Input
-                        type="time"
-                        value={regStartTime}
-                        onChange={(e) => setRegStartTime(e.target.value)}
-                        className="rounded-xl border-gray-300"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium mb-2 block">End Time</Label>
-                      <Input
-                        type="time"
-                        value={regEndTime}
-                        onChange={(e) => setRegEndTime(e.target.value)}
-                        className="rounded-xl border-gray-300"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Info Message */}
-            <div className="bg-info/10 border border-info/30 rounded-2xl p-6">
-              <div className="flex items-start gap-3">
-                <div className="text-info text-2xl dark:text-info">ℹ️</div>
-                <div>
-                  <h3 className="text-lg font-semibold text-info dark:text-info mb-2">
-                    Ticket Types Configuration
-                  </h3>
-                  <p className="text-info/90 dark:text-info/80">
-                    After creating your event, you can add ticket types through the <strong>Ticket Management</strong> dashboard.
-                    This allows you to configure pricing, quantities, and benefits for each ticket tier.
-                  </p>
-                  <p className="text-info/80 dark:text-info/70 text-sm mt-2">
-                    Navigate to: Dashboard → Ticket Management → Select Your Event → Create Ticket Type
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-3 pt-6 border-t mt-8">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate('/dashboard/events')}
-                className="px-6 py-2 rounded-xl"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                {isSubmitting ? (
-                  <span className="flex items-center">
-                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
-                    Creating...
-                  </span>
-                ) : (
-                  'Create Ticketed Event'
-                )}
-              </Button>
-            </div>
-          </form>
-
-          <UpgradePrompt
-            open={showUpgradePrompt}
-            onOpenChange={setShowUpgradePrompt}
-            title={upgradeTitle}
-            message={upgradeMessage}
-          />
-
-          {/* Ticket Type Creation Dialog */}
-          <Dialog open={showTicketTypeDialog} onOpenChange={setShowTicketTypeDialog}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                    <Ticket className="w-5 h-5 text-white" />
-                  </div>
-                  Add Ticket Types
-                </DialogTitle>
-                <DialogDescription>
-                  Your ticketed event has been created successfully! Add ticket types to start selling tickets.
-                  You can always add more ticket types later in Ticket Management.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="flex-1 overflow-y-auto space-y-6 pr-2">
-                {/* Success Message */}
-                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
-                  <div className="flex items-start gap-3">
-                    <div className="text-green-600 mt-0.5">✅</div>
-                    <div>
-                      <p className="text-sm font-medium text-green-800 dark:text-green-300">Event Created Successfully!</p>
-                      <p className="text-sm text-green-700 dark:text-green-400 mt-1">
-                        Your ticketed event has been created. Now let's add some ticket types to start accepting payments.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Current Ticket Types */}
-                {ticketTypes.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-semibold text-foreground">Current Ticket Types</h4>
-                    <div className="space-y-2">
-                      {ticketTypes.map((ticketType, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
-                          <div>
-                            <p className="font-medium text-foreground">{ticketType.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              ETB {ticketType.price.toLocaleString()}
-                              {ticketType.quantity && ` • ${ticketType.quantity} available`}
-                            </p>
-                          </div>
-                          <Badge variant="secondary">Active</Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Add Ticket Type Form */}
-                <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-foreground">Add New Ticket Type</h4>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="ticket-name" className="text-sm font-medium">
-                        Ticket Name *
-                      </Label>
-                      <Input
-                        id="ticket-name"
-                        placeholder="e.g., Early Bird, VIP, General Admission"
-                        value={currentTicketType.name}
-                        onChange={(e) => setCurrentTicketType(prev => ({ ...prev, name: e.target.value }))}
-                        className="h-10"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="ticket-price" className="text-sm font-medium">
-                        Price (ETB) *
-                      </Label>
-                      <Input
-                        id="ticket-price"
-                        type="number"
-                        placeholder="0.00"
-                        min="0"
-                        step="0.01"
-                        value={currentTicketType.price}
-                        onChange={(e) => setCurrentTicketType(prev => ({ ...prev, price: e.target.value }))}
-                        className="h-10"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="ticket-quantity" className="text-sm font-medium">
-                        Quantity Available
-                      </Label>
-                      <Input
-                        id="ticket-quantity"
-                        type="number"
-                        placeholder="Unlimited"
-                        min="1"
-                        value={currentTicketType.quantity}
-                        onChange={(e) => setCurrentTicketType(prev => ({ ...prev, quantity: e.target.value }))}
-                        className="h-10"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="sales-end-date" className="text-sm font-medium">
-                        Sales End Date
-                      </Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full justify-start text-left font-normal h-10"
-                          >
-                            {currentTicketType.sales_end_date
-                              ? currentTicketType.sales_end_date.toLocaleDateString()
-                              : 'Select date'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={currentTicketType.sales_end_date || undefined}
-                            onSelect={(date) => setCurrentTicketType(prev => ({ ...prev, sales_end_date: date || null }))}
-                            disabled={(date) => date < new Date()}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                    <div className="flex-1">
+                      <h4 className="text-base font-bold text-foreground mb-1">Public Event</h4>
+                      <p className="text-muted-foreground text-sm">Discoverable by everyone</p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="ticket-description" className="text-sm font-medium">
-                      Description
-                    </Label>
-                    <Textarea
-                      id="ticket-description"
-                      placeholder="Describe what's included with this ticket type..."
-                      value={currentTicketType.description}
-                      onChange={(e) => setCurrentTicketType(prev => ({ ...prev, description: e.target.value }))}
-                      rows={3}
-                    />
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Visible on Evella platform</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Paid ticket registration</span>
+                    </div>
+                  </div>
+                </div>
+              </label>
+
+              {/* Private Event Option */}
+              <label className="relative cursor-pointer group">
+                <input
+                  type="radio"
+                  name="visibility"
+                  value="private"
+                  checked={formData.visibility === 'private'}
+                  onChange={(e) => handleInputChange('visibility', e.target.value)}
+                  className="peer sr-only"
+                />
+                <div className="relative p-5 border-2 border-border rounded-2xl transition-all duration-300 group-hover:border-muted-foreground/50 peer-checked:border-muted-foreground peer-checked:bg-muted/5 dark:peer-checked:bg-muted/10">
+                  {/* Selected indicator */}
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-muted-foreground rounded-full flex items-center justify-center opacity-0 peer-checked:opacity-100 transition-opacity duration-300 shadow-lg">
+                    <div className="w-2 h-2 bg-white rounded-full"></div>
                   </div>
 
-                  <Button
-                    onClick={handleAddTicketType}
-                    disabled={isAddingTicketType || !currentTicketType.name.trim() || !currentTicketType.price}
-                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                  >
-                    {isAddingTicketType ? 'Adding...' : 'Add Ticket Type'}
-                  </Button>
+                  <div className="flex items-start gap-4 mb-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+                      <Lock className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-base font-bold text-foreground mb-1">Private Event</h4>
+                      <p className="text-muted-foreground text-sm">Invite-only access</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Hidden from public discovery</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
+                      <span className="text-muted-foreground">Exclusive ticket access</span>
+                    </div>
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            {/* Additional Info */}
+            <div className="mt-6 p-4 bg-muted/30 rounded-xl border border-border">
+              <div className="flex items-start gap-3">
+                <div className="text-info mt-0.5">ℹ️</div>
+                <div>
+                  <p className="text-sm font-medium text-foreground mb-1">Visibility Settings</p>
+                  <p className="text-sm text-muted-foreground">
+                    Public events can be discovered on the Evella platform and have open ticket registration.
+                    Private events require direct invitations and are not visible in public searches.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Date & Time */}
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-brand-gradient rounded-xl flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-foreground">Date & Time</h3>
+                <p className="text-muted-foreground text-sm">Event schedule and registration period</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <Label className="flex items-center gap-2 text-foreground font-medium mb-4">
+                  <Calendar className="w-4 h-4 text-warning" /> Event Date Range
+                </Label>
+
+                {/* Single Day Toggle */}
+                <div className="flex items-center gap-2 mb-3">
+                  <input
+                    type="checkbox"
+                    id="single-day-event-ticketed"
+                    checked={isSingleDayEvent}
+                    onChange={(e) => {
+                      setIsSingleDayEvent(e.target.checked)
+                      if (e.target.checked && selectedEventDate) {
+                        // For single day events, set both start and end to same date
+                        setEventRange([{
+                          ...eventRange[0],
+                          startDate: selectedEventDate,
+                          endDate: selectedEventDate
+                        }])
+                      }
+                    }}
+                    className="rounded border-gray-300"
+                  />
+                  <label htmlFor="single-day-event-ticketed" className="text-sm text-muted-foreground">
+                    Single day event
+                  </label>
+                </div>
+
+                <div className="modern-date-picker border border-border rounded-2xl overflow-hidden shadow-lg bg-card">
+                  <div className="date-picker-header">
+                    <div className="date-picker-title">
+                      <Calendar className="w-5 h-5" />
+                      Select Event Dates
+                    </div>
+                    <div className="date-picker-nav">
+                      <button type="button" className="nav-btn" onClick={() => {
+                        const newDate = new Date(eventRange[0].startDate);
+                        newDate.setMonth(newDate.getMonth() - 1);
+                        setEventRange([{
+                          ...eventRange[0],
+                          startDate: newDate
+                        }]);
+                      }}>
+                        ←
+                      </button>
+                      <button type="button" className="nav-btn" onClick={() => {
+                        const newDate = new Date(eventRange[0].startDate);
+                        newDate.setMonth(newDate.getMonth() + 1);
+                        setEventRange([{
+                          ...eventRange[0],
+                          startDate: newDate
+                        }]);
+                      }}>
+                        →
+                      </button>
+                    </div>
+                  </div>
+                  <div className="month-year-selector">
+                    <select
+                      className="month-selector"
+                      value={eventRange[0].startDate.getMonth()}
+                      onChange={(e) => {
+                        const newDate = new Date(eventRange[0].startDate);
+                        newDate.setMonth(parseInt(e.target.value));
+                        setEventRange([{
+                          ...eventRange[0],
+                          startDate: newDate
+                        }]);
+                      }}
+                    >
+                      {[
+                        'January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'
+                      ].map((month, index) => (
+                        <option key={month} value={index}>{month}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="year-selector"
+                      value={eventRange[0].startDate.getFullYear()}
+                      onChange={(e) => {
+                        const newDate = new Date(eventRange[0].startDate);
+                        newDate.setFullYear(parseInt(e.target.value));
+                        setEventRange([{
+                          ...eventRange[0],
+                          startDate: newDate
+                        }]);
+                      }}
+                    >
+                      {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="weekdays-grid">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                      <div key={day} className="weekday">{day}</div>
+                    ))}
+                  </div>
+                  <div className="days-grid">
+                    {Array.from({ length: 42 }, (_, index) => {
+                      const monthStart = new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth(), 1);
+                      const firstDay = monthStart.getDay();
+                      const day = index - firstDay + 1;
+                      const currentDate = new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth(), day);
+
+                      // Normalize dates to midnight for comparison
+                      const normalizeDate = (date: Date) => {
+                        const normalized = new Date(date);
+                        normalized.setHours(0, 0, 0, 0);
+                        return normalized;
+                      };
+
+                      const normalizedCurrent = normalizeDate(currentDate);
+                      const normalizedStart = eventRange[0].startDate ? normalizeDate(eventRange[0].startDate) : null;
+                      const normalizedEnd = eventRange[0].endDate ? normalizeDate(eventRange[0].endDate) : null;
+                      const normalizedToday = normalizeDate(new Date());
+
+                      const isCurrentMonth = currentDate.getMonth() === eventRange[0].startDate.getMonth();
+                      const isToday = normalizedCurrent.getTime() === normalizedToday.getTime();
+                      const isSelected = (normalizedStart && normalizedStart.getTime() === normalizedCurrent.getTime()) ||
+                        (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
+                      const isInRange = normalizedStart && normalizedEnd &&
+                        normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
+                      const isDisabled = normalizedCurrent < normalizedToday;
+
+                      return (
+                        <div
+                          key={index}
+                          className={`day-cell ${!isCurrentMonth ? 'other-month' :
+                            isDisabled ? 'disabled' :
+                              isSelected ? 'selected' :
+                                isInRange ? 'in-range' :
+                                  isToday ? 'today' : ''
+                            }`}
+                          onClick={() => {
+                            if (isDisabled) return;
+                            const newRange = { ...eventRange[0] };
+                            // If both dates are set or neither is set, start a new selection
+                            if ((newRange.startDate && newRange.endDate) || (!newRange.startDate && !newRange.endDate)) {
+                              newRange.startDate = normalizeDate(currentDate);
+                              newRange.endDate = undefined;
+                            } else if (newRange.startDate && normalizedCurrent < normalizeDate(newRange.startDate)) {
+                              // If clicking before start date, make it the new start
+                              newRange.startDate = normalizeDate(currentDate);
+                              newRange.endDate = undefined;
+                            } else if (newRange.startDate) {
+                              // Set end date
+                              newRange.endDate = normalizeDate(currentDate);
+                            }
+                            setEventRange([newRange]);
+                          }}
+                        >
+                          {isCurrentMonth && day > 0 && day <= new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth() + 1, 0).getDate() ? day : ''}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="date-picker-actions">
+                    <button
+                      type="button"
+                      className="action-btn today"
+                      onClick={() => {
+                        const today = new Date();
+                        setEventRange([{
+                          startDate: today,
+                          endDate: today,
+                          key: 'selection'
+                        }]);
+                      }}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      className="action-btn"
+                      onClick={() => {
+                        setEventRange([{
+                          startDate: new Date(),
+                          endDate: undefined,
+                          key: 'selection'
+                        }]);
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                {/* Event Time Selectors */}
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">Start Time</Label>
+                    <Input
+                      type="time"
+                      value={eventStartTime}
+                      onChange={(e) => setEventStartTime(e.target.value)}
+                      className="rounded-xl border-gray-300"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">End Time</Label>
+                    <Input
+                      type="time"
+                      value={eventEndTime}
+                      onChange={(e) => setEventEndTime(e.target.value)}
+                      className="rounded-xl border-gray-300"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <DialogFooter className="flex-shrink-0 gap-2">
+              <div>
+                <Label className="flex items-center gap-2 text-foreground font-medium mb-4">
+                  <Calendar className="w-4 h-4 text-success" /> Registration Period
+                </Label>
+
+                {/* Spacer to align with Single Day toggle in the first column */}
+                <div className="flex items-center gap-2 mb-3 opacity-0 pointer-events-none select-none">
+                  <div className="w-4 h-4" />
+                  <span className="text-sm">Alignment Spacer</span>
+                </div>
+
+                <div className="modern-date-picker border border-border rounded-2xl overflow-hidden shadow-lg bg-card">
+                  <div className="date-picker-header">
+                    <div className="date-picker-title">
+                      <Calendar className="w-5 h-5" />
+                      Select Registration Dates
+                    </div>
+                    <div className="date-picker-nav">
+                      <button type="button" className="nav-btn" onClick={() => {
+                        const newDate = new Date(regRange[0].startDate);
+                        newDate.setMonth(newDate.getMonth() - 1);
+                        setRegRange([{
+                          ...regRange[0],
+                          startDate: newDate
+                        }]);
+                      }}>
+                        ←
+                      </button>
+                      <button type="button" className="nav-btn" onClick={() => {
+                        const newDate = new Date(regRange[0].startDate);
+                        newDate.setMonth(newDate.getMonth() + 1);
+                        setRegRange([{
+                          ...regRange[0],
+                          startDate: newDate
+                        }]);
+                      }}>
+                        →
+                      </button>
+                    </div>
+                  </div>
+                  <div className="month-year-selector">
+                    <select
+                      className="month-selector"
+                      value={regRange[0].startDate.getMonth()}
+                      onChange={(e) => {
+                        const newDate = new Date(regRange[0].startDate);
+                        newDate.setMonth(parseInt(e.target.value));
+                        setRegRange([{
+                          ...regRange[0],
+                          startDate: newDate
+                        }]);
+                      }}
+                    >
+                      {[
+                        'January', 'February', 'March', 'April', 'May', 'June',
+                        'July', 'August', 'September', 'October', 'November', 'December'
+                      ].map((month, index) => (
+                        <option key={month} value={index}>{month}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="year-selector"
+                      value={regRange[0].startDate.getFullYear()}
+                      onChange={(e) => {
+                        const newDate = new Date(regRange[0].startDate);
+                        newDate.setFullYear(parseInt(e.target.value));
+                        setRegRange([{
+                          ...regRange[0],
+                          startDate: newDate
+                        }]);
+                      }}
+                    >
+                      {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="weekdays-grid">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                      <div key={day} className="weekday">{day}</div>
+                    ))}
+                  </div>
+                  <div className="days-grid">
+                    {Array.from({ length: 42 }, (_, index) => {
+                      const monthStart = new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth(), 1);
+                      const firstDay = monthStart.getDay();
+                      const day = index - firstDay + 1;
+                      const currentDate = new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth(), day);
+
+                      // Normalize dates to midnight for comparison
+                      const normalizeDate = (date: Date) => {
+                        const normalized = new Date(date);
+                        normalized.setHours(0, 0, 0, 0);
+                        return normalized;
+                      };
+
+                      const normalizedCurrent = normalizeDate(currentDate);
+                      const normalizedStart = regRange[0].startDate ? normalizeDate(regRange[0].startDate) : null;
+                      const normalizedEnd = regRange[0].endDate ? normalizeDate(regRange[0].endDate) : null;
+                      const normalizedToday = normalizeDate(new Date());
+
+                      const isCurrentMonth = currentDate.getMonth() === regRange[0].startDate.getMonth();
+                      const isToday = normalizedCurrent.getTime() === normalizedToday.getTime();
+                      const isSelected = (normalizedStart && normalizedStart.getTime() === normalizedCurrent.getTime()) ||
+                        (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
+                      const isInRange = normalizedStart && normalizedEnd &&
+                        normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
+                      const isDisabled = normalizedCurrent < normalizedToday;
+
+                      return (
+                        <div
+                          key={index}
+                          className={`day-cell ${!isCurrentMonth ? 'other-month' :
+                            isDisabled ? 'disabled' :
+                              isSelected ? 'selected' :
+                                isInRange ? 'in-range' :
+                                  isToday ? 'today' : ''
+                            }`}
+                          onClick={() => {
+                            if (isDisabled) return;
+                            const newRange = { ...regRange[0] };
+                            // If both dates are set or neither is set, start a new selection
+                            if ((newRange.startDate && newRange.endDate) || (!newRange.startDate && !newRange.endDate)) {
+                              newRange.startDate = normalizeDate(currentDate);
+                              newRange.endDate = undefined;
+                            } else if (newRange.startDate && normalizedCurrent < normalizeDate(newRange.startDate)) {
+                              // If clicking before start date, make it the new start
+                              newRange.startDate = normalizeDate(currentDate);
+                              newRange.endDate = undefined;
+                            } else if (newRange.startDate) {
+                              // Set end date
+                              newRange.endDate = normalizeDate(currentDate);
+                            }
+                            setRegRange([newRange]);
+                          }}
+                        >
+                          {isCurrentMonth && day > 0 && day <= new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth() + 1, 0).getDate() ? day : ''}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="date-picker-actions">
+                    <button
+                      type="button"
+                      className="action-btn today"
+                      onClick={() => {
+                        const today = new Date();
+                        setRegRange([{
+                          startDate: today,
+                          endDate: today,
+                          key: 'selection'
+                        }]);
+                      }}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      className="action-btn"
+                      onClick={() => {
+                        setRegRange([{
+                          startDate: new Date(),
+                          endDate: undefined,
+                          key: 'selection'
+                        }]);
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                {/* Registration Time Selectors */}
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">Start Time</Label>
+                    <Input
+                      type="time"
+                      value={regStartTime}
+                      onChange={(e) => setRegStartTime(e.target.value)}
+                      className="rounded-xl border-gray-300"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">End Time</Label>
+                    <Input
+                      type="time"
+                      value={regEndTime}
+                      onChange={(e) => setRegEndTime(e.target.value)}
+                      className="rounded-xl border-gray-300"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Info Message */}
+          <div className="bg-info/10 border border-info/30 rounded-2xl p-6">
+            <div className="flex items-start gap-3">
+              <div className="text-info text-2xl dark:text-info">ℹ️</div>
+              <div>
+                <h3 className="text-lg font-semibold text-info dark:text-info mb-2">
+                  Ticket Types Configuration
+                </h3>
+                <p className="text-info/90 dark:text-info/80">
+                  After creating your event, you can add ticket types through the <strong>Ticket Management</strong> dashboard.
+                  This allows you to configure pricing, quantities, and benefits for each ticket tier.
+                </p>
+                <p className="text-info/80 dark:text-info/70 text-sm mt-2">
+                  Navigate to: Dashboard → Ticket Management → Select Your Event → Create Ticket Type
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 pt-6 border-t mt-8">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate('/dashboard/events')}
+              className="px-6 py-2 rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center">
+                  <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+                  Creating...
+                </span>
+              ) : (
+                'Create Ticketed Event'
+              )}
+            </Button>
+          </div>
+        </form>
+
+        <UpgradePrompt
+          open={showUpgradePrompt}
+          onOpenChange={setShowUpgradePrompt}
+          title={upgradeTitle}
+          message={upgradeMessage}
+        />
+
+        {/* Ticket Type Creation Dialog */}
+        <Dialog open={showTicketTypeDialog} onOpenChange={setShowTicketTypeDialog}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                  <Ticket className="w-5 h-5 text-white" />
+                </div>
+                Add Ticket Types
+              </DialogTitle>
+              <DialogDescription>
+                Your ticketed event has been created successfully! Add ticket types to start selling tickets.
+                You can always add more ticket types later in Ticket Management.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+              {/* Success Message */}
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <div className="text-green-600 mt-0.5">✅</div>
+                  <div>
+                    <p className="text-sm font-medium text-green-800 dark:text-green-300">Event Created Successfully!</p>
+                    <p className="text-sm text-green-700 dark:text-green-400 mt-1">
+                      Your ticketed event has been created. Now let's add some ticket types to start accepting payments.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Current Ticket Types */}
+              {ticketTypes.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-foreground">Current Ticket Types</h4>
+                  <div className="space-y-2">
+                    {ticketTypes.map((ticketType, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
+                        <div>
+                          <p className="font-medium text-foreground">{ticketType.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            ETB {ticketType.price.toLocaleString()}
+                            {ticketType.quantity && ` • ${ticketType.quantity} available`}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">Active</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add Ticket Type Form */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-foreground">Add New Ticket Type</h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-name" className="text-sm font-medium">
+                      Ticket Name *
+                    </Label>
+                    <Input
+                      id="ticket-name"
+                      placeholder="e.g., Early Bird, VIP, General Admission"
+                      value={currentTicketType.name}
+                      onChange={(e) => setCurrentTicketType(prev => ({ ...prev, name: e.target.value }))}
+                      className="h-10"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-price" className="text-sm font-medium">
+                      Price (ETB) *
+                    </Label>
+                    <Input
+                      id="ticket-price"
+                      type="number"
+                      placeholder="0.00"
+                      min="0"
+                      step="0.01"
+                      value={currentTicketType.price}
+                      onChange={(e) => setCurrentTicketType(prev => ({ ...prev, price: e.target.value }))}
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-quantity" className="text-sm font-medium">
+                      Quantity Available
+                    </Label>
+                    <Input
+                      id="ticket-quantity"
+                      type="number"
+                      placeholder="Unlimited"
+                      min="1"
+                      value={currentTicketType.quantity}
+                      onChange={(e) => setCurrentTicketType(prev => ({ ...prev, quantity: e.target.value }))}
+                      className="h-10"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sales-end-date" className="text-sm font-medium">
+                      Sales End Date
+                    </Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal h-10"
+                        >
+                          {currentTicketType.sales_end_date
+                            ? currentTicketType.sales_end_date.toLocaleDateString()
+                            : 'Select date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={currentTicketType.sales_end_date || undefined}
+                          onSelect={(date) => setCurrentTicketType(prev => ({ ...prev, sales_end_date: date || null }))}
+                          disabled={(date) => date < new Date()}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="ticket-description" className="text-sm font-medium">
+                    Description
+                  </Label>
+                  <Textarea
+                    id="ticket-description"
+                    placeholder="Describe what's included with this ticket type..."
+                    value={currentTicketType.description}
+                    onChange={(e) => setCurrentTicketType(prev => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+
                 <Button
-                  variant="outline"
-                  onClick={handleContinueToEvent}
-                  className="flex-1"
+                  onClick={handleAddTicketType}
+                  disabled={isAddingTicketType || !currentTicketType.name.trim() || !currentTicketType.price}
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                 >
-                  Skip for Now
+                  {isAddingTicketType ? 'Adding...' : 'Add Ticket Type'}
                 </Button>
-                <Button
-                  onClick={handleGoToTicketManagement}
-                  className="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-                >
-                  Manage Tickets
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+              </div>
+            </div>
+
+            <DialogFooter className="flex-shrink-0 gap-2">
+              <Button
+                variant="outline"
+                onClick={handleContinueToEvent}
+                className="flex-1"
+              >
+                Skip for Now
+              </Button>
+              <Button
+                onClick={handleGoToTicketManagement}
+                className="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+              >
+                Manage Tickets
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-    )
-  } 
+    </div>
+  )
+} 

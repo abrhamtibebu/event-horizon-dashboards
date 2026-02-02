@@ -15,7 +15,11 @@ import {
   Users2,
   Plus,
   Trash2,
+  Check,
+  ChevronsUpDown,
+  Search as SearchIcon,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,6 +40,14 @@ import {
 } from '@/components/ui/select'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Calendar as ShadCalendar } from '@/components/ui/calendar'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 
 // Ethiopian major cities
 const ETHIOPIAN_CITIES = [
@@ -71,6 +83,62 @@ const ETHIOPIAN_CITIES = [
   'Dembi Dolo'
 ]
 
+// Venue Data categorized by city
+const VENUES_BY_CITY: Record<string, any[]> = {
+  'Addis Ababa': [
+    { name: 'Millennium Hall', category: 'Event Venue', type: 'Exhibition & Concert Hall', latitude: 9.00561, longitude: 38.75830 },
+    { name: 'African Union Conference Center (AUCC)', category: 'Conference Center', type: 'International Conference Hall', latitude: 8.99987, longitude: 38.74416 },
+    { name: 'United Nations Conference Hall (UNECA)', category: 'Conference Center', type: 'International Conference Hall' },
+    { name: 'Addis International Convention Center', category: 'Conference Center', type: 'Convention Hall' },
+    { name: 'Sheraton Addis', category: 'Hotel', type: 'Luxury Conference Hotel' },
+    { name: 'Skylight Hotel', category: 'Hotel', type: 'Convention & Meeting Hotel' },
+    { name: 'Radisson Blu Hotel', category: 'Hotel', type: 'Business Hotel' },
+    { name: 'Hilton Addis Ababa', category: 'Hotel', type: 'Conference & Meeting Hotel', latitude: 9.01810, longitude: 38.76466 },
+    { name: 'Elilly International Hotel', category: 'Hotel', type: 'Conference Hotel' },
+    { name: 'Radisson Blu Hotel', category: 'Hotel', type: 'Business Hotel' },
+    { name: 'Golden Tulip Hotel', category: 'Hotel', type: 'Business Hotel' },
+    { name: 'Jupiter International Hotel (Kazanchis)', category: 'Hotel', type: 'Meeting Hotel' },
+    { name: 'Capital Hotel & Spa', category: 'Hotel', type: 'Conference Hotel' },
+    { name: 'Intercontinental Addis', category: 'Hotel', type: 'Conference Hotel' },
+    { name: 'Ghion Hotel', category: 'Hotel', type: 'Event & Meeting Venue' },
+    { name: 'Harmony Hotel', category: 'Hotel', type: 'Conference Hotel' },
+    { name: 'Friendship Park Event Hall', category: 'Event Venue', type: 'Outdoor & Indoor' },
+    { name: 'Holy Trinity Cathedral Hall', category: 'Meeting Hall', type: 'Institutional Hall' },
+    { name: 'Addis Ababa Museum Hall', category: 'Event Venue', type: 'Cultural Venue' },
+    { name: 'Africa Hall', category: 'Conference Center', type: 'Heritage Venue' },
+    { name: 'Addis Ababa University (Main Campus)', category: 'Institution', type: 'Educational Venue' },
+    { name: 'Sheikh Mohammed Hussein Ali Al-Amoudi Hall', category: 'Institution', type: 'Conference Hall' },
+    { name: 'Meridian Convention Center', category: 'Conference Center', type: 'Convention Hall' }
+  ],
+  'Adama': [
+    { name: 'Adama University Conference Center', category: 'Institution', type: 'Educational Venue' },
+    { name: 'Sodere Resort Event Hall', category: 'Resort', type: 'Leisure & Event Venue' },
+    { name: 'Kuriftu Resort Adama', category: 'Resort', type: 'Luxury Event Venue' },
+    { name: 'Executive Hotel Adama', category: 'Hotel', type: 'Business & Meeting Hotel' },
+    { name: 'Rift Valley University Hall', category: 'Institution', type: 'Meeting Hall' }
+  ],
+  'Hawassa': [
+    { name: 'Haile Resort Hawassa', category: 'Resort', type: 'Luxury Event Venue' },
+    { name: 'Hawassa University Hall', category: 'Institution', type: 'Educational Venue' },
+    { name: 'Lewi Resort Hawassa', category: 'Resort', type: 'Event Venue' },
+    { name: 'Central Hawassa Hotel', category: 'Hotel', type: 'Business Hotel' },
+    { name: 'South Star International Hotel', category: 'Hotel', type: 'Conference Hotel' }
+  ],
+  'Bahir Dar': [
+    { name: 'Kuriftu Resort Bahir Dar', category: 'Resort', type: 'Luxury Event Venue' },
+    { name: 'Bahir Dar University Hall', category: 'Institution', type: 'Educational Venue' },
+    { name: 'Winn Hotel', category: 'Hotel', type: 'Conference Hotel' },
+    { name: 'Blue Nile Resort', category: 'Resort', type: 'Event Venue' },
+    { name: 'Avanti Blue Nile Hotel', category: 'Hotel', type: 'Meeting Hotel' }
+  ],
+  'Dire Dawa': [
+    { name: 'Ras Hotel Dire Dawa', category: 'Hotel', type: 'Historic Event Venue' },
+    { name: 'Dire Dawa University Hall', category: 'Institution', type: 'Meeting Hall' },
+    { name: 'Samrat Hotel', category: 'Hotel', type: 'Business Hotel' },
+    { name: 'Tana Hotel', category: 'Hotel', type: 'Meeting Venue' }
+  ]
+}
+
 // Utility to filter valid select options
 function filterValidOptions<T extends { id?: any }>(arr: T[]) {
   return arr.filter(
@@ -102,6 +170,10 @@ export default function CreateEvent() {
     guest_types: '',
     event_type: 'free' as 'free' | 'ticketed', // Add event type selection
     visibility: 'public' as 'public' | 'private', // Add visibility selection
+    latitude: '' as string | number,
+    longitude: '' as string | number,
+    venue_name: '',
+    formatted_address: '',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showEventRange, setShowEventRange] = useState(false)
@@ -157,6 +229,8 @@ export default function CreateEvent() {
   const [ticketTypes, setTicketTypes] = useState<any[]>([])
   const [guestTypes, setGuestTypes] = useState<any[]>([])
   const [selectedGuestTypes, setSelectedGuestTypes] = useState<string[]>([]);
+  const [isVenueOpen, setIsVenueOpen] = useState(false)
+  const [venueSearch, setVenueSearch] = useState('')
 
   useEffect(() => {
     if (user && (user.role === 'organizer' || user.role === 'organizer_admin') && user.organizer_id) {
@@ -490,8 +564,8 @@ export default function CreateEvent() {
                 {/* Free Event Option */}
                 <div
                   className={`p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${formData.event_type === 'free'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/40'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/40'
                     }`}
                   onClick={() => handleInputChange('event_type', 'free')}
                 >
@@ -523,8 +597,8 @@ export default function CreateEvent() {
                 {/* Ticketed Event Option */}
                 <div
                   className={`p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 ${formData.event_type === 'ticketed'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/40'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/40'
                     }`}
                   onClick={() => handleInputChange('event_type', 'ticketed')}
                 >
@@ -540,7 +614,8 @@ export default function CreateEvent() {
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     <li className="flex items-center">
                       <div className="w-2 h-2 bg-primary rounded-full mr-2"></div>
-                      le                    </li>
+                      Multiple ticket tiers
+                    </li>
                     <li className="flex items-center">
                       <div className="w-2 h-2 bg-primary rounded-full mr-2"></div>
                       Revenue tracking
@@ -708,7 +783,7 @@ export default function CreateEvent() {
                   </Label>
                   {(user?.role === 'organizer' || user?.role === 'organizer_admin') ? (
                     <Input
-                      value={user.organizer?.name || 'Loading organizer...'}
+                      value={(user.organizer?.name || 'Loading organizer...').replace(/&amp;/g, '&')}
                       disabled
                       className="mt-2 h-12 border-border bg-muted rounded-xl cursor-not-allowed"
                       placeholder="Your organization"
@@ -826,7 +901,15 @@ export default function CreateEvent() {
                   </Label>
                   <Select
                     value={formData.city}
-                    onValueChange={(value) => handleInputChange('city', value)}
+                    onValueChange={(value) => {
+                      handleInputChange('city', value);
+                      // Reset venue when city changes
+                      handleInputChange('venue', '');
+                      handleInputChange('venue_name', '');
+                      handleInputChange('latitude', '');
+                      handleInputChange('longitude', '');
+                      handleInputChange('formatted_address', '');
+                    }}
                   >
                     <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
                       <SelectValue placeholder="Select a city" />
@@ -844,15 +927,114 @@ export default function CreateEvent() {
                   <Label htmlFor="venue" className="flex items-center gap-2 text-foreground font-medium">
                     <MapPin className="w-4 h-4 text-primary" /> Venue
                   </Label>
-                  <Input
-                    id="venue"
-                    value={formData.venue}
-                    onChange={(e) =>
-                      handleInputChange('venue', e.target.value)
-                    }
-                    placeholder="e.g. Grand Convention Center"
-                    className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl"
-                  />
+                  <Popover open={isVenueOpen} onOpenChange={setIsVenueOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={isVenueOpen}
+                        className="w-full justify-between mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl"
+                      >
+                        {formData.venue ? formData.venue : "Select or search a venue..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <Command className="border border-border">
+                        <CommandInput
+                          placeholder="Search or add custom venue..."
+                          value={venueSearch}
+                          onValueChange={setVenueSearch}
+                        />
+                        <CommandList>
+                          <CommandEmpty>
+                            <div className="p-4 text-center">
+                              <p className="text-sm text-muted-foreground mb-4">No venue found in this city.</p>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="w-full"
+                                onClick={() => {
+                                  handleInputChange('venue', venueSearch);
+                                  handleInputChange('venue_name', venueSearch);
+                                  setIsVenueOpen(false);
+                                }}
+                              >
+                                Use "{venueSearch}" as custom venue
+                              </Button>
+                            </div>
+                          </CommandEmpty>
+                          {formData.city && VENUES_BY_CITY[formData.city] && (
+                            <CommandGroup heading={`Venues in ${formData.city}`}>
+                              {VENUES_BY_CITY[formData.city].map((venue) => (
+                                <CommandItem
+                                  key={venue.name}
+                                  value={venue.name}
+                                  onSelect={(currentValue) => {
+                                    handleInputChange('venue', currentValue);
+                                    handleInputChange('venue_name', venue.name);
+                                    if (venue.latitude) handleInputChange('latitude', venue.latitude);
+                                    if (venue.longitude) handleInputChange('longitude', venue.longitude);
+                                    handleInputChange('formatted_address', `${venue.name}, ${formData.city}`);
+                                    setIsVenueOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      formData.venue === venue.name ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span>{venue.name}</span>
+                                    <span className="text-xs text-muted-foreground">{venue.type || venue.category}</span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          )}
+                          <CommandGroup heading="Custom">
+                            <CommandItem
+                              value={venueSearch}
+                              onSelect={() => {
+                                handleInputChange('venue', venueSearch);
+                                handleInputChange('venue_name', venueSearch);
+                                setIsVenueOpen(false);
+                              }}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              <span>Add "{venueSearch || 'custom'}"...</span>
+                            </CommandItem>
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Option to show/edit coordinates */}
+                  {formData.venue && (
+                    <div className="mt-4 grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                      <div>
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Latitude</Label>
+                        <Input
+                          value={formData.latitude}
+                          onChange={(e) => handleInputChange('latitude', e.target.value)}
+                          placeholder="Optional"
+                          className="h-8 text-xs rounded-lg mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Longitude</Label>
+                        <Input
+                          value={formData.longitude}
+                          onChange={(e) => handleInputChange('longitude', e.target.value)}
+                          placeholder="Optional"
+                          className="h-8 text-xs rounded-lg mt-1"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="max_guests" className="flex items-center gap-2 text-foreground font-medium">
@@ -903,542 +1085,541 @@ export default function CreateEvent() {
               </div>
             </div>
           </div>
-      </div>
 
-      {/* Event & Registration Dates Section */}
-      <div className="bg-card rounded-2xl border border-border p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-            <Calendar className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-foreground">
-              Event & Registration Dates
-            </h3>
-            <p className="text-muted-foreground text-sm">
-              Set event and registration periods
-            </p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Event Date & Time Picker */}
-          <div>
-            <Label className="flex items-center gap-2 text-foreground">
-              <Calendar className="w-4 h-4" /> Event Date & Time
-            </Label>
-
-            {/* Single Day Toggle */}
-            <div className="flex items-center gap-2 mt-2 mb-3">
-              <input
-                type="checkbox"
-                id="single-day-event"
-                checked={isSingleDayEvent}
-                onChange={(e) => {
-                  setIsSingleDayEvent(e.target.checked)
-                  if (e.target.checked && selectedEventDate) {
-                    // For single day events, set both start and end to same date
-                    setFormData((prev) => ({
-                      ...prev,
-                      start_date: selectedEventDate,
-                      end_date: selectedEventDate
-                    }))
-                    setEventRange([{
-                      ...eventRange[0],
-                      startDate: selectedEventDate,
-                      endDate: selectedEventDate
-                    }])
-                  }
-                }}
-                className="rounded border-border"
-              />
-              <label htmlFor="single-day-event" className="text-sm text-muted-foreground">
-                Single day event
-              </label>
-            </div>
-
-            {isSingleDayEvent ? (
-              /* Single Day Event Picker */
-              <div className="space-y-3">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full rounded-xl shadow"
-                    >
-                      {selectedEventDate
-                        ? selectedEventDate.toLocaleDateString()
-                        : 'Select event date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
-                    <div className="flex flex-col gap-4">
-                      <ShadCalendar
-                        mode="single"
-                        selected={selectedEventDate || undefined}
-                        onSelect={(date) => {
-                          if (date) {
-                            setSelectedEventDate(date)
-                            setFormData((prev) => ({
-                              ...prev,
-                              start_date: date,
-                              end_date: date
-                            }))
-                            setEventRange([{
-                              ...eventRange[0],
-                              startDate: date,
-                              endDate: date
-                            }])
-                          }
-                        }}
-                        className="rounded-xl border"
-                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                      />
-                      {/* Time Pickers for Single Day */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Start Time</Label>
-                          <Input
-                            type="time"
-                            value={formData.start_time}
-                            onChange={(e) => setFormData((prev) => ({ ...prev, start_time: e.target.value }))}
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">End Time</Label>
-                          <Input
-                            type="time"
-                            value={formData.end_time}
-                            onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
-                            className="mt-1"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-
-                {selectedEventDate && (
-                  <div className="text-sm text-muted-foreground">
-                    {selectedEventDate.toLocaleDateString()} from {formData.start_time} to {formData.end_time}
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* Multi-Day Event Picker */
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full rounded-xl shadow"
-                  >
-                    {formData.start_date && formData.end_date
-                      ? `${eventRange[0].startDate.toLocaleDateString()} - ${eventRange[0].endDate.toLocaleDateString()}`
-                      : 'Select event date range'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
-                  <div className="flex flex-col gap-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1">Start Date & Time</div>
-                        <ShadCalendar
-                          mode="single"
-                          selected={eventRange[0].startDate}
-                          onSelect={(date) => {
-                            setEventRange([{ ...eventRange[0], startDate: date || new Date(), endDate: eventRange[0].endDate }])
-                            setFormData((prev) => ({ ...prev, start_date: date }))
-                          }}
-                          className="rounded-xl border mb-2"
-                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                        />
-                        <Input
-                          type="time"
-                          value={formData.start_time}
-                          onChange={(e) => setFormData((prev) => ({ ...prev, start_time: e.target.value }))}
-                          className="text-xs"
-                        />
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1">End Date & Time</div>
-                        <ShadCalendar
-                          mode="single"
-                          selected={eventRange[0].endDate}
-                          onSelect={(date) => {
-                            setEventRange([{ ...eventRange[0], endDate: date || new Date(), startDate: eventRange[0].startDate }])
-                            setFormData((prev) => ({ ...prev, end_date: date }))
-                          }}
-                          className="rounded-xl border mb-2"
-                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                        />
-                        <Input
-                          type="time"
-                          value={formData.end_time}
-                          onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
-                          className="text-xs"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
-          </div>
-          {/* Registration Date Range Picker */}
-          <div>
-            <Label className="flex items-center gap-2 text-foreground">
-              <Calendar className="w-4 h-4" /> Registration Period
-            </Label>
-            <div className="mt-1 mb-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full rounded-xl shadow"
-                  >
-                    {formData.registration_start_date && formData.registration_end_date
-                      ? `${regRange[0].startDate.toLocaleDateString()} - ${regRange[0].endDate.toLocaleDateString()}`
-                      : 'Select registration date range'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
-                  <div className="flex flex-col gap-4">
-                    {/* Info about date restrictions */}
-                    <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg">
-                      Registration dates must be between today and the event start date (inclusive).
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1">Start Date</div>
-                        <ShadCalendar
-                          mode="single"
-                          selected={regRange[0].startDate}
-                          onSelect={(date) => {
-                            if (date) {
-                              // Validate date is not before today
-                              const today = new Date()
-                              today.setHours(0, 0, 0, 0)
-
-                              if (date < today) {
-                                toast.error('Registration start date cannot be before today')
-                                return
-                              }
-
-                              // Validate date is not after event start date
-                              if (formData.start_date && date > formData.start_date) {
-                                toast.error('Registration start date cannot be after event start date')
-                                return
-                              }
-
-                              setRegRange([{ ...regRange[0], startDate: date, endDate: regRange[0].endDate }])
-                              setFormData((prev) => ({ ...prev, registration_start_date: date }))
-                            }
-                          }}
-                          className="rounded-xl border"
-                          disabled={(date) => {
-                            const today = new Date()
-                            today.setHours(0, 0, 0, 0)
-                            const eventStart = formData.start_date
-
-                            // Disable dates before today
-                            if (date < today) return true
-
-                            // Disable dates after event start date (if set)
-                            if (eventStart && date > eventStart) return true
-
-                            return false
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1">End Date</div>
-                        <ShadCalendar
-                          mode="single"
-                          selected={regRange[0].endDate}
-                          onSelect={(date) => {
-                            if (date) {
-                              // Validate date is not before today
-                              const today = new Date()
-                              today.setHours(0, 0, 0, 0)
-
-                              if (date < today) {
-                                toast.error('Registration end date cannot be before today')
-                                return
-                              }
-
-                              // Validate date is not after event start date
-                              if (formData.start_date && date > formData.start_date) {
-                                toast.error('Registration end date cannot be after event start date')
-                                return
-                              }
-
-                              // Validate end date is not before start date
-                              if (date < regRange[0].startDate) {
-                                toast.error('Registration end date cannot be before start date')
-                                return
-                              }
-
-                              setRegRange([{ ...regRange[0], endDate: date, startDate: regRange[0].startDate }])
-                              setFormData((prev) => ({ ...prev, registration_end_date: date }))
-                            }
-                          }}
-                          className="rounded-xl border"
-                          disabled={(date) => {
-                            const today = new Date()
-                            today.setHours(0, 0, 0, 0)
-                            const eventStart = formData.start_date
-                            const regStart = regRange[0].startDate
-
-                            // Disable dates before today
-                            if (date < today) return true
-
-                            // Disable dates before registration start date
-                            if (regStart && date < regStart) return true
-
-                            // Disable dates after event start date (if set)
-                            if (eventStart && date > eventStart) return true
-
-                            return false
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Show selected range info */}
-                    {formData.registration_start_date && formData.registration_end_date && (
-                      <div className="text-xs text-center text-muted-foreground bg-muted/30 p-2 rounded-lg">
-                        Selected: {regRange[0].startDate.toLocaleDateString()} to {regRange[0].endDate.toLocaleDateString()}
-                      </div>
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {/* Additional validation info */}
-            <div className="text-xs text-muted-foreground">
-              Registration must open on or after today and close on or before the event starts.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Ticket Types Section - Only show for ticketed events */}
-      {formData.event_type === 'ticketed' && (
-        <div className="bg-card rounded-2xl border border-border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
+          {/* Event & Registration Dates Section */}
+          <div className="bg-card rounded-2xl border border-border p-6">
+            <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                <Ticket className="w-5 h-5 text-primary" />
+                <Calendar className="w-5 h-5 text-primary" />
               </div>
               <div>
                 <h3 className="text-xl font-bold text-foreground">
-                  Ticket Types <span className="text-sm font-normal text-muted-foreground">(Optional)</span>
+                  Event & Registration Dates
                 </h3>
                 <p className="text-muted-foreground text-sm">
-                  You can add ticket types now or later in Ticket Management
+                  Set event and registration periods
                 </p>
               </div>
             </div>
-          </div>
-
-          {/* Info Alert */}
-          <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-lg">
-            <div className="flex items-start gap-3">
-              <div className="text-primary mt-0.5">ℹ️</div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Event Date & Time Picker */}
               <div>
-                <p className="text-sm text-primary font-medium">Ticket types are optional during event creation</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  You can skip this section and add ticket types later through the <strong>Ticket Management</strong> dashboard.
-                  This allows you to configure pricing and availability after your event is created.
-                </p>
-              </div>
-            </div>
-          </div>
+                <Label className="flex items-center gap-2 text-foreground">
+                  <Calendar className="w-4 h-4" /> Event Date & Time
+                </Label>
 
-          {/* Available Ticket Types */}
-          <div className="mb-6">
-            <h4 className="text-lg font-semibold text-foreground mb-4">Available Ticket Types</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {ticketTypeOptions.map((option) => {
-                const isSelected = ticketTypes.some(t => t.name === option.name)
-                return (
-                  <div
-                    key={option.name}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 ${isSelected
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border hover:border-primary/50'
-                      }`}
-                    onClick={() => !isSelected && addTicketType(option)}
-                  >
-                    <div className="flex items-center mb-2">
-                      <option.icon className="w-5 h-5 text-primary dark:text-primary mr-2" />
-                      <span className="font-semibold text-foreground">{option.name}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{option.description}</p>
-                    <p className="text-sm font-medium text-primary dark:text-primary mt-2">
-                      Starting at ETB {option.defaultPrice.toLocaleString()}
-                    </p>
+                {/* Single Day Toggle */}
+                <div className="flex items-center gap-2 mt-2 mb-3">
+                  <input
+                    type="checkbox"
+                    id="single-day-event"
+                    checked={isSingleDayEvent}
+                    onChange={(e) => {
+                      setIsSingleDayEvent(e.target.checked)
+                      if (e.target.checked && selectedEventDate) {
+                        // For single day events, set both start and end to same date
+                        setFormData((prev) => ({
+                          ...prev,
+                          start_date: selectedEventDate,
+                          end_date: selectedEventDate
+                        }))
+                        setEventRange([{
+                          ...eventRange[0],
+                          startDate: selectedEventDate,
+                          endDate: selectedEventDate
+                        }])
+                      }
+                    }}
+                    className="rounded border-border"
+                  />
+                  <label htmlFor="single-day-event" className="text-sm text-muted-foreground">
+                    Single day event
+                  </label>
+                </div>
+
+                {isSingleDayEvent ? (
+                  /* Single Day Event Picker */
+                  <div className="space-y-3">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full rounded-xl shadow"
+                        >
+                          {selectedEventDate
+                            ? selectedEventDate.toLocaleDateString()
+                            : 'Select event date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
+                        <div className="flex flex-col gap-4">
+                          <ShadCalendar
+                            mode="single"
+                            selected={selectedEventDate || undefined}
+                            onSelect={(date) => {
+                              if (date) {
+                                setSelectedEventDate(date)
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  start_date: date,
+                                  end_date: date
+                                }))
+                                setEventRange([{
+                                  ...eventRange[0],
+                                  startDate: date,
+                                  endDate: date
+                                }])
+                              }
+                            }}
+                            className="rounded-xl border"
+                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                          />
+                          {/* Time Pickers for Single Day */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Start Time</Label>
+                              <Input
+                                type="time"
+                                value={formData.start_time}
+                                onChange={(e) => setFormData((prev) => ({ ...prev, start_time: e.target.value }))}
+                                className="mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground">End Time</Label>
+                              <Input
+                                type="time"
+                                value={formData.end_time}
+                                onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
+                                className="mt-1"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+
+                    {selectedEventDate && (
+                      <div className="text-sm text-muted-foreground">
+                        {selectedEventDate.toLocaleDateString()} from {formData.start_time} to {formData.end_time}
+                      </div>
+                    )}
                   </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Selected Ticket Types */}
-          {ticketTypes.length > 0 && (
-            <div>
-              <h4 className="text-lg font-semibold text-foreground mb-4">Configure Ticket Types</h4>
-              <div className="space-y-4">
-                {ticketTypes.map((ticketType, index) => (
-                  <div key={index} className="p-6 border border-border rounded-xl bg-card">
-                    <div className="flex items-center justify-between mb-4">
-                      <h5 className="text-lg font-semibold text-foreground">{ticketType.name}</h5>
-                      <button
+                ) : (
+                  /* Multi-Day Event Picker */
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
                         type="button"
-                        onClick={() => removeTicketType(index)}
-                        className="p-2 text-error hover:bg-error/10 rounded-lg"
+                        variant="outline"
+                        className="w-full rounded-xl shadow"
                       >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="block text-sm font-medium text-foreground mb-2">
-                          Price (ETB) *
-                        </Label>
-                        <Input
-                          type="number"
-                          value={ticketType.price}
-                          onChange={(e) => updateTicketType(index, 'price', parseFloat(e.target.value))}
-                          className="w-full h-12 border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
-                          placeholder="0"
-                          min="0"
-                          step="1"
-                        />
-                      </div>
-
-                      <div>
-                        <Label className="block text-sm font-medium text-foreground mb-2">
-                          Quantity (leave empty for unlimited)
-                        </Label>
-                        <Input
-                          type="number"
-                          value={ticketType.quantity || ''}
-                          onChange={(e) => updateTicketType(index, 'quantity', e.target.value ? parseInt(e.target.value) : null)}
-                          className="w-full h-12 border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
-                          placeholder="Unlimited"
-                          min="1"
-                        />
-                      </div>
-
-                      <div>
-                        <Label className="block text-sm font-medium text-foreground mb-2">
-                          Sales End Date
-                        </Label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="w-full h-12 rounded-xl shadow focus:ring-2 focus:ring-primary focus:border-primary"
-                            >
-                              {ticketType.sales_end_date
-                                ? new Date(ticketType.sales_end_date).toLocaleDateString()
-                                : 'Select sales end date'}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
+                        {formData.start_date && formData.end_date
+                          ? `${eventRange[0].startDate.toLocaleDateString()} - ${eventRange[0].endDate.toLocaleDateString()}`
+                          : 'Select event date range'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
+                      <div className="flex flex-col gap-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">Start Date & Time</div>
                             <ShadCalendar
                               mode="single"
-                              selected={ticketType.sales_end_date ? new Date(ticketType.sales_end_date) : undefined}
+                              selected={eventRange[0].startDate}
+                              onSelect={(date) => {
+                                setEventRange([{ ...eventRange[0], startDate: date || new Date(), endDate: eventRange[0].endDate }])
+                                setFormData((prev) => ({ ...prev, start_date: date }))
+                              }}
+                              className="rounded-xl border mb-2"
+                              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                            />
+                            <Input
+                              type="time"
+                              value={formData.start_time}
+                              onChange={(e) => setFormData((prev) => ({ ...prev, start_time: e.target.value }))}
+                              className="text-xs"
+                            />
+                          </div>
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">End Date & Time</div>
+                            <ShadCalendar
+                              mode="single"
+                              selected={eventRange[0].endDate}
+                              onSelect={(date) => {
+                                setEventRange([{ ...eventRange[0], endDate: date || new Date(), startDate: eventRange[0].startDate }])
+                                setFormData((prev) => ({ ...prev, end_date: date }))
+                              }}
+                              className="rounded-xl border mb-2"
+                              disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                            />
+                            <Input
+                              type="time"
+                              value={formData.end_time}
+                              onChange={(e) => setFormData((prev) => ({ ...prev, end_time: e.target.value }))}
+                              className="text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+              {/* Registration Date Range Picker */}
+              <div>
+                <Label className="flex items-center gap-2 text-foreground">
+                  <Calendar className="w-4 h-4" /> Registration Period
+                </Label>
+                <div className="mt-1 mb-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full rounded-xl shadow"
+                      >
+                        {formData.registration_start_date && formData.registration_end_date
+                          ? `${regRange[0].startDate.toLocaleDateString()} - ${regRange[0].endDate.toLocaleDateString()}`
+                          : 'Select registration date range'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
+                      <div className="flex flex-col gap-4">
+                        {/* Info about date restrictions */}
+                        <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg">
+                          Registration dates must be between today and the event start date (inclusive).
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">Start Date</div>
+                            <ShadCalendar
+                              mode="single"
+                              selected={regRange[0].startDate}
                               onSelect={(date) => {
                                 if (date) {
-                                  updateTicketType(index, 'sales_end_date', date.toISOString())
+                                  // Validate date is not before today
+                                  const today = new Date()
+                                  today.setHours(0, 0, 0, 0)
+
+                                  if (date < today) {
+                                    toast.error('Registration start date cannot be before today')
+                                    return
+                                  }
+
+                                  // Validate date is not after event start date
+                                  if (formData.start_date && date > formData.start_date) {
+                                    toast.error('Registration start date cannot be after event start date')
+                                    return
+                                  }
+
+                                  setRegRange([{ ...regRange[0], startDate: date, endDate: regRange[0].endDate }])
+                                  setFormData((prev) => ({ ...prev, registration_start_date: date }))
                                 }
                               }}
                               className="rounded-xl border"
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
+                              disabled={(date) => {
+                                const today = new Date()
+                                today.setHours(0, 0, 0, 0)
+                                const eventStart = formData.start_date
 
-                      <div>
-                        <Label className="block text-sm font-medium text-foreground mb-2">
-                          Description
-                        </Label>
-                        <Textarea
-                          value={ticketType.description}
-                          onChange={(e) => updateTicketType(index, 'description', e.target.value)}
-                          rows={2}
-                          className="w-full border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary resize-none"
-                          placeholder="Describe this ticket type..."
-                        />
+                                // Disable dates before today
+                                if (date < today) return true
+
+                                // Disable dates after event start date (if set)
+                                if (eventStart && date > eventStart) return true
+
+                                return false
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <div className="text-xs text-muted-foreground mb-1">End Date</div>
+                            <ShadCalendar
+                              mode="single"
+                              selected={regRange[0].endDate}
+                              onSelect={(date) => {
+                                if (date) {
+                                  // Validate date is not before today
+                                  const today = new Date()
+                                  today.setHours(0, 0, 0, 0)
+
+                                  if (date < today) {
+                                    toast.error('Registration end date cannot be before today')
+                                    return
+                                  }
+
+                                  // Validate date is not after event start date
+                                  if (formData.start_date && date > formData.start_date) {
+                                    toast.error('Registration end date cannot be after event start date')
+                                    return
+                                  }
+
+                                  // Validate end date is not before start date
+                                  if (date < regRange[0].startDate) {
+                                    toast.error('Registration end date cannot be before start date')
+                                    return
+                                  }
+
+                                  setRegRange([{ ...regRange[0], endDate: date, startDate: regRange[0].startDate }])
+                                  setFormData((prev) => ({ ...prev, registration_end_date: date }))
+                                }
+                              }}
+                              className="rounded-xl border"
+                              disabled={(date) => {
+                                const today = new Date()
+                                today.setHours(0, 0, 0, 0)
+                                const eventStart = formData.start_date
+                                const regStart = regRange[0].startDate
+
+                                // Disable dates before today
+                                if (date < today) return true
+
+                                // Disable dates before registration start date
+                                if (regStart && date < regStart) return true
+
+                                // Disable dates after event start date (if set)
+                                if (eventStart && date > eventStart) return true
+
+                                return false
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Show selected range info */}
+                        {formData.registration_start_date && formData.registration_end_date && (
+                          <div className="text-xs text-center text-muted-foreground bg-muted/30 p-2 rounded-lg">
+                            Selected: {regRange[0].startDate.toLocaleDateString()} to {regRange[0].endDate.toLocaleDateString()}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Additional validation info */}
+                <div className="text-xs text-muted-foreground">
+                  Registration must open on or after today and close on or before the event starts.
+                </div>
               </div>
             </div>
+          </div>
+
+          {/* Ticket Types Section - Only show for ticketed events */}
+          {formData.event_type === 'ticketed' && (
+            <div className="bg-card rounded-2xl border border-border p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <Ticket className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-foreground">
+                      Ticket Types <span className="text-sm font-normal text-muted-foreground">(Optional)</span>
+                    </h3>
+                    <p className="text-muted-foreground text-sm">
+                      You can add ticket types now or later in Ticket Management
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info Alert */}
+              <div className="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="text-primary mt-0.5">ℹ️</div>
+                  <div>
+                    <p className="text-sm text-primary font-medium">Ticket types are optional during event creation</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      You can skip this section and add ticket types later through the <strong>Ticket Management</strong> dashboard.
+                      This allows you to configure pricing and availability after your event is created.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Available Ticket Types */}
+              <div className="mb-6">
+                <h4 className="text-lg font-semibold text-foreground mb-4">Available Ticket Types</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {ticketTypeOptions.map((option) => {
+                    const isSelected = ticketTypes.some(t => t.name === option.name)
+                    return (
+                      <div
+                        key={option.name}
+                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-300 ${isSelected
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-primary/50'
+                          }`}
+                        onClick={() => !isSelected && addTicketType(option)}
+                      >
+                        <div className="flex items-center mb-2">
+                          <option.icon className="w-5 h-5 text-primary dark:text-primary mr-2" />
+                          <span className="font-semibold text-foreground">{option.name}</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{option.description}</p>
+                        <p className="text-sm font-medium text-primary dark:text-primary mt-2">
+                          Starting at ETB {option.defaultPrice.toLocaleString()}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Selected Ticket Types */}
+              {ticketTypes.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold text-foreground mb-4">Configure Ticket Types</h4>
+                  <div className="space-y-4">
+                    {ticketTypes.map((ticketType, index) => (
+                      <div key={index} className="p-6 border border-border rounded-xl bg-card">
+                        <div className="flex items-center justify-between mb-4">
+                          <h5 className="text-lg font-semibold text-foreground">{ticketType.name}</h5>
+                          <button
+                            type="button"
+                            onClick={() => removeTicketType(index)}
+                            className="p-2 text-error hover:bg-error/10 rounded-lg"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="block text-sm font-medium text-foreground mb-2">
+                              Price (ETB) *
+                            </Label>
+                            <Input
+                              type="number"
+                              value={ticketType.price}
+                              onChange={(e) => updateTicketType(index, 'price', parseFloat(e.target.value))}
+                              className="w-full h-12 border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
+                              placeholder="0"
+                              min="0"
+                              step="1"
+                            />
+                          </div>
+
+                          <div>
+                            <Label className="block text-sm font-medium text-foreground mb-2">
+                              Quantity (leave empty for unlimited)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={ticketType.quantity || ''}
+                              onChange={(e) => updateTicketType(index, 'quantity', e.target.value ? parseInt(e.target.value) : null)}
+                              className="w-full h-12 border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary"
+                              placeholder="Unlimited"
+                              min="1"
+                            />
+                          </div>
+
+                          <div>
+                            <Label className="block text-sm font-medium text-foreground mb-2">
+                              Sales End Date
+                            </Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full h-12 rounded-xl shadow focus:ring-2 focus:ring-primary focus:border-primary"
+                                >
+                                  {ticketType.sales_end_date
+                                    ? new Date(ticketType.sales_end_date).toLocaleDateString()
+                                    : 'Select sales end date'}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="p-4 bg-popover rounded-2xl shadow-xl border border-border w-auto">
+                                <ShadCalendar
+                                  mode="single"
+                                  selected={ticketType.sales_end_date ? new Date(ticketType.sales_end_date) : undefined}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      updateTicketType(index, 'sales_end_date', date.toISOString())
+                                    }
+                                  }}
+                                  className="rounded-xl border"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          <div>
+                            <Label className="block text-sm font-medium text-foreground mb-2">
+                              Description
+                            </Label>
+                            <Textarea
+                              value={ticketType.description}
+                              onChange={(e) => updateTicketType(index, 'description', e.target.value)}
+                              rows={2}
+                              className="w-full border-border rounded-xl focus:ring-2 focus:ring-primary focus:border-primary resize-none"
+                              placeholder="Describe this ticket type..."
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
-        </div>
-      )}
 
 
 
-      {/* Additional Information Section */}
-      <div className="bg-card rounded-2xl border border-border p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-            <FileText className="w-5 h-5 text-primary" />
+          {/* Additional Information Section */}
+          <div className="bg-card rounded-2xl border border-border p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                <FileText className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-foreground">
+                  Additional Information
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                  Requirements, agenda, and additional details
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-6">
+              <div>
+                <Label htmlFor="requirements" className="flex items-center gap-2 text-foreground font-medium">
+                  <FileText className="w-4 h-4 text-primary" /> Requirements & Prerequisites
+                </Label>
+                <Textarea
+                  id="requirements"
+                  value={formData.requirements}
+                  onChange={(e) =>
+                    handleInputChange('requirements', e.target.value)
+                  }
+                  placeholder="Any requirements or prerequisites for attendees..."
+                  rows={3}
+                  className="mt-2 border-border focus:border-primary focus:ring-primary/20 rounded-xl resize-none"
+                />
+              </div>
+              <div>
+                <Label htmlFor="agenda" className="flex items-center gap-2 text-foreground font-medium">
+                  <FileText className="w-4 h-4 text-primary" /> Event Agenda
+                </Label>
+                <Textarea
+                  id="agenda"
+                  value={formData.agenda}
+                  onChange={(e) => handleInputChange('agenda', e.target.value)}
+                  placeholder="Detailed event schedule and agenda..."
+                  rows={4}
+                  className="mt-2 border-border focus:border-primary focus:ring-primary/20 rounded-xl resize-none"
+                />
+              </div>
+            </div>
           </div>
-          <div>
-            <h3 className="text-xl font-bold text-foreground">
-              Additional Information
-            </h3>
-            <p className="text-muted-foreground text-sm">
-              Requirements, agenda, and additional details
-            </p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-6">
-          <div>
-            <Label htmlFor="requirements" className="flex items-center gap-2 text-foreground font-medium">
-              <FileText className="w-4 h-4 text-primary" /> Requirements & Prerequisites
-            </Label>
-            <Textarea
-              id="requirements"
-              value={formData.requirements}
-              onChange={(e) =>
-                handleInputChange('requirements', e.target.value)
-              }
-              placeholder="Any requirements or prerequisites for attendees..."
-              rows={3}
-              className="mt-2 border-border focus:border-primary focus:ring-primary/20 rounded-xl resize-none"
-            />
-          </div>
-          <div>
-            <Label htmlFor="agenda" className="flex items-center gap-2 text-foreground font-medium">
-              <FileText className="w-4 h-4 text-primary" /> Event Agenda
-            </Label>
-            <Textarea
-              id="agenda"
-              value={formData.agenda}
-              onChange={(e) => handleInputChange('agenda', e.target.value)}
-              placeholder="Detailed event schedule and agenda..."
-              rows={4}
-              className="mt-2 border-border focus:border-primary focus:ring-primary/20 rounded-xl resize-none"
-            />
-          </div>
-        </div>
-      </div>
 
-      {/* Debug Section - Remove after fixing
+          {/* Debug Section - Remove after fixing
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
             <h4 className="font-semibold text-yellow-800 mb-2">Debug Info (Remove this section after fixing):</h4>
             <div className="text-sm text-yellow-700 space-y-1">
@@ -1463,47 +1644,47 @@ export default function CreateEvent() {
             </div>
           </div> */}
 
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-3 pt-6 border-t mt-8">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => navigate(-1)}
-          className="px-6 py-2 rounded-xl"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={
-            isSubmitting ||
-            loading.eventTypes ||
-            loading.eventCategories ||
-            ((user?.role !== 'organizer' && user?.role !== 'organizer_admin') && loading.organizers) ||
-            !formData.name.trim() ||
-            !formData.city.trim() ||
-            !formData.venue.trim() ||
-            !formData.max_guests.trim() ||
-            !formData.event_type_id ||
-            !formData.event_category_id ||
-            ((user?.role !== 'organizer' && user?.role !== 'organizer_admin') && !formData.organizer_id) ||
-            !filterValidOptions(eventTypes).some(et => String(et.id) === formData.event_type_id) ||
-            !filterValidOptions(eventCategories).some(ec => String(ec.id) === formData.event_category_id) ||
-            ((user?.role !== 'organizer' && user?.role !== 'organizer_admin') && !filterValidOptions(organizers).some(org => String(org.id) === formData.organizer_id)) ||
-            (formData.event_type === 'free' && selectedGuestTypes.length === 0) ||
-            (formData.event_type === 'ticketed' && ticketTypes.length === 0)
-          }
-          className="bg-primary text-primary-foreground font-semibold px-6 py-2 rounded-xl shadow-sm hover:bg-primary/90 transition-colors"
-        >
-          {isSubmitting ? (
-            <span className="flex items-center">
-              <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
-              Creating...
-            </span>
-          ) : (
-            'Create Event'
-          )}
-        </Button>
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 pt-6 border-t mt-8">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate(-1)}
+              className="px-6 py-2 rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={
+                isSubmitting ||
+                loading.eventTypes ||
+                loading.eventCategories ||
+                ((user?.role !== 'organizer' && user?.role !== 'organizer_admin') && loading.organizers) ||
+                !formData.name.trim() ||
+                !formData.city.trim() ||
+                !formData.venue.trim() ||
+                !formData.max_guests.trim() ||
+                !formData.event_type_id ||
+                !formData.event_category_id ||
+                ((user?.role !== 'organizer' && user?.role !== 'organizer_admin') && !formData.organizer_id) ||
+                !filterValidOptions(eventTypes).some(et => String(et.id) === formData.event_type_id) ||
+                !filterValidOptions(eventCategories).some(ec => String(ec.id) === formData.event_category_id) ||
+                ((user?.role !== 'organizer' && user?.role !== 'organizer_admin') && !filterValidOptions(organizers).some(org => String(org.id) === formData.organizer_id)) ||
+                (formData.event_type === 'free' && selectedGuestTypes.length === 0) ||
+                (formData.event_type === 'ticketed' && ticketTypes.length === 0)
+              }
+              className="bg-primary text-primary-foreground font-semibold px-6 py-2 rounded-xl shadow-sm hover:bg-primary/90 transition-colors"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center">
+                  <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+                  Creating...
+                </span>
+              ) : (
+                'Create Event'
+              )}
+            </Button>
           </div>
         </form>
       </div>

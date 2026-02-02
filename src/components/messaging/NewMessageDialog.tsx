@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import { getAllUsers, getMessagingContacts } from '../../lib/api'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../../hooks/use-auth'
+import { cn } from '@/lib/utils'
 import type { User, Event } from '../../types/message'
 
 interface NewMessageDialogProps {
@@ -151,7 +152,7 @@ export const NewMessageDialog: React.FC<NewMessageDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md p-0 overflow-hidden">
+      <DialogContent className="max-w-md max-h-[85vh] p-0 overflow-hidden flex flex-col">
         <DialogHeader className="p-6 pb-4 border-b border-border/50">
           <DialogTitle className="text-xl font-semibold">Start Conversation</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground mt-2">

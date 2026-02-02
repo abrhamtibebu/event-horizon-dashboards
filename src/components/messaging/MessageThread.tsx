@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
+import { MessageCircle, MessageSquare } from 'lucide-react'
 import { useDeleteMessage, useMarkMessageRead } from '../../hooks/use-messages'
 import { useTypingIndicator } from '../../hooks/use-typing-indicator'
 import { usePaginatedMessages } from '../../hooks/use-paginated-messages'

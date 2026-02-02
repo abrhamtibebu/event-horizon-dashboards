@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Shield, Lock, Eye, Users, FileText } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -6,7 +6,16 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 
 export default function PrivacyPolicy() {
   const [searchParams] = useSearchParams()
-  const returnUrl = searchParams.get('returnUrl') || '/'
+  const navigate = useNavigate()
+  const returnUrl = searchParams.get('returnUrl')
+
+  const handleBack = () => {
+    if (returnUrl) {
+      navigate(returnUrl)
+    } else {
+      navigate(-1)
+    }
+  }
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center relative bg-[#0A0D14] overflow-hidden">
@@ -69,14 +78,12 @@ export default function PrivacyPolicy() {
                 </div>
               </div>
               <Button
-                asChild
                 variant="outline"
+                onClick={handleBack}
                 className="hidden sm:flex border-white/10 hover:bg-white/5 hover:text-white text-gray-300 gap-2"
               >
-                <Link to={returnUrl}>
-                  <ArrowLeft className="w-4 h-4" />
-                  Back
-                </Link>
+                <ArrowLeft className="w-4 h-4" />
+                Back
               </Button>
             </div>
           </div>
@@ -264,8 +271,8 @@ export default function PrivacyPolicy() {
 
           {/* Mobile Footer */}
           <div className="p-4 border-t border-white/5 bg-white/[0.02] sm:hidden">
-            <Button asChild className="w-full bg-white/10 hover:bg-white/20 text-white">
-              <Link to={returnUrl}>Back</Link>
+            <Button onClick={handleBack} className="w-full bg-white/10 hover:bg-white/20 text-white">
+              Back
             </Button>
           </div>
         </motion.div>
