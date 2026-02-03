@@ -5,6 +5,7 @@ import { useSubscription } from '@/hooks/useSubscription'
 import { SubscriptionTierCard } from '@/components/subscription/SubscriptionTierCard'
 import { FeatureComparison } from '@/components/subscription/FeatureComparison'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Spinner } from '@/components/ui/spinner'
@@ -48,7 +49,7 @@ export default function SubscriptionPlans() {
     }
 
     // If has subscription, determine if upgrade or downgrade
-    const currentPlanPrice = subscription.billing_cycle === 'yearly' 
+    const currentPlanPrice = subscription.billing_cycle === 'yearly'
       ? subscription.plan?.price_yearly || 0
       : subscription.plan?.price_monthly || 0
     const newPlanPrice = billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly
@@ -128,7 +129,7 @@ export default function SubscriptionPlans() {
                   {subscription?.status === 'pending_upgrade' ? 'Upgrade Request Pending' : 'Downgrade Request Pending'}
                 </p>
                 <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
-                  You have a pending {subscription?.status === 'pending_upgrade' ? 'upgrade' : 'downgrade'} request. 
+                  You have a pending {subscription?.status === 'pending_upgrade' ? 'upgrade' : 'downgrade'} request.
                   Please wait for admin approval before making another request.
                 </p>
               </div>
@@ -141,7 +142,7 @@ export default function SubscriptionPlans() {
         {plans.map((plan) => {
           const isCurrent = plan.id === currentPlanId
           const canChange = canRequestChange(plan)
-          const currentPlanPrice = subscription?.billing_cycle === 'yearly' 
+          const currentPlanPrice = subscription?.billing_cycle === 'yearly'
             ? subscription?.plan?.price_yearly || 0
             : subscription?.plan?.price_monthly || 0
           const newPlanPrice = billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly
