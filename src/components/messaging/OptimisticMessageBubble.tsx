@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { RefreshCw, AlertCircle, Check, CheckCheck, Download, Reply, Trash2 } from 'lucide-react'
+import { RefreshCw, AlertCircle, Check, CheckCheck, Download, Reply, Trash2, MoreVertical } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
@@ -38,7 +38,7 @@ export const OptimisticMessageBubble: React.FC<OptimisticMessageBubbleProps> = (
 }) => {
   const [messageStatus, setMessageStatus] = useState<'sending' | 'sent' | 'failed'>('sending')
   const [reactions, setReactions] = useState<{ [emoji: string]: number }>({})
-  
+
   const { confirmDelete } = useModernAlerts()
   const isOwnMessage = message.sender_id === currentUserId
   const isOptimistic = message.isOptimistic || message.tempId
@@ -158,7 +158,7 @@ export const OptimisticMessageBubble: React.FC<OptimisticMessageBubbleProps> = (
           return <RefreshCw className="w-3 h-3 text-gray-400 animate-spin" />
       }
     }
-    
+
     // Regular message status
     if (message.seen_at) return <CheckCheck className="w-3 h-3 text-blue-600" />
     if (message.read_at) return <CheckCheck className="w-3 h-3 text-blue-500" />
@@ -223,8 +223,8 @@ export const OptimisticMessageBubble: React.FC<OptimisticMessageBubbleProps> = (
         <div
           className={`
             relative px-4 py-3 rounded-2xl shadow-sm message-bubble
-            ${isOwnMessage 
-              ? 'bg-blue-500 text-white rounded-br-md' 
+            ${isOwnMessage
+              ? 'bg-blue-500 text-white rounded-br-md'
               : 'bg-gray-100 text-gray-900 rounded-bl-md'
             }
             hover:shadow-md transition-all duration-200

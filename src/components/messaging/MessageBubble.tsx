@@ -25,6 +25,7 @@ interface MessageBubbleProps {
   conversationId?: string
   onPin?: (messageId: number) => void
   onUnpin?: (messageId: number) => void
+  onOpenThread?: (message: Message) => void
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -38,6 +39,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   conversationId,
   onPin,
   onUnpin,
+  onOpenThread,
 }) => {
   const { confirmDelete } = useModernAlerts()
   const isOwnMessage = message.sender_id === currentUserId
@@ -49,6 +51,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   }
 
   const getInitials = (name: string) => name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)
+
+  const isSent = message.status === 'sent' || !!message.id
 
   const handleDeleteMessage = async () => {
     await confirmDelete('Message', 'message', async () => onDelete(message.id))
@@ -143,7 +147,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         )}
 
         {/* Bubble */}
-        <div className="relative group/bubble">
+        <div className="relative group/bubble flex flex-col items-end">
           <div
             className={cn(
               "relative px-4 py-3 shadow-md transition-all duration-300",
@@ -155,15 +159,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {/* Quoted Message */}
             {message.parentMessage && (
               <div className={cn(
-                "px-3 py-2 rounded-xl mb-2 flex flex-col gap-0.5 border-l-4",
+                "px-3 py-2 rounded-xl mb-2 flex flex-col gap-0.5 border-l-[3px] transition-all",
                 isOwnMessage
-                  ? 'bg-black/10 border-white/30 text-white/90'
-                  : 'bg-muted/50 border-primary/20 text-muted-foreground'
+                  ? 'bg-black/10 border-white/40 text-white/90 group-hover:bg-black/20'
+                  : 'bg-muted/50 border-primary/40 text-muted-foreground group-hover:bg-muted/80'
               )}>
-                <span className="text-[10px] font-black uppercase tracking-tight opacity-70">
+                <span className="text-[10px] font-black uppercase tracking-tight opacity-70 flex items-center gap-1.5">
+                  <Reply className="w-2.5 h-2.5" />
                   {message.parentMessage.sender.name}
                 </span>
-                <p className="text-xs line-clamp-1 italic font-medium">
+                <p className="text-xs line-clamp-1 italic font-semibold leading-snug">
                   {message.parentMessage.content || "📎 Attachment"}
                 </p>
               </div>
@@ -189,6 +194,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <span className="text-[9px] font-black uppercase tracking-tighter">
                 {formatMessageTime(message.created_at)}
               </span>
+              {isOwnMessage && (
+                <div className="flex items-center">
+                  {isSent ? (
+                    <CheckCheck className="w-2.5 h-2.5 text-white/80" />
+                  ) : (
+                    <Check className="w-2.5 h-2.5 text-white/40" />
+                  )}
+                </div>
+              )}
               {isOwnMessage && (
                 <ReadReceipts
                   message={message}

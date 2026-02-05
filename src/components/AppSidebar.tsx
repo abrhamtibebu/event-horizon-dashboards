@@ -241,17 +241,17 @@ const navigationCategories = [
     label: 'Operations',
     items: [
       {
-        title: 'Check-in',
-        url: '/dashboard/check-in',
-        icon: UserCheck,
-        roles: ['usher'],
-      },
-      {
         title: 'Validator',
         url: '/dashboard/ticket-validator',
         icon: UserCheck,
-        roles: ['usher', 'organizer', 'organizer_admin', 'admin', 'superadmin'],
+        roles: ['organizer', 'organizer_admin', 'admin', 'superadmin'],
         permission: 'tickets.validate',
+      },
+      {
+        title: 'Guest Management',
+        url: '/dashboard/usher/events',
+        icon: Users2,
+        roles: ['usher'],
       },
       {
         title: 'Locate Badges',
@@ -366,7 +366,9 @@ export function AppSidebar() {
       label: isOrganizer && category.label === 'Management' ? 'Manage' :
         isOrganizer && category.label === 'Operations' ? 'Tools' :
           isOrganizer && category.label === 'Connect' ? 'Communicate' :
-            category.label,
+            user?.role === 'usher' && category.label === 'Operations' ? 'My Duties' :
+              user?.role === 'usher' && category.label === 'Connect' ? 'Communicate' :
+                category.label,
       items: category.items.filter((item) => {
         if (!user) return false
 

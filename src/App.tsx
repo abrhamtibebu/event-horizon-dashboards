@@ -178,6 +178,8 @@ const DashboardRouter = () => {
     return <AdminDashboard />
   } else if (user.role === 'organizer' || user.role === 'organizer_admin') {
     return <OrganizerDashboard />
+  } else if (user.role === 'usher') {
+    return <UsherDashboard />
   } else {
     // Default to organizer dashboard for other roles
     return <OrganizerDashboard />

@@ -112,7 +112,24 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
     const eventId = conversationId?.startsWith('event_') ? parseInt(conversationId.replace('event_', '')) : undefined
 
-    // Optimistic UI handled by parent through MessageThread
+    // Trigger optimistic UI update immediately
+    if (onOptimisticMessage) {
+      onOptimisticMessage({
+        content: content.trim(),
+        sender_id: user.id,
+        recipient_id: recipientId,
+        event_id: eventId,
+        file: selectedFile || undefined,
+        parent_message_id: replyingTo?.id,
+        sender: {
+          id: user.id,
+          name: user.username || user.first_name || 'You',
+          profile_image: user.profile_image
+        },
+        created_at: new Date().toISOString()
+      })
+    }
+
     playMessageSent()
     stopTyping()
     reset()

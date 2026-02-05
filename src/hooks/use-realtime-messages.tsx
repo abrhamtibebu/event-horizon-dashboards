@@ -33,13 +33,17 @@ export const useRealtimeMessages = () => {
 
     // Listen for new messages on user's private channel
     const channel = echo.private(`user.${user.id}`)
-    
+
     channel.listen('.message.sent', (data: any) => {
       console.log('Received real-time message:', data)
-      
+
       // Update the relevant query cache
       const conversationId = data.conversation_id
-      
+
+      // CRITICAL: Match query keys with usePaginatedMessages.tsx
+      // Keys are ['messages', conversationId, 50]
+      queryClient.invalidateQueries({ queryKey: ['messages', conversationId, 50] })
+
       if (conversationId.startsWith('direct_')) {
         const userId = conversationId.replace('direct_', '')
         queryClient.invalidateQueries({ queryKey: ['directMessages', userId] })
@@ -47,7 +51,7 @@ export const useRealtimeMessages = () => {
         const eventId = conversationId.replace('event_', '')
         queryClient.invalidateQueries({ queryKey: ['eventMessages', eventId] })
       }
-      
+
       // Invalidate conversations list
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
       queryClient.invalidateQueries({ queryKey: ['unreadCount'] })
@@ -76,8 +80,8 @@ export const useRealtimeMessages = () => {
         addNotification({
           type: 'message',
           title: `New message from ${data.message.sender.name}`,
-          message: data.message.content.length > 50 
-            ? data.message.content.substring(0, 50) + '...' 
+          message: data.message.content.length > 50
+            ? data.message.content.substring(0, 50) + '...'
             : data.message.content,
           senderName: data.message.sender.name,
           senderAvatar: data.message.sender.profile_image,
@@ -128,10 +132,10 @@ export const useRealtimeMessages = () => {
     // Listen for reaction updates
     channel.listen('.message.reaction.updated', (data: any) => {
       console.log('Received reaction update:', data)
-      
+
       // Update the message in the relevant query cache
       const conversationId = data.conversation_id
-      
+
       if (conversationId.startsWith('direct_')) {
         const userId = conversationId.replace('direct_', '')
         queryClient.invalidateQueries({ queryKey: ['directMessages', userId] })
@@ -139,7 +143,7 @@ export const useRealtimeMessages = () => {
         const eventId = conversationId.replace('event_', '')
         queryClient.invalidateQueries({ queryKey: ['eventMessages', eventId] })
       }
-      
+
       // Also invalidate conversations list to update reaction counts
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     })
@@ -160,5 +164,5 @@ export const useRealtimeMessages = () => {
       channel.stopListening('.message.read')
     }
   }, [user?.id, queryClient, addNotification])
- 
+
 }

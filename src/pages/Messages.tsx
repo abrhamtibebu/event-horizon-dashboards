@@ -36,6 +36,7 @@ export default function Messages() {
   const [isConversationSearchOpen, setIsConversationSearchOpen] = useState(false)
   const [activeFilter, setActiveFilter] = useState<'all' | 'direct' | 'event' | 'unread' | 'pinned'>('all')
   const [conversationSearch, setConversationSearch] = useState('')
+  const onOptimisticMessageRef = useRef<((message: any) => void) | null>(null)
 
   const hasMarkedAsRead = useRef<string | null>(null)
 
@@ -271,7 +272,7 @@ export default function Messages() {
   }
 
   return (
-    <div className="flex h-[100dvh] bg-background overflow-hidden">
+    <div className="flex h-[calc(100vh-64px)] bg-background overflow-hidden">
       {/* Sidebar Overlay */}
       <AnimatePresence>
         {showSidebar && window.innerWidth < 1024 && (
@@ -436,23 +437,25 @@ export default function Messages() {
                 </AnimatePresence>
 
                 {/* Messages Area - Scrollable */}
-                <div className="flex-1 min-h-0 overflow-hidden">
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                   <MessageThread
                     conversationId={selectedConversationId}
                     currentUserId={user?.id || 1}
                     onReply={setReplyingTo}
                     onOpenThread={handleOpenThread}
+                    onOptimisticMessage={(fn) => { onOptimisticMessageRef.current = fn }}
                   />
                 </div>
 
                 {/* Message Input - Sticky at bottom */}
-                <div className="shrink-0 p-4 border-t border-border/50 bg-background">
+                <div className="shrink-0 p-4 border-t border-border/50 bg-background z-20">
                   <MessageInput
                     conversationId={selectedConversationId}
                     recipientId={selectedUser?.id}
                     replyingTo={replyingTo}
                     onCancelReply={() => setReplyingTo(null)}
                     isGroup={selectedConversationId?.startsWith('event_')}
+                    onOptimisticMessage={(msg) => onOptimisticMessageRef.current?.(msg)}
                   />
                 </div>
               </div>

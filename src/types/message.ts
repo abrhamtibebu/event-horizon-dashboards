@@ -85,6 +85,7 @@ export interface Message {
   thread_reply_count?: number  // Number of replies in thread
   is_edited?: boolean  // Whether message has been edited
   edited_at?: string  // When message was last edited
+  status?: 'sending' | 'sent' | 'failed' // Optimistic status
 }
 
 export interface ReadReceipt {

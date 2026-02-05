@@ -58,7 +58,7 @@ export const VirtualizedInfiniteMessageList: React.FC<VirtualizedInfiniteMessage
 
     messages.forEach((message, index) => {
       const messageDate = new Date(message.created_at).toDateString()
-      
+
       // Add date separator if date changed
       if (messageDate !== currentDate) {
         items.push({
@@ -108,12 +108,34 @@ export const VirtualizedInfiniteMessageList: React.FC<VirtualizedInfiniteMessage
     return () => observer.disconnect()
   }, [hasMore, isLoading, onLoadMore])
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom on initial load and when new messages arrive
+  const previousMessageCount = useRef(0)
+  const isInitialLoad = useRef(true)
+
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (!scrollRef.current) return
+
+    // Scroll to bottom on initial load
+    if (isInitialLoad.current && messages.length > 0) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      })
+      isInitialLoad.current = false
+      previousMessageCount.current = messages.length
+      return
     }
-  }, [messageItems.length])
+
+    // Scroll to bottom when new messages are added (not when loading older messages)
+    if (messages.length > previousMessageCount.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      })
+    }
+
+    previousMessageCount.current = messages.length
+  }, [messages.length])
 
   if (messages.length === 0) {
     return (
@@ -128,65 +150,65 @@ export const VirtualizedInfiniteMessageList: React.FC<VirtualizedInfiniteMessage
   }
 
   return (
-    <div 
+    <div
       ref={scrollRef}
-      className="flex-1 overflow-y-auto px-4 py-2 space-y-4 min-h-0 message-thread-scrollbar"
+      className="flex-1 overflow-y-auto px-4 py-2 space-y-4 message-thread-scrollbar flex flex-col min-h-0 scroll-smooth"
     >
-        {/* Load more trigger */}
-        {hasMore && (
-          <div ref={loadingRef} className="flex justify-center py-4">
-            {isLoading ? (
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+      {/* Load more trigger */}
+      {hasMore && (
+        <div ref={loadingRef} className="flex justify-center py-4">
+          {isLoading ? (
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+          ) : (
+            <div className="text-xs text-gray-500">Scroll up to load more messages</div>
+          )}
+        </div>
+      )}
+
+      {/* Messages */}
+      {messageItems.map((item, index) => {
+        if (item.type === 'date') {
+          return (
+            <DateSeparator key={`date-${index}`} date={item.data} />
+          )
+        }
+
+        const message = item.data
+        const isOptimistic = message.isOptimistic || message.tempId
+        const showAvatar = shouldShowAvatar(message, messageItems.findIndex(m => m.data === message))
+
+        return (
+          <div key={message.id || message.tempId || index}>
+            {isOptimistic ? (
+              <OptimisticMessageBubble
+                message={message}
+                currentUserId={currentUserId}
+                onReply={onReply}
+                onDelete={onDelete}
+                onRetry={onRetry}
+                showAvatar={showAvatar}
+                isGroup={isGroup}
+                onImageClick={onImageClick}
+                conversationId={conversationId}
+              />
             ) : (
-              <div className="text-xs text-gray-500">Scroll up to load more messages</div>
+              <MessageBubble
+                message={message}
+                currentUserId={currentUserId}
+                onReply={onReply}
+                onDelete={onDelete}
+                showAvatar={showAvatar}
+                isGroup={isGroup}
+                onImageClick={onImageClick}
+                conversationId={conversationId}
+                onPin={onPin}
+                onUnpin={onUnpin}
+                onOpenThread={onOpenThread}
+              />
             )}
           </div>
-        )}
-
-        {/* Messages */}
-        {messageItems.map((item, index) => {
-          if (item.type === 'date') {
-            return (
-              <DateSeparator key={`date-${index}`} date={item.data} />
-            )
-          }
-
-          const message = item.data
-          const isOptimistic = message.isOptimistic || message.tempId
-          const showAvatar = shouldShowAvatar(message, messageItems.findIndex(m => m.data === message))
-
-          return (
-            <div key={message.id || message.tempId || index}>
-              {isOptimistic ? (
-                <OptimisticMessageBubble
-                  message={message}
-                  currentUserId={currentUserId}
-                  onReply={onReply}
-                  onDelete={onDelete}
-                  onRetry={onRetry}
-                  showAvatar={showAvatar}
-                  isGroup={isGroup}
-                  onImageClick={onImageClick}
-                  conversationId={conversationId}
-                />
-              ) : (
-                <MessageBubble
-                  message={message}
-                  currentUserId={currentUserId}
-                  onReply={onReply}
-                  onDelete={onDelete}
-                  showAvatar={showAvatar}
-                  isGroup={isGroup}
-                  onImageClick={onImageClick}
-                  conversationId={conversationId}
-                  onPin={onPin}
-                  onUnpin={onUnpin}
-                  onOpenThread={onOpenThread}
-                />
-              )}
-            </div>
-          )
-          })}
+        )
+      })}
     </div>
   )
 }

@@ -14,6 +14,7 @@ import {
   RefreshCw,
   MessageCircle,
   MessageSquare,
+  DollarSign,
 } from 'lucide-react'
 import { MetricCard } from '@/components/MetricCard'
 import { DashboardCard } from '@/components/DashboardCard'
@@ -43,12 +44,13 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
-import axios from 'axios';
 import { Spinner } from '@/components/ui/spinner';
+import { useToast } from '@/hooks/use-toast'
 
 
 export default function UsherDashboard() {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [dashboardData, setDashboardData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -190,24 +192,31 @@ export default function UsherDashboard() {
   const handleAcceptJob = async (eventId: string) => {
     setActionLoading(true);
     try {
-      await axios.post(`/api/events/${eventId}/usher/accept`);
-      window.location.reload(); // Or refetch events
+      await api.post(`/events/${eventId}/usher/accept`);
+      toast({ title: 'Success', description: 'Job accepted successfully.' });
+      // Refetch data
+      const response = await api.get('/dashboard/usher');
+      setDashboardData(response.data);
     } catch (err) {
-      alert('Failed to accept job.');
+      toast({ title: 'Error', description: 'Failed to accept job.', variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
   };
+
   // Reject job
   const handleRejectJob = async (eventId: string) => {
     setActionLoading(true);
     try {
-      await axios.post(`/api/events/${eventId}/usher/reject`, { reason: rejectReason });
+      await api.post(`/events/${eventId}/usher/reject`, { reason: rejectReason });
       setRejectDialogOpenId(null);
       setRejectReason('');
-      window.location.reload(); // Or refetch events
+      toast({ title: 'Success', description: 'Job rejected.' });
+      // Refetch data
+      const response = await api.get('/dashboard/usher');
+      setDashboardData(response.data);
     } catch (err) {
-      alert('Failed to reject job.');
+      toast({ title: 'Error', description: 'Failed to reject job.', variant: 'destructive' });
     } finally {
       setActionLoading(false);
     }
@@ -262,12 +271,12 @@ export default function UsherDashboard() {
         <MetricCard
           title="Total Earnings"
           value={keyMetrics?.totalEarnings ? `${keyMetrics.totalEarnings} ETB` : '0.00'}
-          icon={<CheckCircle className="w-6 h-6 text-yellow-500" />}
+          icon={<DollarSign className="w-6 h-6 text-yellow-500" />}
         />
         <MetricCard
           title="Earnings per Event"
           value={keyMetrics?.earningsPerEvent ? `${keyMetrics.earningsPerEvent} ETB` : '0.00'}
-          icon={<CheckCircle className="w-6 h-6 text-yellow-500" />}
+          icon={<DollarSign className="w-6 h-6 text-yellow-500" />}
         />
         {/* More stats coming soon */}
       </div>
@@ -548,7 +557,10 @@ export default function UsherDashboard() {
               </p>
             </div>
 
-            <Button className="w-full bg-brand-gradient bg-brand-gradient-hover text-foreground text-sm py-2">
+            <Button
+              onClick={() => navigate('/dashboard/ticket-validator')}
+              className="w-full bg-brand-gradient bg-brand-gradient-hover text-foreground text-sm py-2"
+            >
               <UserCheck className="w-4 h-4 mr-2" />
               Manual Check-in
             </Button>
@@ -561,14 +573,28 @@ export default function UsherDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
           <Link
             to="/dashboard/messages"
-            className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg"
+            className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg transition-colors"
           >
             <MessageSquare className="w-8 h-8 mx-auto mb-2 text-primary" />
             <span className="font-medium">Messages</span>
           </Link>
           <Link
+            to="/dashboard/ticket-validator"
+            className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg transition-colors"
+          >
+            <QrCode className="w-8 h-8 mx-auto mb-2 text-primary" />
+            <span className="font-medium">Ticket Validator</span>
+          </Link>
+          <Link
+            to="/dashboard/usher/events"
+            className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg transition-colors"
+          >
+            <Users className="w-8 h-8 mx-auto mb-2 text-primary" />
+            <span className="font-medium">Guest List</span>
+          </Link>
+          <Link
             to="/dashboard/locate-badges"
-            className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg"
+            className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg transition-colors"
           >
             <MapPin className="w-8 h-8 mx-auto mb-2 text-primary" />
             <span className="font-medium">Locate Badges</span>
@@ -630,25 +656,6 @@ export default function UsherDashboard() {
         </div>
       </div>
 
-      {/* Example usage of filteredAssignedEvents and filteredCheckIns */}
-      {filteredAssignedEvents && (
-        <DashboardCard title="Assigned Events (Filtered)">
-          <ul>
-            {filteredAssignedEvents.map((event: any, idx: number) => (
-              <li key={idx}>{event.name}</li>
-            ))}
-          </ul>
-        </DashboardCard>
-      )}
-      {filteredCheckIns && (
-        <DashboardCard title="Recent Check-ins (Filtered)">
-          <ul>
-            {filteredCheckIns.map((checkIn: any, idx: number) => (
-              <li key={idx}>{checkIn.name}</li>
-            ))}
-          </ul>
-        </DashboardCard>
-      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
-import { MessageCircle, MessageSquare } from 'lucide-react'
+import { RefreshCw, AlertCircle, Check, CheckCheck, Download, Reply, Trash2, MoreVertical, MessageCircle, MessageSquare } from 'lucide-react'
 import { useDeleteMessage, useMarkMessageRead } from '../../hooks/use-messages'
 import { useTypingIndicator } from '../../hooks/use-typing-indicator'
 import { usePaginatedMessages } from '../../hooks/use-paginated-messages'
@@ -143,6 +143,10 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
 
   // Handle optimistic message updates
   const handleOptimisticMessage = useCallback((message: any) => {
+    if (!message) {
+      console.warn('Received null optimistic message')
+      return
+    }
     console.log('Adding optimistic message to MessageThread:', message)
     addOptimisticMessage(
       message.content,
@@ -211,48 +215,22 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
             <p className="text-sm text-gray-500 max-w-xs">Start the conversation! Your messages will appear here as you type.</p>
           </div>
         ) : (
-          <div className="h-full flex flex-col">
-            <VirtualizedInfiniteMessageList
-              messages={allMessages}
-              currentUserId={currentUserId}
-              onReply={onReply}
-              onDelete={handleDeleteMessage}
-              onImageClick={openLightbox}
-              onRetry={retryMessage}
-              isGroup={conversationId?.startsWith('event_')}
-              conversationId={conversationId}
-              onLoadMore={loadMore}
-              hasMore={hasMore}
-              isLoading={isLoadingMore}
-              itemHeight={120}
-              containerHeight={600}
-              overscan={5}
-              onPin={handlePinMessage}
-              onUnpin={handleUnpinMessage}
-              onOpenThread={onOpenThread}
-            />
-
-            {/* Typing Indicator */}
-            {typingUsers.length > 0 && (
-              <div className="absolute bottom-2 left-6 z-10 animate-in slide-in-from-bottom-2 duration-200">
-                <div className="bg-white dark:bg-gray-900 px-3 py-1.5 rounded-full border border-gray-100 dark:border-gray-800 shadow-lg">
-                  <TypingIndicator
-                    users={typingUsers.map(user => ({
-                      id: user.id,
-                      name: user.name,
-                      email: '',
-                      profile_image: user.avatar,
-                      role: 'user',
-                      created_at: '',
-                      updated_at: '',
-                    }))}
-                    conversationId={conversationId || ''}
-                    isGroup={conversationId?.startsWith('event_')}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          <VirtualizedInfiniteMessageList
+            messages={allMessages}
+            currentUserId={currentUserId}
+            onReply={onReply}
+            onDelete={handleDeleteMessage}
+            onImageClick={openLightbox}
+            onRetry={retryMessage}
+            isGroup={conversationId?.startsWith('event_')}
+            conversationId={conversationId}
+            onLoadMore={loadMore}
+            hasMore={hasMore}
+            isLoading={isLoadingMore}
+            onPin={handlePinMessage}
+            onUnpin={handleUnpinMessage}
+            onOpenThread={onOpenThread}
+          />
         )}
       </div>
 
