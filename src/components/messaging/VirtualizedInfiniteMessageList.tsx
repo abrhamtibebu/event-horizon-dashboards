@@ -115,27 +115,32 @@ export const VirtualizedInfiniteMessageList: React.FC<VirtualizedInfiniteMessage
   useEffect(() => {
     if (!scrollRef.current) return
 
-    // Scroll to bottom on initial load
-    if (isInitialLoad.current && messages.length > 0) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: 'smooth'
-      })
-      isInitialLoad.current = false
+    // Use requestAnimationFrame to ensure DOM has updated
+    requestAnimationFrame(() => {
+      if (!scrollRef.current) return
+
+      // Scroll to bottom on initial load
+      if (isInitialLoad.current && messages.length > 0) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+        isInitialLoad.current = false
+        previousMessageCount.current = messages.length
+        return
+      }
+
+      // Scroll to bottom when new messages are added ONLY if user is near the bottom
+      // This allows users to scroll up and view older messages without interruption
+      if (messages.length > previousMessageCount.current) {
+        // Only auto-scroll if user is near the bottom (within 100px)
+        const isNearBottom = scrollRef.current.scrollHeight - scrollRef.current.scrollTop - scrollRef.current.clientHeight < 100
+
+        if (isNearBottom) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+        }
+      }
+
       previousMessageCount.current = messages.length
-      return
-    }
-
-    // Scroll to bottom when new messages are added (not when loading older messages)
-    if (messages.length > previousMessageCount.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: 'smooth'
-      })
-    }
-
-    previousMessageCount.current = messages.length
-  }, [messages.length])
+    })
+  }, [messages])
 
   if (messages.length === 0) {
     return (
@@ -152,7 +157,7 @@ export const VirtualizedInfiniteMessageList: React.FC<VirtualizedInfiniteMessage
   return (
     <div
       ref={scrollRef}
-      className="flex-1 overflow-y-auto px-4 py-2 space-y-4 message-thread-scrollbar flex flex-col min-h-0 scroll-smooth"
+      className="h-full overflow-y-auto px-4 py-2 space-y-4 message-thread-scrollbar scroll-smooth"
     >
       {/* Load more trigger */}
       {hasMore && (

@@ -25,7 +25,7 @@ export const FormattedMessage: React.FC<FormattedMessageProps> = ({
     // Return plain text if no formatting needed
     return (
       <div className={className} onClick={onClick}>
-        <span>{content}</span>
+        <span className="break-words">{content}</span>
         {showLinkPreviews && urls.length > 0 && (
           <div className="mt-2">
             {urls.map((url, index) => (
@@ -43,6 +43,7 @@ export const FormattedMessage: React.FC<FormattedMessageProps> = ({
   return (
     <div className={className} onClick={onClick}>
       <span
+        className="break-words"
         dangerouslySetInnerHTML={{ __html: formattedContent }}
       />
       {showLinkPreviews && urls.length > 0 && (

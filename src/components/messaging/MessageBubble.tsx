@@ -175,7 +175,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             )}
 
             {/* Main Content */}
-            <div className="text-[14px] leading-relaxed font-medium">
+            <div className="text-[14px] leading-relaxed font-medium break-words overflow-wrap-anywhere">
               <MessageContent content={message.content} />
             </div>
 
