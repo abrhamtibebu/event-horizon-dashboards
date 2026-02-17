@@ -39,7 +39,7 @@ export const usePaginatedMessages = ({
   const [hasMore, setHasMore] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const queryClient = useQueryClient()
-  
+
   // Use ref to prevent infinite loops
   const lastConversationId = useRef<string | null>(null)
   const isInitialLoad = useRef(true)
@@ -49,9 +49,8 @@ export const usePaginatedMessages = ({
 
   const upsertMessage = useCallback((incoming: Message) => {
     setMessages(prev => {
-      const index = prev.findIndex(
-        msg => typeof msg.id !== 'string' && msg.id === incoming.id
-      )
+      const index = prev.findIndex(msg => String(msg.id) === String(incoming.id))
+      console.log('Upserting message:', { id: incoming.id, index, content: incoming.content.substring(0, 20) })
 
       if (index !== -1) {
         const next = [...prev]
@@ -73,7 +72,7 @@ export const usePaginatedMessages = ({
       isInitialLoad.current = true
       hasLoadedMoreRef.current = false
       nextCursorRef.current = null
-      
+
       if (realtimeListener.current) {
         realtimeListener.current.stopListening('.message.sent')
         realtimeListener.current.stopListening('.message.reaction.updated')
@@ -87,7 +86,7 @@ export const usePaginatedMessages = ({
     const messages = payload?.data || payload?.messages || payload || []
     const nextCursor = payload?.next_cursor || payload?.nextCursor || null
     const hasMore = Boolean(payload?.has_more ?? payload?.hasMore ?? payload?.next_cursor ?? payload?.nextCursor)
-    
+
     return {
       messages: Array.isArray(messages) ? messages : [],
       nextCursor,
@@ -133,10 +132,10 @@ export const usePaginatedMessages = ({
     queryKey: ['messages', conversationId, pageSize],
     queryFn: async () => {
       if (!conversationId) return { messages: [], nextCursor: null, hasMore: false }
-      
+
       const timestamp = new Date().toISOString()
       console.log(`[${timestamp}] [usePaginatedMessages] Fetching messages for conversation:`, conversationId)
-      
+
       try {
         const payload = await fetchConversationPage(conversationId)
         console.log(`[${timestamp}] [usePaginatedMessages] Received ${(payload?.messages || []).length} messages`)
@@ -171,7 +170,7 @@ export const usePaginatedMessages = ({
   useEffect(() => {
     if (data) {
       const timestamp = new Date().toISOString()
-      
+
       if (isInitialLoad.current) {
         // Initial load
         console.log(`[${timestamp}] [usePaginatedMessages] Initial load - ${data.messages?.length || 0} messages`)
@@ -184,7 +183,7 @@ export const usePaginatedMessages = ({
         const newMessages = data.messages || []
         console.log(`[${timestamp}] [usePaginatedMessages] Polling update - received ${newMessages.length} messages`)
         console.log(`[${timestamp}] [usePaginatedMessages] Message IDs from server:`, newMessages.map((m: any) => m.id))
-        
+
         setMessages(prev => {
           const map = new Map<string | number, Message>()
           prev.forEach(msg =>
@@ -215,7 +214,7 @@ export const usePaginatedMessages = ({
   // Load more messages
   const loadMore = useCallback(async () => {
     if (!hasMore || isLoadingMore || !conversationId || !nextCursorRef.current) return
-    
+
     setIsLoadingMore(true)
     try {
       const payload = await fetchConversationPage(conversationId, nextCursorRef.current)
@@ -255,8 +254,8 @@ export const usePaginatedMessages = ({
 
   // Update an existing message
   const updateMessage = useCallback((messageId: number, updates: Partial<Message>) => {
-    setMessages(prev => 
-      prev.map(msg => 
+    setMessages(prev =>
+      prev.map(msg =>
         msg.id === messageId ? { ...msg, ...updates } : msg
       )
     )
@@ -292,17 +291,20 @@ export const usePaginatedMessages = ({
       const incoming = data.message as Message
       upsertMessage(incoming)
 
+      // Try to find tempId from multiple possible locations in the payload
       const optimisticTempId =
         data?.temp_id ||
         data?.client_temp_id ||
         data?.message?.temp_id ||
-        data?.message?.client_temp_id
+        data?.message?.client_temp_id ||
+        data?.message?.tempId
 
       if (
-        incoming.sender_id === currentUserId &&
+        String(incoming.sender_id) === String(currentUserId) &&
         optimisticTempId &&
         onConfirmOptimisticMessage
       ) {
+        console.log('Confirming optimistic message from real-time:', optimisticTempId)
         onConfirmOptimisticMessage(optimisticTempId, incoming)
       }
     }

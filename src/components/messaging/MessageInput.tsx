@@ -65,7 +65,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   const { startTyping, stopTyping } = useTypingIndicator({
     conversationId,
-    currentUserId: user?.id ?? null,
+    currentUserId: user?.id ? Number(user.id) : null,
   })
 
   // Mention logic
@@ -111,10 +111,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     if (!canSend || !recipientId || !user?.id || sendMessageMutation.isPending) return
 
     const eventId = conversationId?.startsWith('event_') ? parseInt(conversationId.replace('event_', '')) : undefined
+    const tempId = `temp_${Date.now()}`
 
     // Trigger optimistic UI update immediately
     if (onOptimisticMessage) {
       onOptimisticMessage({
+        tempId,
         content: content.trim(),
         sender_id: user.id,
         recipient_id: recipientId,
@@ -123,8 +125,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         parent_message_id: replyingTo?.id,
         sender: {
           id: user.id,
-          name: user.username || user.first_name || 'You',
-          profile_image: user.profile_image
+          name: (user as any).username || (user as any).first_name || 'You',
+          profile_image: (user as any).profile_image
         },
         created_at: new Date().toISOString()
       })
@@ -139,8 +141,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       const response = await sendMessageMutation.mutateAsync({
         recipient_id: recipientId,
         content: content.trim(),
-        parent_message_id: replyingTo?.id,
+        parent_message_id: typeof replyingTo?.id === 'number' ? replyingTo.id : undefined,
         file: selectedFile || undefined,
+        temp_id: tempId
       })
       if (onMessageSent) onMessageSent(response.data)
     } catch (error: any) {

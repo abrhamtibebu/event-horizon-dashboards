@@ -49,7 +49,7 @@ const refreshToken = async (): Promise<string | null> => {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     )
 
     const { token: newToken, user, expires_in } = response.data
@@ -64,7 +64,9 @@ const refreshToken = async (): Promise<string | null> => {
     // Store token expiration timestamp
     if (expires_in) {
       const expiresAt = Date.now() + expires_in * 1000
-      const storage = localStorage.getItem('jwt') ? localStorage : sessionStorage
+      const storage = localStorage.getItem('jwt')
+        ? localStorage
+        : sessionStorage
       storage.setItem('token_expires_at', expiresAt.toString())
     }
 
@@ -96,11 +98,13 @@ api.interceptors.request.use(
     const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
 
     // Check if URL matches public event patterns: /events/{id} or /events/{id}/ticket-types/available
-    const isPublicEventEndpoint = config.url?.match(/^\/events\/\d+$/) ||
+    const isPublicEventEndpoint =
+      config.url?.match(/^\/events\/\d+$/) ||
       config.url?.includes('/ticket-types/available') ||
       config.url?.includes('/share-analytics')
 
-    const isPublicEndpoint = config.url?.startsWith('/public/') ||
+    const isPublicEndpoint =
+      config.url?.startsWith('/public/') ||
       config.url?.startsWith('/guest/') ||
       config.url?.startsWith('/events/uuid/') ||
       config.url?.startsWith('/invitations/track') ||
@@ -108,7 +112,9 @@ api.interceptors.request.use(
       config.url?.includes('/register') ||
       config.url?.includes('/guest-types') ||
       config.url?.startsWith('/forms/') || // Public form access
-      config.url?.includes('/attendees/') && (config.url?.includes('/badge') || config.url?.includes('/resend-email')) || // Public attendee resources
+      (config.url?.includes('/attendees/') &&
+        (config.url?.includes('/badge') ||
+          config.url?.includes('/resend-email'))) || // Public attendee resources
       config.url === '/login' ||
       config.url === '/register' ||
       config.url === '/forgot-password' ||
@@ -121,13 +127,15 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`
     } else if (!isPublicEndpoint) {
       // Only warn for non-public endpoints
-      console.warn('[API] No JWT token found in localStorage or sessionStorage. Requests may fail with 401 Unauthorized.')
+      console.warn(
+        '[API] No JWT token found in localStorage or sessionStorage. Requests may fail with 401 Unauthorized.',
+      )
     }
     return config
   },
   (error) => {
     return Promise.reject(error)
-  }
+  },
 )
 
 // Add response interceptor to handle token expiration and auto-refresh
@@ -136,7 +144,9 @@ api.interceptors.response.use(
     // Store token expiration if provided in response (e.g., from login)
     if (response.data?.expires_in) {
       const expiresAt = Date.now() + response.data.expires_in * 1000
-      const storage = localStorage.getItem('jwt') ? localStorage : sessionStorage
+      const storage = localStorage.getItem('jwt')
+        ? localStorage
+        : sessionStorage
       storage.setItem('token_expires_at', expiresAt.toString())
 
       // Store token creation time if this is a new token
@@ -163,7 +173,10 @@ api.interceptors.response.use(
       localStorage.removeItem('organizer_id')
       localStorage.removeItem('mock_auth')
 
-      if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
+      if (
+        window.location.pathname !== '/' &&
+        window.location.pathname !== '/login'
+      ) {
         window.location.href = '/'
       }
 
@@ -171,7 +184,11 @@ api.interceptors.response.use(
     }
 
     // Handle 401 unauthorized - attempt token refresh
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry
+    ) {
       // Check if we're already refreshing
       if (isRefreshing) {
         // Queue this request to retry after refresh completes
@@ -179,7 +196,8 @@ api.interceptors.response.use(
           failedQueue.push({ resolve, reject, config: originalRequest })
         })
           .then(() => {
-            const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
+            const token =
+              localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
             if (token) {
               originalRequest.headers.Authorization = `Bearer ${token}`
             }
@@ -220,7 +238,10 @@ api.interceptors.response.use(
         localStorage.removeItem('mock_auth')
 
         // Redirect to login if not already there
-        if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
+        if (
+          window.location.pathname !== '/' &&
+          window.location.pathname !== '/login'
+        ) {
           window.location.href = '/'
         }
       } finally {
@@ -229,7 +250,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error)
-  }
+  },
 )
 
 export default api
@@ -242,13 +263,13 @@ export const getBadgeTemplate = (eventId: string, templateId: string) =>
 
 export const createBadgeTemplate = (
   eventId: string,
-  data: { name: string; template_json: any; is_default?: boolean }
+  data: { name: string; template_json: any; is_default?: boolean },
 ) => api.post(`/events/${eventId}/badge-templates`, data)
 
 export const updateBadgeTemplate = (
   eventId: string,
   templateId: string,
-  data: { name?: string; template_json?: any; is_default?: boolean }
+  data: { name?: string; template_json?: any; is_default?: boolean },
 ) => api.put(`/events/${eventId}/badge-templates/${templateId}`, data)
 
 export const deleteBadgeTemplate = (eventId: string, templateId: string) =>
@@ -263,7 +284,7 @@ export const getEventMessages = (eventId: string) =>
 
 export const sendEventMessage = (
   eventId: string,
-  data: { recipient_id: string; content: string }
+  data: { recipient_id: string; content: string },
 ) => api.post(`/events/${eventId}/messages`, data)
 
 export const markMessageRead = (messageId: string) =>
@@ -284,6 +305,7 @@ export const sendDirectMessage = (data: {
   content: string
   parent_message_id?: number
   file?: File
+  temp_id?: string
 }) => {
   const formData = new FormData()
   formData.append('recipient_id', data.recipient_id.toString())
@@ -293,6 +315,9 @@ export const sendDirectMessage = (data: {
   }
   if (data.file) {
     formData.append('file', data.file)
+  }
+  if (data.temp_id) {
+    formData.append('temp_id', data.temp_id)
   }
   return api.post('/messages/direct', formData, {
     headers: {
@@ -308,7 +333,8 @@ export const sendEventMessageWithAttachment = (
     content: string
     parent_message_id?: number
     file?: File
-  }
+    temp_id?: string
+  },
 ) => {
   const formData = new FormData()
   formData.append('recipient_id', data.recipient_id.toString())
@@ -318,6 +344,9 @@ export const sendEventMessageWithAttachment = (
   }
   if (data.file) {
     formData.append('file', data.file)
+  }
+  if (data.temp_id) {
+    formData.append('temp_id', data.temp_id)
   }
   return api.post(`/events/${eventId}/messages`, formData, {
     headers: {
@@ -336,11 +365,14 @@ export const uploadMessageAttachment = (file: File) => {
   })
 }
 
-export const searchMessages = (query: string, filters: {
-  type?: 'all' | 'event' | 'direct'
-  per_page?: number
-  page?: number
-} = {}) => {
+export const searchMessages = (
+  query: string,
+  filters: {
+    type?: 'all' | 'event' | 'direct'
+    per_page?: number
+    page?: number
+  } = {},
+) => {
   const params = new URLSearchParams({ q: query })
   if (filters.type && filters.type !== 'all') {
     params.append('type', filters.type)
@@ -392,13 +424,13 @@ export const getEventUshers = (eventId: number) =>
 
 export const assignUshersToEvent = (
   eventId: number,
-  ushers: { id: number; tasks: string[] }[]
-) => api.post(`/events/${eventId}/ushers`, { ushers });
+  ushers: { id: number; tasks: string[] }[],
+) => api.post(`/events/${eventId}/ushers`, { ushers })
 
 export const updateUsherTasks = (
   eventId: number,
   usherId: number,
-  tasks: string[]
+  tasks: string[],
 ) => api.put(`/events/${eventId}/ushers/${usherId}`, { tasks })
 
 export const removeUsherFromEvent = (eventId: number, usherId: number) =>
@@ -411,14 +443,23 @@ export const getEvent = (eventId: string) => getEventById(eventId)
 export const getAllGuests = () => api.get('/guests')
 
 // Get attendees for an event
-export const getAttendees = (eventId: string) => api.get(`/events/${eventId}/attendees`)
+export const getAttendees = (eventId: string) =>
+  api.get(`/events/${eventId}/attendees`)
 
 // Fetch all organizers (admin)
 export const getAllOrganizers = () => api.get('/organizers')
 
 // Fetch events for the current organizer (organizer)
-export const getMyEvents = (status: string = 'draft,active', excludeStatus?: string) =>
-  api.get('/organizer/events', { params: { status: status === 'all' ? undefined : status, exclude_status: excludeStatus } })
+export const getMyEvents = (
+  status: string = 'draft,active',
+  excludeStatus?: string,
+) =>
+  api.get('/organizer/events', {
+    params: {
+      status: status === 'all' ? undefined : status,
+      exclude_status: excludeStatus,
+    },
+  })
 
 // Fetch events for a specific organizer (admin only)
 export const getEventsForOrganizer = (organizerId: number) =>
@@ -435,11 +476,11 @@ export const getAvailableUshersForEvent = (eventId: number) =>
 // Alternative endpoint for assigning ushers (for backward compatibility)
 export const assignUshersToEventAlt = (
   eventId: number,
-  ushers: { id: number; tasks: string[] }[]
+  ushers: { id: number; tasks: string[] }[],
 ) => api.post(`/events/${eventId}/assign-ushers`, { ushers })
 
 export const postAttendeesBatch = (eventId: string, attendees: any[]) =>
-  api.post(`/events/${eventId}/attendees/batch`, { attendees });
+  api.post(`/events/${eventId}/attendees/batch`, { attendees })
 
 // --- Usher Registration ---
 export const createUsherRegistration = (eventId: number, data: any) =>
@@ -447,25 +488,41 @@ export const createUsherRegistration = (eventId: number, data: any) =>
 export const getUsherRegistrations = (eventId: number) =>
   api.get(`/events/${eventId}/usher-registrations`)
 export const exportUsherRegistrations = (eventId: number) =>
-  api.get(`/events/${eventId}/usher-registrations/export`, { responseType: 'blob' })
-export const updateUsherRegistrationStatus = (eventId: number, registrationId: number, status: string) =>
-  api.patch(`/events/${eventId}/usher-registrations/${registrationId}`, { status })
-export const deleteUsherRegistration = (eventId: number, registrationId: number) =>
-  api.delete(`/events/${eventId}/usher-registrations/${registrationId}`)
+  api.get(`/events/${eventId}/usher-registrations/export`, {
+    responseType: 'blob',
+  })
+export const updateUsherRegistrationStatus = (
+  eventId: number,
+  registrationId: number,
+  status: string,
+) =>
+  api.patch(`/events/${eventId}/usher-registrations/${registrationId}`, {
+    status,
+  })
+export const deleteUsherRegistration = (
+  eventId: number,
+  registrationId: number,
+) => api.delete(`/events/${eventId}/usher-registrations/${registrationId}`)
 
 // --- Short Links ---
-export const createShortLink = (eventId: number, registrationData: any, expiresAt?: string) =>
-  api.post('/short-links', { event_id: eventId, registration_data: registrationData, expires_at: expiresAt })
+export const createShortLink = (
+  eventId: number,
+  registrationData: any,
+  expiresAt?: string,
+) =>
+  api.post('/short-links', {
+    event_id: eventId,
+    registration_data: registrationData,
+    expires_at: expiresAt,
+  })
 export const resolveShortLink = (shortCode: string) =>
   api.get(`/r/${shortCode}`)
 export const getShortLinks = (params = {}) =>
   api.get('/short-links', { params })
-export const getShortLink = (id: number) =>
-  api.get(`/short-links/${id}`)
+export const getShortLink = (id: number) => api.get(`/short-links/${id}`)
 export const updateShortLink = (id: number, data: any) =>
   api.put(`/short-links/${id}`, data)
-export const deleteShortLink = (id: number) =>
-  api.delete(`/short-links/${id}`)
+export const deleteShortLink = (id: number) => api.delete(`/short-links/${id}`)
 export const getShortLinkStats = (id: number) =>
   api.get(`/short-links/${id}/stats`)
 
@@ -481,111 +538,182 @@ export const createVendor = (data: any) => {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-    });
+    })
   }
-  return api.post('/vendors', data);
+  return api.post('/vendors', data)
 }
-export const updateVendor = (id: number, data: any) => api.put(`/vendors/${id}`, data)
+export const updateVendor = (id: number, data: any) =>
+  api.put(`/vendors/${id}`, data)
 export const deleteVendor = (id: number) => api.delete(`/vendors/${id}`)
-export const deactivateVendor = (id: number) => api.patch(`/vendors/${id}/deactivate`)
-export const activateVendor = (id: number) => api.patch(`/vendors/${id}/activate`)
+export const deactivateVendor = (id: number) =>
+  api.patch(`/vendors/${id}/deactivate`)
+export const activateVendor = (id: number) =>
+  api.patch(`/vendors/${id}/activate`)
 
 // Vendor Quotations
-export const getVendorQuotations = (params = {}) => api.get('/vendors/quotations', { params })
-export const getVendorQuotationById = (id: number) => api.get(`/vendors/quotations/${id}`)
-export const createVendorQuotation = (data: any) => api.post('/vendors/quotations', data)
-export const updateVendorQuotation = (id: number, data: any) => api.put(`/vendors/quotations/${id}`, data)
-export const deleteVendorQuotation = (id: number) => api.delete(`/vendors/quotations/${id}`)
-export const approveVendorQuotation = (id: number) => api.post(`/vendors/quotations/${id}/approve`)
-export const bulkApproveVendorQuotations = (quotationIds: number[]) => api.post('/vendors/quotations/bulk-approve', { quotation_ids: quotationIds })
-export const rejectVendorQuotation = (id: number, reason: string) => api.post(`/vendors/quotations/${id}/reject`, { rejection_reason: reason })
+export const getVendorQuotations = (params = {}) =>
+  api.get('/vendors/quotations', { params })
+export const getVendorQuotationById = (id: number) =>
+  api.get(`/vendors/quotations/${id}`)
+export const createVendorQuotation = (data: any) =>
+  api.post('/vendors/quotations', data)
+export const updateVendorQuotation = (id: number, data: any) =>
+  api.put(`/vendors/quotations/${id}`, data)
+export const deleteVendorQuotation = (id: number) =>
+  api.delete(`/vendors/quotations/${id}`)
+export const approveVendorQuotation = (id: number) =>
+  api.post(`/vendors/quotations/${id}/approve`)
+export const bulkApproveVendorQuotations = (quotationIds: number[]) =>
+  api.post('/vendors/quotations/bulk-approve', { quotation_ids: quotationIds })
+export const rejectVendorQuotation = (id: number, reason: string) =>
+  api.post(`/vendors/quotations/${id}/reject`, { rejection_reason: reason })
 
 // Vendor Payments
-export const getVendorPayments = (params = {}) => api.get('/vendors/payments', { params })
-export const getVendorPaymentById = (id: number) => api.get(`/vendors/payments/${id}`)
-export const createVendorPayment = (data: any) => api.post('/vendors/payments', data)
-export const updateVendorPayment = (id: number, data: any) => api.put(`/vendors/payments/${id}`, data)
-export const deleteVendorPayment = (id: number) => api.delete(`/vendors/payments/${id}`)
-export const markPaymentAsPaid = (id: number, data: any) => api.post(`/vendors/payments/${id}/mark-paid`, data)
-export const markPaymentAsFailed = (id: number, data: any) => api.post(`/vendors/payments/${id}/mark-failed`, data)
+export const getVendorPayments = (params = {}) =>
+  api.get('/vendors/payments', { params })
+export const getVendorPaymentById = (id: number) =>
+  api.get(`/vendors/payments/${id}`)
+export const createVendorPayment = (data: any) =>
+  api.post('/vendors/payments', data)
+export const updateVendorPayment = (id: number, data: any) =>
+  api.put(`/vendors/payments/${id}`, data)
+export const deleteVendorPayment = (id: number) =>
+  api.delete(`/vendors/payments/${id}`)
+export const markPaymentAsPaid = (id: number, data: any) =>
+  api.post(`/vendors/payments/${id}/mark-paid`, data)
+export const markPaymentAsFailed = (id: number, data: any) =>
+  api.post(`/vendors/payments/${id}/mark-failed`, data)
 
 // Purchase Requests (PR)
-export const getPurchaseRequests = (params = {}) => api.get('/purchase-requests', { params })
+export const getPurchaseRequests = (params = {}) =>
+  api.get('/purchase-requests', { params })
 export const getPRStatistics = () => api.get('/purchase-requests/statistics')
-export const getPurchaseRequestById = (id: number) => api.get(`/purchase-requests/${id}`)
-export const createPurchaseRequest = (data: any) => api.post('/purchase-requests', data)
-export const updatePurchaseRequest = (id: number, data: any) => api.put(`/purchase-requests/${id}`, data)
-export const deletePurchaseRequest = (id: number) => api.delete(`/purchase-requests/${id}`)
-export const approvePurchaseRequest = (id: number, data: { status: 'approved' | 'rejected', comments?: string }) =>
-  api.post(`/purchase-requests/${id}/approve`, data)
+export const getPurchaseRequestById = (id: number) =>
+  api.get(`/purchase-requests/${id}`)
+export const createPurchaseRequest = (data: any) =>
+  api.post('/purchase-requests', data)
+export const updatePurchaseRequest = (id: number, data: any) =>
+  api.put(`/purchase-requests/${id}`, data)
+export const deletePurchaseRequest = (id: number) =>
+  api.delete(`/purchase-requests/${id}`)
+export const approvePurchaseRequest = (
+  id: number,
+  data: { status: 'approved' | 'rejected'; comments?: string },
+) => api.post(`/purchase-requests/${id}/approve`, data)
 
 // Proforma Invoices
-export const getProformaInvoices = (params = {}) => api.get('/proforma-invoices', { params })
-export const getProformaInvoiceById = (id: number) => api.get(`/proforma-invoices/${id}`)
-export const uploadProformaInvoice = (data: FormData) => api.post('/proforma-invoices', data, {
-  headers: { 'Content-Type': 'multipart/form-data' }
-})
-export const approveProformaInvoice = (id: number, data: { status: 'approved' | 'rejected', comments?: string }) =>
-  api.post(`/proforma-invoices/${id}/approve`, data)
-export const getProformaStatistics = () => api.get('/proforma-invoices/statistics')
+export const getProformaInvoices = (params = {}) =>
+  api.get('/proforma-invoices', { params })
+export const getProformaInvoiceById = (id: number) =>
+  api.get(`/proforma-invoices/${id}`)
+export const uploadProformaInvoice = (data: FormData) =>
+  api.post('/proforma-invoices', data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+export const approveProformaInvoice = (
+  id: number,
+  data: { status: 'approved' | 'rejected'; comments?: string },
+) => api.post(`/proforma-invoices/${id}/approve`, data)
+export const getProformaStatistics = () =>
+  api.get('/proforma-invoices/statistics')
 
 // Purchase Orders (PO)
-export const getPurchaseOrders = (params = {}) => api.get('/purchase-orders', { params })
-export const getPurchaseOrderById = (id: number) => api.get(`/purchase-orders/${id}`)
-export const createPurchaseOrder = (data: any) => api.post('/purchase-orders', data)
-export const sendPOToVendor = (id: number) => api.post(`/purchase-orders/${id}/send`)
-export const getApprovedProformas = (params = {}) => api.get('/purchase-orders/approved-proformas', { params })
-export const downloadPOPDF = (id: number) => api.get(`/purchase-orders/${id}/download`, { responseType: 'blob' })
+export const getPurchaseOrders = (params = {}) =>
+  api.get('/purchase-orders', { params })
+export const getPurchaseOrderById = (id: number) =>
+  api.get(`/purchase-orders/${id}`)
+export const createPurchaseOrder = (data: any) =>
+  api.post('/purchase-orders', data)
+export const sendPOToVendor = (id: number) =>
+  api.post(`/purchase-orders/${id}/send`)
+export const getApprovedProformas = (params = {}) =>
+  api.get('/purchase-orders/approved-proformas', { params })
+export const downloadPOPDF = (id: number) =>
+  api.get(`/purchase-orders/${id}/download`, { responseType: 'blob' })
 export const getPOStatistics = () => api.get('/purchase-orders/statistics')
 
 // Payment Requests
-export const getPaymentRequests = (params = {}) => api.get('/payment-requests', { params })
-export const getPaymentRequestById = (id: number) => api.get(`/payment-requests/${id}`)
-export const createPaymentRequest = (data: any) => api.post('/payment-requests', data)
-export const approvePaymentRequest = (id: number, data: { status: 'approved' | 'rejected', comments?: string }) =>
-  api.post(`/payment-requests/${id}/approve`, data)
+export const getPaymentRequests = (params = {}) =>
+  api.get('/payment-requests', { params })
+export const getPaymentRequestById = (id: number) =>
+  api.get(`/payment-requests/${id}`)
+export const createPaymentRequest = (data: any) =>
+  api.post('/payment-requests', data)
+export const approvePaymentRequest = (
+  id: number,
+  data: { status: 'approved' | 'rejected'; comments?: string },
+) => api.post(`/payment-requests/${id}/approve`, data)
 export const processPaymentRequest = (id: number, data: any) =>
   api.post(`/payment-requests/${id}/process-payment`, data)
-export const getPaymentRequestStatistics = () => api.get('/payment-requests/statistics')
+export const getPaymentRequestStatistics = () =>
+  api.get('/payment-requests/statistics')
 
 // Revamped Vendor Payments
-export const getVendorPaymentsRevamped = (params = {}) => api.get('/vendor-payments', { params })
-export const processVendorPayment = (id: number, data: any) => api.post(`/vendor-payments/${id}/process`, data)
-export const getVendorPaymentRevampedStatistics = () => api.get('/vendor-payments/statistics')
+export const getVendorPaymentsRevamped = (params = {}) =>
+  api.get('/vendor-payments', { params })
+export const processVendorPayment = (id: number, data: any) =>
+  api.post(`/vendor-payments/${id}/process`, data)
+export const getVendorPaymentRevampedStatistics = () =>
+  api.get('/vendor-payments/statistics')
 
 // Vendor Deliveries
-export const getVendorDeliveries = (params = {}) => api.get('/vendors/deliveries', { params })
-export const getVendorDeliveryById = (id: number) => api.get(`/vendors/deliveries/${id}`)
-export const createVendorDelivery = (data: any) => api.post('/vendors/deliveries', data)
-export const updateVendorDelivery = (id: number, data: any) => api.put(`/vendors/deliveries/${id}`, data)
-export const deleteVendorDelivery = (id: number) => api.delete(`/vendors/deliveries/${id}`)
-export const markDeliveryAsDelivered = (id: number, data: any) => api.post(`/vendors/deliveries/${id}/mark-delivered`, data)
-export const markDeliveryAsFailed = (id: number, data: any) => api.post(`/vendors/deliveries/${id}/mark-failed`, data)
+export const getVendorDeliveries = (params = {}) =>
+  api.get('/vendors/deliveries', { params })
+export const getVendorDeliveryById = (id: number) =>
+  api.get(`/vendors/deliveries/${id}`)
+export const createVendorDelivery = (data: any) =>
+  api.post('/vendors/deliveries', data)
+export const updateVendorDelivery = (id: number, data: any) =>
+  api.put(`/vendors/deliveries/${id}`, data)
+export const deleteVendorDelivery = (id: number) =>
+  api.delete(`/vendors/deliveries/${id}`)
+export const markDeliveryAsDelivered = (id: number, data: any) =>
+  api.post(`/vendors/deliveries/${id}/mark-delivered`, data)
+export const markDeliveryAsFailed = (id: number, data: any) =>
+  api.post(`/vendors/deliveries/${id}/mark-failed`, data)
 
 // Vendor Ratings
-export const getVendorRatings = (params = {}) => api.get('/vendors/ratings', { params })
-export const getVendorRatingById = (id: number) => api.get(`/vendors/ratings/${id}`)
-export const createVendorRating = (data: any) => api.post('/vendors/ratings', data)
-export const updateVendorRating = (id: number, data: any) => api.put(`/vendors/ratings/${id}`, data)
-export const deleteVendorRating = (id: number) => api.delete(`/vendors/ratings/${id}`)
-export const getVendorRatingSummary = (vendorId: number) => api.get(`/vendors/ratings/vendor/${vendorId}/summary`)
+export const getVendorRatings = (params = {}) =>
+  api.get('/vendors/ratings', { params })
+export const getVendorRatingById = (id: number) =>
+  api.get(`/vendors/ratings/${id}`)
+export const createVendorRating = (data: any) =>
+  api.post('/vendors/ratings', data)
+export const updateVendorRating = (id: number, data: any) =>
+  api.put(`/vendors/ratings/${id}`, data)
+export const deleteVendorRating = (id: number) =>
+  api.delete(`/vendors/ratings/${id}`)
+export const getVendorRatingSummary = (vendorId: number) =>
+  api.get(`/vendors/ratings/vendor/${vendorId}/summary`)
 
 // Vendor Statistics and Reports
 export const getVendorStatistics = () => api.get('/vendors/statistics')
-export const getVendorQuotationStatistics = () => api.get('/vendors/quotations/statistics')
-export const getVendorPaymentStatistics = () => api.get('/vendors/payments/statistics')
-export const getVendorDeliveryStatistics = () => api.get('/vendors/deliveries/statistics')
-export const getVendorRatingStatistics = () => api.get('/vendors/ratings/statistics')
+export const getVendorQuotationStatistics = () =>
+  api.get('/vendors/quotations/statistics')
+export const getVendorPaymentStatistics = () =>
+  api.get('/vendors/payments/statistics')
+export const getVendorDeliveryStatistics = () =>
+  api.get('/vendors/deliveries/statistics')
+export const getVendorRatingStatistics = () =>
+  api.get('/vendors/ratings/statistics')
 
 // Vendor Event Assignment
-export const assignVendorToEvent = (eventId: number, vendorId: number, data: any) =>
-  api.post(`/events/${eventId}/vendors`, { vendor_id: vendorId, ...data })
+export const assignVendorToEvent = (
+  eventId: number,
+  vendorId: number,
+  data: any,
+) => api.post(`/events/${eventId}/vendors`, { vendor_id: vendorId, ...data })
 export const removeVendorFromEvent = (eventId: number, vendorId: number) =>
   api.delete(`/events/${eventId}/vendors/${vendorId}`)
-export const getEventVendors = (eventId: number) => api.get(`/events/${eventId}/vendors`)
+export const getEventVendors = (eventId: number) =>
+  api.get(`/events/${eventId}/vendors`)
 
 // File Upload for Vendor Documents
-export const uploadVendorDocument = (vendorId: number, file: File, type: string) => {
+export const uploadVendorDocument = (
+  vendorId: number,
+  file: File,
+  type: string,
+) => {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('type', type)
@@ -610,28 +738,41 @@ export const uploadQuotationAttachment = (quotationId: number, file: File) => {
 export const uploadProforma = (quotationId: number, file: File) => {
   const formData = new FormData()
   formData.append('proforma', file)
-  return api.post(`/vendors/quotations/${quotationId}/upload-proforma`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
+  return api.post(
+    `/vendors/quotations/${quotationId}/upload-proforma`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     },
-  })
+  )
 }
 
 // Line Items
-export const getQuotationLineItems = (quotationId: number) => api.get(`/vendors/quotations/${quotationId}/line-items`)
-export const createQuotationLineItem = (quotationId: number, data: {
-  item_name: string;
-  description?: string;
-  quantity: number;
-  unit_price: number;
-}) => api.post(`/vendors/quotations/${quotationId}/line-items`, data)
-export const updateQuotationLineItem = (quotationId: number, itemId: number, data: {
-  item_name?: string;
-  description?: string;
-  quantity?: number;
-  unit_price?: number;
-}) => api.put(`/vendors/quotations/${quotationId}/line-items/${itemId}`, data)
-export const deleteQuotationLineItem = (quotationId: number, itemId: number) => api.delete(`/vendors/quotations/${quotationId}/line-items/${itemId}`)
+export const getQuotationLineItems = (quotationId: number) =>
+  api.get(`/vendors/quotations/${quotationId}/line-items`)
+export const createQuotationLineItem = (
+  quotationId: number,
+  data: {
+    item_name: string
+    description?: string
+    quantity: number
+    unit_price: number
+  },
+) => api.post(`/vendors/quotations/${quotationId}/line-items`, data)
+export const updateQuotationLineItem = (
+  quotationId: number,
+  itemId: number,
+  data: {
+    item_name?: string
+    description?: string
+    quantity?: number
+    unit_price?: number
+  },
+) => api.put(`/vendors/quotations/${quotationId}/line-items/${itemId}`, data)
+export const deleteQuotationLineItem = (quotationId: number, itemId: number) =>
+  api.delete(`/vendors/quotations/${quotationId}/line-items/${itemId}`)
 
 export const uploadPaymentReceipt = (paymentId: number, file: File) => {
   const formData = new FormData()
@@ -644,14 +785,21 @@ export const uploadPaymentReceipt = (paymentId: number, file: File) => {
 }
 
 // Export Reports
-export const exportVendorReport = (params = {}) => api.get('/vendors/export', { params, responseType: 'blob' })
-export const exportQuotationReport = (params = {}) => api.get('/vendors/quotations/export', { params, responseType: 'blob' })
-export const exportPaymentReport = (params = {}) => api.get('/vendors/payments/export', { params, responseType: 'blob' })
-export const exportDeliveryReport = (params = {}) => api.get('/vendors/deliveries/export', { params, responseType: 'blob' })
+export const exportVendorReport = (params = {}) =>
+  api.get('/vendors/export', { params, responseType: 'blob' })
+export const exportQuotationReport = (params = {}) =>
+  api.get('/vendors/quotations/export', { params, responseType: 'blob' })
+export const exportPaymentReport = (params = {}) =>
+  api.get('/vendors/payments/export', { params, responseType: 'blob' })
+export const exportDeliveryReport = (params = {}) =>
+  api.get('/vendors/deliveries/export', { params, responseType: 'blob' })
 
 // Bulk Operations
-export const bulkVendorOperations = (data: { action: string; vendor_ids: number[]; data?: any }) =>
-  api.post('/vendors/bulk-operations', data)
+export const bulkVendorOperations = (data: {
+  action: string
+  vendor_ids: number[]
+  data?: any
+}) => api.post('/vendors/bulk-operations', data)
 export const bulkActivateVendors = (vendorIds: number[]) =>
   bulkVendorOperations({ action: 'activate', vendor_ids: vendorIds })
 export const bulkDeactivateVendors = (vendorIds: number[]) =>
@@ -659,79 +807,116 @@ export const bulkDeactivateVendors = (vendorIds: number[]) =>
 export const bulkDeleteVendors = (vendorIds: number[]) =>
   bulkVendorOperations({ action: 'delete', vendor_ids: vendorIds })
 
-
-
 // Share Analytics API functions
-export const getShareAnalytics = (eventId: string, params?: { start_date?: string; end_date?: string }) =>
-  api.get(`/events/${eventId}/share-analytics`, { params })
+export const getShareAnalytics = (
+  eventId: string,
+  params?: { start_date?: string; end_date?: string },
+) => api.get(`/events/${eventId}/share-analytics`, { params })
 
 export const getRealTimeShareAnalytics = (eventId: string) =>
   api.get(`/events/${eventId}/share-analytics/realtime`)
 
-export const trackShare = (eventId: string, data: {
-  platform: string;
-  source?: string;
-  user_agent?: string;
-  ip_address?: string;
-}) => api.post(`/events/${eventId}/share-analytics/track`, data)
+export const trackShare = (
+  eventId: string,
+  data: {
+    platform: string
+    source?: string
+    user_agent?: string
+    ip_address?: string
+  },
+) => api.post(`/events/${eventId}/share-analytics/track`, data)
 
-export const trackRegistration = (eventId: string, data: {
-  source?: string;
-  platform?: string;
-  user_agent?: string;
-  ip_address?: string;
-}) => api.post(`/events/${eventId}/share-analytics/registration`, data)
+export const trackRegistration = (
+  eventId: string,
+  data: {
+    source?: string
+    platform?: string
+    user_agent?: string
+    ip_address?: string
+  },
+) => api.post(`/events/${eventId}/share-analytics/registration`, data)
 
 // --- Sessions API ---
-export const getEventSessions = (eventId: number) => api.get(`/events/${eventId}/sessions`)
-export const createEventSession = (eventId: number, data: any) => api.post(`/events/${eventId}/sessions`, data)
-export const getSessionById = (sessionId: number) => api.get(`/sessions/${sessionId}`)
-export const updateSession = (sessionId: number, data: any) => api.put(`/sessions/${sessionId}`, data)
-export const deleteSession = (sessionId: number) => api.delete(`/sessions/${sessionId}`)
-export const cancelSession = (sessionId: number) => api.post(`/sessions/${sessionId}/cancel`)
+export const getEventSessions = (eventId: number) =>
+  api.get(`/events/${eventId}/sessions`)
+export const createEventSession = (eventId: number, data: any) =>
+  api.post(`/events/${eventId}/sessions`, data)
+export const getSessionById = (sessionId: number) =>
+  api.get(`/sessions/${sessionId}`)
+export const updateSession = (sessionId: number, data: any) =>
+  api.put(`/sessions/${sessionId}`, data)
+export const deleteSession = (sessionId: number) =>
+  api.delete(`/sessions/${sessionId}`)
+export const cancelSession = (sessionId: number) =>
+  api.post(`/sessions/${sessionId}/cancel`)
 
 // Session Attendance
-export const createSessionAttendance = (sessionId: number, data: any) => api.post(`/sessions/${sessionId}/attendances`, data)
-export const updateSessionAttendance = (sessionId: number, attendanceId: number, data: any) => api.put(`/sessions/${sessionId}/attendances/${attendanceId}`, data)
+export const createSessionAttendance = (sessionId: number, data: any) =>
+  api.post(`/sessions/${sessionId}/attendances`, data)
+export const updateSessionAttendance = (
+  sessionId: number,
+  attendanceId: number,
+  data: any,
+) => api.put(`/sessions/${sessionId}/attendances/${attendanceId}`, data)
 
 // Session Usher assignment
-export const getSessionUshers = (sessionId: number) => api.get(`/sessions/${sessionId}/ushers`)
-export const assignSessionUshers = (sessionId: number, ushers: { id: number; tasks?: string[] }[]) => api.post(`/sessions/${sessionId}/ushers`, { ushers })
-export const updateSessionUsher = (sessionId: number, usherId: number, tasks: string[]) => api.put(`/sessions/${sessionId}/ushers/${usherId}`, { tasks })
-export const removeSessionUsher = (sessionId: number, usherId: number) => api.delete(`/sessions/${sessionId}/ushers/${usherId}`)
+export const getSessionUshers = (sessionId: number) =>
+  api.get(`/sessions/${sessionId}/ushers`)
+export const assignSessionUshers = (
+  sessionId: number,
+  ushers: { id: number; tasks?: string[] }[],
+) => api.post(`/sessions/${sessionId}/ushers`, { ushers })
+export const updateSessionUsher = (
+  sessionId: number,
+  usherId: number,
+  tasks: string[],
+) => api.put(`/sessions/${sessionId}/ushers/${usherId}`, { tasks })
+export const removeSessionUsher = (sessionId: number, usherId: number) =>
+  api.delete(`/sessions/${sessionId}/ushers/${usherId}`)
 
 // Deliverables
-export const getDeliverables = (params?: any) => api.get('/deliverables', { params })
+export const getDeliverables = (params?: any) =>
+  api.get('/deliverables', { params })
 export const getDeliverable = (id: number) => api.get(`/deliverables/${id}`)
 export const createDeliverable = (data: any) => api.post('/deliverables', data)
-export const updateDeliverable = (id: number, data: any) => api.put(`/deliverables/${id}`, data)
-export const deleteDeliverable = (id: number) => api.delete(`/deliverables/${id}`)
-export const bulkUpdateDeliverableStatus = (ids: number[], status: string) => api.post('/deliverables/bulk-update-status', { deliverable_ids: ids, status })
-export const getVendorEventDeliverables = (vendorId: number, eventId: number) => api.get(`/vendors/${vendorId}/events/${eventId}/deliverables`)
+export const updateDeliverable = (id: number, data: any) =>
+  api.put(`/deliverables/${id}`, data)
+export const deleteDeliverable = (id: number) =>
+  api.delete(`/deliverables/${id}`)
+export const bulkUpdateDeliverableStatus = (ids: number[], status: string) =>
+  api.post('/deliverables/bulk-update-status', { deliverable_ids: ids, status })
+export const getVendorEventDeliverables = (vendorId: number, eventId: number) =>
+  api.get(`/vendors/${vendorId}/events/${eventId}/deliverables`)
 
 // Pre-generated Badges API
-export const bulkGenerateBadges = (eventId: number, data: { guest_type_id: number; quantity: number }) =>
-  api.post(`/events/${eventId}/pre-generated-badges/bulk-generate`, data)
+export const bulkGenerateBadges = (
+  eventId: number,
+  data: { guest_type_id: number; quantity: number },
+) => api.post(`/events/${eventId}/pre-generated-badges/bulk-generate`, data)
 
-export const getPreGeneratedBadges = (eventId: number, filters?: {
-  guest_type_id?: number;
-  status?: string;
-  search?: string;
-  per_page?: number
-}) =>
-  api.get(`/events/${eventId}/pre-generated-badges`, { params: filters })
+export const getPreGeneratedBadges = (
+  eventId: number,
+  filters?: {
+    guest_type_id?: number
+    status?: string
+    search?: string
+    per_page?: number
+  },
+) => api.get(`/events/${eventId}/pre-generated-badges`, { params: filters })
 
-export const assignPreGeneratedBadge = (eventId: number, data: {
-  badge_code: string
-  guest_id?: number
-  first_name?: string
-  last_name?: string
-  email?: string
-  phone?: string
-  company?: string
-  job_title?: string
-}) =>
-  api.post(`/events/${eventId}/pre-generated-badges/assign`, data)
+export const assignPreGeneratedBadge = (
+  eventId: number,
+  data: {
+    badge_code: string
+    guest_id?: number
+    first_name?: string
+    last_name?: string
+    email?: string
+    phone?: string
+    company?: string
+    job_title?: string
+  },
+) => api.post(`/events/${eventId}/pre-generated-badges/assign`, data)
 
 export const unassignPreGeneratedBadge = (eventId: number, badgeId: number) =>
   api.delete(`/events/${eventId}/pre-generated-badges/${badgeId}/unassign`)
@@ -739,16 +924,21 @@ export const unassignPreGeneratedBadge = (eventId: number, badgeId: number) =>
 export const getPreGeneratedBadgeStats = (eventId: number) =>
   api.get(`/events/${eventId}/pre-generated-badges/statistics`)
 
-export const exportPreGeneratedBadges = (eventId: number, format: 'csv' | 'pdf', guestTypeId?: number) =>
+export const exportPreGeneratedBadges = (
+  eventId: number,
+  format: 'csv' | 'pdf',
+  guestTypeId?: number,
+) =>
   api.get(`/events/${eventId}/pre-generated-badges/export`, {
     params: { format, guest_type_id: guestTypeId },
-    responseType: 'blob'
+    responseType: 'blob',
   })
 
 export const generatePrintableBadges = (eventId: number, badgeIds: number[]) =>
-  api.post(`/events/${eventId}/pre-generated-badges/generate-printables`,
+  api.post(
+    `/events/${eventId}/pre-generated-badges/generate-printables`,
     { badge_ids: badgeIds },
-    { responseType: 'blob' }
+    { responseType: 'blob' },
   )
 
 // QR Code Check-in

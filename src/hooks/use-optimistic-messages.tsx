@@ -34,9 +34,10 @@ export const useOptimisticMessages = ({
     recipientId: number,
     eventId?: number,
     file?: File,
-    parentMessageId?: number
+    parentMessageId?: number,
+    providedTempId?: string
   ): OptimisticMessage => {
-    const tempId = generateTempId()
+    const tempId = providedTempId || generateTempId()
     const objectUrl = file ? URL.createObjectURL(file) : undefined
     const optimisticMessage: OptimisticMessage = {
       id: tempId,
@@ -83,24 +84,27 @@ export const useOptimisticMessages = ({
   // Confirm an optimistic message (replace with real message from server)
   const confirmMessage = useCallback((tempId: string, realMessage: Message) => {
     setOptimisticMessages(prev => {
-      const messageIndex = prev.findIndex(msg => msg.tempId === tempId)
-      if (messageIndex === -1) return prev
+      const messageIndex = prev.findIndex(msg => String(msg.tempId) === String(tempId))
+      if (messageIndex === -1) {
+        console.log('Optimistic message not found for confirmation:', tempId)
+        return prev
+      }
 
       // Remove the optimistic message
       const newOptimisticMessages = prev.filter(msg => msg.tempId !== tempId)
-      
+
       // Add the real message
       onAddMessage(realMessage)
-      
+
       return newOptimisticMessages
     })
   }, [onAddMessage])
 
   // Mark an optimistic message as failed
   const failMessage = useCallback((tempId: string, error?: string) => {
-    setOptimisticMessages(prev => 
-      prev.map(msg => 
-        msg.tempId === tempId 
+    setOptimisticMessages(prev =>
+      prev.map(msg =>
+        msg.tempId === tempId
           ? { ...msg, status: 'failed' as const }
           : msg
       )
@@ -109,9 +113,9 @@ export const useOptimisticMessages = ({
 
   // Retry a failed message
   const retryMessage = useCallback((tempId: string) => {
-    setOptimisticMessages(prev => 
-      prev.map(msg => 
-        msg.tempId === tempId 
+    setOptimisticMessages(prev =>
+      prev.map(msg =>
+        msg.tempId === tempId
           ? { ...msg, status: 'sending' as const }
           : msg
       )

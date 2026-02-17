@@ -44,7 +44,7 @@ export interface MessageReaction {
 }
 
 export interface Message {
-  id: number
+  id: number | string
   event_id?: number
   sender_id: number
   recipient_id: number
@@ -81,10 +81,10 @@ export interface Message {
   reaction_counts?: { [emoji: string]: number }
   // Enhanced corporate messaging features
   is_pinned?: boolean
-  mentions?: number[]  // Array of user IDs mentioned in message
-  thread_reply_count?: number  // Number of replies in thread
-  is_edited?: boolean  // Whether message has been edited
-  edited_at?: string  // When message was last edited
+  mentions?: number[] // Array of user IDs mentioned in message
+  thread_reply_count?: number // Number of replies in thread
+  is_edited?: boolean // Whether message has been edited
+  edited_at?: string // When message was last edited
   status?: 'sending' | 'sent' | 'failed' // Optimistic status
 }
 
@@ -106,10 +106,10 @@ export interface Conversation {
   participants: User[]
   event?: Event
   // Enhanced corporate messaging features
-  is_pinned?: boolean  // Whether conversation is pinned to top
-  is_starred?: boolean  // Whether conversation is starred
-  is_muted?: boolean  // Whether notifications are muted
-  is_archived?: boolean  // Whether conversation is archived
+  is_pinned?: boolean // Whether conversation is pinned to top
+  is_starred?: boolean // Whether conversation is starred
+  is_muted?: boolean // Whether notifications are muted
+  is_archived?: boolean // Whether conversation is archived
 }
 
 export interface ConversationPartner {

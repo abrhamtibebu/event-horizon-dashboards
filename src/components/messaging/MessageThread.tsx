@@ -32,22 +32,8 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
 
-  // Initialize real-time messaging (disabled for now, using polling instead)
-  // useRealtimeMessages()
-
-  // Use optimistic messages hook first
-  const {
-    optimisticMessages,
-    addOptimisticMessage,
-    confirmMessage,
-    failMessage,
-    retryMessage,
-    removeOptimisticMessage,
-  } = useOptimisticMessages({
-    onAddMessage: () => { }, // Will be set after usePaginatedMessages
-    onUpdateMessage: () => { }, // Will be set after usePaginatedMessages
-    onRemoveMessage: () => { }, // Will be set after usePaginatedMessages
-  })
+  // Initialize real-time messaging
+  useRealtimeMessages()
 
   // Use paginated messages hook
   const {
@@ -63,7 +49,24 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
     conversationId,
     currentUserId,
     pageSize: 50,
-    onConfirmOptimisticMessage: confirmMessage,
+    onConfirmOptimisticMessage: (tempId, realMessage) => {
+      console.log('Confirming optimistic message in thread:', { tempId, realMessage })
+      confirmMessage(tempId, realMessage)
+    },
+  })
+
+  // Use optimistic messages hook
+  const {
+    optimisticMessages,
+    addOptimisticMessage,
+    confirmMessage,
+    failMessage,
+    retryMessage,
+    removeOptimisticMessage,
+  } = useOptimisticMessages({
+    onAddMessage: addMessage,
+    onUpdateMessage: updateMessage,
+    onRemoveMessage: removeMessage,
   })
 
   const deleteMessageMutation = useDeleteMessage()
@@ -154,7 +157,8 @@ export const MessageThread: React.FC<MessageThreadProps> = ({
       message.recipient_id,
       message.event_id,
       message.file,
-      message.parent_message_id
+      message.parent_message_id,
+      message.tempId
     )
   }, [addOptimisticMessage])
 

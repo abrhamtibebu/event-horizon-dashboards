@@ -21,7 +21,7 @@ interface Organizer {
 }
 
 interface User {
-  id: string
+  id: number | string
   email: string
   role: Role
   roles?: string[]
