@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Calendar, CreditCard, AlertCircle, CheckCircle2, TrendingUp, Zap, Shield, ArrowRight, Sparkles, Clock, History } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { motion } from 'framer-motion'
 import { subscriptionsApi } from '@/lib/api/subscriptions'
 
 export default function SubscriptionManagement() {
@@ -76,99 +77,84 @@ export default function SubscriptionManagement() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Current Plan Card - Takes 2 columns */}
-        <Card className="lg:col-span-2 border-2">
+        <Card className="lg:col-span-2 border-2 overflow-hidden">
+          <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+            <Sparkles className="w-24 h-24" />
+          </div>
           <CardHeader className="pb-4">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Zap className="w-6 h-6 text-primary" />
+                <div className="flex items-center gap-4 mb-2">
+                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner">
+                    <Zap className="w-8 h-8 text-primary" />
                   </div>
                   <div>
-                    <CardTitle className="text-2xl">
+                    <h2 className="text-3xl font-black tracking-tight uppercase">
                       {subscription.plan?.name || 'Current Plan'}
-                    </CardTitle>
-                    <SubscriptionStatusBadge subscription={subscription} />
+                    </h2>
+                    <SubscriptionStatusBadge subscription={subscription} className="mt-1" />
                   </div>
                 </div>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-8">
             {subscription.plan && (
               <>
-                {/* Plan Details */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">Billing Cycle</p>
-                    <p className="text-lg font-semibold capitalize">{subscription.billing_cycle}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 p-6 rounded-2xl bg-muted/30 border border-muted/50">
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Billing Cycle</p>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-primary" />
+                      <p className="text-xl font-bold capitalize">{subscription.billing_cycle}</p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">Price</p>
-                    <p className="text-lg font-semibold">
-                      {subscription.billing_cycle === 'yearly'
-                        ? subscription.plan.price_yearly.toLocaleString()
-                        : subscription.plan.price_monthly.toLocaleString()}{' '}
-                      <span className="text-sm font-normal text-muted-foreground">
-                        ETB / {subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
-                      </span>
-                    </p>
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Commitment</p>
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-primary" />
+                      <p className="text-xl font-bold">
+                        {subscription.billing_cycle === 'yearly'
+                          ? subscription.plan.price_yearly.toLocaleString()
+                          : subscription.plan.price_monthly.toLocaleString()}{' '}
+                        <span className="text-sm font-medium text-muted-foreground text-opacity-70">
+                          ETB / {subscription.billing_cycle === 'yearly' ? 'year' : 'month'}
+                        </span>
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                <Separator />
-
-                {/* Trial Info */}
+                {/* Status-specific banners */}
                 {isOnTrial && trialEndsAt && (
-                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                    <div className="flex items-start gap-3">
-                      <Calendar className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/5 to-transparent border border-primary/20 shadow-sm"
+                  >
+                    <div className="p-4 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-lg">
+                        <History className="w-5 h-5" />
+                      </div>
                       <div className="flex-1">
-                        <p className="font-semibold text-sm mb-1">Trial Period Active</p>
-                        <p className="text-sm text-muted-foreground">
-                          Your trial ends on <span className="font-semibold text-foreground">{trialEndsAt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <p className="font-bold text-sm">Experimental Access Active</p>
+                        <p className="text-xs text-muted-foreground">
+                          Trial ends <span className="text-foreground font-semibold">{trialEndsAt.toLocaleDateString()}</span>
                         </p>
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {/* Pending Upgrade/Downgrade Requests */}
-                {(subscription.status === 'pending_upgrade' || subscription.status === 'pending_downgrade') && (
-                  <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950 dark:border-amber-800">
-                    <div className="flex items-start gap-3">
-                      <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-                      <div className="flex-1">
-                        <p className="font-semibold text-sm mb-1 text-amber-900 dark:text-amber-100">
-                          {subscription.status === 'pending_upgrade' ? 'Upgrade Request Pending' : 'Downgrade Request Pending'}
-                        </p>
-                        <p className="text-sm text-amber-800 dark:text-amber-200">
-                          Your {subscription.status === 'pending_upgrade' ? 'upgrade' : 'downgrade'} request is waiting for admin approval.
-                          {subscription.requestedPlan && (
-                            <span className="block mt-1">
-                              Requested plan: <span className="font-semibold">{subscription.requestedPlan.name}</span>
-                            </span>
-                          )}
-                          {subscription.scheduledPlan && (
-                            <span className="block mt-1">
-                              Scheduled plan: <span className="font-semibold">{subscription.scheduledPlan.name}</span>
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                  </motion.div>
                 )}
 
                 {/* Next Billing */}
                 {periodEndsAt && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="w-4 h-4" />
-                      <span>Next billing date</span>
+                  <div className="flex items-center justify-between p-4 rounded-xl border border-dashed border-muted-foreground/30">
+                    <div className="flex items-center gap-3">
+                      <Calendar className="w-5 h-5 text-muted-foreground" />
+                      <p className="text-sm font-medium text-muted-foreground">Upcoming Renewal</p>
                     </div>
-                    <p className="text-lg font-semibold">
-                      {periodEndsAt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    <p className="font-bold text-sm">
+                      {periodEndsAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                     </p>
                   </div>
                 )}
@@ -240,7 +226,7 @@ export default function SubscriptionManagement() {
           <TabsTrigger value="usage">Usage Statistics</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="usage">
           {usage && Object.keys(usage.usage).length > 0 && (
             <Card className="border-2">
@@ -282,7 +268,7 @@ export default function SubscriptionManagement() {
             </Card>
           )}
         </TabsContent>
-        
+
         <TabsContent value="history">
           {isHistoryLoading ? (
             <Card className="border-2">

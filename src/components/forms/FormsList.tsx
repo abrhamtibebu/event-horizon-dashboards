@@ -88,11 +88,13 @@ import {
 
 interface FormsListProps {
   eventId: number;
+  isTicketed?: boolean;
   onCreateForm?: () => void;
 }
 
 export const FormsList: React.FC<FormsListProps> = ({
   eventId,
+  isTicketed = false,
   onCreateForm
 }) => {
   const [selectedForm, setSelectedForm] = useState<Form | null>(null);
@@ -119,7 +121,12 @@ export const FormsList: React.FC<FormsListProps> = ({
     enabled: !!eventId,
   });
 
-  const guestTypes: GuestType[] = eventData?.guestTypes || [];
+  const availableTypes: GuestType[] = isTicketed
+    ? (eventData?.ticketTypes || [])
+    : (eventData?.guestTypes || []);
+
+  const typeLabel = isTicketed ? 'Ticket Type' : 'Guest Type';
+  const typeLabelPlural = isTicketed ? 'Ticket Types' : 'Guest Types';
 
   // Fetch forms for the event
   const {
@@ -152,15 +159,16 @@ export const FormsList: React.FC<FormsListProps> = ({
 
   // Create form with fields mutation (for two-step wizard)
   const createFormWithFieldsMutation = useMutation({
-    mutationFn: async (data: { 
-      name: string; 
-      description?: string; 
+    mutationFn: async (data: {
+      name: string;
+      description?: string;
       guest_type_id: number;
       fields: CreateFormFieldRequest[];
     }) => {
       try {
         // First create the form
         const form = await formApi.createForm(eventId, {
+          event_id: eventId,
           name: data.name,
           description: data.description,
           guest_type_id: data.guest_type_id,
@@ -178,15 +186,15 @@ export const FormsList: React.FC<FormsListProps> = ({
               order: index + 1,
               page_number: field.page_number || 1,
             };
-            
+
             // Only include options if they exist
             if (field.options && field.options.length > 0) {
               fieldData.options = field.options;
             }
-            
+
             return formFieldApi.createField(form.id, fieldData);
           });
-          
+
           await Promise.all(fieldPromises);
         }
 
@@ -216,7 +224,7 @@ export const FormsList: React.FC<FormsListProps> = ({
       console.error('Failed to create form:', error);
       console.error('Error response:', error?.response?.data);
       const errorMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to create form';
-      
+
       // Handle specific error cases
       if (errorMessage.includes('already exists') || errorMessage.includes('already exists for this guest type')) {
         toast.error('A form already exists for this guest type. Please edit the existing form instead.');
@@ -299,8 +307,8 @@ export const FormsList: React.FC<FormsListProps> = ({
     } else {
       // If no form exists, open create dialog
       setSelectedGuestTypeId(guestTypeId);
-      const guestType = guestTypes.find(gt => gt.id === guestTypeId);
-      setNewFormName(`${guestType?.name || 'Guest'} Registration Form`);
+      const guestType = availableTypes.find(gt => gt.id === guestTypeId);
+      setNewFormName(`${guestType?.name || (isTicketed ? 'Ticket' : 'Guest')} Registration Form`);
       setShowCreateFormDialog(true);
     }
   };
@@ -309,7 +317,7 @@ export const FormsList: React.FC<FormsListProps> = ({
     if (!selectedGuestTypeId || !newFormName.trim()) {
       return;
     }
-    
+
     // If we're on step 2, create form with fields
     if (createFormStep === 2) {
       createFormWithFieldsMutation.mutate({
@@ -336,7 +344,7 @@ export const FormsList: React.FC<FormsListProps> = ({
       is_required: false,
       order: selectedFields.length + 1,
       page_number: 1,
-      options: fieldType === 'select' || fieldType === 'radio' || fieldType === 'checkbox' 
+      options: fieldType === 'select' || fieldType === 'radio' || fieldType === 'checkbox'
         ? [{ label: 'Option 1', value: 'option1' }]
         : undefined,
     };
@@ -412,11 +420,11 @@ export const FormsList: React.FC<FormsListProps> = ({
   // Group forms by guest type - only include guest types that have forms
   const formsByGuestType = React.useMemo(() => {
     const grouped: Record<number, { guestType: GuestType; forms: Form[] }> = {};
-    
+
     // Only add guest types that have forms
     forms?.forEach(form => {
       if (form.guest_type_id) {
-        const guestType = guestTypes.find(gt => gt.id === form.guest_type_id);
+        const guestType = availableTypes.find(gt => gt.id === form.guest_type_id);
         if (guestType) {
           if (!grouped[form.guest_type_id]) {
             grouped[form.guest_type_id] = { guestType, forms: [] };
@@ -425,9 +433,9 @@ export const FormsList: React.FC<FormsListProps> = ({
         }
       }
     });
-    
+
     return grouped;
-  }, [forms, guestTypes]);
+  }, [forms, availableTypes]);
 
   const confirmDeleteForm = () => {
     if (formToDelete) {
@@ -492,7 +500,7 @@ export const FormsList: React.FC<FormsListProps> = ({
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const apiError = (error as any)?.response?.data?.error || (error as any)?.response?.data?.message;
     const statusCode = (error as any)?.response?.status;
-    
+
     return (
       <div className="space-y-4">
         <Alert variant="destructive">
@@ -523,19 +531,19 @@ export const FormsList: React.FC<FormsListProps> = ({
           </Button>
           <Button
             onClick={() => setShowCreateFormDialog(true)}
-            disabled={guestTypes.length === 0}
+            disabled={availableTypes.length === 0}
           >
             <Plus className="w-4 h-4 mr-2" />
             Create Form Anyway
           </Button>
         </div>
-        {guestTypes.length === 0 && (
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-              No guest types found for this event. Please create guest types first before creating forms.
-        </AlertDescription>
-      </Alert>
+        {availableTypes.length === 0 && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No {typeLabel.toLowerCase()}s found for this event. Please create {typeLabel.toLowerCase()}s first before creating forms.
+            </AlertDescription>
+          </Alert>
         )}
       </div>
     );
@@ -548,16 +556,16 @@ export const FormsList: React.FC<FormsListProps> = ({
         <div>
           <h3 className="text-lg font-semibold">Registration Forms</h3>
           <p className="text-sm text-muted-foreground">
-            Create and manage custom registration forms for different guest types
+            Create and manage custom registration forms for different {typeLabel.toLowerCase()}s
           </p>
         </div>
-        <Button 
+        <Button
           className="flex items-center gap-2"
           onClick={() => setShowCreateFormDialog(true)}
         >
-              <Plus className="w-4 h-4" />
-              Create New Form
-            </Button>
+          <Plus className="w-4 h-4" />
+          Create New Form
+        </Button>
       </div>
 
       {/* Forms List - Only show created forms */}
@@ -582,129 +590,129 @@ export const FormsList: React.FC<FormsListProps> = ({
                 </Button>
               </div>
 
-        <div className="grid gap-4">
+              <div className="grid gap-4">
                 {guestTypeForms.map((form) => (
-            <Card key={form.id} className={`hover:shadow-md transition-shadow ${form.status === 'draft' ? 'border-orange-200 bg-orange-50/50 dark:border-orange-800 dark:bg-orange-950/20' : ''}`}>
-              <CardContent className="p-6">
-                {form.status === 'draft' && (
-                  <Alert className="mb-4 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
-                    <AlertCircle className="h-4 w-4 text-orange-600" />
-                    <AlertDescription className="text-orange-800 dark:text-orange-200">
-                      This form is in draft status. Click "Activate" to enable public registration.
-                    </AlertDescription>
-                  </Alert>
-                )}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 flex-1">
-                    {/* Form Icon */}
-                    <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                              <FileText className="w-4 h-4" />
-                    </div>
-
-                    {/* Form Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-medium text-foreground truncate">
-                          {form.name}
-                        </h4>
-                        {getStatusBadge(form.status)}
-                      </div>
-
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        {form.formSubmissions_count !== undefined && (
-                          <span className="flex items-center gap-1">
-                            <Users className="w-3 h-3" />
-                            {form.formSubmissions_count} submissions
-                          </span>
-                        )}
-                        {form.is_multi_page && (
-                          <Badge variant="outline" className="text-xs">
-                            Multi-page
-                          </Badge>
-                        )}
-                        {form.expires_at && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            Expires: {new Date(form.expires_at).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-
-                      {form.description && (
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                          {form.description}
-                        </p>
+                  <Card key={form.id} className={`hover:shadow-md transition-shadow ${form.status === 'draft' ? 'border-orange-200 bg-orange-50/50 dark:border-orange-800 dark:bg-orange-950/20' : ''}`}>
+                    <CardContent className="p-6">
+                      {form.status === 'draft' && (
+                        <Alert className="mb-4 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+                          <AlertCircle className="h-4 w-4 text-orange-600" />
+                          <AlertDescription className="text-orange-800 dark:text-orange-200">
+                            This form is in draft status. Click "Activate" to enable public registration.
+                          </AlertDescription>
+                        </Alert>
                       )}
-                    </div>
-                  </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 flex-1">
+                          {/* Form Icon */}
+                          <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                            <FileText className="w-4 h-4" />
+                          </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    {form.status === 'draft' && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => activateFormMutation.mutate(form.id)}
-                        disabled={activateFormMutation.isPending}
-                        className="flex items-center gap-1 bg-green-600 hover:bg-green-700"
-                      >
-                        {activateFormMutation.isPending ? (
-                          <>
-                            <Clock className="w-3 h-3 animate-spin" />
-                            Activating...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="w-3 h-3" />
-                            Activate
-                          </>
-                        )}
-                      </Button>
-                    )}
+                          {/* Form Details */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-medium text-foreground truncate">
+                                {form.name}
+                              </h4>
+                              {getStatusBadge(form.status)}
+                            </div>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewSubmissions(form)}
-                      className="flex items-center gap-1"
-                    >
-                      <Eye className="w-3 h-3" />
-                      Submissions
-                    </Button>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              {form.formSubmissions_count !== undefined && (
+                                <span className="flex items-center gap-1">
+                                  <Users className="w-3 h-3" />
+                                  {form.formSubmissions_count} submissions
+                                </span>
+                              )}
+                              {form.is_multi_page && (
+                                <Badge variant="outline" className="text-xs">
+                                  Multi-page
+                                </Badge>
+                              )}
+                              {form.expires_at && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  Expires: {new Date(form.expires_at).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
 
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditForm(form)}>
-                          <Edit className="w-4 h-4 mr-2" />
-                          Edit Form
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setFormForRegistrationLink(form)}>
-                          <Link2 className="w-4 h-4 mr-2" />
-                          Get Registration Link
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDuplicateForm(form)}>
-                          <Copy className="w-4 h-4 mr-2" />
-                          Duplicate
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleDeleteForm(form)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                            {form.description && (
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                {form.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2">
+                          {form.status === 'draft' && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => activateFormMutation.mutate(form.id)}
+                              disabled={activateFormMutation.isPending}
+                              className="flex items-center gap-1 bg-green-600 hover:bg-green-700"
+                            >
+                              {activateFormMutation.isPending ? (
+                                <>
+                                  <Clock className="w-3 h-3 animate-spin" />
+                                  Activating...
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="w-3 h-3" />
+                                  Activate
+                                </>
+                              )}
+                            </Button>
+                          )}
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewSubmissions(form)}
+                            className="flex items-center gap-1"
+                          >
+                            <Eye className="w-3 h-3" />
+                            Submissions
+                          </Button>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditForm(form)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Form
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setFormForRegistrationLink(form)}>
+                                <Link2 className="w-4 h-4 mr-2" />
+                                Get Registration Link
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDuplicateForm(form)}>
+                                <Copy className="w-4 h-4 mr-2" />
+                                Duplicate
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteForm(form)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             </div>
@@ -726,17 +734,17 @@ export const FormsList: React.FC<FormsListProps> = ({
                 Forms can be customized for different guest types with custom input fields,
                 validation rules, and badge field mapping.
               </p>
-              <Button 
-                onClick={() => setShowCreateFormDialog(true)} 
+              <Button
+                onClick={() => setShowCreateFormDialog(true)}
                 className="flex items-center gap-2 mx-auto"
-                disabled={guestTypes.length === 0}
+                disabled={availableTypes.length === 0}
               >
                 <Plus className="w-4 h-4" />
                 Create New Form
               </Button>
-              {guestTypes.length === 0 && (
+              {availableTypes.length === 0 && (
                 <p className="text-sm text-muted-foreground mt-4">
-                  Please create guest types for this event first.
+                  Please create {typeLabel.toLowerCase()}s for this event first.
                 </p>
               )}
             </div>
@@ -869,10 +877,10 @@ export const FormsList: React.FC<FormsListProps> = ({
                 </h3>
                 <div className="flex items-center gap-4">
                   <div className="bg-background p-3 rounded-lg border border-success/30">
-                    <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/form/register/${formForRegistrationLink.id}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`} 
-                      alt="QR Code for registration" 
-                      className="w-24 h-24" 
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/form/register/${formForRegistrationLink.id}`)}&format=png&margin=10&color=1F2937&bgcolor=FFFFFF`}
+                      alt="QR Code for registration"
+                      className="w-24 h-24"
                     />
                   </div>
                   <div className="flex flex-col gap-2">
@@ -1071,7 +1079,7 @@ export const FormsList: React.FC<FormsListProps> = ({
                   <div className="text-sm text-muted-foreground">
                     <div>Form: {formForRegistrationLink.name}</div>
                     {formForRegistrationLink.guest_type && (
-                      <div>Guest Type: {formForRegistrationLink.guest_type.name}</div>
+                      <div>{typeLabel}: {formForRegistrationLink.guest_type.name}</div>
                     )}
                     <div>Status: {formForRegistrationLink.status}</div>
                     {formForRegistrationLink.formFields && (
@@ -1089,7 +1097,7 @@ export const FormsList: React.FC<FormsListProps> = ({
                   This form is currently {formForRegistrationLink?.status || 'inactive'}. Only active forms can accept public registrations.
                 </AlertDescription>
               </Alert>
-              
+
               <div className="bg-muted rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1174,7 +1182,7 @@ export const FormsList: React.FC<FormsListProps> = ({
             <DialogTitle>
               Create New Registration Form
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription asChild>
               <div className="flex items-center gap-2 mt-2">
                 <div className={`flex items-center gap-2 ${createFormStep === 1 ? 'text-primary' : 'text-muted-foreground'}`}>
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center ${createFormStep === 1 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
@@ -1198,16 +1206,16 @@ export const FormsList: React.FC<FormsListProps> = ({
               /* Step 1: Form Details */
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="guest-type">Guest Type *</Label>
+                  <Label htmlFor="guest-type">{typeLabel} *</Label>
                   <Select
                     value={selectedGuestTypeId?.toString() || ''}
                     onValueChange={(value) => setSelectedGuestTypeId(parseInt(value))}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a guest type" />
+                      <SelectValue placeholder={`Select a ${typeLabel.toLowerCase()}`} />
                     </SelectTrigger>
                     <SelectContent>
-                      {guestTypes.map(gt => {
+                      {availableTypes.map(gt => {
                         const existingForm = forms?.find(f => f.guest_type_id === gt.id);
                         return (
                           <SelectItem key={gt.id} value={gt.id.toString()}>
@@ -1223,13 +1231,13 @@ export const FormsList: React.FC<FormsListProps> = ({
                   {selectedGuestTypeId && forms?.some(f => f.guest_type_id === selectedGuestTypeId) && (
                     <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
                       <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                        ⚠️ A form already exists for this guest type. You can edit the existing form or create a new one (which will require deleting the existing form first).
+                        ⚠️ A form already exists for this {typeLabel.toLowerCase()}. You can edit the existing form or create a new one (which will require deleting the existing form first).
                       </p>
                     </div>
                   )}
-                  {guestTypes.length === 0 && (
+                  {availableTypes.length === 0 && (
                     <p className="text-sm text-muted-foreground mt-1">
-                      No guest types found. Please create guest types for this event first.
+                      No {typeLabel.toLowerCase()}s found. Please create {typeLabel.toLowerCase()}s for this event first.
                     </p>
                   )}
                 </div>
@@ -1291,11 +1299,10 @@ export const FormsList: React.FC<FormsListProps> = ({
                       return (
                         <Card
                           key={idx}
-                          className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${
-                            isAdded 
-                              ? 'border-primary bg-primary/5' 
-                              : 'hover:border-primary/50 border-2'
-                          }`}
+                          className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${isAdded
+                            ? 'border-primary bg-primary/5'
+                            : 'hover:border-primary/50 border-2'
+                            }`}
                           onClick={() => !isAdded && handleAddCommonField(field.type, field.label, field.placeholder)}
                         >
                           <CardContent className="p-4">
@@ -1349,7 +1356,7 @@ export const FormsList: React.FC<FormsListProps> = ({
                     </div>
                     <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                       {selectedFields.map((field, index) => (
-                        <Card 
+                        <Card
                           key={index}
                           className="group hover:shadow-md transition-all duration-200 border-2 hover:border-primary/30"
                         >
@@ -1521,9 +1528,9 @@ export const FormsList: React.FC<FormsListProps> = ({
                             </div>
                           </CardContent>
                         </Card>
-                        ))}
+                      ))}
                     </div>
-                    
+
                     {/* Add Custom Field Button at Bottom */}
                     <div className="pt-2">
                       <Button
@@ -1608,8 +1615,8 @@ export const FormsList: React.FC<FormsListProps> = ({
               <Button
                 onClick={handleCreateForm}
                 disabled={
-                  !selectedGuestTypeId || 
-                  !newFormName.trim() || 
+                  !selectedGuestTypeId ||
+                  !newFormName.trim() ||
                   (createFormStep === 2 && createFormWithFieldsMutation.isPending)
                 }
               >

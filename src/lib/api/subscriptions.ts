@@ -41,7 +41,7 @@ export interface Subscription {
   trial_ends_at: string | null
   current_period_start: string | null
   current_period_end: string | null
-  payment_method: 'telebirr' | 'cbe_birr' | null
+  payment_method: 'telebirr' | 'cbe_birr' | 'chapa' | null
   metadata: Record<string, any> | null
   approved_by_admin?: boolean
   is_trial?: boolean
@@ -81,7 +81,7 @@ export interface SubscriptionPayment {
   amount: number
   currency: string
   status: 'pending' | 'paid' | 'failed'
-  payment_method: 'telebirr' | 'cbe_birr' | null
+  payment_method: 'telebirr' | 'cbe_birr' | 'chapa' | null
   transaction_id: string | null
   payment_reference: string | null
   paid_at: string | null
@@ -153,7 +153,7 @@ export const subscriptionsApi = {
     id: number,
     data: {
       billing_cycle?: 'monthly' | 'yearly'
-      payment_method?: 'telebirr' | 'cbe_birr'
+      payment_method?: 'telebirr' | 'cbe_birr' | 'chapa'
     }
   ): Promise<Subscription> {
     const response = await api.put(`/subscriptions/${id}`, data)
@@ -183,7 +183,7 @@ export const subscriptionsApi = {
   // Subscription Payments
   async initiatePayment(data: {
     subscription_id: number
-    payment_method: 'telebirr' | 'cbe_birr'
+    payment_method: 'telebirr' | 'cbe_birr' | 'chapa'
     phone_number: string
   }): Promise<{
     payment_id: number
@@ -195,6 +195,7 @@ export const subscriptionsApi = {
     phone_number: string
     expires_at: string
     message: string
+    checkout_url?: string
   }> {
     const response = await api.post('/subscription-payments/initiate', data)
     return response.data.data
@@ -256,7 +257,7 @@ export const subscriptionsApi = {
     plan?: string
     organizer_id?: number
     per_page?: number
-  }): Promise<{ data: Subscription[] | { data: Subscription[]; [key: string]: any }; meta?: any }> {
+  }): Promise<{ data: Subscription[] | { data: Subscription[];[key: string]: any }; meta?: any }> {
     const response = await api.get('/admin/subscriptions', { params })
     // Backend returns { success: true, data: { data: [...], current_page, ... } } for paginated
     // or { success: true, data: [...] } for direct array

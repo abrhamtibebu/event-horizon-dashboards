@@ -272,7 +272,8 @@ export default function CreateTicketedEvent() {
         name: formData.name,
         description: formData.description,
         event_type: 'ticketed',
-        organizer_id: user?.organizer_id, // Use optional chaining for user
+        event_type_id: formData.event_type_id,
+        event_category_id: formData.event_category_id,
         status: 'active', // Default to active upon creation
         start_date: formatDateTime(eventRange[0].startDate, eventStartTime),
         end_date: eventRange[0].endDate
@@ -282,12 +283,11 @@ export default function CreateTicketedEvent() {
         registration_end_date: regRange[0].endDate
           ? formatDateTime(regRange[0].endDate, regEndTime)
           : formatDateTime(regRange[0].startDate, regEndTime),
-        location: formData.city, // Using city as location for now
+        location: formData.city, // Using city as location
         venue_name: formData.venue,
         max_guests: parseInt(formData.max_guests, 10),
         // Only include organizer_id if not an organizer or organizer_admin (backend sets it for them)
         ...(user?.role !== 'organizer' && user?.role !== 'organizer_admin' && { organizer_id: formData.organizer_id }),
-
       }
       const headers = {}
 
@@ -751,7 +751,7 @@ export default function CreateTicketedEvent() {
                 </Label>
                 {(user?.role === 'organizer' || user?.role === 'organizer_admin') ? (
                   <Input
-                    value={(user.organizer?.name || 'Loading organizer...').replace(/&amp;/g, '&')}
+                    value={decodeHtmlEntities(user.organizer?.name || 'Loading organizer...')}
                     disabled
                     className="mt-2 h-12 border-border bg-muted rounded-xl cursor-not-allowed"
                     placeholder="Your organization"
@@ -769,7 +769,7 @@ export default function CreateTicketedEvent() {
                     <SelectContent>
                       {Array.isArray(organizers) && organizers.map((org: any) => (
                         <SelectItem key={org.id} value={String(org.id)}>
-                          {org.name.replace(/&amp;/g, '&')}
+                          {decodeHtmlEntities(org.name)}
                         </SelectItem>
                       ))}
                     </SelectContent>

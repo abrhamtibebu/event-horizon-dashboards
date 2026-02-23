@@ -793,7 +793,7 @@ export default function CreateFreeEvent() {
                   </Label>
                   {(user?.role === 'organizer' || user?.role === 'organizer_admin') ? (
                     <Input
-                      value={(user.organizer?.name || 'Loading organizer...').replace(/&amp;/g, '&')}
+                      value={decodeHtmlEntities(user.organizer?.name || 'Loading organizer...')}
                       disabled
                       className="h-11 bg-muted/50 cursor-not-allowed"
                       placeholder="Your organization"
@@ -811,7 +811,7 @@ export default function CreateFreeEvent() {
                       <SelectContent>
                         {organizers.map((org: any) => (
                           <SelectItem key={org.id} value={String(org.id)}>
-                            {org.name.replace(/&amp;/g, '&')}
+                            {decodeHtmlEntities(org.name)}
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -23,8 +23,7 @@ export function useFeatureAccess() {
   })
 
   const hasFeature = (feature: string): boolean => {
-    if (!subscription?.plan) return false
-    return subscription.plan.features?.includes(feature) || false
+    return true
   }
 
   const getLimit = (limitName: string): number | null => {
@@ -33,8 +32,7 @@ export function useFeatureAccess() {
   }
 
   const isUnlimited = (limitName: string): boolean => {
-    const limit = getLimit(limitName)
-    return limit === -1 || limit === null
+    return true
   }
 
   const canUseTicketing = (): boolean => {
@@ -54,23 +52,7 @@ export function useFeatureAccess() {
   }
 
   const canCreateEvent = (): { allowed: boolean; current?: number; limit?: number | null } => {
-    if (!subscription) {
-      return { allowed: false }
-    }
-
-    const eventsLimit = getLimit('events_per_month')
-    if (isUnlimited('events_per_month')) {
-      return { allowed: true }
-    }
-
-    const current = usage?.usage?.events?.current ?? 0
-    const limit = eventsLimit
-
-    return {
-      allowed: limit === null || current < limit,
-      current,
-      limit,
-    }
+    return { allowed: true }
   }
 
   return {

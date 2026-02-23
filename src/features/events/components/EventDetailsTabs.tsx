@@ -33,8 +33,10 @@ export function EventDetailsTabs({
 
   const copyRegistrationLink = () => {
     if (event?.uuid) {
-      const url = `${window.location.origin}/event/register/${event.uuid}`
-      navigator.clipboard.writeText(url)
+      const registrationUrl = event?.event_type === 'ticketed'
+        ? `${window.location.origin}/tickets/purchase/${event.id}`
+        : `${window.location.origin}/event/register/${event.uuid}`;
+      navigator.clipboard.writeText(registrationUrl)
       toast.success('Registration link copied to clipboard!')
     }
   }
@@ -131,7 +133,9 @@ export function EventDetailsTabs({
                     </label>
                     <div className="flex gap-2">
                       <Input
-                        value={`${window.location.origin}/event/register/${event.uuid}`}
+                        value={event.event_type === 'ticketed'
+                          ? `${window.location.origin}/tickets/purchase/${event.id}`
+                          : `${window.location.origin}/event/register/${event.uuid}`}
                         readOnly
                         className="bg-background border-border text-foreground h-10 text-sm"
                       />

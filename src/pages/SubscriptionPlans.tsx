@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans'
 import { useSubscription } from '@/hooks/useSubscription'
 import { SubscriptionTierCard } from '@/components/subscription/SubscriptionTierCard'
+import { PricingTable } from '@/components/subscription/PricingTable'
 import { FeatureComparison } from '@/components/subscription/FeatureComparison'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -138,46 +139,13 @@ export default function SubscriptionPlans() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {plans.map((plan) => {
-          const isCurrent = plan.id === currentPlanId
-          const canChange = canRequestChange(plan)
-          const currentPlanPrice = subscription?.billing_cycle === 'yearly'
-            ? subscription?.plan?.price_yearly || 0
-            : subscription?.plan?.price_monthly || 0
-          const newPlanPrice = billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly
-          const isUpgrade = newPlanPrice > currentPlanPrice
-          const isDowngrade = newPlanPrice < currentPlanPrice
-
-          return (
-            <div key={plan.id} className="relative">
-              <SubscriptionTierCard
-                plan={plan}
-                isCurrentPlan={isCurrent}
-                onSelect={canChange ? handleSelectPlan : undefined}
-                billingCycle={billingCycle}
-                isLoading={isCreating || isRequestingUpgrade || isRequestingDowngrade}
-              />
-              {subscription && !isCurrent && canChange && (
-                <div className="absolute top-4 right-4">
-                  {isUpgrade && (
-                    <Badge className="bg-purple-100 text-purple-800 border-purple-300">
-                      <ArrowUp className="w-3 h-3 mr-1" />
-                      Upgrade
-                    </Badge>
-                  )}
-                  {isDowngrade && (
-                    <Badge className="bg-amber-100 text-amber-800 border-amber-300">
-                      <ArrowDown className="w-3 h-3 mr-1" />
-                      Downgrade
-                    </Badge>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+      <PricingTable
+        plans={plans}
+        currentPlanId={currentPlanId}
+        onSelectPlan={handleSelectPlan}
+        billingCycle={billingCycle}
+        isLoading={isCreating || isRequestingUpgrade || isRequestingDowngrade}
+      />
 
       <FeatureComparison plans={plans} currentPlanId={subscription?.subscription_plan_id} />
     </div>

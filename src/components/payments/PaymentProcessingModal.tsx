@@ -1,12 +1,12 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { motion } from 'framer-motion';
 import type { PaymentStatus } from '@/types/tickets';
 
 interface PaymentProcessingModalProps {
-  open: boolean;
+  isOpen: boolean;
   status: PaymentStatus;
   message?: string;
   progress?: number;
@@ -15,7 +15,7 @@ interface PaymentProcessingModalProps {
 }
 
 export function PaymentProcessingModal({
-  open,
+  isOpen,
   status,
   message,
   progress = 0,
@@ -27,72 +27,64 @@ export function PaymentProcessingModal({
   const isFailed = status === 'failed' || status === 'cancelled';
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md" hideClose={isProcessing}>
-        <DialogHeader>
-          <DialogTitle>
-            {isProcessing && 'Processing Payment'}
-            {isSuccess && 'Payment Successful'}
-            {isFailed && 'Payment Failed'}
-          </DialogTitle>
-          <DialogDescription>
-            {isProcessing && 'Please wait while we process your payment...'}
-            {isSuccess && 'Your payment has been processed successfully'}
-            {isFailed && 'We encountered an error processing your payment'}
-          </DialogDescription>
-        </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={isProcessing ? undefined : onClose}>
+      <DialogContent className="sm:max-w-md border-none shadow-2xl overflow-hidden p-0">
+        <div className={`h-1.5 w-full ${isProcessing ? 'bg-primary/20' : isSuccess ? 'bg-green-500/20' : 'bg-destructive/20'}`}>
+          {isProcessing && (
+            <motion.div
+              className="h-full bg-primary"
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.5 }}
+            />
+          )}
+          {!isProcessing && <div className={`h-full ${isSuccess ? 'bg-green-500' : 'bg-destructive'} w-full`} />}
+        </div>
 
-        <div className="py-6 space-y-6">
-          {/* Status Icon */}
-          <div className="flex justify-center">
-            {isProcessing && (
-              <Spinner size="xl" variant="primary" />
-            )}
-            {isSuccess && (
-              <CheckCircle className="w-16 h-16 text-green-500" />
-            )}
-            {isFailed && (
-              <XCircle className="w-16 h-16 text-destructive" />
-            )}
+        <div className="p-8 space-y-8">
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl font-black tracking-tighter">
+              {isProcessing && 'Securing Your Tickets'}
+              {isSuccess && 'Purchase Confirmed'}
+              {isFailed && 'Payment Issue'}
+            </h2>
+            <p className="text-muted-foreground text-sm font-medium">
+              {isProcessing && 'Hang tight! We\'re verifying your transaction.'}
+              {isSuccess && 'Success! Your digital tickets are ready.'}
+              {isFailed && 'Something went wrong with the transaction.'}
+            </p>
           </div>
 
-          {/* Progress Bar (only for processing) */}
-          {isProcessing && (
-            <div className="space-y-2">
-              <Progress value={progress} className="w-full" />
-              <p className="text-sm text-center text-muted-foreground">
-                {progress}% complete
-              </p>
+          <div className="flex justify-center py-4">
+            <div className={`relative flex items-center justify-center w-24 h-24 rounded-full ${isProcessing ? 'bg-primary/5' : isSuccess ? 'bg-green-500/5' : 'bg-destructive/5'}`}>
+              {isProcessing && <Spinner size="xl" variant="primary" />}
+              {isSuccess && <CheckCircle className="w-12 h-12 text-green-500" />}
+              {isFailed && <XCircle className="w-12 h-12 text-destructive" />}
+            </div>
+          </div>
+
+          {message && (
+            <div className="bg-muted/30 p-4 rounded-xl text-center">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 mb-1">Status Update</p>
+              <p className="text-sm font-medium text-foreground">{message}</p>
             </div>
           )}
 
-          {/* Message */}
-          {message && (
-            <p className="text-sm text-center text-muted-foreground">
-              {message}
-            </p>
-          )}
-
-          {/* Action Buttons */}
           {!isProcessing && (
-            <div className="flex gap-2 justify-center">
-              {isSuccess && onClose && (
-                <Button onClick={onClose} className="w-full">
-                  Continue
+            <div className="flex gap-3 pt-2">
+              {isSuccess && (
+                <Button onClick={onClose} className="w-full h-12 font-bold text-base">
+                  View My Tickets
                 </Button>
               )}
               {isFailed && (
                 <>
-                  {onRetry && (
-                    <Button onClick={onRetry} variant="default">
-                      Try Again
-                    </Button>
-                  )}
-                  {onClose && (
-                    <Button onClick={onClose} variant="outline">
-                      Cancel
-                    </Button>
-                  )}
+                  <Button onClick={onRetry} className="flex-1 h-12 font-bold text-base">
+                    Try Again
+                  </Button>
+                  <Button onClick={onClose} variant="ghost" className="flex-1 h-12 font-bold">
+                    Cancel
+                  </Button>
                 </>
               )}
             </div>
@@ -102,4 +94,3 @@ export function PaymentProcessingModal({
     </Dialog>
   );
 }
-

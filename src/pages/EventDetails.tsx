@@ -104,6 +104,7 @@ import api, {
   trackShare,
 } from '@/lib/api'
 import { format, parseISO } from 'date-fns'
+import { decodeHtmlEntities } from '@/lib/utils/string'
 import { getGuestTypeBadgeClasses, getImageUrl } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import Pagination from '@/components/Pagination'
@@ -141,6 +142,7 @@ import BadgePrint from '@/components/Badge'
 import BadgeTest from '@/components/BadgeTest'
 import { getOfficialBadgeTemplate, getBadgeTemplates } from '@/lib/badgeTemplates'
 import { BadgeTemplate } from '@/types/badge'
+import { TicketManagementTab } from '@/components/tickets/TicketManagementTab'
 import { DateRange } from 'react-date-range'
 import { useModernAlerts } from '@/hooks/useModernAlerts'
 import 'react-date-range/dist/styles.css'
@@ -374,6 +376,17 @@ export default function EventDetails() {
   const [editAttendeeForm, setEditAttendeeForm] = useState<any>(null)
   const [editAttendeeLoading, setEditAttendeeLoading] = useState(false)
 
+  // Auto-default registration end date when event end date changes in edit form
+  useEffect(() => {
+    if (editDialogOpen && editEventRange[0].endDate) {
+      const regEndDate = new Date(editEventRange[0].endDate);
+      regEndDate.setDate(regEndDate.getDate() - 1);
+
+      // Only update if it's different and we are in edit mode
+      setEditRegRange(prev => [{ ...prev[0], endDate: regEndDate }]);
+    }
+  }, [editEventRange[0].endDate.getTime(), editDialogOpen]);
+
   // Check if usher is assigned to this event
   useEffect(() => {
     if (!eventId || !user || user.role !== 'usher') return
@@ -403,8 +416,8 @@ export default function EventDetails() {
       .then((res) => {
         const data = res.data
         // Decode HTML entities in names
-        if (data.name) data.name = data.name.replace(/&amp;/g, '&')
-        if (data.organizer?.name) data.organizer.name = data.organizer.name.replace(/&amp;/g, '&')
+        if (data.name) data.name = decodeHtmlEntities(data.name)
+        if (data.organizer?.name) data.organizer.name = decodeHtmlEntities(data.organizer.name)
 
         console.log('Event data fetched:', {
           id: data.id,
@@ -1342,6 +1355,7 @@ export default function EventDetails() {
       };
       if (processedEditForm.event_image && processedEditForm.event_image instanceof File) {
         payload = new FormData();
+        payload.append('_method', 'PUT'); // Laravel requires spoofing for PUT with files
         Object.entries(processedEditForm).forEach(([key, value]) => {
           if (key === 'event_image' && value) {
             payload.append('event_image', value);
@@ -1354,10 +1368,11 @@ export default function EventDetails() {
           }
         });
         headers = { 'Content-Type': 'multipart/form-data' };
+        await api.post(`/events/${Number(eventId)}`, payload, { headers });
       } else {
         payload = processedEditForm;
+        await api.put(`/events/${Number(eventId)}`, payload, { headers });
       }
-      await api.put(`/events/${Number(eventId)}`, payload, { headers });
       // Refresh event details before closing dialog
       const res = await api.get(`/events/${Number(eventId)}`);
       setEventData(res.data);
@@ -2254,7 +2269,7 @@ export default function EventDetails() {
                 </div>
 
                 <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4 leading-tight tracking-tight">
-                  {eventData.name?.replace(/&amp;/g, '&')}
+                  {decodeHtmlEntities(eventData.name)}
                 </h1>
 
                 <div className="flex flex-wrap items-center gap-6 text-muted-foreground text-sm font-medium">
@@ -2308,10 +2323,21 @@ export default function EventDetails() {
                         </>
                       ) : (
                         <div className="flex gap-x-4 sm:gap-x-6 md:gap-x-8">
-                          {['Details', 'Attendees', 'Ushers', 'Bulk Badges', 'Team', 'Forms', 'Sessions', 'Invitations', 'Analytics'].map((tab) => {
+                          {[
+                            'Details',
+                            ...(eventData?.event_type === 'ticketed' ? ['Tickets'] : []),
+                            'Attendees',
+                            'Ushers',
+                            ...(eventData?.event_type !== 'ticketed' ? ['Bulk Badges'] : []),
+                            'Team',
+                            'Forms',
+                            'Sessions',
+                            ...(eventData?.event_type !== 'ticketed' ? ['Invitations'] : []),
+                            'Analytics'
+                          ].map((tab) => {
                             const val = tab.toLowerCase().replace(/ /g, '-');
                             // Filter tabs based on role permissions
-                            if (val === 'bulk-badges' || val === 'forms' || val === 'ushers' || val === 'analytics' || val === 'invitations' || val === 'team') {
+                            if (val === 'bulk-badges' || val === 'tickets' || val === 'forms' || val === 'ushers' || val === 'analytics' || val === 'invitations' || val === 'team') {
                               if (!canManageEvent) return null;
                             }
                             return (
@@ -2387,13 +2413,18 @@ export default function EventDetails() {
                             <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Registration URL</label>
                             <div className="flex gap-2">
                               <Input
-                                value={`${window.location.origin}/event/register/${eventData.uuid}`}
+                                value={eventData?.event_type === 'ticketed'
+                                  ? `${window.location.origin}/tickets/purchase/${eventData.id}`
+                                  : `${window.location.origin}/event/register/${eventData.uuid}`}
                                 readOnly
                                 className="bg-background border-border text-foreground h-10 text-sm"
                               />
                               <Button
                                 onClick={() => {
-                                  navigator.clipboard.writeText(`${window.location.origin}/event/register/${eventData.uuid}`);
+                                  const registrationUrl = eventData?.event_type === 'ticketed'
+                                    ? `${window.location.origin}/tickets/purchase/${eventData.id}`
+                                    : `${window.location.origin}/event/register/${eventData.uuid}`;
+                                  navigator.clipboard.writeText(registrationUrl);
                                   toast.success('URL Copied');
                                 }}
                                 className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg px-4"
@@ -2406,7 +2437,9 @@ export default function EventDetails() {
                           <div className="flex items-center gap-6 bg-muted/30 rounded-xl p-4 border border-border">
                             <div className="bg-white p-2 rounded-lg shrink-0">
                               <img
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=0&color=000&bgcolor=fff`}
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(eventData?.event_type === 'ticketed'
+                                  ? `${window.location.origin}/tickets/purchase/${eventData.id}`
+                                  : `${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=0&color=000&bgcolor=fff`}
                                 className="w-24 h-24"
                                 alt="Access QR"
                               />
@@ -2419,7 +2452,10 @@ export default function EventDetails() {
                                 size="sm"
                                 onClick={() => {
                                   const link = document.createElement('a');
-                                  link.href = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(`${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=10&color=000&bgcolor=fff`;
+                                  const registrationUrl = eventData?.event_type === 'ticketed'
+                                    ? `${window.location.origin}/tickets/purchase/${eventData.id}`
+                                    : `${window.location.origin}/event/register/${eventData.uuid}`;
+                                  link.href = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(registrationUrl)}&format=png&margin=10&color=000&bgcolor=fff`;
                                   link.download = `qr-${eventData.uuid}.png`;
                                   link.click();
                                 }}
@@ -2613,6 +2649,43 @@ export default function EventDetails() {
                             </p>
                           </div>
                         </div>
+
+                        {/* Event Requirements */}
+                        {eventData?.requirements && (
+                          <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
+                            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-error/10 text-error flex items-center justify-center shrink-0">
+                                <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
+                              </div>
+                              <h3 className="text-lg sm:text-xl font-bold text-foreground">Requirements & Prerequisites</h3>
+                            </div>
+                            <div className="bg-error/5 rounded-xl p-4 sm:p-5 border border-error/10">
+                              <p className="text-foreground leading-relaxed whitespace-pre-line text-sm sm:text-base">
+                                {eventData.requirements}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Event Agenda */}
+                        {eventData?.agenda && (
+                          <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
+                            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-info/10 text-info flex items-center justify-center shrink-0">
+                                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />
+                              </div>
+                              <h3 className="text-lg sm:text-xl font-bold text-foreground">Event Agenda</h3>
+                            </div>
+                            <div className="relative pl-6 sm:pl-8 border-l-2 border-info/30 space-y-4 ml-2">
+                              {eventData.agenda.split('\n').filter(Boolean).map((line: string, i: number) => (
+                                <div key={i} className="relative">
+                                  <div className="absolute -left-[31px] sm:-left-[39px] top-1.5 w-3 h-3 rounded-full bg-info border-2 border-background shadow-sm" />
+                                  <p className="text-foreground leading-relaxed text-sm sm:text-base">{line}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Event Type Details */}
                         <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
@@ -2929,7 +3002,7 @@ export default function EventDetails() {
                         {selectedAttendees.size > 0 && (
                           <Button
                             variant="outline"
-                            onClick={handleBatchPrintBadges}
+                            onClick={() => handleBatchPrintBadges()}
                             disabled={selectedAttendees.size === 0}
                             className="bg-background border-border hover:bg-accent text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
                           >
@@ -3010,11 +3083,11 @@ export default function EventDetails() {
                           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                             <Select value={guestTypeFilter} onValueChange={handleGuestTypeFilterChange}>
                               <SelectTrigger className="w-full sm:w-[160px] bg-background border-border text-sm h-9 sm:h-10">
-                                <SelectValue placeholder="All types" />
+                                <SelectValue placeholder={eventData?.event_type === 'ticketed' ? "All ticket types" : "All guest types"} />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="all">All types</SelectItem>
-                                {guestTypes.map((type) => (
+                                <SelectItem value="all">{eventData?.event_type === 'ticketed' ? "All ticket types" : "All guest types"}</SelectItem>
+                                {(eventData?.event_type === 'ticketed' ? ticketTypes : guestTypes).map((type) => (
                                   <SelectItem key={type.id} value={type.name.toLowerCase()}>
                                     {type.name}
                                   </SelectItem>
@@ -3961,7 +4034,7 @@ export default function EventDetails() {
                                     nameKey="country"
                                   >
                                     {(analytics.country_distribution || []).map((entry: any, index: number) => (
-                                      <Cell key={`cell-${index}`} fill={getChartColorPalette('info')[index % getChartColorPalette('info').length]} />
+                                      <Cell key={`cell-${index}`} fill={getChartColorPalette('primary')[index % getChartColorPalette('primary').length]} />
                                     ))}
                                   </Pie>
                                   <RechartsTooltip
@@ -4221,6 +4294,7 @@ export default function EventDetails() {
                   <div className="min-h-screen bg-background p-6">
                     <FormsList
                       eventId={Number(eventId)}
+                      isTicketed={eventData?.event_type === 'ticketed'}
                       onCreateForm={() => {
                         // TODO: Open form creation modal
                         console.log('Create new form');
@@ -4233,16 +4307,18 @@ export default function EventDetails() {
                     <EventSessions eventId={Number(eventId)} />
                   </div>
                 </TabsContent>
-                <TabsContent value="invitations">
-                  <InvitationsTab
-                    eventId={Number(eventId)}
-                    eventUuid={eventData?.uuid || ''}
-                    eventName={eventData?.name || ''}
-                    eventType={eventData?.event_type as 'free' | 'ticketed' || 'free'}
-                    isOrganizer={user?.role === 'organizer' || user?.role === 'organizer_admin' || user?.role === 'admin' || user?.role === 'superadmin'}
-                  />
-                </TabsContent>
-                {user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin' ? (
+                {eventData?.event_type !== 'ticketed' && (
+                  <TabsContent value="invitations">
+                    <InvitationsTab
+                      eventId={Number(eventId)}
+                      eventUuid={eventData?.uuid || ''}
+                      eventName={eventData?.name || ''}
+                      eventType={eventData?.event_type as 'free' | 'ticketed' || 'free'}
+                      isOrganizer={user?.role === 'organizer' || user?.role === 'organizer_admin' || user?.role === 'admin' || user?.role === 'superadmin'}
+                    />
+                  </TabsContent>
+                )}
+                {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin') && eventData?.event_type !== 'ticketed' ? (
                   <TabsContent value="bulk-badges">
                     <BulkBadgesTab
                       eventId={Number(eventId)}
@@ -4251,98 +4327,108 @@ export default function EventDetails() {
                     />
                   </TabsContent>
                 ) : null}
+                {eventData?.event_type === 'ticketed' && (
+                  <TabsContent value="tickets">
+                    <div className="min-h-screen bg-background p-6">
+                      <TicketManagementTab eventId={Number(eventId)} />
+                    </div>
+                  </TabsContent>
+                )}
               </div>
             </Tabs>
 
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-              <style>{customRangeStyles}</style>
-              <DialogContent className="max-w-6xl w-full h-[95vh] flex flex-col bg-gradient-to-br from-slate-50 to-blue-50">
-                <DialogHeader className="flex-shrink-0 bg-white rounded-t-xl p-6 border-b border-gray-200">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-                      <Edit className="w-6 h-6 text-white" />
+              <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-background">
+                <DialogHeader className="px-6 py-4 border-b border-border bg-gradient-to-r from-muted/50 via-background to-muted/50">
+                  <DialogTitle className="flex items-center gap-3 text-xl font-bold tracking-tight">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-sm">
+                      <Edit className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                        Edit Event
-                      </DialogTitle>
-                      <DialogDescription className="text-gray-600 mt-1">
-                        Update your event details and configuration
-                      </DialogDescription>
+                      <span>Edit Event</span>
+                      <p className="text-xs font-normal text-muted-foreground mt-0.5">Modify your event configuration and details</p>
                     </div>
-                  </div>
+                  </DialogTitle>
                 </DialogHeader>
+
                 {editForm && (
-                  <form onSubmit={handleEditEvent} className="flex-1 overflow-y-auto p-6">
-                    <div className="max-w-5xl mx-auto space-y-8">
-                      {/* Event Information */}
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
-                            <Tag className="w-5 h-5 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="text-xl font-bold text-gray-900">
-                              Event Information
-                            </h3>
-                            <p className="text-gray-500 text-sm">
-                              Basic event details and logistics
-                            </p>
-                          </div>
+                  <form id="edit-event-form" onSubmit={handleEditEvent} className="flex-1 overflow-y-auto px-6 py-6 scrollbar-thin">
+                    <div className="space-y-8">
+                      {/* Basic Details */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-2 px-2 py-1 bg-primary/5 rounded-md w-fit">
+                            <Tag className="w-3 h-3" /> Basic Details
+                          </h3>
+                          <div className="h-px flex-1 bg-gradient-to-r from-primary/20 to-transparent ml-4" />
                         </div>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          <div>
-                            <Label htmlFor="edit_name" className="flex items-center gap-2 text-gray-700 font-medium">
-                              <Tag className="w-4 h-4 text-blue-500" /> Event Name
-                            </Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_name">Event Name <span className="text-destructive">*</span></Label>
                             <Input
                               id="edit_name"
                               value={editForm.name}
                               onChange={(e) => handleEditInput('name', e.target.value)}
-                              placeholder="Enter event name"
+                              placeholder="e.g. Annual Tech Conference"
+                              className="rounded-xl shadow-sm border-muted-foreground/20 focus-visible:ring-primary"
                               required
-                              className="mt-2 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
                             />
                           </div>
-                          <div>
-                            <Label htmlFor="edit_location" className="flex items-center gap-2 text-gray-700 font-medium">
-                              <MapPin className="w-4 h-4 text-green-500" /> Location
-                            </Label>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_location">Location</Label>
                             <Input
                               id="edit_location"
                               value={editForm.location}
                               onChange={(e) => handleEditInput('location', e.target.value)}
                               placeholder="e.g. Grand Convention Center"
-                              className="mt-2 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-xl"
+                              className="rounded-xl shadow-sm border-muted-foreground/20"
                             />
                           </div>
-                          <div className="lg:col-span-2">
-                            <Label htmlFor="edit_description" className="flex items-center gap-2 text-gray-700 font-medium">
-                              <FileText className="w-4 h-4 text-purple-500" /> Description
-                            </Label>
+                          <div className="space-y-2 sm:col-span-2">
+                            <Label htmlFor="edit_description">Description</Label>
                             <Textarea
                               id="edit_description"
                               value={editForm.description}
                               onChange={(e) => handleEditInput('description', e.target.value)}
                               placeholder="Describe your event..."
-                              rows={4}
-                              className="mt-2 border-gray-300 focus:border-purple-500 focus:ring-purple-500 rounded-xl resize-none"
+                              rows={3}
+                              className="resize-none rounded-xl shadow-sm border-muted-foreground/20"
                             />
                           </div>
-                          <div>
-                            <Label htmlFor="edit_event_type_id" className="flex items-center gap-2 text-gray-700 font-medium">
-                              <Tag className="w-4 h-4 text-orange-500" /> Event Type
-                            </Label>
+                          <div className="space-y-2 sm:col-span-2">
+                            <Label htmlFor="edit_requirements">Requirements & Prerequisites</Label>
+                            <Textarea
+                              id="edit_requirements"
+                              value={editForm.requirements || ''}
+                              onChange={(e) => handleEditInput('requirements', e.target.value)}
+                              placeholder="Any requirements or prerequisites for attendees..."
+                              rows={2}
+                              className="resize-none rounded-xl shadow-sm border-muted-foreground/20"
+                            />
+                          </div>
+                          <div className="space-y-2 sm:col-span-2">
+                            <Label htmlFor="edit_agenda">Event Agenda</Label>
+                            <Textarea
+                              id="edit_agenda"
+                              value={editForm.agenda || ''}
+                              onChange={(e) => handleEditInput('agenda', e.target.value)}
+                              placeholder="Detailed event schedule and agenda..."
+                              rows={3}
+                              className="resize-none rounded-xl shadow-sm border-muted-foreground/20"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_event_type_id">Event Type <span className="text-destructive">*</span></Label>
                             <Select
-                              value={editForm.event_type_id}
+                              value={String(editForm.event_type_id || '')}
                               onValueChange={(value) => handleEditInput('event_type_id', value)}
                               disabled={editLoadingStates.eventTypes}
                               required
                             >
-                              <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl" id="edit_event_type_id">
-                                <SelectValue placeholder="Select event type" />
+                              <SelectTrigger id="edit_event_type_id" className="rounded-xl border-muted-foreground/20 shadow-sm">
+                                <SelectValue placeholder="Select type" />
                               </SelectTrigger>
-                              <SelectContent>
+                              <SelectContent className="rounded-xl">
                                 {filterValidOptions(eventTypes).map((type: any) => (
                                   <SelectItem key={type.id} value={String(type.id)}>
                                     {type.name}
@@ -4350,26 +4436,19 @@ export default function EventDetails() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            {editErrors.eventTypes && (
-                              <div className="text-xs text-error mt-2">
-                                {editErrors.eventTypes}
-                              </div>
-                            )}
                           </div>
-                          <div>
-                            <Label htmlFor="edit_event_category_id" className="flex items-center gap-2 text-gray-700 font-medium">
-                              <Tag className="w-4 h-4 text-indigo-500" /> Event Category
-                            </Label>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_event_category_id">Category <span className="text-destructive">*</span></Label>
                             <Select
-                              value={editForm.event_category_id}
+                              value={String(editForm.event_category_id || '')}
                               onValueChange={(value) => handleEditInput('event_category_id', value)}
                               disabled={editLoadingStates.eventCategories}
                               required
                             >
-                              <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl" id="edit_event_category_id">
-                                <SelectValue placeholder="Select event category" />
+                              <SelectTrigger id="edit_event_category_id" className="rounded-xl border-muted-foreground/20 shadow-sm">
+                                <SelectValue placeholder="Select category" />
                               </SelectTrigger>
-                              <SelectContent>
+                              <SelectContent className="rounded-xl">
                                 {filterValidOptions(eventCategories).map((cat: any) => (
                                   <SelectItem key={cat.id} value={String(cat.id)}>
                                     {cat.name}
@@ -4377,398 +4456,198 @@ export default function EventDetails() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            {editErrors.eventCategories && (
-                              <div className="text-xs text-error mt-2">
-                                {editErrors.eventCategories}
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_visibility">Visibility <span className="text-destructive">*</span></Label>
+                            <Select
+                              value={editForm.visibility || 'public'}
+                              onValueChange={(value) => handleEditInput('visibility', value)}
+                              required
+                            >
+                              <SelectTrigger id="edit_visibility" className="rounded-xl border-muted-foreground/20 shadow-sm">
+                                <SelectValue placeholder="Select visibility" />
+                              </SelectTrigger>
+                              <SelectContent className="rounded-xl">
+                                <SelectItem value="public">Public</SelectItem>
+                                <SelectItem value="private">Private</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="edit_event_image">Event Banner Image</Label>
+                          <div className="mt-2 space-y-4">
+                            {editImagePreview && (
+                              <div className="relative w-full h-44 rounded-xl overflow-hidden border border-border group bg-muted shadow-md">
+                                <img src={editImagePreview} alt="Preview" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <button
+                                  type="button"
+                                  onClick={handleRemoveEditImage}
+                                  className="absolute top-2 right-2 p-2 bg-background/90 backdrop-blur-md rounded-full text-destructive shadow-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-destructive hover:text-white transform hover:scale-110"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
                               </div>
                             )}
+                            <div className="flex items-center gap-4">
+                              <Input
+                                id="edit_event_image"
+                                type="file"
+                                accept="image/*"
+                                onChange={handleEditFile}
+                                className="hidden"
+                                ref={editImageInputRef}
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => editImageInputRef.current?.click()}
+                                className="w-full h-24 border-dashed border-2 hover:border-primary hover:bg-primary/5 transition-all duration-300 flex flex-col gap-2 group rounded-xl bg-muted/20"
+                              >
+                                <div className="p-2.5 rounded-full bg-background border border-border shadow-sm group-hover:scale-110 group-hover:border-primary/30 transition-all">
+                                  <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary" />
+                                </div>
+                                <span className="text-xs font-bold text-muted-foreground group-hover:text-primary uppercase tracking-tight">
+                                  {editImagePreview ? 'Change Banner Image' : 'Upload Banner Image'}
+                                </span>
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Event Configuration Section */}
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                            <Settings className="w-5 h-5 text-white" />
+                      {/* Schedule & Registration */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-2 px-2 py-1 bg-primary/5 rounded-md w-fit">
+                            <Calendar className="w-3 h-3" /> Schedule & Registration
+                          </h3>
+                          <div className="h-px flex-1 bg-gradient-to-r from-primary/20 to-transparent ml-4" />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_start_date">Event Start <span className="text-destructive">*</span></Label>
+                            <Input
+                              id="edit_start_date"
+                              type="datetime-local"
+                              value={editEventRange[0]?.startDate && !isNaN(editEventRange[0].startDate.getTime()) ? new Date(editEventRange[0].startDate.getTime() - editEventRange[0].startDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  setEditEventRange(prev => [{ ...prev[0], startDate: new Date(e.target.value) }]);
+                                }
+                              }}
+                              className="rounded-xl border-muted-foreground/20 shadow-sm"
+                              required
+                            />
                           </div>
-                          <div>
-                            <h3 className="text-xl font-bold text-gray-900">
-                              Event Configuration
-                            </h3>
-                            <p className="text-gray-500 text-sm">
-                              Capacity, guest types, and event image
-                            </p>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_end_date">Event End <span className="text-destructive">*</span></Label>
+                            <Input
+                              id="edit_end_date"
+                              type="datetime-local"
+                              value={editEventRange[0]?.endDate && !isNaN(editEventRange[0].endDate.getTime()) ? new Date(editEventRange[0].endDate.getTime() - editEventRange[0].endDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  setEditEventRange(prev => [{ ...prev[0], endDate: new Date(e.target.value) }]);
+                                }
+                              }}
+                              className="rounded-xl border-muted-foreground/20 shadow-sm"
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_reg_start_date">Registration Opens</Label>
+                            <Input
+                              id="edit_reg_start_date"
+                              type="datetime-local"
+                              value={editRegRange[0]?.startDate && !isNaN(editRegRange[0].startDate.getTime()) ? new Date(editRegRange[0].startDate.getTime() - editRegRange[0].startDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  setEditRegRange(prev => [{ ...prev[0], startDate: new Date(e.target.value) }]);
+                                }
+                              }}
+                              className="rounded-xl border-muted-foreground/20 shadow-sm"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_reg_end_date">Registration Closes</Label>
+                            <Input
+                              id="edit_reg_end_date"
+                              type="datetime-local"
+                              value={editRegRange[0]?.endDate && !isNaN(editRegRange[0].endDate.getTime()) ? new Date(editRegRange[0].endDate.getTime() - editRegRange[0].endDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  setEditRegRange(prev => [{ ...prev[0], endDate: new Date(e.target.value) }]);
+                                }
+                              }}
+                              className="rounded-xl border-muted-foreground/20 shadow-sm"
+                            />
                           </div>
                         </div>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          <div>
-                            <Label htmlFor="edit_max_guests" className="flex items-center gap-2 text-gray-700 font-medium">
-                              <Users className="w-4 h-4 text-teal-500" /> Max Guests
-                            </Label>
+                      </div>
+
+                      {/* Capacity & Guests */}
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-2 px-2 py-1 bg-primary/5 rounded-md w-fit">
+                            <Users className="w-3 h-3" /> Capacity & Guests
+                          </h3>
+                          <div className="h-px flex-1 bg-gradient-to-r from-primary/20 to-transparent ml-4" />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_max_guests">Max Guests</Label>
                             <Input
                               id="edit_max_guests"
                               type="number"
-                              value={editForm.max_guests}
+                              min={0}
+                              value={editForm.max_guests || ''}
                               onChange={(e) => handleEditInput('max_guests', e.target.value)}
                               placeholder="e.g. 500"
-                              className="mt-2 h-12 border-gray-300 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                              className="rounded-xl border-muted-foreground/20 shadow-sm"
                             />
                           </div>
-                          <div className="lg:col-span-2">
-                            <Label htmlFor="edit_guest_types" className="flex items-center gap-2 text-gray-700 font-medium">
-                              <Users className="w-4 h-4 text-pink-500" /> Guest Types
-                            </Label>
-                            <div className="flex flex-wrap gap-2 mb-3 mt-2">
-                              {PREDEFINED_GUEST_TYPES.map(type => {
-                                const isSelected = Array.isArray(editForm.guest_types)
-                                  ? editForm.guest_types.includes(type)
-                                  : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).includes(type);
-                                return (
-                                  <Button
-                                    key={type}
-                                    type="button"
-                                    variant={isSelected ? 'default' : 'outline'}
-                                    className={`${isSelected ? 'bg-pink-600 text-white border-pink-600' : 'border-gray-300 hover:border-pink-300'} rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200`}
-                                    onClick={() => {
-                                      let current = Array.isArray(editForm.guest_types)
-                                        ? editForm.guest_types
-                                        : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).filter(Boolean);
-                                      if (current.includes(type)) {
-                                        current = current.filter((t: string) => t !== type);
-                                      } else {
-                                        current = [...current, type];
-                                      }
-                                      handleEditInput('guest_types', current);
-                                    }}
-                                  >
-                                    {type}
-                                  </Button>
-                                );
-                              })}
-                            </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit_guest_types_custom">Guest Types (Comma Separated)</Label>
                             <Input
                               id="edit_guest_types_custom"
-                              value={Array.isArray(editForm.guest_types) ? editForm.guest_types.filter((t: string) => !PREDEFINED_GUEST_TYPES.includes(t)).join(', ') : ''}
+                              value={Array.isArray(editForm.guest_types) ? editForm.guest_types.join(', ') : (editForm.guest_types || '')}
                               onChange={e => {
-                                let custom = e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean);
-                                let current = Array.isArray(editForm.guest_types)
-                                  ? editForm.guest_types.filter((t: string) => PREDEFINED_GUEST_TYPES.includes(t))
-                                  : (editForm.guest_types || '').split(',').map((s: string) => s.trim()).filter(t => PREDEFINED_GUEST_TYPES.includes(t));
-                                handleEditInput('guest_types', [...current, ...custom]);
+                                handleEditInput('guest_types', e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean));
                               }}
-                              placeholder="Add custom guest types, comma separated"
-                              className="border-gray-300 focus:border-pink-500 focus:ring-pink-500 rounded-xl"
+                              placeholder="e.g. VIP, Regular, Speaker"
+                              className="rounded-xl border-muted-foreground/20 shadow-sm"
                             />
-                            <p className="text-xs text-gray-500 mt-2">
-                              Select from predefined or add custom guest types
-                            </p>
-
-                            {/* Current Guest Types Display */}
+                          </div>
+                          <div className="sm:col-span-2">
                             {Array.isArray(editForm.guest_types) && editForm.guest_types.length > 0 && (
-                              <div className="mt-4 p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl border border-pink-200">
-                                <h4 className="text-sm font-semibold text-pink-800 mb-3 flex items-center gap-2">
-                                  <Users className="w-4 h-4" />
-                                  Currently Selected Guest Types
-                                </h4>
-                                <div className="flex flex-wrap gap-2">
-                                  {editForm.guest_types.map((gt: any, index: number) => {
-                                    const guestTypeName = typeof gt === 'object' && gt !== null && gt.name ? gt.name : String(gt);
-                                    return (
-                                      <Badge key={index} variant="secondary" className="text-xs bg-pink-100 text-pink-800 border-pink-300">
-                                        {guestTypeName}
-                                      </Badge>
-                                    );
-                                  })}
-                                </div>
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                {editForm.guest_types.map((gt: any, index: number) => {
+                                  const guestTypeName = typeof gt === 'object' && gt !== null && gt.name ? gt.name : String(gt);
+                                  return (
+                                    <Badge key={index} variant="secondary" className="px-3 py-1 bg-primary/5 text-primary border border-primary/10 rounded-lg font-medium transition-colors hover:bg-primary/10">
+                                      {guestTypeName}
+                                    </Badge>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
-                        </div>
-                      </div>
-
-                      {/* Event Image Section - Hidden */}
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hidden">
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                            <Image className="w-5 h-5 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="text-xl font-bold text-gray-900">
-                              Event Image
-                            </h3>
-                            <p className="text-gray-500 text-sm">
-                              Upload your event banner or promotional image
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <input
-                            type="file"
-                            id="edit_event_image"
-                            ref={editImageInputRef}
-                            accept="image/*"
-                            onChange={handleEditFile}
-                            className="hidden"
-                          />
-                          <label htmlFor="edit_event_image" className="inline-block">
-                            <div className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-medium rounded-xl cursor-pointer border border-emerald-600 hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-sm">
-                              Choose File
-                            </div>
-                          </label>
-                          <span className="text-gray-600 text-sm">
-                            {editForm.event_image instanceof File
-                              ? editForm.event_image.name
-                              : editForm.event_image
-                                ? 'Current image'
-                                : 'No file chosen'}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                          Upload your event banner (PNG, JPG, SVG) - Max 2MB
-                        </p>
-                        {editImagePreview && (
-                          <div className="mt-4 relative inline-block">
-                            <img
-                              src={editImagePreview}
-                              alt="Event image preview"
-                              className="h-32 rounded-xl shadow-lg border border-gray-200"
-                            />
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="icon"
-                              className="absolute -top-2 -right-2 rounded-full h-8 w-8 shadow-lg"
-                              onClick={handleRemoveEditImage}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Additional Information Section */}
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center">
-                            <FileText className="w-5 h-5 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="text-xl font-bold text-gray-900">
-                              Additional Information
-                            </h3>
-                            <p className="text-gray-500 text-sm">
-                              Requirements, agenda, and additional details
-                            </p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-6">
-                          <div>
-                            <Label htmlFor="edit_requirements" className="flex items-center gap-2 text-gray-700 font-medium">
-                              <FileText className="w-4 h-4 text-amber-500" /> Requirements & Prerequisites
-                            </Label>
-                            <Textarea
-                              id="edit_requirements"
-                              value={editForm.requirements || ''}
-                              onChange={(e) => handleEditInput('requirements', e.target.value)}
-                              placeholder="Any requirements or prerequisites for attendees..."
-                              rows={3}
-                              className="mt-2 border-gray-300 focus:border-amber-500 focus:ring-amber-500 rounded-xl resize-none"
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="edit_agenda" className="flex items-center gap-2 text-gray-700 font-medium">
-                              <FileText className="w-4 h-4 text-amber-500" /> Event Agenda
-                            </Label>
-                            <Textarea
-                              id="edit_agenda"
-                              value={editForm.agenda || ''}
-                              onChange={(e) => handleEditInput('agenda', e.target.value)}
-                              placeholder="Detailed event schedule and agenda..."
-                              rows={4}
-                              className="mt-2 border-gray-300 focus:border-amber-500 focus:ring-amber-500 rounded-xl resize-none"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Event & Registration Dates Section */}
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-violet-600 rounded-xl flex items-center justify-center">
-                            <Calendar className="w-5 h-5 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="text-xl font-bold text-gray-900">
-                              Event & Registration Dates
-                            </h3>
-                            <p className="text-gray-500 text-sm">
-                              Set event and registration periods
-                            </p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                          <div>
-                            <Label className="flex items-center gap-2 text-gray-700 font-medium">
-                              <Calendar className="w-4 h-4 text-violet-500" /> Event Date Range
-                            </Label>
-                            <Button
-                              type="button"
-                              className="w-full mt-2 h-12 bg-gradient-to-r from-violet-100 to-purple-100 text-violet-700 hover:from-violet-200 hover:to-purple-200 border border-violet-300 rounded-xl font-medium"
-                              onClick={() => setShowEditEventRange(true)}
-                            >
-                              {editForm.start_date && editForm.end_date
-                                ? `${editEventRange[0].startDate.toLocaleDateString()} - ${editEventRange[0].endDate.toLocaleDateString()}`
-                                : 'Select event date range'}
-                            </Button>
-                            {showEditEventRange && (
-                              <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
-                                <div className="bg-white border rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
-                                  <DateRange
-                                    ranges={editEventRange}
-                                    onChange={(item) => setEditEventRange([item.selection])}
-                                    editableDateInputs
-                                    moveRangeOnFirstSelection={false}
-                                    direction="horizontal"
-                                  />
-                                  <div className="flex justify-end gap-3 mt-6">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      onClick={() => setShowEditEventRange(false)}
-                                      className="rounded-xl px-6"
-                                    >
-                                      Cancel
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      className="bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl px-6"
-                                      onClick={() => {
-                                        setEditForm((prev: any) => ({
-                                          ...prev,
-                                          start_date: editEventRange[0].startDate,
-                                          end_date: editEventRange[0].endDate,
-                                        }))
-                                        setShowEditEventRange(false)
-                                      }}
-                                    >
-                                      Apply
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <Label className="flex items-center gap-2 text-gray-700 font-medium">
-                              <Calendar className="w-4 h-4 text-emerald-500" /> Registration Date Range
-                            </Label>
-                            <Button
-                              type="button"
-                              className="w-full mt-2 h-12 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 hover:from-emerald-200 hover:to-green-200 border border-emerald-300 rounded-xl font-medium"
-                              onClick={() => setShowEditRegRange(true)}
-                            >
-                              {editForm.registration_start_date && editForm.registration_end_date
-                                ? `${editRegRange[0].startDate.toLocaleDateString()} - ${editRegRange[0].endDate.toLocaleDateString()}`
-                                : 'Select registration date range'}
-                            </Button>
-                            {showEditRegRange && (
-                              <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
-                                <div className="bg-white border rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
-                                  <DateRange
-                                    ranges={editRegRange}
-                                    onChange={(item) => setEditRegRange([item.selection])}
-                                    editableDateInputs
-                                    moveRangeOnFirstSelection={false}
-                                    direction="horizontal"
-                                  />
-                                  <div className="flex justify-end gap-3 mt-6">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      onClick={() => setShowEditRegRange(false)}
-                                      className="rounded-xl px-6"
-                                    >
-                                      Cancel
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      className="bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl px-6"
-                                      onClick={() => {
-                                        setEditForm((prev: any) => ({
-                                          ...prev,
-                                          registration_start_date: editRegRange[0].startDate,
-                                          registration_end_date: editRegRange[0].endDate,
-                                        }))
-                                        setShowEditRegRange(false)
-                                      }}
-                                    >
-                                      Apply
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Current Guest Types Display in Event & Registration Dates Section */}
-                        {Array.isArray(editForm.guest_types) && editForm.guest_types.length > 0 && (
-                          <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-                            <h4 className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
-                              <Users className="w-4 h-4" />
-                              Current Guest Types for This Event
-                            </h4>
-                            <div className="flex flex-wrap gap-2">
-                              {editForm.guest_types.map((gt: any, index: number) => {
-                                const guestTypeName = typeof gt === 'object' && gt !== null && gt.name ? gt.name : String(gt);
-                                return (
-                                  <Badge key={index} variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
-                                    {guestTypeName}
-                                  </Badge>
-                                );
-                              })}
-                            </div>
-                            <p className="text-xs text-blue-600 mt-2">
-                              These guest types are currently configured for this event. You can modify them in the Guest Types section above.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-2xl border border-gray-200 p-6">
-                        <div className="flex flex-col sm:flex-row gap-4 justify-end">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setEditDialogOpen(false)}
-                            className="px-8 py-3 rounded-xl border-gray-300 hover:border-gray-400 font-medium"
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            type="submit"
-                            disabled={editLoading}
-                            className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-                          >
-                            {editLoading ? (
-                              <div className="flex items-center gap-2">
-                                <SpinnerInline size="sm" />
-                                Updating Event...
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <CheckCircle className="w-4 h-4" />
-                                Update Event
-                              </div>
-                            )}
-                          </Button>
                         </div>
                       </div>
                     </div>
                   </form>
                 )}
+
+                <DialogFooter className="px-6 py-4 border-t border-border bg-muted/30 xs:justify-end gap-2">
+                  <Button variant="outline" type="button" onClick={() => setEditDialogOpen(false)} disabled={editLoading}>
+                    Cancel
+                  </Button>
+                  <Button form="edit-event-form" type="submit" disabled={editLoading}>
+                    {editLoading ? 'Saving Changes...' : 'Save Changes'}
+                  </Button>
+                </DialogFooter>
               </DialogContent>
             </Dialog>
 
@@ -5963,7 +5842,7 @@ export default function EventDetails() {
             </div>
           </>
         )}
-      </div>
+      </div >
     </>
   )
 }

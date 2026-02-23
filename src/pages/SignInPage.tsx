@@ -89,7 +89,7 @@ export default function SignIn() {
             x: [0, 100, 0],
             y: [0, 50, 0]
           }}
-          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+          transition={{ duration: 25, repeat: 9999, ease: "linear" }}
           className="absolute -top-[10%] -left-[5%] w-[600px] h-[600px] bg-primary/20 rounded-full blur-[100px]"
         />
         <motion.div
@@ -99,7 +99,7 @@ export default function SignIn() {
             x: [0, -80, 0],
             y: [0, -40, 0]
           }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear", delay: 2 }}
+          transition={{ duration: 20, repeat: 9999, ease: "linear", delay: 2 }}
           className="absolute top-[30%] -right-[10%] w-[500px] h-[500px] bg-orange-600/10 rounded-full blur-[120px]"
         />
         <motion.div
@@ -108,7 +108,7 @@ export default function SignIn() {
             x: [0, 60, 0],
             y: [0, 80, 0]
           }}
-          transition={{ duration: 18, repeat: Infinity, ease: "linear", delay: 5 }}
+          transition={{ duration: 18, repeat: 9999, ease: "linear", delay: 5 }}
           className="absolute -bottom-[10%] left-[15%] w-[550px] h-[550px] bg-primary/15 rounded-full blur-[100px]"
         />
 

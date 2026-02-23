@@ -18,6 +18,8 @@ import {
   Check,
   ChevronsUpDown,
   Search as SearchIcon,
+  Shield,
+  ListTree,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -233,6 +235,16 @@ export default function CreateEvent() {
   const [venueSearch, setVenueSearch] = useState('')
 
   useEffect(() => {
+    if (formData.end_date) {
+      const regEndDate = new Date(formData.end_date)
+      regEndDate.setDate(regEndDate.getDate() - 1)
+
+      setFormData(prev => ({ ...prev, registration_end_date: regEndDate }))
+      setRegRange(prev => [{ ...prev[0], endDate: regEndDate }])
+    }
+  }, [formData.end_date?.getTime()])
+
+  useEffect(() => {
     if (user && (user.role === 'organizer' || user.role === 'organizer_admin') && user.organizer_id) {
       handleInputChange('organizer_id', String(user.organizer_id))
     }
@@ -424,9 +436,7 @@ export default function CreateEvent() {
           } else if (key === 'ticket_types') {
             if (Array.isArray(value)) {
               value.forEach((ticketType: any) => {
-                Object.keys(ticketType).forEach(field => {
-                  payload.append(`ticket_types[${ticketTypes.indexOf(ticketType)}][${field}]`, ticketType[field] || '')
-                })
+                payload.append('ticket_types[]', JSON.stringify(ticketType))
               })
             }
           } else if (key === 'guest_types_custom') {
@@ -450,9 +460,7 @@ export default function CreateEvent() {
           } else if (key === 'ticket_types') {
             if (Array.isArray(value)) {
               value.forEach((ticketType: any) => {
-                Object.keys(ticketType).forEach(field => {
-                  payload.append(`ticket_types[${ticketTypes.indexOf(ticketType)}][${field}]`, ticketType[field] || '')
-                })
+                payload.append('ticket_types[]', JSON.stringify(ticketType))
               })
             }
           } else if (key === 'guest_types_custom') {
@@ -833,7 +841,37 @@ export default function CreateEvent() {
                       handleInputChange('description', e.target.value)
                     }
                     placeholder="Describe your event..."
-                    rows={4}
+                    rows={3}
+                    className="mt-2 border-border focus:border-primary focus:ring-primary/20 rounded-xl resize-none"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="requirements" className="flex items-center gap-2 text-foreground font-medium">
+                    <Shield className="w-4 h-4 text-primary" /> Requirements & Prerequisites
+                  </Label>
+                  <Textarea
+                    id="requirements"
+                    value={formData.requirements}
+                    onChange={(e) =>
+                      handleInputChange('requirements', e.target.value)
+                    }
+                    placeholder="e.g. Bring your laptop, ID card..."
+                    rows={2}
+                    className="mt-2 border-border focus:border-primary focus:ring-primary/20 rounded-xl resize-none"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="agenda" className="flex items-center gap-2 text-foreground font-medium">
+                    <ListTree className="w-4 h-4 text-primary" /> Event Agenda
+                  </Label>
+                  <Textarea
+                    id="agenda"
+                    value={formData.agenda}
+                    onChange={(e) =>
+                      handleInputChange('agenda', e.target.value)
+                    }
+                    placeholder="Outline the schedule of your event..."
+                    rows={2}
                     className="mt-2 border-border focus:border-primary focus:ring-primary/20 rounded-xl resize-none"
                   />
                 </div>
@@ -1289,7 +1327,7 @@ export default function CreateEvent() {
                       <div className="flex flex-col gap-4">
                         {/* Info about date restrictions */}
                         <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-lg">
-                          Registration dates must be between today and the event start date (inclusive).
+                          Registration dates must be between today and the event end date (inclusive).
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -1309,9 +1347,9 @@ export default function CreateEvent() {
                                     return
                                   }
 
-                                  // Validate date is not after event start date
-                                  if (formData.start_date && date > formData.start_date) {
-                                    toast.error('Registration start date cannot be after event start date')
+                                  // Validate date is not after event end date
+                                  if (formData.end_date && date > formData.end_date) {
+                                    toast.error('Registration start date cannot be after event end date')
                                     return
                                   }
 
@@ -1323,13 +1361,14 @@ export default function CreateEvent() {
                               disabled={(date) => {
                                 const today = new Date()
                                 today.setHours(0, 0, 0, 0)
-                                const eventStart = formData.start_date
+                                const eventEnd = formData.end_date ? new Date(formData.end_date) : null
+                                if (eventEnd) eventEnd.setHours(0, 0, 0, 0)
 
                                 // Disable dates before today
                                 if (date < today) return true
 
-                                // Disable dates after event start date (if set)
-                                if (eventStart && date > eventStart) return true
+                                // Disable dates after event end date (if set)
+                                if (eventEnd && date > eventEnd) return true
 
                                 return false
                               }}
@@ -1351,9 +1390,9 @@ export default function CreateEvent() {
                                     return
                                   }
 
-                                  // Validate date is not after event start date
-                                  if (formData.start_date && date > formData.start_date) {
-                                    toast.error('Registration end date cannot be after event start date')
+                                  // Validate date is not after event end date
+                                  if (formData.end_date && date > formData.end_date) {
+                                    toast.error('Registration end date cannot be after event end date')
                                     return
                                   }
 
@@ -1371,8 +1410,10 @@ export default function CreateEvent() {
                               disabled={(date) => {
                                 const today = new Date()
                                 today.setHours(0, 0, 0, 0)
-                                const eventStart = formData.start_date
-                                const regStart = regRange[0].startDate
+                                const eventEnd = formData.end_date ? new Date(formData.end_date) : null
+                                if (eventEnd) eventEnd.setHours(0, 0, 0, 0)
+                                const regStart = regRange[0].startDate ? new Date(regRange[0].startDate) : null
+                                if (regStart) regStart.setHours(0, 0, 0, 0)
 
                                 // Disable dates before today
                                 if (date < today) return true
@@ -1380,8 +1421,8 @@ export default function CreateEvent() {
                                 // Disable dates before registration start date
                                 if (regStart && date < regStart) return true
 
-                                // Disable dates after event start date (if set)
-                                if (eventStart && date > eventStart) return true
+                                // Disable dates after event end date (if set)
+                                if (eventEnd && date > eventEnd) return true
 
                                 return false
                               }}
@@ -1402,7 +1443,7 @@ export default function CreateEvent() {
 
                 {/* Additional validation info */}
                 <div className="text-xs text-muted-foreground">
-                  Registration must open on or after today and close on or before the event starts.
+                  Registration must open on or after today and close on or before the event ends.
                 </div>
               </div>
             </div>

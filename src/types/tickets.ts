@@ -6,7 +6,7 @@
 
 export type TicketStatus = 'confirmed' | 'pending' | 'cancelled' | 'used' | 'refunded';
 export type PaymentStatus = 'pending' | 'success' | 'failed' | 'cancelled';
-export type PaymentMethod = 'telebirr' | 'cbe_birr' | 'bank' | 'dashen_superapp';
+export type PaymentMethod = 'telebirr' | 'chapa' | 'bank' | 'dashen_superapp';
 export type ValidationStatus = 'valid' | 'invalid' | 'expired' | 'already_used' | 'refunded' | 'cancelled' | 'pending' | 'too_early';
 
 /**

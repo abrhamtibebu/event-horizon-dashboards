@@ -76,6 +76,7 @@ import RegistrationSuccess from './pages/RegistrationSuccess'
 import SubscriptionPlans from './pages/SubscriptionPlans'
 import SubscriptionManagement from './pages/SubscriptionManagement'
 import SubscriptionPayment from './pages/SubscriptionPayment'
+import SubscriptionPaymentSuccess from './pages/SubscriptionPaymentSuccess'
 import UsageDashboard from './pages/UsageDashboard'
 import AdminSubscriptionManagement from './pages/AdminSubscriptionManagement'
 import PlanManagement from './pages/PlanManagement'
@@ -615,6 +616,14 @@ const AppWithRealtime = () => {
               element={
                 <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin']}>
                   <SubscriptionPayment />
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="subscription/payment/success"
+              element={
+                <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin']}>
+                  <SubscriptionPaymentSuccess />
                 </RoleProtectedRoute>
               }
             />

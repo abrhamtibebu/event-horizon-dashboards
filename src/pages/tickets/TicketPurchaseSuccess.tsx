@@ -1,150 +1,119 @@
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Mail, Download, Home } from 'lucide-react';
+import { CheckCircle2, Mail, Download, Home, ArrowRight, ShieldCheck, Ticket } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function TicketPurchaseSuccess() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-success/10 via-background to-muted/50 p-4 md:p-8 flex flex-col items-center justify-center">
+    <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Background Decorative Elements */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+        <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-[120px]" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-[120px]" />
+      </div>
+
       <motion.div
-        className="max-w-2xl w-full"
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
+        className="max-w-xl w-full relative z-10"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
       >
-        <Card className="p-8 shadow-2xl">
-          <CardContent className="text-center space-y-6">
-            {/* Success Icon */}
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-              className="flex justify-center"
-            >
-              <div className="w-24 h-24 rounded-full bg-success/10 flex items-center justify-center">
-                <CheckCircle2 className="w-16 h-16 text-success" />
-              </div>
-            </motion.div>
+        <Card className="border-none shadow-[0_32px_64px_-12px_rgba(0,0,0,0.14)] dark:shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] overflow-hidden">
+          <div className="h-2 w-full bg-brand-gradient" />
+          <CardContent className="p-8 md:p-12 text-center space-y-8">
+            {/* Header */}
+            <div className="space-y-4">
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.2 }}
+                className="mx-auto w-20 h-20 bg-green-500/10 dark:bg-green-500/20 rounded-full flex items-center justify-center text-green-500 mb-6"
+              >
+                <CheckCircle2 className="w-10 h-10" />
+              </motion.div>
 
-            {/* Success Message */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <h1 className="text-3xl md:text-4xl font-bold text-card-foreground mb-3">
-                🎉 Purchase Successful!
-              </h1>
-              <p className="text-lg text-muted-foreground">
-                Your ticket purchase has been completed successfully.
-              </p>
-            </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <h1 className="text-3xl md:text-4xl font-black tracking-tighter mb-2">Purchase Confirmed!</h1>
+                <p className="text-muted-foreground font-medium">Your tickets have been secured and issued.</p>
+              </motion.div>
+            </div>
 
-            {/* Information Cards */}
+            {/* Ticket Info Card */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.6 }}
-              className="bg-gradient-to-br from-info/10 to-primary/10 dark:from-info/20 dark:to-primary/20 rounded-lg p-6 space-y-4"
+              className="bg-muted/30 border border-border rounded-2xl p-6 text-left space-y-6"
             >
-              <div className="flex items-start gap-3">
-                <Mail className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
-                <div className="text-left">
-                  <h3 className="font-semibold text-card-foreground mb-1">
-                    Check Your Email
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Your tickets have been sent to your email address. Please check your inbox (and spam folder) for your ticket confirmation.
+              <div className="flex gap-4">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary shrink-0">
+                  <Mail className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">Check your inbox</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    We've sent your digital tickets and receipt to your email. Don't forget to check your spam folder just in case!
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
-                <Download className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
-                <div className="text-left">
-                  <h3 className="font-semibold text-card-foreground mb-1">
-                    Download Your Tickets
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    You can download your tickets from the email or save them to your mobile wallet for easy access at the event.
+              <div className="h-px bg-border w-full" />
+
+              <div className="flex gap-4">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary shrink-0">
+                  <Ticket className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">Entry instructions</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Present the QR code in your email at the event entrance. You can print it or show it directly from your phone.
                   </p>
                 </div>
               </div>
             </motion.div>
 
-            {/* Important Notes */}
+            {/* Security Notice */}
+            <div className="flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">
+              <ShieldCheck className="w-4 h-4" /> Secure Blockchain-backed Ticketing
+            </div>
+
+            {/* Actions */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
-              className="bg-warning/10 dark:bg-warning/20 border border-warning/30 dark:border-warning/40 rounded-lg p-4 text-left"
-            >
-              <h4 className="font-semibold text-card-foreground mb-2 flex items-center gap-2">
-                <span className="text-xl">📌</span>
-                Important Information
-              </h4>
-              <ul className="text-sm text-muted-foreground space-y-2">
-                <li className="flex items-start gap-2">
-                  <span className="text-primary">•</span>
-                  <span>Please bring your ticket (digital or printed) to the event</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-primary">•</span>
-                  <span>Your ticket contains a unique QR code for entry</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-primary">•</span>
-                  <span>Arrive early to avoid queues at the entrance</span>
-                </li>
-              </ul>
-            </motion.div>
-
-            {/* Action Buttons */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1 }}
-              className="flex flex-col sm:flex-row gap-3 pt-4"
+              className="flex flex-col gap-3"
             >
               <Button
                 onClick={() => navigate('/')}
-                className="flex-1 bg-brand-gradient"
-                size="lg"
+                className="h-14 w-full text-lg font-bold shadow-xl shadow-primary/20 group"
               >
-                <Home className="w-5 h-5 mr-2" />
-                Return to Home
+                Back to Explorer <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </Button>
+              <Button variant="ghost" className="h-12 w-full font-bold text-muted-foreground hover:text-foreground">
+                Download PDF Receipt
               </Button>
             </motion.div>
-
-            {/* Contact Support */}
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.2 }}
-              className="text-sm text-muted-foreground pt-4"
-            >
-              Have questions? Contact event support if you need assistance.
-            </motion.p>
           </CardContent>
         </Card>
 
-        {/* Confetti Animation (Optional) */}
-        <motion.div
+        {/* Support Footer */}
+        <motion.p
           initial={{ opacity: 0 }}
-          animate={{ opacity: [0, 1, 1, 0] }}
-          transition={{ duration: 2, times: [0, 0.2, 0.8, 1] }}
-          className="text-6xl text-center mt-4"
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+          className="text-center mt-8 text-sm text-muted-foreground"
         >
-          🎊 🎉 🎊
-        </motion.div>
+          Need help? <span className="text-primary font-bold cursor-pointer hover:underline">Contact Support</span>
+        </motion.p>
       </motion.div>
     </div>
   );
 }
-
-
-
-

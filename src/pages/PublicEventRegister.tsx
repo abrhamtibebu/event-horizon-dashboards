@@ -654,13 +654,13 @@ export default function PublicEventRegister() {
     setPurchaseStep('payment');
   };
 
-  // Show redirecting message for authenticated users on ticketed events
-  if (isTicketedEvent && isAuthenticated && event?.id) {
+  // Show redirecting message for all users (guests and authenticated) on ticketed events
+  if (isTicketedEvent && event?.id) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
           <SpinnerInline className="mx-auto" />
-          <p className="mt-4 text-muted-foreground">Redirecting to ticket purchase...</p>
+          <p className="mt-4 text-muted-foreground font-medium">Redirecting to ticket purchase...</p>
         </div>
       </div>
     );
