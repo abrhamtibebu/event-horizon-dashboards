@@ -32,6 +32,7 @@ import {
   SelectItem,
   SelectValue,
 } from '@/components/ui/select'
+import { decodeHtmlEntities } from '@/lib/utils/string'
 
 // Ethiopian major cities
 const ETHIOPIAN_CITIES = [

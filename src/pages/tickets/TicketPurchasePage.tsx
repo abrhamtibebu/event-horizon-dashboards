@@ -308,7 +308,7 @@ export default function TicketPurchasePage() {
                           <div className="space-y-2">
                             <Label>Full Name</Label>
                             <Input
-                              placeholder="Abrham Tibebu"
+                              placeholder="Abebe Kebede"
                               value={attendeeDetails.name}
                               onChange={e => setAttendeeDetails(prev => ({ ...prev, name: e.target.value }))}
                               className="h-12 bg-muted/30"
@@ -318,7 +318,7 @@ export default function TicketPurchasePage() {
                             <Label>Email Address</Label>
                             <Input
                               type="email"
-                              placeholder="abrham@example.com"
+                              placeholder="abekebe@gmail.com"
                               value={attendeeDetails.email}
                               onChange={e => setAttendeeDetails(prev => ({ ...prev, email: e.target.value }))}
                               className="h-12 bg-muted/30"
