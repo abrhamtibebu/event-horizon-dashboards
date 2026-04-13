@@ -54,7 +54,7 @@ export default function DataManagement() {
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [backupDialogOpen, setBackupDialogOpen] = useState(false)
-  const [exportType, setExportType] = useState<'events' | 'users' | 'all'>('all')
+  const [exportType, setExportType] = useState<'events' | 'users' | 'visitors' | 'all'>('all')
   const [exportFormat, setExportFormat] = useState<'csv' | 'json' | 'xlsx'>('csv')
   const [backupType, setBackupType] = useState<'full' | 'incremental'>('full')
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -377,6 +377,7 @@ export default function DataManagement() {
                   <SelectItem value="all">All Data</SelectItem>
                   <SelectItem value="events">Events Only</SelectItem>
                   <SelectItem value="users">Users Only</SelectItem>
+                  <SelectItem value="visitors">Visitors Only</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -424,6 +425,7 @@ export default function DataManagement() {
                   <SelectItem value="all">All Data</SelectItem>
                   <SelectItem value="events">Events Only</SelectItem>
                   <SelectItem value="users">Users Only</SelectItem>
+                  <SelectItem value="visitors">Visitors Only</SelectItem>
                 </SelectContent>
               </Select>
             </div>

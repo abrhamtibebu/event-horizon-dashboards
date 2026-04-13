@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Ticket, Gift, ArrowRight, Users, DollarSign, Calendar, Star } from 'lucide-react'
+import { Ticket, Gift, ArrowRight, Users, DollarSign, Calendar, Star, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Breadcrumbs from '@/components/Breadcrumbs'
 
@@ -128,6 +128,54 @@ export default function EventTypeSelection() {
                 className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 w-full"
               >
                 Create Ticketed Event
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </div>
+
+          {/* External Event Option */}
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-8 hover:shadow-lg transition-all duration-300 lg:col-span-2 max-w-2xl mx-auto w-full">
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <ExternalLink className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-card-foreground mb-2">External Event</h2>
+              <p className="text-muted-foreground">For events managed outside Evella. Mention where users can register.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                  <ExternalLink className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <span className="text-card-foreground">Custom registration links</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                  <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <span className="text-card-foreground">External organizer profiles</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                  <Star className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <span className="text-card-foreground">Global discovery exposure</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                  <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <span className="text-card-foreground">Simple publishing flow</span>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <Button
+                onClick={() => navigate('/dashboard/events/create/external')}
+                className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 w-full"
+              >
+                Create External Event
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>

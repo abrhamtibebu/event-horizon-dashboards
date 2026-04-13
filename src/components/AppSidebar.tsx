@@ -41,6 +41,7 @@ import {
   Package,
   Clock,
   History,
+  Megaphone,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -229,6 +230,12 @@ const navigationCategories = [
         roles: ['superadmin', 'admin'],
       },
       {
+        title: 'Advertising',
+        url: '/dashboard/admin/advertising',
+        icon: Megaphone,
+        roles: ['superadmin', 'admin'],
+      },
+      {
         title: 'Team',
         url: '/dashboard/team',
         icon: Users2,
@@ -242,7 +249,7 @@ const navigationCategories = [
     items: [
       {
         title: 'Validator',
-        url: '/dashboard/ticket-validator',
+        url: '/dashboard/usher/redemption',
         icon: UserCheck,
         roles: ['organizer', 'organizer_admin', 'admin', 'superadmin'],
         permission: 'tickets.validate',

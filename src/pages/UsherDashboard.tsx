@@ -558,7 +558,7 @@ export default function UsherDashboard() {
             </div>
 
             <Button
-              onClick={() => navigate('/dashboard/ticket-validator')}
+              onClick={() => navigate('/dashboard/usher/redemption')}
               className="w-full bg-brand-gradient bg-brand-gradient-hover text-foreground text-sm py-2"
             >
               <UserCheck className="w-4 h-4 mr-2" />
@@ -579,7 +579,7 @@ export default function UsherDashboard() {
             <span className="font-medium">Messages</span>
           </Link>
           <Link
-            to="/dashboard/ticket-validator"
+            to="/dashboard/usher/redemption"
             className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg transition-colors"
           >
             <QrCode className="w-8 h-8 mx-auto mb-2 text-primary" />

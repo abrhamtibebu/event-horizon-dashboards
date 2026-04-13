@@ -14,6 +14,7 @@ import {
   safeGetLocalStorage, 
   safeSetLocalStorage 
 } from '@/utils/reportTransformers';
+import { Card, CardContent } from '@/components/ui/card';
 import { ReportsHeader } from '@/components/reports/ReportsHeader';
 import { ReportFilters } from '@/components/reports/ReportFilters';
 import { ExecutiveSummary } from '@/components/reports/ExecutiveSummary';
@@ -246,140 +247,137 @@ export default function Reports() {
   const keyMetrics = useMemo(() => {
     if (!metrics) return null;
 
+    const cards = [
+      {
+        id: 'revenue',
+        label: 'Total Revenue',
+        value: `ETB ${(metrics.total_revenue || 0).toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`,
+        hint: 'From ticket sales',
+        icon: DollarSign,
+      },
+      {
+        id: 'events',
+        label: 'Total Events',
+        value: (metrics.total_events || 0).toLocaleString(),
+        hint: 'Organized events',
+        icon: BarChart,
+      },
+      {
+        id: 'attendees',
+        label: 'Total Attendees',
+        value: (metrics.total_attendees || 0).toLocaleString(),
+        hint: 'Registered participants',
+        icon: Users,
+      },
+      {
+        id: 'tickets',
+        label: 'Tickets Sold',
+        value: (metrics.total_tickets_sold || 0).toLocaleString(),
+        hint: 'Across all events',
+        icon: Ticket,
+      },
+    ];
+
   return (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="group relative overflow-hidden bg-success/5 rounded-2xl shadow-sm border border-success/30 p-6 hover:shadow-lg transition-all duration-300">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-success/15 rounded-full -translate-y-10 translate-x-10"></div>
-              <div className="relative">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-success rounded-xl flex items-center justify-center shadow-md">
-                    <DollarSign className="w-5 h-5 text-white" />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {cards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <Card key={card.id} className="border-border/80">
+              <CardContent className="p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {card.label}
+                  </p>
+                  <div className="rounded-md bg-muted p-2 text-muted-foreground">
+                    <Icon className="h-4 w-4" />
                   </div>
-                  <div className="text-sm font-semibold text-success">Total Revenue</div>
                 </div>
-                <div className="text-3xl font-bold text-success mb-1">
-              ETB {(metrics.total_revenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </div>
-                <div className="text-xs text-success font-medium">From all ticket sales</div>
-              </div>
-            </div>
-
-            <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-info/15 rounded-full -translate-y-10 translate-x-10"></div>
-              <div className="relative">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-info rounded-xl flex items-center justify-center">
-                <BarChart className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="text-sm font-medium text-muted-foreground">Total Events</div>
-                </div>
-            <div className="text-3xl font-bold text-card-foreground mb-1">
-              {metrics.total_events || 0}
-            </div>
-                <div className="text-xs text-muted-foreground/70">Organized events</div>
-              </div>
-            </div>
-
-            <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:shadow-lg transition-all duration-300">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-[hsl(var(--color-warning))]/15 rounded-full -translate-y-10 translate-x-10"></div>
-              <div className="relative">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-[hsl(var(--color-warning))] rounded-xl flex items-center justify-center">
-                    <Users className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="text-sm font-medium text-muted-foreground">Total Attendees</div>
-                </div>
-            <div className="text-3xl font-bold text-card-foreground mb-1">
-              {(metrics.total_attendees || 0).toLocaleString()}
-            </div>
-                <div className="text-xs text-muted-foreground/70">All participants</div>
-              </div>
-            </div>
-
-            <div className="group relative overflow-hidden bg-info/5 rounded-2xl shadow-sm border border-info/30 p-6 hover:shadow-lg transition-all duration-300">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-info/15 rounded-full -translate-y-10 translate-x-10"></div>
-              <div className="relative">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-info rounded-xl flex items-center justify-center shadow-md">
-                    <Ticket className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="text-sm font-semibold text-info">Tickets Sold</div>
-                </div>
-                <div className="text-3xl font-bold text-info mb-1">
-              {(metrics.total_tickets_sold || 0).toLocaleString()}
-                </div>
-                <div className="text-xs text-info font-medium">Across all events</div>
-              </div>
-            </div>
-          </div>
+                <p className="text-2xl font-semibold tracking-tight text-foreground">{card.value}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{card.hint}</p>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     );
   }, [metrics]);
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <Breadcrumbs 
-        items={[{ label: 'Reports', href: '/dashboard/reports' }]}
-        className="mb-4"
-      />
-      
-      <ReportsHeader
-        selectedEventId={selectedEventId}
-        onEventChange={setSelectedEventId}
-        eventsList={eventsList}
-        onExportCSV={handleExportCSV}
-        onExportPDF={handleGeneratePDF}
-        onRefresh={handleRefresh}
-        exporting={exporting}
-        generating={generating}
-        refreshing={refreshing}
-      />
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto w-full max-w-7xl space-y-5 p-4 md:p-6">
+        <Breadcrumbs 
+          items={[{ label: 'Reports', href: '/dashboard/reports' }]}
+          className="mb-1"
+        />
+        
+        <ReportsHeader
+          selectedEventId={selectedEventId}
+          onEventChange={setSelectedEventId}
+          eventsList={eventsList}
+          onExportCSV={handleExportCSV}
+          onExportPDF={handleGeneratePDF}
+          onRefresh={handleRefresh}
+          exporting={exporting}
+          generating={generating}
+          refreshing={refreshing}
+        />
 
-      <ReportFilters
-        reportSections={REPORT_SECTIONS}
-        visibleReports={visibleReports}
-        onToggleReport={toggleReportVisibility}
-        onToggleAll={toggleAllReports}
-      />
+        <ReportFilters
+          reportSections={REPORT_SECTIONS}
+          visibleReports={visibleReports}
+          onToggleReport={toggleReportVisibility}
+          onToggleAll={toggleAllReports}
+        />
 
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <Spinner size="xl" variant="primary" text="Loading reports dashboard..." />
-          <div className="text-sm text-muted-foreground mt-2">Gathering comprehensive analytics data</div>
-                </div>
-      ) : error ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="w-16 h-16 bg-error/10 rounded-full flex items-center justify-center mb-4">
-            <BarChart className="w-8 h-8 text-error" />
-                </div>
-          <div className="text-lg font-medium text-foreground mb-2">Failed to load reports</div>
-          <div className="text-muted-foreground mb-6">{error}</div>
-          <Button 
-            variant="outline" 
-            onClick={() => fetchReportData()}
-            className="flex items-center gap-2"
-          >
-            Retry
-          </Button>
-                  </div>
-      ) : (
-        <>
-          {keyMetrics}
-          
-          {visibleReports.has('executive') && <ExecutiveSummary metrics={metrics} />}
-          {visibleReports.has('performance') && <PerformanceMetrics metrics={metrics} />}
-          {visibleReports.has('financial') && <FinancialMetrics metrics={metrics} />}
-          {visibleReports.has('attendee') && <AttendeeInsights metrics={metrics} />}
-          {visibleReports.has('engagement') && <EngagementReports metrics={metrics} />}
-          {visibleReports.has('revenue') && <RevenueCharts metrics={metrics} />}
-          {visibleReports.has('demographics') && (
-            <DemographicsSection
-              metrics={metrics}
-              topEvents={topEvents}
-              eventIdToName={eventIdToName}
-            />
-          )}
-        </>
-      )}
+        {loading ? (
+          <Card className="border-border/80">
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <Spinner size="xl" variant="primary" text="Loading reports..." />
+              <div className="mt-2 text-sm text-muted-foreground">
+                Gathering analytics for your selected scope
+              </div>
+            </CardContent>
+          </Card>
+        ) : error ? (
+          <Card className="border-border/80">
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-error/10">
+                <BarChart className="h-6 w-6 text-error" />
+              </div>
+              <div className="mb-1 text-lg font-medium text-foreground">Failed to load reports</div>
+              <div className="mb-5 text-sm text-muted-foreground">{error}</div>
+              <Button 
+                variant="outline" 
+                onClick={() => fetchReportData()}
+              >
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-5">
+            {keyMetrics}
+            
+            {visibleReports.has('executive') && <ExecutiveSummary metrics={metrics} />}
+            {visibleReports.has('performance') && <PerformanceMetrics metrics={metrics} />}
+            {visibleReports.has('financial') && <FinancialMetrics metrics={metrics} />}
+            {visibleReports.has('attendee') && <AttendeeInsights metrics={metrics} />}
+            {visibleReports.has('engagement') && <EngagementReports metrics={metrics} />}
+            {visibleReports.has('revenue') && <RevenueCharts metrics={metrics} />}
+            {visibleReports.has('demographics') && (
+              <DemographicsSection
+                metrics={metrics}
+                topEvents={topEvents}
+                eventIdToName={eventIdToName}
+              />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -957,3 +957,4 @@ export const getBadgePreview = (eventId: number, attendeeId: number) =>
   api.get(`/public/events/${eventId}/attendees/${attendeeId}/badge-preview`)
 
 export { api }
+export const deleteAccount = (userId: number) => api.delete(`/users/${userId}`)

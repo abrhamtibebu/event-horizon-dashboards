@@ -1355,7 +1355,7 @@ export default function EventDetails() {
       };
       if (processedEditForm.event_image && processedEditForm.event_image instanceof File) {
         payload = new FormData();
-        payload.append('_method', 'PUT'); // Laravel requires spoofing for PUT with files
+        payload.append('_method', 'PUT');
         Object.entries(processedEditForm).forEach(([key, value]) => {
           if (key === 'event_image' && value) {
             payload.append('event_image', value);
@@ -1370,7 +1370,8 @@ export default function EventDetails() {
         headers = { 'Content-Type': 'multipart/form-data' };
         await api.post(`/events/${Number(eventId)}`, payload, { headers });
       } else {
-        payload = processedEditForm;
+        const { event_image, ...payloadWithoutImage } = processedEditForm;
+        payload = payloadWithoutImage;
         await api.put(`/events/${Number(eventId)}`, payload, { headers });
       }
       // Refresh event details before closing dialog

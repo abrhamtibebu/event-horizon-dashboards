@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Camera, Mail, Phone, MapPin, Calendar, Briefcase, Save, Lock, Eye, EyeOff } from 'lucide-react'
+import { Camera, Mail, Phone, MapPin, Calendar, Briefcase, Save, Lock, Eye, EyeOff, Building2, FileText } from 'lucide-react'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { SpinnerInline } from '@/components/ui/spinner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/hooks/use-auth'
 import { useModernAlerts } from '@/hooks/useModernAlerts'
 import api from '@/lib/api'
+import { ModernConfirmationDialog } from '@/components/ui/ModernConfirmationDialog'
 
 export default function Profile() {
   const { user, setUser, logout } = useAuth()
@@ -19,7 +20,44 @@ export default function Profile() {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isUploadingImage, setIsUploadingImage] = useState(false)
-  
+  const [isSettingUpOrg, setIsSettingUpOrg] = useState(false)
+
+  const needsOrgSetup =
+    user?.role === 'organizer_admin' && !user?.organizer_id
+
+  const [orgForm, setOrgForm] = useState({
+    name: '',
+    location: '',
+    tin_number: '',
+    email: user?.email || '',
+    phone_number: user?.phone || '',
+  })
+
+  const handleOrgChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setOrgForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  const handleOrgSetup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSettingUpOrg(true)
+    try {
+      const res = await api.post('/organizer/setup', orgForm)
+      const updatedUser = res.data?.user ?? res.data
+      setUser({ ...user, ...updatedUser } as any)
+      showSuccess('Organization created successfully! You can now start creating events.')
+    } catch (error: any) {
+      const msg =
+        error.response?.data?.error ||
+        (error.response?.data && typeof error.response.data === 'object'
+          ? Object.values(error.response.data).flat().join(', ')
+          : null) ||
+        'Failed to create organization'
+      showError(msg)
+    } finally {
+      setIsSettingUpOrg(false)
+    }
+  }
+
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -246,6 +284,113 @@ export default function Profile() {
         </CardContent>
       </Card>
 
+      {/* Organization Setup — visible only for organizer_admins with no org */}
+      {needsOrgSetup && (
+        <Card className="mb-6 border-2 border-primary/40 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="w-5 h-5" />
+              Set Up Your Organization
+            </CardTitle>
+            <CardDescription>
+              Complete the details below to create your event organizer company. Once set up you can start creating and managing events.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleOrgSetup} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="org_name">Organization Name *</Label>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      id="org_name"
+                      name="name"
+                      value={orgForm.name}
+                      onChange={handleOrgChange}
+                      className="pl-10"
+                      placeholder="Acme Events Ltd."
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="org_location">Location</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      id="org_location"
+                      name="location"
+                      value={orgForm.location}
+                      onChange={handleOrgChange}
+                      className="pl-10"
+                      placeholder="Addis Ababa, Ethiopia"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="org_tin">TIN Number</Label>
+                  <div className="relative">
+                    <FileText className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      id="org_tin"
+                      name="tin_number"
+                      value={orgForm.tin_number}
+                      onChange={handleOrgChange}
+                      className="pl-10"
+                      placeholder="0000000000"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="org_email">Business Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      id="org_email"
+                      name="email"
+                      type="email"
+                      value={orgForm.email}
+                      onChange={handleOrgChange}
+                      className="pl-10"
+                      placeholder="contact@acme-events.com"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="org_phone">Business Phone</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      id="org_phone"
+                      name="phone_number"
+                      value={orgForm.phone_number}
+                      onChange={handleOrgChange}
+                      className="pl-10"
+                      placeholder="+251 911 000 000"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Button type="submit" disabled={isSettingUpOrg} className="bg-brand-gradient">
+                {isSettingUpOrg ? (
+                  <>
+                    <SpinnerInline className="mr-2" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Create Organization
+                  </>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Personal Information */}
       <Card className="mb-6">
         <CardHeader>
@@ -430,7 +575,7 @@ export default function Profile() {
       </Card>
 
       {/* Account Stats */}
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>Account Statistics</CardTitle>
           <CardDescription>Your activity overview</CardDescription>
@@ -469,6 +614,59 @@ export default function Profile() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Danger Zone */}
+      <Card className="border-2 border-destructive/20 bg-destructive/5">
+        <CardHeader>
+          <CardTitle className="text-destructive flex items-center gap-2">
+            Danger Zone
+          </CardTitle>
+          <CardDescription>
+            Once you delete your account, there is no going back. Please be certain.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h4 className="font-bold text-foreground">Delete your account</h4>
+              <p className="text-sm text-muted-foreground">
+                Permanently delete your account and all associated data, including events and team members.
+              </p>
+            </div>
+            <Button 
+              variant="destructive" 
+              onClick={() => setIsDeleting(true)}
+            >
+              Delete Account
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ModernConfirmationDialog
+        isOpen={isDeleting}
+        onClose={() => setIsDeleting(false)}
+        onConfirm={async () => {
+          if (!user?.id) return;
+          setIsSaving(true) // Reusing isSaving for loading state
+          try {
+            await api.delete(`/users/${user.id}`);
+            showSuccess('Account successfully deleted. Goodbye!');
+            logout();
+          } catch (err: any) {
+            showError(err.response?.data?.error || 'Failed to delete account');
+            setIsDeleting(false)
+          } finally {
+            setIsSaving(false)
+          }
+        }}
+        title="Delete Your Account Permanently?"
+        description="This ABSOLUTELY IRREVERSIBLE action will permanently delete your account, all your events, and disconnect your entire team. You will lose access to all data immediately."
+        confirmText="Yes, delete my account"
+        cancelText="Keep my account"
+        variant="danger"
+        isLoading={isSaving}
+      />
     </div>
   )
 }

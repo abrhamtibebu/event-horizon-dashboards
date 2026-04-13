@@ -1,6 +1,6 @@
 import React from 'react';
-import { BarChart, Download, FileText, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { BarChart3, Download, FileText, RefreshCw } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProtectedButton } from '@/components/ProtectedButton';
 import { Event } from '@/types/reports';
@@ -29,65 +29,68 @@ export const ReportsHeader: React.FC<ReportsHeaderProps> = ({
   refreshing,
 }) => {
   return (
-    <div className="mb-8">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-          <BarChart className="w-6 h-6 text-white" />
+    <div className="space-y-4">
+      <div className="flex items-start gap-3">
+        <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <BarChart3 className="h-5 w-5" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Reports & Analytics</h1>
-          <p className="text-muted-foreground">Comprehensive insights and performance metrics across all events</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Reports</h1>
+          <p className="text-sm text-muted-foreground">
+            Clear performance, revenue, and attendee insights.
+          </p>
         </div>
       </div>
-      
-      <div className="flex flex-col sm:flex-row gap-4 mt-6">
-        <Select value={selectedEventId} onValueChange={onEventChange}>
-          <SelectTrigger className="w-full sm:w-64 bg-card border-border shadow-sm">
-            <SelectValue placeholder="All Events" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Events</SelectItem>
-            {eventsList.map((event) => (
-              <SelectItem key={event.id} value={String(event.id)}>
-                {event.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={onRefresh}
-            disabled={refreshing}
-            className="bg-card border-border shadow-sm hover:bg-accent"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            {refreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
-          <ProtectedButton
-            permission="reports.export"
-            onClick={onExportCSV}
-            disabled={exporting}
-            variant="outline"
-            actionName="export reports to CSV"
-            className="bg-card border-border shadow-sm hover:bg-accent"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            {exporting ? 'Exporting...' : 'Export CSV'}
-          </ProtectedButton>
-          <ProtectedButton
-            permission="reports.export"
-            onClick={onExportPDF}
-            disabled={generating}
-            className="bg-brand-gradient bg-brand-gradient-hover text-foreground shadow-lg"
-            actionName="export reports to PDF"
-          >
-            <FileText className="w-4 h-4 mr-2" />
-            {generating ? 'Generating...' : 'Generate PDF'}
-          </ProtectedButton>
-        </div>
-      </div>
+
+      <Card className="border-border/80">
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <Select value={selectedEventId} onValueChange={onEventChange}>
+            <SelectTrigger className="w-full sm:w-72">
+              <SelectValue placeholder="All Events" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Events</SelectItem>
+              {eventsList.map((event) => (
+                <SelectItem key={event.id} value={String(event.id)}>
+                  {event.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex flex-wrap gap-2">
+            <ProtectedButton
+              permission="reports.export"
+              onClick={onRefresh}
+              disabled={refreshing}
+              variant="outline"
+              actionName="refresh reports"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </ProtectedButton>
+            <ProtectedButton
+              permission="reports.export"
+              onClick={onExportCSV}
+              disabled={exporting}
+              variant="outline"
+              actionName="export reports to CSV"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {exporting ? 'Exporting...' : 'CSV'}
+            </ProtectedButton>
+            <ProtectedButton
+              permission="reports.export"
+              onClick={onExportPDF}
+              disabled={generating}
+              actionName="export reports to PDF"
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              {generating ? 'Generating...' : 'PDF'}
+            </ProtectedButton>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

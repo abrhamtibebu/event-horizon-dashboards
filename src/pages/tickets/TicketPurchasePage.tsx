@@ -18,6 +18,9 @@ import api from '@/lib/api';
 import type { PaymentMethod } from '@/types/tickets';
 import type { TicketType } from '@/types';
 import { format } from 'date-fns';
+import EventLocationMapCard from '@/components/EventLocationMapCard';
+import CloudflareTurnstileWidget from '@/components/CloudflareTurnstileWidget';
+import { getTurnstileSiteKey } from '@/config/env';
 
 type Step = 'select' | 'details' | 'payment';
 
@@ -36,6 +39,8 @@ export default function TicketPurchasePage() {
   const [paymentMessage, setPaymentMessage] = useState('');
   const [progress, setProgress] = useState(0);
   const [paymentPhoneNumber, setPaymentPhoneNumber] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileSiteKey = getTurnstileSiteKey();
 
   // Attendee details
   const [attendeeDetails, setAttendeeDetails] = useState({
@@ -100,6 +105,9 @@ export default function TicketPurchasePage() {
       if (!selectedTicketType || !selectedPaymentMethod) {
         throw new Error('Please select a ticket type and payment method');
       }
+      if (turnstileSiteKey && !turnstileToken) {
+        throw new Error('Please complete the security challenge');
+      }
 
       const response = await api.post('/guest/payments/initiate', {
         event_uuid: event?.uuid,
@@ -113,6 +121,7 @@ export default function TicketPurchasePage() {
         payment_method: selectedPaymentMethod,
         phone_number: paymentPhoneNumber,
         invitation_code: invitationCode || undefined,
+        ...(turnstileToken ? { cf_turnstile_response: turnstileToken } : {}),
       });
 
       return response.data.data;
@@ -226,6 +235,18 @@ export default function TicketPurchasePage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-12 -mt-8 relative z-10">
+        {(event?.latitude || event?.longitude || event?.venue_name || event?.location || event?.formatted_address) && (
+          <div className="mb-8">
+            <EventLocationMapCard
+              latitude={event?.latitude}
+              longitude={event?.longitude}
+              venueName={event?.venue_name}
+              location={event?.location}
+              formattedAddress={event?.formatted_address}
+            />
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
 
           {/* Main Checkout Flow */}
@@ -388,6 +409,14 @@ export default function TicketPurchasePage() {
                             </p>
                           </CardContent>
                         </Card>
+                        {turnstileSiteKey && (
+                          <div className="mt-4 rounded-xl border border-border bg-background/60 p-3">
+                            <CloudflareTurnstileWidget
+                              siteKey={turnstileSiteKey}
+                              onTokenChange={setTurnstileToken}
+                            />
+                          </div>
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -458,7 +487,7 @@ export default function TicketPurchasePage() {
                       ) : (
                         <Button
                           onClick={() => purchaseMutation.mutate()}
-                          disabled={!selectedPaymentMethod || purchaseMutation.isPending}
+                          disabled={(!selectedPaymentMethod || purchaseMutation.isPending || (turnstileSiteKey ? !turnstileToken : false))}
                           size="lg"
                           className="w-full h-14 text-lg font-bold bg-green-600 hover:bg-green-700 shadow-xl shadow-green-600/20"
                         >

@@ -19,6 +19,9 @@ import { useAuth } from '@/hooks/use-auth';
 import type { PaymentMethod, PaymentStatus } from '@/types/tickets';
 import type { PublicTicketType } from '@/types/publicTickets';
 import { SpinnerInline } from '@/components/ui/spinner';
+import EventLocationMapCard from '@/components/EventLocationMapCard';
+import CloudflareTurnstileWidget from '@/components/CloudflareTurnstileWidget';
+import { getTurnstileSiteKey } from '@/config/env';
 
 export default function PublicEventRegister() {
   const { eventUuid } = useParams();
@@ -60,6 +63,8 @@ export default function PublicEventRegister() {
   const [customFormParticipantType, setCustomFormParticipantType] = useState<string>('attendee'); // Deprecated - kept for backward compatibility
   const [existingGuestInfo, setExistingGuestInfo] = useState<any>(null);
   const [guestTypes, setGuestTypes] = useState<any[]>([]);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileSiteKey = getTurnstileSiteKey();
 
   const handleCustomFormSuccess = useCallback(() => {
     setSuccess(true);
@@ -411,6 +416,11 @@ export default function PublicEventRegister() {
       return;
     }
 
+    if (turnstileSiteKey && !turnstileToken) {
+      toast.error('Please complete the security challenge.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       // Check if we need FormData (for future file uploads)
@@ -429,6 +439,7 @@ export default function PublicEventRegister() {
         formData.append('guest_type_id', (selectedGuestTypeId || visitorGuestTypeId)?.toString() || '');
         if (referralCode) formData.append('referral_code', referralCode);
         if (invitationCode) formData.append('invitation_code', invitationCode);
+        if (turnstileToken) formData.append('cf_turnstile_response', turnstileToken);
 
         const response = await api.post(`/public/events/${event.uuid}/register`, formData, {
           headers: {
@@ -469,6 +480,7 @@ export default function PublicEventRegister() {
         guest_type_id: selectedGuestTypeId || visitorGuestTypeId,
         referral_code: referralCode,
         invitation_code: invitationCode,
+        ...(turnstileToken ? { cf_turnstile_response: turnstileToken } : {}),
       };
 
       const response = await api.post(`/public/events/${event.uuid}/register`, registrationData);
@@ -544,6 +556,10 @@ export default function PublicEventRegister() {
       toast.error('Please complete all required fields');
       return;
     }
+    if (turnstileSiteKey && !turnstileToken) {
+      toast.error('Please complete the security challenge');
+      return;
+    }
 
     setIsProcessingPayment(true);
     setPaymentStatus('pending');
@@ -576,6 +592,7 @@ export default function PublicEventRegister() {
           agreed_to_terms: true,
         },
         payment_method: selectedPaymentMethod,
+        ...(turnstileToken ? { cf_turnstile_response: turnstileToken } : {}),
       });
 
       if (!paymentResponse.data?.success) {
@@ -872,6 +889,18 @@ export default function PublicEventRegister() {
           </div>
 
           <div className="p-5 sm:p-12">
+            {(event.latitude || event.longitude || event.venue_name || event.location || event.formatted_address) && (
+              <div className="mb-8">
+                <EventLocationMapCard
+                  latitude={event.latitude}
+                  longitude={event.longitude}
+                  venueName={event.venue_name}
+                  location={event.location}
+                  formattedAddress={event.formatted_address}
+                />
+              </div>
+            )}
+
             {/* Description Card */}
             {event.description && (
               <div className="mb-8 sm:mb-12 text-center max-w-2xl mx-auto">
@@ -1126,6 +1155,14 @@ export default function PublicEventRegister() {
                             'Join Event'
                           )}
                         </Button>
+                        {turnstileSiteKey && (
+                          <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-white/70 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                            <CloudflareTurnstileWidget
+                              siteKey={turnstileSiteKey}
+                              onTokenChange={setTurnstileToken}
+                            />
+                          </div>
+                        )}
                       </form>
                     </div>
                   )}

@@ -73,6 +73,7 @@ export interface ValidationResult {
   icon: string;
   color: 'success' | 'danger' | 'warning' | 'info';
   ticket?: any; // Full ticket object if found
+  related_tickets?: any[]; // Other tickets in the same purchase
 }
 
 /**

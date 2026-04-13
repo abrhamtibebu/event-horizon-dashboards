@@ -213,11 +213,14 @@ export const getImageUrl = (imagePath: string | null | undefined | any): string 
 
   // Check if it's a storage path (with or without leading slash)
   if (imagePath.includes('storage/')) {
-    // Ensure path starts with a single slash
     const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
     return `${getApiBaseURLForStorage()}${cleanPath}`
   }
 
-  // If it's a relative path, assume it's from the public folder
+  // Handle raw storage paths (e.g. "event_images/filename.jpg")
+  if (imagePath.startsWith('event_images/') || imagePath.startsWith('organizer_logos/')) {
+    return `${getApiBaseURLForStorage()}/storage/${imagePath}`
+  }
+
   return imagePath
 }

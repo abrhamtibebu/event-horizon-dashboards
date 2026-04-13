@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_EVELLA_URL?: string
   readonly VITE_PLATFORM_URL?: string
   readonly VITE_GOOGLE_MAPS_API_KEY?: string
+  readonly VITE_TURNSTILE_SITE_KEY?: string
   readonly VITE_MESSAGING_TRANSPORT?: string
   readonly VITE_MESSAGING_POLL_INTERVAL_MS?: string
   readonly VITE_MESSAGING_RESYNC_INTERVAL_MS?: string

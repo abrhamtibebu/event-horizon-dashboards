@@ -1,316 +1,416 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
-import {
-  Mail,
-  Lock,
-  ArrowRight,
-  Eye,
-  EyeOff,
-  Shield,
-  CheckCircle,
-  AlertCircle
-} from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, Shield } from 'lucide-react'
 import { SpinnerInline } from '@/components/ui/spinner'
-import { motion } from 'framer-motion'
+import CloudflareTurnstileWidget from '@/components/CloudflareTurnstileWidget'
+import { getTurnstileSiteKey } from '@/config/env'
+import api from '@/lib/api'
 
-export default function SignIn() {
+export default function AuthPage() {
+  const location = useLocation()
+  const [mode, setMode] = useState<'signin' | 'signup'>(
+    location.pathname === '/register' ? 'signup' : 'signin',
+  )
+
+  useEffect(() => {
+    setMode(location.pathname === '/register' ? 'signup' : 'signin')
+  }, [location.pathname])
+
+  const isSignUp = mode === 'signup'
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-muted p-4">
+      <div className="relative flex h-[580px] w-full max-w-[860px] overflow-hidden rounded-[32px] bg-card shadow-2xl">
+        {/* ── Forms layer ── */}
+        <div className="relative z-0 flex h-full w-full">
+          {/* Sign-in form (left half) */}
+          <div
+            className={`absolute inset-y-0 left-0 flex w-1/2 flex-col items-center justify-center px-8 transition-all duration-700 ease-in-out sm:px-12 ${
+              isSignUp ? '-translate-x-[20%] scale-90 opacity-0' : 'translate-x-0 scale-100 opacity-100'
+            }`}
+          >
+            <SignInForm />
+          </div>
+
+          {/* Sign-up form (right half) */}
+          <div
+            className={`absolute inset-y-0 right-0 flex w-1/2 flex-col items-center justify-center overflow-y-auto px-8 transition-all duration-700 ease-in-out sm:px-12 ${
+              isSignUp ? 'translate-x-0 scale-100 opacity-100' : 'translate-x-[20%] scale-90 opacity-0'
+            }`}
+          >
+            <SignUpForm />
+          </div>
+        </div>
+
+        {/* ── Sliding overlay panel ── */}
+        <div
+          className={`pointer-events-none absolute inset-y-0 z-10 w-1/2 transition-transform duration-700 ease-in-out ${
+            isSignUp ? 'translate-x-0' : 'translate-x-full'
+          }`}
+        >
+          <div className="pointer-events-auto flex h-full flex-col items-center justify-center bg-primary px-10 text-center text-primary-foreground"
+            style={{ borderRadius: isSignUp ? '0 0 0 0' : '0 0 0 0' }}
+          >
+            <h2 className="text-[30px] font-bold leading-tight">
+              {isSignUp ? 'Welcome Back!' : 'Hello, Friend!'}
+            </h2>
+            <p className="mt-3 max-w-[220px] text-sm leading-relaxed text-primary-foreground/80">
+              {isSignUp
+                ? 'Sign in with your credentials to access the Evella dashboard'
+                : 'Register with your personal details to use all of Evella\u2019s features'}
+            </p>
+            <button
+              onClick={() => setMode(isSignUp ? 'signin' : 'signup')}
+              className="mt-7 flex h-11 items-center justify-center rounded-full border-2 border-primary-foreground px-10 text-xs font-semibold uppercase tracking-wider text-primary-foreground transition-colors hover:bg-primary-foreground/10"
+            >
+              {isSignUp ? 'SIGN IN' : 'SIGN UP'}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile-only: the overlay is hidden; show inline link instead via each form */}
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────
+   Sign-In form (used inside the card)
+   ───────────────────────────────────────────── */
+
+function SignInForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<{
-    message: string;
-    remainingAttempts?: number;
-    warning?: string;
+    message: string
+    remainingAttempts?: number
   } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
-  const { login } = useAuth()
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const { login, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
+  const turnstileSiteKey = getTurnstileSiteKey()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
-
     try {
-      await login({ email, password }, rememberMe)
-      navigate('/dashboard')
-    } catch (err: any) {
-      console.error('[SignIn] Login error details:', err)
-
-      if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
-        setError({ message: 'Cannot connect to the server. Please check your connection and that the API URL is set correctly in .env (VITE_API_URL).' })
+      if (turnstileSiteKey && !turnstileToken) {
+        setError({ message: 'Please complete the security challenge.' })
         return
       }
-
+      await login(
+        { email, password, ...(turnstileToken ? { cf_turnstile_response: turnstileToken } : {}) },
+        rememberMe,
+      )
+      navigate('/dashboard')
+    } catch (err: any) {
+      if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
+        setError({ message: 'Cannot connect to the server.' })
+        return
+      }
       if (err.response?.status === 422) {
-        const responseData = err.response?.data
-        const errors = responseData?.errors
-
-        if (errors) {
-          const errorMessages = Object.values(errors).flat() as string[]
-          setError({ message: errorMessages.join(', ') || 'Please check your input fields.' })
-        } else if (responseData?.message) {
-          setError({ message: responseData.message })
-        } else {
-          setError({ message: 'Validation failed. Please check your input.' })
-        }
+        const d = err.response?.data
+        const msgs = d?.errors ? (Object.values(d.errors).flat() as string[]).join(', ') : d?.message
+        setError({ message: msgs || 'Validation failed.' })
       } else if (err.response?.status === 401) {
-        const data = err.response?.data;
-        setError({
-          message: data?.error || data?.message || 'Invalid email or password.',
-          remainingAttempts: data?.remaining_attempts,
-          warning: data?.warning
-        })
+        const d = err.response?.data
+        setError({ message: d?.error || d?.message || 'Invalid email or password.', remainingAttempts: d?.remaining_attempts })
       } else {
-        const errorMessage = err.response?.data?.message ||
-          err.response?.data?.error ||
-          err.message ||
-          'Login failed. Please check your credentials and try again.'
-        setError({ message: errorMessage })
+        setError({ message: err.response?.data?.message || err.message || 'Login failed.' })
       }
     } finally {
       setIsLoading(false)
     }
   }
 
+  const handleGoogle = async () => {
+    setGoogleLoading(true)
+    setError(null)
+    try {
+      await loginWithGoogle()
+    } catch {
+      setError({ message: 'Could not start Google sign-in.' })
+      setGoogleLoading(false)
+    }
+  }
+
   return (
-    <div className="min-h-screen w-full flex items-center justify-center relative overflow-x-hidden bg-[#0A0D14] py-12">
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            rotate: [0, 90, 0],
-            x: [0, 100, 0],
-            y: [0, 50, 0]
-          }}
-          transition={{ duration: 25, repeat: 9999, ease: "linear" }}
-          className="absolute -top-[10%] -left-[5%] w-[600px] h-[600px] bg-primary/20 rounded-full blur-[100px]"
-        />
-        <motion.div
-          animate={{
-            scale: [1, 1.3, 1],
-            rotate: [0, -45, 0],
-            x: [0, -80, 0],
-            y: [0, -40, 0]
-          }}
-          transition={{ duration: 20, repeat: 9999, ease: "linear", delay: 2 }}
-          className="absolute top-[30%] -right-[10%] w-[500px] h-[500px] bg-orange-600/10 rounded-full blur-[120px]"
-        />
-        <motion.div
-          animate={{
-            scale: [1, 1.1, 1],
-            x: [0, 60, 0],
-            y: [0, 80, 0]
-          }}
-          transition={{ duration: 18, repeat: 9999, ease: "linear", delay: 5 }}
-          className="absolute -bottom-[10%] left-[15%] w-[550px] h-[550px] bg-primary/15 rounded-full blur-[100px]"
-        />
+    <>
+      <img src="/evella-logo.png" alt="Evella" className="mb-2 h-11 w-11 object-contain" />
+      <h1 className="text-2xl font-bold text-foreground">Sign In</h1>
 
-        {/* Subtle Grid Pattern */}
-        <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))] opacity-10" />
+      <div className="mt-4 flex items-center gap-3">
+        <SocialButton onClick={handleGoogle} disabled={googleLoading || isLoading}>
+          {googleLoading ? <SpinnerInline /> : <GoogleIcon />}
+        </SocialButton>
       </div>
 
-      <div className="relative z-10 w-full max-w-[550px] px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-[#151921]/60 backdrop-blur-2xl border border-white/5 rounded-[2rem] shadow-[0_22px_70px_4px_rgba(0,0,0,0.56)] overflow-hidden"
-        >
-          {/* Top Accent Line */}
-          <div className="h-1.5 w-full bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
+      <p className="mt-3 text-[11px] text-muted-foreground">Or use your email password</p>
 
-          {/* Header Section */}
-          <div className="pt-8 pb-4 px-8 text-center">
-            <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{
-                delay: 0.3,
-                duration: 0.8,
-                type: "spring",
-                stiffness: 100
-              }}
-              className="inline-flex items-center justify-center mb-4 relative"
-            >
-              <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full scale-150" />
-              <div className="relative p-2">
-                <img
-                  src="/evella-logo.png"
-                  alt="Evella Admin Logo"
-                  className="w-14 h-14 object-contain filter drop-shadow-[0_0_8px_rgba(255,111,60,0.5)]"
-                />
-              </div>
-            </motion.div>
+      <form onSubmit={handleSubmit} className="mt-3 w-full max-w-[320px] space-y-2.5">
+        <PillInput icon="mail" type="email" placeholder="Email" required value={email} onChange={setEmail} disabled={isLoading} />
+        <div className="relative">
+          <PillInput icon="lock" type={showPassword ? 'text' : 'password'} placeholder="Password" required value={password} onChange={setPassword} disabled={isLoading} />
+          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
 
-            <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">
-              Welcome Back
-            </h1>
-            <p className="text-gray-400 text-sm font-medium">
-              Manage your event with style.
-            </p>
+        {error && (
+          <div className="flex items-start gap-2 rounded-xl bg-destructive/10 p-2.5 text-destructive">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="text-xs">{error.message}</p>
+              {error.remainingAttempts !== undefined && <p className="mt-0.5 text-[10px] font-medium">Attempts left: {error.remainingAttempts}</p>}
+            </div>
           </div>
+        )}
 
-          <div className="px-12 pb-8">
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Email Field */}
-              <div className="space-y-2.5">
-                <Label htmlFor="email" className="text-[11px] font-bold uppercase tracking-[0.1em] text-gray-500 ml-1">
-                  Email Address
-                </Label>
-                <div className="relative group">
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="name@example.com"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={isLoading}
-                    className="bg-white/[0.03] border-white/10 text-white placeholder:text-gray-600 pl-11 h-12 focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all rounded-xl hover:bg-white/[0.05]"
-                  />
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 group-focus-within:text-primary transition-colors" />
-                </div>
-              </div>
+        <div className="flex items-center justify-between text-[11px]">
+          <label className="flex items-center gap-1.5 text-muted-foreground">
+            <input type="checkbox" className="h-3.5 w-3.5 rounded border-border accent-primary" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+            Remember me
+          </label>
+          <Link to="/forgot-password" className="font-medium text-foreground hover:underline">Forgot Password?</Link>
+        </div>
 
-              {/* Password Field */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-[11px] font-bold uppercase tracking-[0.1em] text-gray-500 ml-1">
-                    Password
-                  </Label>
-                  <Link
-                    to="/forgot-password"
-                    className="text-[11px] font-bold uppercase tracking-[0.1em] text-primary hover:text-primary/80 transition-all"
-                  >
-                    Reset?
-                  </Link>
-                </div>
-                <div className="relative group">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={isLoading}
-                    className="bg-white/[0.03] border-white/10 text-white placeholder:text-gray-600 pl-11 pr-11 h-12 focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-all rounded-xl hover:bg-white/[0.05]"
-                  />
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 group-focus-within:text-primary transition-colors" />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Error Display */}
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex gap-3 items-start"
-                >
-                  <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
-                  <div className="space-y-1">
-                    <p className="text-[13px] text-red-200 font-medium leading-relaxed">{error.message}</p>
-                    {error.remainingAttempts !== undefined && (
-                      <p className="text-[11px] text-red-400 font-bold uppercase tracking-wider">
-                        Attempts remaining: {error.remainingAttempts}
-                      </p>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Remember Me */}
-              <div className="flex items-center">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <div className="relative flex items-center justify-center">
-                    <input
-                      type="checkbox"
-                      className="peer sr-only"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                    />
-                    <div className="h-5 w-5 rounded-md border-2 border-white/10 bg-white/5 peer-checked:bg-primary peer-checked:border-primary transition-all duration-300" />
-                    <CheckCircle className={`absolute w-3.5 h-3.5 text-white ${rememberMe ? 'opacity-100 scale-100' : 'opacity-0 scale-50'} transition-all duration-300`} />
-                  </div>
-                  <span className="text-sm font-medium text-gray-400 group-hover:text-gray-300 transition-colors">
-                    Keep me signed in
-                  </span>
-                </label>
-              </div>
-
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full h-14 bg-primary hover:bg-primary/90 text-white font-bold text-base rounded-2xl shadow-[0_10px_30px_-10px_rgba(255,111,60,0.5)] transition-all duration-300 active:scale-[0.98] disabled:opacity-50 group overflow-hidden relative"
-              >
-                {isLoading ? (
-                  <div className="flex items-center gap-3">
-                    <SpinnerInline className="text-white" />
-                    <span>Processing...</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center gap-2">
-                    <span>Sign In to Dashboard</span>
-                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                )}
-
-                {/* Subtle button glare effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-              </Button>
-            </form>
-
-            {/* Dev Mode Shortcut */}
-            {import.meta.env.DEV && (
-              <div className="mt-8">
-                <button
-                  type="button"
-                  className="w-full py-3 px-4 rounded-xl border border-white/5 bg-white/[0.02] text-[11px] font-bold uppercase tracking-[0.2em] text-gray-500 hover:text-primary hover:border-primary/20 hover:bg-primary/5 transition-all flex items-center justify-center gap-2"
-                  onClick={() => {
-                    sessionStorage.removeItem('just_logged_out')
-                    localStorage.setItem('mock_auth', 'true')
-                    localStorage.setItem('jwt', 'dev-token')
-                    localStorage.setItem('user_role', 'organizer')
-                    localStorage.setItem('user_id', '6')
-                    localStorage.setItem('organizer_id', '1')
-                    window.location.href = '/dashboard'
-                  }}
-                >
-                  <Shield className="w-3.5 h-3.5" />
-                  Developer Bypass
-                </button>
-              </div>
-            )}
+        {turnstileSiteKey && (
+          <div className="rounded-xl bg-muted p-2">
+            <CloudflareTurnstileWidget siteKey={turnstileSiteKey} onTokenChange={setTurnstileToken} />
           </div>
-        </motion.div>
+        )}
 
-        {/* Footer Links */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1, duration: 1 }}
-          className="mt-10 flex justify-center gap-8"
+        <PillButton disabled={isLoading}>{isLoading ? <SpinnerInline /> : 'SIGN IN'}</PillButton>
+      </form>
+
+      <p className="mt-4 text-xs text-muted-foreground md:hidden">
+        No account?{' '}
+        <Link to="/register" className="font-semibold text-primary hover:underline">Sign Up</Link>
+      </p>
+
+      {import.meta.env.DEV && (
+        <button
+          type="button"
+          className="mt-3 flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground hover:text-primary"
+          onClick={() => {
+            sessionStorage.removeItem('just_logged_out')
+            localStorage.setItem('mock_auth', 'true')
+            localStorage.setItem('jwt', 'dev-token')
+            localStorage.setItem('user_role', 'organizer')
+            localStorage.setItem('user_id', '6')
+            localStorage.setItem('organizer_id', '1')
+            window.location.href = '/dashboard'
+          }}
         >
-          <Link to="/privacy" className="text-[11px] font-bold uppercase tracking-[0.15em] text-gray-500 hover:text-white transition-colors">Privacy</Link>
-          <Link to="/terms" className="text-[11px] font-bold uppercase tracking-[0.15em] text-gray-500 hover:text-white transition-colors">Terms</Link>
-          <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-gray-600">© 2026 Evella</span>
-        </motion.div>
+          <Shield className="h-3 w-3" /> Dev bypass
+        </button>
+      )}
+    </>
+  )
+}
+
+/* ─────────────────────────────────────────────
+   Sign-Up form (used inside the card)
+   ───────────────────────────────────────────── */
+
+function SignUpForm() {
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' })
+  const [showPw, setShowPw] = useState(false)
+  const [showCpw, setShowCpw] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const { loginWithGoogle } = useAuth()
+  const navigate = useNavigate()
+
+  const handleChange = (name: string, value: string) => {
+    setFormData((p) => ({ ...p, [name]: value }))
+    if (errors[name]) setErrors((p) => ({ ...p, [name]: '' }))
+  }
+
+  const validate = () => {
+    const e: Record<string, string> = {}
+    if (!formData.name) e.name = 'Required'
+    if (!formData.email) e.email = 'Required'
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) e.email = 'Invalid email'
+    if (!formData.password) e.password = 'Required'
+    else if (formData.password.length < 6) e.password = 'Min 6 characters'
+    if (!formData.confirmPassword) e.confirmPassword = 'Required'
+    else if (formData.password !== formData.confirmPassword) e.confirmPassword = 'Mismatch'
+    setErrors(e)
+    return !Object.keys(e).length
+  }
+
+  const handleSubmit = async (ev: React.FormEvent) => {
+    ev.preventDefault()
+    if (!validate()) return
+    setIsLoading(true)
+    try {
+      await new Promise((r) => setTimeout(r, 1500))
+      navigate('/signin')
+    } catch { /* noop */ } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleGoogle = async () => {
+    setGoogleLoading(true)
+    try {
+      await loginWithGoogle()
+    } catch {
+      setGoogleLoading(false)
+    }
+  }
+
+  return (
+    <>
+      <img src="/evella-logo.png" alt="Evella" className="mb-2 h-11 w-11 object-contain" />
+      <h1 className="text-2xl font-bold text-foreground">Create Account</h1>
+
+      <div className="mt-4 flex items-center gap-3">
+        <SocialButton onClick={handleGoogle} disabled={googleLoading || isLoading}>
+          {googleLoading ? <SpinnerInline /> : <GoogleIcon />}
+        </SocialButton>
       </div>
+
+      <p className="mt-3 text-[11px] text-muted-foreground">Or use your email for registration</p>
+
+      <form onSubmit={handleSubmit} className="mt-3 w-full max-w-[320px] space-y-2.5">
+        <PillInput icon="user" placeholder="Name" value={formData.name} onChange={(v) => handleChange('name', v)} disabled={isLoading} error={!!errors.name} />
+        {errors.name && <ErrorText>{errors.name}</ErrorText>}
+
+        <PillInput icon="mail" type="email" placeholder="Email" value={formData.email} onChange={(v) => handleChange('email', v)} disabled={isLoading} error={!!errors.email} />
+        {errors.email && <ErrorText>{errors.email}</ErrorText>}
+
+        <div className="relative">
+          <PillInput icon="lock" type={showPw ? 'text' : 'password'} placeholder="Password" value={formData.password} onChange={(v) => handleChange('password', v)} disabled={isLoading} error={!!errors.password} />
+          <TogglePw show={showPw} toggle={() => setShowPw(!showPw)} />
+        </div>
+        {errors.password && <ErrorText>{errors.password}</ErrorText>}
+
+        <div className="relative">
+          <PillInput icon="lock" type={showCpw ? 'text' : 'password'} placeholder="Confirm Password" value={formData.confirmPassword} onChange={(v) => handleChange('confirmPassword', v)} disabled={isLoading} error={!!errors.confirmPassword} />
+          <TogglePw show={showCpw} toggle={() => setShowCpw(!showCpw)} />
+        </div>
+        {errors.confirmPassword && <ErrorText>{errors.confirmPassword}</ErrorText>}
+
+        <PillButton disabled={isLoading}>{isLoading ? <SpinnerInline /> : 'SIGN UP'}</PillButton>
+      </form>
+
+      <p className="mt-4 text-xs text-muted-foreground md:hidden">
+        Already have an account?{' '}
+        <Link to="/signin" className="font-semibold text-primary hover:underline">Sign In</Link>
+      </p>
+    </>
+  )
+}
+
+/* ─────────────────────────────────────────────
+   Shared primitives (dark-mode aware)
+   ───────────────────────────────────────────── */
+
+const iconPaths: Record<string, JSX.Element> = {
+  mail: <><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></>,
+  lock: <><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>,
+  user: <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
+}
+
+function PillInput({
+  icon,
+  type = 'text',
+  placeholder,
+  required,
+  value,
+  onChange,
+  disabled,
+  error,
+}: {
+  icon: keyof typeof iconPaths
+  type?: string
+  placeholder: string
+  required?: boolean
+  value: string
+  onChange: (v: string) => void
+  disabled?: boolean
+  error?: boolean
+}) {
+  return (
+    <div className="relative">
+      <svg
+        className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {iconPaths[icon]}
+      </svg>
+      <input
+        type={type}
+        placeholder={placeholder}
+        required={required}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className={`h-11 w-full rounded-full border-0 bg-muted pl-10 pr-10 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40 ${error ? 'ring-2 ring-destructive/60' : ''}`}
+      />
     </div>
+  )
+}
+
+function PillButton({ children, disabled }: { children: React.ReactNode; disabled?: boolean }) {
+  return (
+    <button
+      type="submit"
+      disabled={disabled}
+      className="flex h-11 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold uppercase tracking-wider text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+    >
+      {children}
+    </button>
+  )
+}
+
+function SocialButton({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card transition hover:bg-muted disabled:opacity-50"
+    >
+      {children}
+    </button>
+  )
+}
+
+function TogglePw({ show, toggle }: { show: boolean; toggle: () => void }) {
+  return (
+    <button type="button" onClick={toggle} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+      {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+    </button>
+  )
+}
+
+function ErrorText({ children }: { children: React.ReactNode }) {
+  return <p className="pl-4 text-[11px] text-destructive">{children}</p>
+}
+
+function GoogleIcon() {
+  return (
+    <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A10.96 10.96 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+    </svg>
   )
 }

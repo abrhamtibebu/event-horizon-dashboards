@@ -42,6 +42,14 @@ export const getTicketAnalytics = async (eventId: number): Promise<TicketAnalyti
 };
 
 /**
+ * Get aggregate sales summary for the current organizer
+ */
+export const getOrganizerSalesSummary = async () => {
+  const response = await api.get('/organizer/tickets/sales-summary');
+  return response.data.data;
+};
+
+/**
  * Get single ticket details
  */
 export const getTicketDetails = async (ticketId: number): Promise<Ticket> => {
@@ -104,7 +112,7 @@ export const downloadTicketPDF = async (ticketId: number) => {
   const response = await api.get(`/tickets/${ticketId}/download`, {
     responseType: 'blob',
   });
-  
+
   // Create download link
   const url = window.URL.createObjectURL(new Blob([response.data]));
   const link = document.createElement('a');
@@ -113,7 +121,7 @@ export const downloadTicketPDF = async (ticketId: number) => {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  
+
   return response.data;
 };
 
@@ -142,6 +150,14 @@ export const getEventValidationStats = async (eventId: number): Promise<EventVal
 };
 
 /**
+ * Bulk check-in tickets
+ */
+export const bulkCheckInTickets = async (data: { ticket_ids: number[], event_id: number }) => {
+  const response = await api.post('/tickets/bulk-check-in', data);
+  return response.data;
+};
+
+/**
  * Purchase tickets (creates ticket purchase)
  */
 export const purchaseTickets = async (data: TicketPurchaseRequest): Promise<TicketPurchase> => {
@@ -156,7 +172,7 @@ export const exportTicketData = async (request: ExportRequest) => {
   const response = await api.post('/tickets/export', request, {
     responseType: 'blob',
   });
-  
+
   // Create download link
   const url = window.URL.createObjectURL(new Blob([response.data]));
   const link = document.createElement('a');
@@ -166,7 +182,7 @@ export const exportTicketData = async (request: ExportRequest) => {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  
+
   return response.data;
 };
 

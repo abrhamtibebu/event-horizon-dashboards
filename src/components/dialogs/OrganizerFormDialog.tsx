@@ -8,7 +8,15 @@ import {
   Save,
   X,
   Upload,
+  Globe,
+  Facebook,
+  Twitter,
+  Instagram,
+  Linkedin,
+  Type,
+  AlignLeft,
 } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -46,16 +54,41 @@ export function OrganizerFormDialog({
     location: '',
     tin_number: '',
     phone_number: '',
+    description: '',
+    tagline: '',
+    website: '',
+    facebook: '',
+    twitter: '',
+    instagram: '',
+    linkedin: '',
     logo: null as File | null,
+    banner: null as File | null,
   })
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loadingOrganizer, setLoadingOrganizer] = useState(false)
 
   useEffect(() => {
     if (!open) {
-      setFormData({ name: '', email: '', location: '', tin_number: '', phone_number: '', logo: null })
+      setFormData({ 
+        name: '', 
+        email: '', 
+        location: '', 
+        tin_number: '', 
+        phone_number: '', 
+        description: '',
+        tagline: '',
+        website: '',
+        facebook: '',
+        twitter: '',
+        instagram: '',
+        linkedin: '',
+        logo: null, 
+        banner: null 
+      })
       setLogoPreview(null)
+      setBannerPreview(null)
     }
   }, [open])
 
@@ -79,7 +112,15 @@ export function OrganizerFormDialog({
           location: org.location ?? '',
           tin_number: org.tin_number ?? '',
           phone_number: org.phone_number ?? '',
+          description: org.description ?? '',
+          tagline: org.tagline ?? '',
+          website: org.website ?? '',
+          facebook: org.facebook ?? '',
+          twitter: org.twitter ?? '',
+          instagram: org.instagram ?? '',
+          linkedin: org.linkedin ?? '',
           logo: null,
+          banner: null,
         })
       } catch (err: any) {
         toast.error(err.response?.data?.message ?? 'Failed to load organizer.')
@@ -111,34 +152,60 @@ export function OrganizerFormDialog({
     if (logoInputRef.current) logoInputRef.current.value = ''
   }
 
+  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setFormData((prev) => ({ ...prev, banner: file }))
+      const reader = new FileReader()
+      reader.onloadend = () => setBannerPreview(reader.result as string)
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveBanner = () => {
+    setFormData((prev) => ({ ...prev, banner: null }))
+    setBannerPreview(null)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
     try {
       if (isEdit && editId) {
-        const payload: Record<string, string> = {
-          name: formData.name,
-          email: formData.email,
-          location: formData.location,
-          tin_number: formData.tin_number,
-          phone_number: formData.phone_number,
+        let payload: any
+        let headers: Record<string, string> = {}
+
+        if (formData.logo || formData.banner) {
+          payload = new FormData()
+          payload.append('_method', 'PUT')
+          Object.entries(formData).forEach(([key, value]) => {
+            if (key === 'logo' && value) payload.append('logo', value)
+            else if (key === 'banner' && value) payload.append('banner', value)
+            else if (value !== null && value !== '') payload.append(key, String(value))
+          })
+          headers = { 'Content-Type': 'multipart/form-data' }
+          // Use POST for method spoofing because multipart PUT/PATCH is problematic in PHP
+          await api.post(`/organizers/${editId}`, payload, { headers })
+        } else {
+          payload = { ...formData, logo: undefined, banner: undefined }
+          await api.put(`/organizers/${editId}`, payload)
         }
-        await api.put(`/organizers/${editId}`, payload)
         toast.success('Organizer updated successfully.')
         onSuccess?.()
         onOpenChange(false)
       } else {
         let payload: any
         let headers: Record<string, string> = {}
-        if (formData.logo) {
+        if (formData.logo || formData.banner) {
           payload = new FormData()
           Object.entries(formData).forEach(([key, value]) => {
             if (key === 'logo' && value) payload.append('logo', value)
+            else if (key === 'banner' && value) payload.append('banner', value)
             else if (value !== null && value !== '') payload.append(key, String(value))
           })
           headers = { 'Content-Type': 'multipart/form-data' }
         } else {
-          payload = { ...formData, logo: undefined }
+          payload = { ...formData, logo: undefined, banner: undefined }
         }
         await api.post('/organizers', payload, { headers })
         toast.success('Organizer created successfully.')
@@ -230,32 +297,147 @@ export function OrganizerFormDialog({
                         className="bg-background border-border"
                       />
                     </div>
-                    {!isEdit && (
-                      <div className="sm:col-span-2 space-y-2">
-                        <Label className="text-foreground">Logo (optional)</Label>
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="file"
-                            ref={logoInputRef}
-                            accept="image/*"
-                            onChange={handleLogoUpload}
-                            className="hidden"
-                          />
-                          <Button type="button" variant="outline" size="sm" className="border-border" onClick={() => logoInputRef.current?.click()}>
-                            <Upload className="w-4 h-4 mr-2" /> Choose file
-                          </Button>
-                          {formData.logo && <span className="text-sm text-muted-foreground">{formData.logo.name}</span>}
-                          {logoPreview && (
-                            <div className="relative inline-block">
-                              <img src={logoPreview} alt="Preview" className="h-12 rounded border border-border" />
-                              <Button type="button" variant="ghost" size="icon" className="absolute -top-1 -right-1 h-5 w-5 rounded-full" onClick={handleRemoveLogo}>
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
+                    <div className="space-y-2">
+                      <Label className="text-foreground">Logo (optional)</Label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="file"
+                          ref={logoInputRef}
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          className="hidden"
+                        />
+                        <Button type="button" variant="outline" size="sm" className="border-border" onClick={() => logoInputRef.current?.click()}>
+                          <Upload className="w-4 h-4 mr-2" /> Choose logo
+                        </Button>
+                        {formData.logo && <span className="text-sm text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{formData.logo.name}</span>}
+                        {logoPreview && (
+                          <div className="relative inline-block">
+                            <img src={logoPreview} alt="Logo Preview" className="h-12 rounded border border-border" />
+                            <Button type="button" variant="ghost" size="icon" className="absolute -top-1 -right-1 h-5 w-5 rounded-full" onClick={handleRemoveLogo}>
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-foreground">Banner (optional)</Label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="file"
+                          id="banner-upload"
+                          accept="image/*"
+                          onChange={handleBannerUpload}
+                          className="hidden"
+                        />
+                        <Button type="button" variant="outline" size="sm" className="border-border" onClick={() => document.getElementById('banner-upload')?.click()}>
+                          <Upload className="w-4 h-4 mr-2" /> Choose banner
+                        </Button>
+                        {formData.banner && <span className="text-sm text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{formData.banner.name}</span>}
+                        {bannerPreview && (
+                          <div className="relative inline-block">
+                            <img src={bannerPreview} alt="Banner Preview" className="h-12 rounded border border-border" />
+                            <Button type="button" variant="ghost" size="icon" className="absolute -top-1 -right-1 h-5 w-5 rounded-full" onClick={handleRemoveBanner}>
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Info Section */}
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <h3 className="font-medium text-foreground mb-3 flex items-center gap-2">
+                    <AlignLeft className="w-4 h-4" /> Additional Details
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-foreground">Tagline</Label>
+                      <Input
+                        value={formData.tagline}
+                        onChange={(e) => handleInputChange('tagline', e.target.value)}
+                        placeholder="Company tagline"
+                        className="bg-background border-border"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-foreground">Description</Label>
+                      <Textarea
+                        value={formData.description}
+                        onChange={(e) => handleInputChange('description', e.target.value)}
+                        placeholder="Tell us about the company..."
+                        rows={4}
+                        className="bg-background border-border resize-none"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-foreground flex items-center gap-2">
+                        <Globe className="w-3.5 h-3.5" /> Website URL
+                      </Label>
+                      <Input
+                        value={formData.website}
+                        onChange={(e) => handleInputChange('website', e.target.value)}
+                        placeholder="https://example.com"
+                        className="bg-background border-border"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Social Media Section */}
+                <div className="space-y-4 pt-4 border-t border-border">
+                  <h3 className="font-medium text-foreground mb-3 flex items-center gap-2">
+                    <Hash className="w-4 h-4" /> Social Media
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-foreground flex items-center gap-2">
+                        <Facebook className="w-3.5 h-3.5" /> Facebook
+                      </Label>
+                      <Input
+                        value={formData.facebook}
+                        onChange={(e) => handleInputChange('facebook', e.target.value)}
+                        placeholder="https://facebook.com/..."
+                        className="bg-background border-border"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-foreground flex items-center gap-2">
+                        <Twitter className="w-3.5 h-3.5" /> Twitter
+                      </Label>
+                      <Input
+                        value={formData.twitter}
+                        onChange={(e) => handleInputChange('twitter', e.target.value)}
+                        placeholder="https://twitter.com/..."
+                        className="bg-background border-border"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-foreground flex items-center gap-2">
+                        <Instagram className="w-3.5 h-3.5" /> Instagram
+                      </Label>
+                      <Input
+                        value={formData.instagram}
+                        onChange={(e) => handleInputChange('instagram', e.target.value)}
+                        placeholder="https://instagram.com/..."
+                        className="bg-background border-border"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-foreground flex items-center gap-2">
+                        <Linkedin className="w-3.5 h-3.5" /> LinkedIn
+                      </Label>
+                      <Input
+                        value={formData.linkedin}
+                        onChange={(e) => handleInputChange('linkedin', e.target.value)}
+                        placeholder="https://linkedin.com/..."
+                        className="bg-background border-border"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

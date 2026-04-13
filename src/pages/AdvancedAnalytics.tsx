@@ -108,6 +108,14 @@ interface AnalyticsData {
     users: number
     revenue: number
   }>
+  visitor_analytics: {
+    total_visitors: number
+    unique_visitors: number
+    average_session_duration: string
+    top_sources: Array<{ source: string, count: number }>
+    device_distribution: Array<{ device: string, percentage: number }>
+    visitor_trends: Array<{ period: string, count: number }>
+  }
 }
 
 const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#06b6d4']
@@ -209,8 +217,30 @@ export default function AdvancedAnalytics() {
         { region: 'Mekelle', events: 18, users: 234, revenue: 95000 },
         { region: 'Other', events: 45, users: 456, revenue: 405000 },
       ],
+      visitor_analytics: {
+        total_visitors: 45200,
+        unique_visitors: 28400,
+        average_session_duration: '4m 32s',
+        top_sources: [
+          { source: 'Google', count: 18500 },
+          { source: 'Direct', count: 12400 },
+          { source: 'Social Media', count: 8500 },
+          { source: 'Referral', count: 5800 },
+        ],
+        device_distribution: [
+          { device: 'Mobile', percentage: 65 },
+          { device: 'Desktop', percentage: 30 },
+          { device: 'Tablet', percentage: 5 },
+        ],
+        visitor_trends: Array.from({ length: periods }, (_, i) => ({
+          period: useDaily
+            ? format(subDays(new Date(), periods - 1 - i), 'MMM d')
+            : format(subMonths(new Date(), periods - 1 - i), 'MMM yyyy'),
+          count: Math.floor(Math.random() * 5000 + 1000),
+        })),
+      },
     }
-  }
+}
 
   useEffect(() => {
     fetchAnalytics()
@@ -400,6 +430,7 @@ export default function AdvancedAnalytics() {
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="engagement">Engagement</TabsTrigger>
           <TabsTrigger value="geographic">Geographic</TabsTrigger>
+          <TabsTrigger value="visitors">Visitors</TabsTrigger>
         </TabsList>
 
         <TabsContent value="events" className="space-y-6">
@@ -578,6 +609,82 @@ export default function AdvancedAnalytics() {
               </BarChart>
             </ResponsiveContainer>
           </DashboardCard>
+        </TabsContent>
+
+        <TabsContent value="visitors" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <DashboardCard title="Total Visitors">
+              <div className="text-center space-y-2">
+                <p className="text-4xl font-extrabold text-blue-500">
+                  {analyticsData.visitor_analytics.total_visitors.toLocaleString()}
+                </p>
+                <p className="text-sm text-muted-foreground uppercase tracking-widest font-bold">Total Interactions</p>
+              </div>
+            </DashboardCard>
+            <DashboardCard title="Unique Visitors">
+              <div className="text-center space-y-2">
+                <p className="text-4xl font-extrabold text-emerald-500">
+                  {analyticsData.visitor_analytics.unique_visitors.toLocaleString()}
+                </p>
+                <p className="text-sm text-muted-foreground uppercase tracking-widest font-bold">Unique Souls</p>
+              </div>
+            </DashboardCard>
+            <DashboardCard title="Avg Session">
+              <div className="text-center space-y-2">
+                <p className="text-4xl font-extrabold text-purple-500">
+                  {analyticsData.visitor_analytics.average_session_duration}
+                </p>
+                <p className="text-sm text-muted-foreground uppercase tracking-widest font-bold">Time Spent</p>
+              </div>
+            </DashboardCard>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <DashboardCard title="Visitor Trends">
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={analyticsData.visitor_analytics.visitor_trends}>
+                  <defs>
+                    <linearGradient id="colorVisitors" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="period" className="text-[10px]" />
+                  <YAxis className="text-[10px]" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '12px',
+                    }}
+                  />
+                  <Area type="monotone" dataKey="count" stroke="#3b82f6" fillOpacity={1} fill="url(#colorVisitors)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </DashboardCard>
+
+            <DashboardCard title="Acquisition Sources">
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={analyticsData.visitor_analytics.top_sources}
+                    dataKey="count"
+                    nameKey="source"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    label
+                  >
+                    {analyticsData.visitor_analytics.top_sources.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </DashboardCard>
+          </div>
         </TabsContent>
       </Tabs>
 

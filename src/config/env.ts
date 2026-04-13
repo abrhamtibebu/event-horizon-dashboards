@@ -13,7 +13,9 @@ const DEFAULT_API_BASE_URL = 'http://localhost:8000/api'
 export function getApiBaseURL(): string {
   const envURL = import.meta.env.VITE_API_URL
   if (envURL && typeof envURL === 'string') {
-    return envURL.endsWith('/api') ? envURL : `${envURL.replace(/\/$/, '')}/api`
+    const trimmed = envURL.trim()
+    if (!trimmed) return DEFAULT_API_BASE_URL
+    return trimmed.endsWith('/api') ? trimmed : `${trimmed.replace(/\/$/, '')}/api`
   }
   return DEFAULT_API_BASE_URL
 }
@@ -32,5 +34,13 @@ export function getApiBaseURLForStorage(): string {
  */
 export function getGoogleMapsApiKey(): string | undefined {
   const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+  return typeof key === 'string' && key ? key : undefined
+}
+
+/**
+ * Optional: Cloudflare Turnstile site key (VITE_TURNSTILE_SITE_KEY)
+ */
+export function getTurnstileSiteKey(): string | undefined {
+  const key = import.meta.env.VITE_TURNSTILE_SITE_KEY
   return typeof key === 'string' && key ? key : undefined
 }

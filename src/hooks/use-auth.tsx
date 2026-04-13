@@ -34,11 +34,12 @@ interface AuthContextType {
   user: User | null
   setUser: React.Dispatch<React.SetStateAction<User | null>>
   login: (
-    credentials: { email: string; password: string },
+    credentials: { email: string; password: string; cf_turnstile_response?: string },
     remember?: boolean
   ) => Promise<void>
   logout: () => Promise<void>
   isLoading: boolean
+  loginWithGoogle: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -200,7 +201,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   const login = async (
-    credentials: { email: string; password: string },
+    credentials: { email: string; password: string; cf_turnstile_response?: string },
     remember = false
   ) => {
     try {
@@ -270,7 +271,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  const value = { isAuthenticated: !!user, user, setUser, login, logout, isLoading }
+  const loginWithGoogle = async () => {
+    try {
+      const res = await api.get('/auth/google/redirect?source=dashboard')
+      window.location.href = res.data.auth_url
+    } catch (error) {
+      console.error('[Auth] Failed to start Google sign-in:', error)
+      throw error
+    }
+  }
+
+  const value = { isAuthenticated: !!user, user, setUser, login, logout, isLoading, loginWithGoogle }
 
   return (
     <AuthContext.Provider value={value}>

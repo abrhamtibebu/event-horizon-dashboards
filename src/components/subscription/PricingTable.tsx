@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X, Zap, Shield, Sparkles, Star } from 'lucide-react';
+import { Check, X, Zap, Shield, Sparkles, Star, ArrowUp, ArrowDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -123,17 +123,45 @@ export const PricingTable: React.FC<PricingTableProps> = ({
                     </CardContent>
 
                     <CardFooter>
-                        <Button
-                            className={cn(
-                                "w-full",
-                                plan.slug === 'ultimate' ? "bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600" : ""
-                            )}
-                            variant={plan.id === currentPlanId ? "outline" : "default"}
-                            disabled={plan.id === currentPlanId || isLoading}
-                            onClick={() => onSelectPlan(plan)}
-                        >
-                            {getButtonText(plan)}
-                        </Button>
+                        {(() => {
+                            const isCurrent = plan.id === currentPlanId;
+                            let buttonText = 'Select Plan';
+                            let icon = null;
+
+                            if (isCurrent) {
+                                buttonText = 'Current Plan';
+                            } else if (currentPlanId) {
+                                // Find current plan price
+                                const currentPlan = plans.find(p => p.id === currentPlanId);
+                                if (currentPlan) {
+                                    const currentPrice = billingCycle === 'yearly' ? currentPlan.price_yearly : currentPlan.price_monthly;
+                                    const nextPrice = billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly;
+
+                                    if (nextPrice > currentPrice) {
+                                        buttonText = 'Upgrade';
+                                        icon = <ArrowUp className="w-4 h-4 mr-2" />;
+                                    } else if (nextPrice < currentPrice) {
+                                        buttonText = 'Downgrade';
+                                        icon = <ArrowDown className="w-4 h-4 mr-2" />;
+                                    }
+                                }
+                            }
+
+                            return (
+                                <Button
+                                    className={cn(
+                                        "w-full",
+                                        plan.slug === 'ultimate' ? "bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600" : ""
+                                    )}
+                                    variant={isCurrent ? "outline" : "default"}
+                                    disabled={isCurrent || isLoading}
+                                    onClick={() => onSelectPlan(plan)}
+                                >
+                                    {icon}
+                                    {buttonText}
+                                </Button>
+                            );
+                        })()}
                     </CardFooter>
                 </Card>
             ))}

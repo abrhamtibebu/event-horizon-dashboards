@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { decodeHtmlEntities } from '@/lib/utils/string'
+import GoogleVenueAutocompleteInput from '@/components/GoogleVenueAutocompleteInput'
 
 // Ethiopian major cities
 const ETHIOPIAN_CITIES = [
@@ -115,6 +116,15 @@ export default function CreateTicketedEvent() {
   // Image upload state
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [locationMeta, setLocationMeta] = useState<{
+    latitude: number | null
+    longitude: number | null
+    formattedAddress: string
+  }>({
+    latitude: null,
+    longitude: null,
+    formattedAddress: '',
+  })
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -286,6 +296,17 @@ export default function CreateTicketedEvent() {
           : formatDateTime(regRange[0].startDate, regEndTime),
         location: formData.city, // Using city as location
         venue_name: formData.venue,
+        ...(locationMeta.latitude !== null && locationMeta.longitude !== null
+          ? {
+              latitude: locationMeta.latitude,
+              longitude: locationMeta.longitude,
+            }
+          : {}),
+        ...(locationMeta.formattedAddress
+          ? {
+              formatted_address: locationMeta.formattedAddress,
+            }
+          : {}),
         max_guests: parseInt(formData.max_guests, 10),
         // Only include organizer_id if not an organizer or organizer_admin (backend sets it for them)
         ...(user?.role !== 'organizer' && user?.role !== 'organizer_admin' && { organizer_id: formData.organizer_id }),
@@ -898,7 +919,14 @@ export default function CreateTicketedEvent() {
                 </Label>
                 <Select
                   value={formData.city}
-                  onValueChange={(value) => handleInputChange('city', value)}
+                  onValueChange={(value) => {
+                    handleInputChange('city', value)
+                    setLocationMeta({
+                      latitude: null,
+                      longitude: null,
+                      formattedAddress: '',
+                    })
+                  }}
                   required
                 >
                   <SelectTrigger className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl">
@@ -918,14 +946,33 @@ export default function CreateTicketedEvent() {
                 <Label htmlFor="venue" className="flex items-center gap-2 text-foreground font-medium">
                   <MapPin className="w-4 h-4 text-green-500" /> Venue
                 </Label>
-                <Input
-                  id="venue"
-                  value={formData.venue}
-                  onChange={(e) => handleInputChange('venue', e.target.value)}
-                  placeholder="Enter venue name"
-                  required
-                  className="mt-2 h-12 border-border focus:border-green-500 focus:ring-green-500 rounded-xl"
-                />
+                <div className="mt-2">
+                  <GoogleVenueAutocompleteInput
+                    value={formData.venue}
+                    onChange={(venueValue) => {
+                      handleInputChange('venue', venueValue)
+                      setLocationMeta({
+                        latitude: null,
+                        longitude: null,
+                        formattedAddress: '',
+                      })
+                    }}
+                    onPlaceSelected={(selection) => {
+                      handleInputChange('venue', selection.venueName)
+                      if (selection.city && ETHIOPIAN_CITIES.includes(selection.city)) {
+                        handleInputChange('city', selection.city)
+                      }
+                      setLocationMeta({
+                        latitude: selection.latitude,
+                        longitude: selection.longitude,
+                        formattedAddress: selection.formattedAddress,
+                      })
+                    }}
+                    placeholder="Enter venue or pick from Google suggestions"
+                    className="h-12 border-border focus:border-green-500 focus:ring-green-500 rounded-xl"
+                    required
+                  />
+                </div>
               </div>
 
               <div>

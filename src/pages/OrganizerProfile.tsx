@@ -70,6 +70,10 @@ export default function OrganizerProfile() {
   const [editOrganizerDialogOpen, setEditOrganizerDialogOpen] = useState(false)
   const [editOrganizerForm, setEditOrganizerForm] = useState<any>(null)
   const [editOrganizerLoading, setEditOrganizerLoading] = useState(false)
+  const [setupBanner, setSetupBanner] = useState<File | null>(null)
+  const [setupLogo, setSetupLogo] = useState<File | null>(null)
+  const [setupBannerPreview, setSetupBannerPreview] = useState<string | null>(null)
+  const [setupLogoPreview, setSetupLogoPreview] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -379,7 +383,24 @@ export default function OrganizerProfile() {
     setEditOrganizerLoading(true)
     try {
       // Always use the admin endpoint for editing as admin/superadmin
-      await api.put(`/organizers/${organizerId}`, editOrganizerForm)
+      let payload: any = editOrganizerForm
+      let headers = {}
+
+      if (setupBanner || setupLogo) {
+        payload = new FormData()
+        payload.append('_method', 'PUT')
+        Object.entries(editOrganizerForm).forEach(([key, value]) => {
+          if (value !== null && value !== undefined) {
+            payload.append(key, String(value))
+          }
+        })
+        if (setupBanner) payload.append('banner', setupBanner)
+        if (setupLogo) payload.append('logo', setupLogo)
+        headers = { 'Content-Type': 'multipart/form-data' }
+        await api.post(`/organizers/${organizerId}`, payload, { headers })
+      } else {
+        await api.put(`/organizers/${organizerId}`, payload, { headers })
+      }
       toast.success('Organizer updated successfully!')
       setEditOrganizerDialogOpen(false)
       const orgRes = await api.get(`/admin/organizers`, { params: { per_page: 1000 } })
@@ -395,6 +416,10 @@ export default function OrganizerProfile() {
 
   const openEditOrganizerDialog = () => {
     setEditOrganizerForm(organizer)
+    setSetupBanner(null)
+    setSetupLogo(null)
+    setSetupBannerPreview(null)
+    setSetupLogoPreview(null)
     setEditOrganizerDialogOpen(true)
   }
 
@@ -422,6 +447,7 @@ export default function OrganizerProfile() {
   }
 
   const logoUrl = organizer.logo?.startsWith('http') ? organizer.logo : `${getApiBaseURLForStorage()}/storage/${organizer.logo}`
+  const bannerUrl = organizer.banner ? (organizer.banner.startsWith('http') ? organizer.banner : `${getApiBaseURLForStorage()}/storage/${organizer.banner}`) : null
 
   const DetailRow = ({ icon: Icon, label, value }: { icon?: React.ElementType; label: string; value: React.ReactNode }) => (
     <div className="flex items-start gap-3 py-2">
@@ -445,18 +471,26 @@ export default function OrganizerProfile() {
 
       {/* Header */}
       <Card className="overflow-hidden border-0 shadow-sm bg-card">
-        <div className="p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row sm:items-start gap-6">
+        {bannerUrl ? (
+          <div className="h-48 w-full overflow-hidden relative">
+            <img src={bannerUrl} alt="Banner" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          </div>
+        ) : (
+          <div className="h-32 w-full bg-gradient-to-r from-primary/20 to-secondary/20" />
+        )}
+        <div className="p-6 sm:p-8 relative">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-6 -mt-12 sm:-mt-16">
             {organizer.logo && (
-              <div className="shrink-0">
+              <div className="shrink-0 relative z-10">
                 <img
                   src={logoUrl}
                   alt=""
-                  className="h-20 w-20 sm:h-24 sm:w-24 rounded-xl object-cover border border-border bg-muted"
+                  className="h-24 w-24 sm:h-32 sm:w-32 rounded-2xl object-cover border-4 border-card bg-muted shadow-xl"
                 />
               </div>
             )}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pt-10 sm:pt-14">
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <h1 className="text-2xl font-semibold tracking-tight text-foreground">{organizer.name}</h1>
                 <Badge variant={organizer.status === 'active' ? 'default' : 'secondary'} className="capitalize">
@@ -1011,6 +1045,86 @@ export default function OrganizerProfile() {
                   handleEditOrganizerInput('tin_number', e.target.value)
                 }
               />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Logo</Label>
+                  <Input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        setSetupLogo(file)
+                        const reader = new FileReader()
+                        reader.onloadend = () => setSetupLogoPreview(reader.result as string)
+                        reader.readAsDataURL(file)
+                      }
+                    }} 
+                  />
+                  {setupLogoPreview && <img src={setupLogoPreview} className="h-16 w-16 object-cover rounded mt-2 shadow-sm border border-border" />}
+                </div>
+                <div className="space-y-2">
+                  <Label>Banner</Label>
+                  <Input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        setSetupBanner(file)
+                        const reader = new FileReader()
+                        reader.onloadend = () => setSetupBannerPreview(reader.result as string)
+                        reader.readAsDataURL(file)
+                      }
+                    }} 
+                  />
+                  {setupBannerPreview && <img src={setupBannerPreview} className="h-16 w-32 object-cover rounded mt-2 shadow-sm border border-border" />}
+                </div>
+              </div>
+              <div className="space-y-4 pt-4 border-t border-border">
+                <h3 className="text-sm font-semibold">Additional Details</h3>
+                <Input
+                  placeholder="Tagline"
+                  value={editOrganizerForm.tagline || ''}
+                  onChange={(e) => handleEditOrganizerInput('tagline', e.target.value)}
+                />
+                <Textarea
+                  placeholder="Description"
+                  value={editOrganizerForm.description || ''}
+                  onChange={(e) => handleEditOrganizerInput('description', e.target.value)}
+                  rows={4}
+                />
+                <Input
+                  placeholder="Website URL"
+                  value={editOrganizerForm.website || ''}
+                  onChange={(e) => handleEditOrganizerInput('website', e.target.value)}
+                />
+              </div>
+              <div className="space-y-4 pt-4 border-t border-border">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest text-[10px]">Social Media</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                        placeholder="Facebook URL"
+                        value={editOrganizerForm.facebook || ''}
+                        onChange={(e) => handleEditOrganizerInput('facebook', e.target.value)}
+                    />
+                    <Input
+                        placeholder="Twitter URL"
+                        value={editOrganizerForm.twitter || ''}
+                        onChange={(e) => handleEditOrganizerInput('twitter', e.target.value)}
+                    />
+                    <Input
+                        placeholder="Instagram URL"
+                        value={editOrganizerForm.instagram || ''}
+                        onChange={(e) => handleEditOrganizerInput('instagram', e.target.value)}
+                    />
+                    <Input
+                        placeholder="LinkedIn URL"
+                        value={editOrganizerForm.linkedin || ''}
+                        onChange={(e) => handleEditOrganizerInput('linkedin', e.target.value)}
+                    />
+                </div>
+              </div>
               <DialogFooter>
                 <Button type="submit" disabled={editOrganizerLoading}>
                   {editOrganizerLoading ? 'Saving...' : 'Save Changes'}

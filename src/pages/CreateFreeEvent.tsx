@@ -39,6 +39,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
+import GoogleVenueAutocompleteInput from '@/components/GoogleVenueAutocompleteInput'
 
 // Ethiopian major cities
 const ETHIOPIAN_CITIES = [
@@ -126,6 +127,15 @@ export default function CreateFreeEvent() {
   // Image upload state
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [locationMeta, setLocationMeta] = useState<{
+    latitude: number | null
+    longitude: number | null
+    formattedAddress: string
+  }>({
+    latitude: null,
+    longitude: null,
+    formattedAddress: '',
+  })
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -341,6 +351,18 @@ export default function CreateFreeEvent() {
           ? formatDateTime(regRange[0].endDate, regEndTime)
           : formatDateTime(regRange[0].startDate, regEndTime),
         location: formData.city && formData.venue ? `${formData.city}, ${formData.venue}` : formData.venue || formData.city || '',
+        venue_name: formData.venue,
+        ...(locationMeta.latitude !== null && locationMeta.longitude !== null
+          ? {
+              latitude: locationMeta.latitude,
+              longitude: locationMeta.longitude,
+            }
+          : {}),
+        ...(locationMeta.formattedAddress
+          ? {
+              formatted_address: locationMeta.formattedAddress,
+            }
+          : {}),
         max_guests: maxGuests,
         // Only include organizer_id if not an organizer or organizer_admin (backend sets it for them)
         ...(user?.role !== 'organizer' && user?.role !== 'organizer_admin' && { organizer_id: formData.organizer_id }),
@@ -1070,7 +1092,14 @@ export default function CreateFreeEvent() {
                   </Label>
                   <Select
                     value={formData.city}
-                    onValueChange={(value) => handleInputChange('city', value)}
+                    onValueChange={(value) => {
+                      handleInputChange('city', value)
+                      setLocationMeta({
+                        latitude: null,
+                        longitude: null,
+                        formattedAddress: '',
+                      })
+                    }}
                     required
                   >
                     <SelectTrigger className="h-11 border-border focus:border-purple-500 focus:ring-purple-500/20">
@@ -1090,11 +1119,28 @@ export default function CreateFreeEvent() {
                   <Label htmlFor="venue" className="text-sm font-semibold">
                     Venue <span className="text-destructive">*</span>
                   </Label>
-                  <Input
-                    id="venue"
+                  <GoogleVenueAutocompleteInput
                     value={formData.venue}
-                    onChange={(e) => handleInputChange('venue', e.target.value)}
-                    placeholder="e.g., Millennium Hall"
+                    onChange={(venueValue) => {
+                      handleInputChange('venue', venueValue)
+                      setLocationMeta({
+                        latitude: null,
+                        longitude: null,
+                        formattedAddress: '',
+                      })
+                    }}
+                    onPlaceSelected={(selection) => {
+                      handleInputChange('venue', selection.venueName)
+                      if (selection.city && ETHIOPIAN_CITIES.includes(selection.city)) {
+                        handleInputChange('city', selection.city)
+                      }
+                      setLocationMeta({
+                        latitude: selection.latitude,
+                        longitude: selection.longitude,
+                        formattedAddress: selection.formattedAddress,
+                      })
+                    }}
+                    placeholder="Search venue with Google suggestions"
                     required
                     className="h-11 border-border focus:border-purple-500 focus:ring-purple-500/20"
                   />

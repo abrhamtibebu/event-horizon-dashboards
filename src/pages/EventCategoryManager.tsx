@@ -15,7 +15,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import api from '@/lib/api'
@@ -23,6 +22,7 @@ import api from '@/lib/api'
 interface Category {
   id: number
   name: string
+  events_count: number
 }
 
 export default function EventCategoryManager() {
@@ -79,7 +79,7 @@ export default function EventCategoryManager() {
       toast.success('Category deleted successfully!')
       fetchCategories()
     } catch (error) {
-      toast.error('Failed to delete category.')
+      toast.error('Failed to delete category. It might be in use.')
     }
   }
 
@@ -97,12 +97,12 @@ export default function EventCategoryManager() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-6">
         <h3 className="text-xl font-bold flex items-center gap-2">
           <Tag className="w-6 h-6 text-purple-600" />
           Manage Event Categories
         </h3>
-        <Button onClick={openNewDialog}>
+        <Button onClick={openNewDialog} className="bg-purple-600 hover:bg-purple-700">
           <PlusCircle className="w-4 h-4 mr-2" />
           Add Category
         </Button>
@@ -115,17 +115,20 @@ export default function EventCategoryManager() {
               {editingCategory ? 'Edit' : 'Add'} Event Category
             </DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            <Input
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              placeholder="Category Name"
-            />
-            <div className="mt-4 flex justify-end gap-2">
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Category Name</label>
+              <Input
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="e.g. Music, Technology..."
+              />
+            </div>
+            <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreateOrUpdate}>
+              <Button onClick={handleCreateOrUpdate} className="bg-purple-600 hover:bg-purple-700">
                 {editingCategory ? 'Update' : 'Create'}
               </Button>
             </div>
@@ -133,36 +136,57 @@ export default function EventCategoryManager() {
         </DialogContent>
       </Dialog>
 
-      <div className="border rounded-lg">
+      <div className="border rounded-xl overflow-hidden bg-card shadow-sm">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="font-bold">Name</TableHead>
+              <TableHead className="text-center font-bold">Usage</TableHead>
+              <TableHead className="text-right font-bold">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {categories.map((category) => (
-              <TableRow key={category.id}>
-                <TableCell>{category.name}</TableCell>
+              <TableRow key={category.id} className="hover:bg-muted/30">
+                <TableCell className="font-medium text-[16px]">{category.name}</TableCell>
+                <TableCell className="text-center">
+                  <span className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-purple-100 text-purple-700 font-bold text-xs">
+                    {category.events_count || 0} Events
+                  </span>
+                </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openEditDialog(category)}
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(category.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEditDialog(category)}
+                      className="hover:text-purple-600 hover:bg-purple-50"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (window.confirm(`Are you sure you want to delete "${category.name}"? This action cannot be undone if it's not in use.`)) {
+                          handleDelete(category.id);
+                        }
+                      }}
+                      className="hover:text-red-500 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
+            {categories.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                  No categories found.
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
