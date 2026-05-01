@@ -24,10 +24,6 @@ export function useEventDetails(eventId: string | undefined): UseEventDetailsRet
       const res = await api.get(`/events/${Number(eventId)}`)
       const data = res.data
 
-      // Decode HTML entities in names
-      if (data.name) data.name = data.name.replace(/&amp;/g, '&')
-      if (data.organizer?.name) data.organizer.name = data.organizer.name.replace(/&amp;/g, '&')
-
       console.log('Event data fetched:', {
         id: data.id,
         name: data.name,

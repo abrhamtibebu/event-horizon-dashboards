@@ -272,6 +272,26 @@ const AppWithRealtime = () => {
               </PublicRoute>
             }
           />
+          <Route
+            path="/reg"
+            element={
+              <PublicRoute>
+                <Lazy>
+                  <P.OnsiteRegistrationPage />
+                </Lazy>
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/reg/:accessId"
+            element={
+              <PublicRoute>
+                <Lazy>
+                  <P.OnsiteRegistrationPage />
+                </Lazy>
+              </PublicRoute>
+            }
+          />
 
           {/* Usher + salesperson public registration */}
           <Route

@@ -791,7 +791,7 @@ export default function CreateEvent() {
                   </Label>
                   {(user?.role === 'organizer' || user?.role === 'organizer_admin') ? (
                     <Input
-                      value={(user.organizer?.name || 'Loading organizer...').replace(/&amp;/g, '&')}
+                      value={user.organizer?.name || 'Loading organizer...'}
                       disabled
                       className="mt-2 h-12 border-border bg-muted rounded-xl cursor-not-allowed"
                       placeholder="Your organization"

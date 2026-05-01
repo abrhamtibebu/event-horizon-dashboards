@@ -439,6 +439,7 @@ export default function PublicEventRegister() {
         formData.append('guest_type_id', (selectedGuestTypeId || visitorGuestTypeId)?.toString() || '');
         if (referralCode) formData.append('referral_code', referralCode);
         if (invitationCode) formData.append('invitation_code', invitationCode);
+        formData.append('registration_type', searchParams.get('type') || 'prereg');
         if (turnstileToken) formData.append('cf_turnstile_response', turnstileToken);
 
         const response = await api.post(`/public/events/${event.uuid}/register`, formData, {
@@ -478,6 +479,7 @@ export default function PublicEventRegister() {
       const registrationData: any = {
         ...form,
         guest_type_id: selectedGuestTypeId || visitorGuestTypeId,
+        registration_type: searchParams.get('type') || 'prereg',
         referral_code: referralCode,
         invitation_code: invitationCode,
         ...(turnstileToken ? { cf_turnstile_response: turnstileToken } : {}),

@@ -44,7 +44,7 @@ export function EventDetailsHeader({ event, attendeeCount, organizerName }: Even
         </div>
 
         <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4 leading-tight tracking-tight">
-          {event.name?.replace(/&amp;/g, '&')}
+          {event.name}
         </h1>
 
         <div className="flex flex-wrap items-center gap-6 text-muted-foreground text-sm font-medium">

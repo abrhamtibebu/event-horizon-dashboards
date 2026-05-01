@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { getApiBaseURL } from '@/config/env'
+import { decodeObjectStrings } from '@/lib/utils/string'
 
 const api = axios.create({
   baseURL: getApiBaseURL(),
@@ -141,6 +142,23 @@ api.interceptors.request.use(
 // Add response interceptor to handle token expiration and auto-refresh
 api.interceptors.response.use(
   (response) => {
+    // Decode HTML entities in JSON responses to handle double-escaped strings
+    if (
+      response.data &&
+      response.headers &&
+      typeof response.headers.get === 'function' &&
+      response.headers.get('content-type')?.includes('application/json')
+    ) {
+      response.data = decodeObjectStrings(response.data);
+    } else if (
+      response.data &&
+      response.headers &&
+      response.headers['content-type'] &&
+      response.headers['content-type'].includes('application/json')
+    ) {
+      response.data = decodeObjectStrings(response.data);
+    }
+
     // Store token expiration if provided in response (e.g., from login)
     if (response.data?.expires_in) {
       const expiresAt = Date.now() + response.data.expires_in * 1000

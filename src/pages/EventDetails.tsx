@@ -104,7 +104,6 @@ import api, {
   trackShare,
 } from '@/lib/api'
 import { format, parseISO } from 'date-fns'
-import { decodeHtmlEntities } from '@/lib/utils/string'
 import { getGuestTypeBadgeClasses, getImageUrl } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import Pagination from '@/components/Pagination'
@@ -137,7 +136,10 @@ import {
 // Badge Designer is now a standalone app - no longer imported here
 // import BadgeDesignerTab from '@/pages/BadgeDesignerTab'
 import { UsherAssignmentDialog } from '@/components/UsherAssignmentDialog'
+import { EventAccessCodesDialog } from '@/components/EventAccessCodesDialog'
 import React from 'react'
+import QRCode from 'react-qr-code'
+import QRCodeLib from 'qrcode'
 import BadgePrint from '@/components/Badge'
 import BadgeTest from '@/components/BadgeTest'
 import { getOfficialBadgeTemplate, getBadgeTemplates } from '@/lib/badgeTemplates'
@@ -415,9 +417,6 @@ export default function EventDetails() {
       .get(`/events/${Number(eventId)}`)
       .then((res) => {
         const data = res.data
-        // Decode HTML entities in names
-        if (data.name) data.name = decodeHtmlEntities(data.name)
-        if (data.organizer?.name) data.organizer.name = decodeHtmlEntities(data.organizer.name)
 
         console.log('Event data fetched:', {
           id: data.id,
@@ -821,6 +820,7 @@ export default function EventDetails() {
         'Gender': attendee.guest?.gender || 'N/A',
         'Country': attendee.guest?.country || 'N/A',
         'Guest Type': guestTypeName,
+        'Reg Type': attendee.registration_type === 'onsite' ? 'Onsite' : 'Pre-Reg',
         'Registration Date': attendee.created_at
           ? format(parseISO(attendee.created_at), 'MMM d, yyyy, h:mm a')
           : 'N/A',
@@ -2146,6 +2146,27 @@ export default function EventDetails() {
     toast.success('Attendee data exported successfully.')
   }
 
+  const downloadQRCode = async (value: string, filename: string) => {
+    try {
+      const url = await QRCodeLib.toDataURL(value, {
+        width: 2048,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#ffffff',
+        },
+      });
+      
+      const downloadLink = document.createElement("a");
+      downloadLink.download = `${filename}.png`;
+      downloadLink.href = url;
+      downloadLink.click();
+    } catch (err) {
+      console.error(err);
+      toast.error('Could not generate high-quality QR code');
+    }
+  }
+
   return (
     <>
       <div
@@ -2270,7 +2291,7 @@ export default function EventDetails() {
                 </div>
 
                 <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4 leading-tight tracking-tight">
-                  {decodeHtmlEntities(eventData.name)}
+                  {eventData.name}
                 </h1>
 
                 <div className="flex flex-wrap items-center gap-6 text-muted-foreground text-sm font-medium">
@@ -2408,96 +2429,135 @@ export default function EventDetails() {
                         </DialogDescription>
                       </DialogHeader>
 
-                      {eventData?.status?.toLowerCase().trim() === 'active' && eventData?.uuid ? (
-                        <div className="space-y-6 mt-4">
-                          <div className="bg-muted/50 rounded-xl p-4 border border-border">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Registration URL</label>
+                      {eventData?.uuid ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                          {/* Pre-Registration Section */}
+                          <div className="space-y-4 p-4 rounded-xl border border-border bg-muted/30">
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-sm font-bold uppercase tracking-wider text-primary">Pre-Registration</h3>
+                              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-[10px]">Recommended</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">For guests registering before the event.</p>
+                            
+                            <div className="flex flex-col items-center gap-3 p-3 bg-white rounded-lg">
+                              <QRCode 
+                                id="qr-prereg"
+                                value={eventData.event_type === 'ticketed'
+                                  ? `${window.location.origin}/tickets/purchase/${eventData.id}?type=prereg`
+                                  : `${window.location.origin}/event/register/${eventData.uuid}?type=prereg`}
+                                size={140}
+                              />
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-[10px] h-6 text-primary hover:bg-primary/5"
+                                onClick={() => {
+                                  const url = eventData.event_type === 'ticketed'
+                                    ? `${window.location.origin}/tickets/purchase/${eventData.id}?type=prereg`
+                                    : `${window.location.origin}/event/register/${eventData.uuid}?type=prereg`;
+                                  downloadQRCode(url, `prereg-${eventData.name}`);
+                                }}
+                              >
+                                <Download className="w-3 h-3 mr-1" />
+                                Download QR
+                              </Button>
+                            </div>
+
                             <div className="flex gap-2">
                               <Input
-                                value={eventData?.event_type === 'ticketed'
-                                  ? `${window.location.origin}/tickets/purchase/${eventData.id}`
-                                  : `${window.location.origin}/event/register/${eventData.uuid}`}
+                                value={eventData.event_type === 'ticketed'
+                                  ? `${window.location.origin}/tickets/purchase/${eventData.id}?type=prereg`
+                                  : `${window.location.origin}/event/register/${eventData.uuid}?type=prereg`}
                                 readOnly
-                                className="bg-background border-border text-foreground h-10 text-sm"
+                                className="bg-background border-border text-[10px] h-8"
                               />
-                              <Button
+                              <Button 
                                 onClick={() => {
-                                  const registrationUrl = eventData?.event_type === 'ticketed'
-                                    ? `${window.location.origin}/tickets/purchase/${eventData.id}`
-                                    : `${window.location.origin}/event/register/${eventData.uuid}`;
-                                  navigator.clipboard.writeText(registrationUrl);
-                                  toast.success('URL Copied');
-                                }}
-                                className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg px-4"
+                                  const url = eventData.event_type === 'ticketed'
+                                    ? `${window.location.origin}/tickets/purchase/${eventData.id}?type=prereg`
+                                    : `${window.location.origin}/event/register/${eventData.uuid}?type=prereg`;
+                                  navigator.clipboard.writeText(url);
+                                  toast.success('Pre-registration link copied!');
+                                }} 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 w-8 p-0"
                               >
-                                Copy
+                                <Copy className="w-3 h-3" />
                               </Button>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-6 bg-muted/30 rounded-xl p-4 border border-border">
-                            <div className="bg-white p-2 rounded-lg shrink-0">
-                              <img
-                                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(eventData?.event_type === 'ticketed'
-                                  ? `${window.location.origin}/tickets/purchase/${eventData.id}`
-                                  : `${window.location.origin}/event/register/${eventData.uuid}`)}&format=png&margin=0&color=000&bgcolor=fff`}
-                                className="w-24 h-24"
-                                alt="Access QR"
+                          {/* Onsite Registration Section */}
+                          <div className="space-y-4 p-4 rounded-xl border border-border bg-muted/30">
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-sm font-bold uppercase tracking-wider text-orange-500">Onsite Registration</h3>
+                              <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/20 text-[10px]">Walk-in</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">For guests registering at the venue.</p>
+                            
+                            <div className="flex flex-col items-center gap-3 p-3 bg-white rounded-lg">
+                              <QRCode 
+                                id="qr-onsite"
+                                value={eventData.event_type === 'ticketed'
+                                  ? `${window.location.origin}/tickets/purchase/${eventData.id}?type=onsite`
+                                  : `${window.location.origin}/event/register/${eventData.uuid}?type=onsite`}
+                                size={140}
                               />
-                            </div>
-                            <div className="space-y-2">
-                              <h4 className="font-semibold text-base">QR Access</h4>
-                              <p className="text-muted-foreground text-xs">Scan to quickly access the registration page.</p>
-                              <Button
-                                variant="link"
-                                size="sm"
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-[10px] h-6 text-orange-500 hover:bg-orange-500/5"
                                 onClick={() => {
-                                  const link = document.createElement('a');
-                                  const registrationUrl = eventData?.event_type === 'ticketed'
-                                    ? `${window.location.origin}/tickets/purchase/${eventData.id}`
-                                    : `${window.location.origin}/event/register/${eventData.uuid}`;
-                                  link.href = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(registrationUrl)}&format=png&margin=10&color=000&bgcolor=fff`;
-                                  link.download = `qr-${eventData.uuid}.png`;
-                                  link.click();
+                                  const url = eventData.event_type === 'ticketed'
+                                    ? `${window.location.origin}/tickets/purchase/${eventData.id}?type=onsite`
+                                    : `${window.location.origin}/event/register/${eventData.uuid}?type=onsite`;
+                                  downloadQRCode(url, `onsite-${eventData.name}`);
                                 }}
-                                className="h-auto p-0 text-primary font-bold"
                               >
-                                Download Asset
+                                <Download className="w-3 h-3 mr-1" />
+                                Download QR
                               </Button>
                             </div>
-                          </div>
 
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                            {[
-                              { icon: Facebook, label: 'FB', platform: 'facebook' },
-                              { icon: Twitter, label: 'X', platform: 'twitter' },
-                              { icon: MessageCircle, label: 'WA', platform: 'whatsapp' },
-                              { icon: Mail, label: 'Email', platform: 'email' }
-                            ].map((s) => (
-                              <Button
-                                key={s.label}
-                                variant="outline"
-                                onClick={async () => {
-                                  await trackShare(eventData.uuid, s.platform as any);
-                                  toast.info(`Sharing via ${s.platform}`);
-                                }}
-                                className="flex flex-col gap-1.5 h-14 sm:h-16 bg-background border-border hover:bg-muted"
+                            <div className="flex gap-2">
+                              <Input
+                                value={eventData.event_type === 'ticketed'
+                                  ? `${window.location.origin}/tickets/purchase/${eventData.id}?type=onsite`
+                                  : `${window.location.origin}/event/register/${eventData.uuid}?type=onsite`}
+                                readOnly
+                                className="bg-background border-border text-[10px] h-8"
+                              />
+                              <Button 
+                                onClick={() => {
+                                  const url = eventData.event_type === 'ticketed'
+                                    ? `${window.location.origin}/tickets/purchase/${eventData.id}?type=onsite`
+                                    : `${window.location.origin}/event/register/${eventData.uuid}?type=onsite`;
+                                  navigator.clipboard.writeText(url);
+                                  toast.success('Onsite registration link copied!');
+                                }} 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 w-8 p-0"
                               >
-                                <s.icon className="w-4 h-4" />
-                                <span className="text-[10px] font-bold">{s.label}</span>
+                                <Copy className="w-3 h-3" />
                               </Button>
-                            ))}
+                            </div>
                           </div>
                         </div>
                       ) : (
                         <div className="py-12 text-center space-y-3">
                           <XCircle className="w-12 h-12 text-muted-foreground mx-auto" />
-                          <h3 className="text-lg font-bold">Registration Inactive</h3>
-                          <p className="text-muted-foreground text-sm">Publish your event to enable registrations.</p>
+                          <h3 className="text-lg font-bold">Event Data Not Found</h3>
+                          <p className="text-muted-foreground text-sm">Please refresh the page to load event information.</p>
                         </div>
                       )}
                     </DialogContent>
                   </Dialog>
+
+                  {canManageEvent && eventData?.id && (
+                    <EventAccessCodesDialog eventId={Number(eventData.id)} />
+                  )}
 
                   {canManageEvent && (
                     <UsherAssignmentDialog
@@ -3183,6 +3243,7 @@ export default function EventDetails() {
                               <TableHead className="hidden md:table-cell px-3">Company / Job Title</TableHead>
                               <TableHead className="w-[140px] px-2">Phone</TableHead>
                               <TableHead className="hidden xl:table-cell w-[200px] px-2">Email</TableHead>
+                              <TableHead className="w-[110px] px-2">Reg Type</TableHead>
                               <TableHead className="w-[130px] px-2">Status</TableHead>
                               <TableHead className="w-[100px] px-2 text-right">Actions</TableHead>
                             </TableRow>
@@ -3235,6 +3296,18 @@ export default function EventDetails() {
 
                                   <TableCell className="hidden xl:table-cell max-w-[180px] truncate px-2 text-sm">
                                     {attendee.guest?.email || '-'}
+                                  </TableCell>
+
+                                  <TableCell className="px-2 w-[130px]">
+                                    {attendee.registration_type === 'onsite' ? (
+                                      <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/30 text-[10px] px-1.5 py-0 rounded-full border whitespace-nowrap">
+                                        Onsite
+                                      </Badge>
+                                    ) : (
+                                      <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-[10px] px-1.5 py-0 rounded-full border whitespace-nowrap">
+                                        Pre-Reg
+                                      </Badge>
+                                    )}
                                   </TableCell>
 
                                   <TableCell className="px-2 w-[130px]">

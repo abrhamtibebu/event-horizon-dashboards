@@ -120,6 +120,7 @@ export default function TicketPurchasePage() {
         },
         payment_method: selectedPaymentMethod,
         phone_number: paymentPhoneNumber,
+        registration_type: searchParams.get('type') || 'prereg',
         invitation_code: invitationCode || undefined,
         ...(turnstileToken ? { cf_turnstile_response: turnstileToken } : {}),
       });
@@ -209,8 +210,8 @@ export default function TicketPurchasePage() {
     <div className="min-h-screen bg-background text-foreground transition-colors duration-500">
       {/* Dynamic Header / Banner */}
       <div className="relative h-[30vh] md:h-[40vh] overflow-hidden">
-        {event?.image_url ? (
-          <img src={event.image_url} alt={event.name} className="w-full h-full object-cover" />
+        {event?.image_url || event?.image || event?.event_image ? (
+          <img src={getImageUrl(event.image_url || event.image || event.event_image)} alt={event.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/5 to-background" />
         )}

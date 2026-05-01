@@ -44,6 +44,7 @@ export const PublicFormRegistrationPage = lazy(
   () => import('@/pages/PublicFormRegistration'),
 )
 export const RegistrationSuccessPage = lazy(() => import('@/pages/RegistrationSuccess'))
+export const OnsiteRegistrationPage = lazy(() => import('@/pages/OnsiteRegistration'))
 
 // Ticket purchase (public)
 export const TicketPurchasePage = lazy(() => import('@/pages/tickets/TicketPurchasePage'))

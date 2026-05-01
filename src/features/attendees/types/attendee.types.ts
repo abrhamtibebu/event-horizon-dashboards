@@ -6,6 +6,7 @@ export interface Attendee {
   event_id: number
   guest_type_id?: number
   ticket_type_id?: number
+  registration_type?: 'onsite' | 'prereg'
   checked_in: boolean
   check_in_time?: string | null
   created_at?: string

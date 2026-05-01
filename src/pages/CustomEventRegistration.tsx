@@ -35,6 +35,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import api from '@/lib/api';
+import { getImageUrl } from '@/lib/utils';
 
 interface EventData {
   id: number;
@@ -417,7 +418,7 @@ const CustomEventRegistration: React.FC = () => {
                 {eventData?.organizer?.logo && (
                   <div className="w-16 h-16 bg-white rounded-lg border-2 border-slate-300 flex items-center justify-center p-2 shadow-sm">
                     <img
-                      src={eventData.organizer.logo}
+                      src={getImageUrl(eventData.organizer.logo)}
                       alt={eventData.organizer.name}
                       className="w-full h-full object-contain"
                     />
@@ -533,7 +534,7 @@ const CustomEventRegistration: React.FC = () => {
               {eventData?.organizer?.logo && (
                 <div className="w-16 h-16 bg-white rounded-lg border-2 border-slate-300 flex items-center justify-center p-2 shadow-sm">
                   <img
-                    src={eventData.organizer.logo}
+                    src={getImageUrl(eventData.organizer.logo)}
                     alt={eventData.organizer.name}
                     className="w-full h-full object-contain"
                   />
