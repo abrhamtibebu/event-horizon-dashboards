@@ -1269,6 +1269,7 @@ export default function PublicEventRegister() {
                 </div>
               )}
             </div>
+            )}
           </div>
           
           {/* Subtle Footer inside card */}
