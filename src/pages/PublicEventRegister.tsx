@@ -1,3 +1,4 @@
+// Trigger HMR
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle, Building, UserCog, Mail, Phone } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle, Building, UserCog, Mail, Phone, X, Mic2, ArrowRight } from 'lucide-react';
 import { getImageUrl } from '@/lib/utils';
 import { PublicTicketSelector } from '@/components/public/PublicTicketSelector';
 import { PublicPaymentSelector } from '@/components/public/PublicPaymentSelector';
@@ -32,6 +33,8 @@ export default function PublicEventRegister() {
   const [error, setError] = useState<string | null>(null);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [invitationCode, setInvitationCode] = useState<string | null>(null);
+  const [invitationDetails, setInvitationDetails] = useState<any>(null);
+  const [rsvpLoading, setRsvpLoading] = useState(false);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -40,6 +43,7 @@ export default function PublicEventRegister() {
     job_title: '',
     gender: '',
     country: '',
+    city: '',
     attendees: '1',
     dietary: '',
     agree: false,
@@ -65,6 +69,11 @@ export default function PublicEventRegister() {
   const [guestTypes, setGuestTypes] = useState<any[]>([]);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileSiteKey = getTurnstileSiteKey();
+
+  // RSVP and Speaker states
+  const [rsvpStatus, setRsvpStatus] = useState<'pending' | 'accepted' | 'declined'>('pending');
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
 
   const handleCustomFormSuccess = useCallback(() => {
     setSuccess(true);
@@ -149,6 +158,22 @@ export default function PublicEventRegister() {
   ];
   const attendeeOptions = ['1 Person', '2 People', '3 People', '4+ People'];
 
+  // Static city data for common countries
+  const CITY_DATA: Record<string, string[]> = {
+    'Ethiopia': ['Addis Ababa', 'Dire Dawa', 'Adama', 'Bahir Dar', 'Gondar', 'Mekele', 'Hawassa', 'Jimma', 'Dessie', 'Jijiga', 'Bishoftu', 'Arba Minch', 'Hosaena', 'Dilla', 'Nekemte', 'Debre Birhan', 'Asella'],
+    'United States': ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia', 'San Antonio', 'San Diego', 'Dallas', 'San Jose', 'Austin', 'Jacksonville', 'Fort Worth', 'Columbus', 'San Francisco', 'Charlotte', 'Indianapolis', 'Seattle', 'Denver', 'Washington D.C.'],
+    'United Kingdom': ['London', 'Birmingham', 'Manchester', 'Glasgow', 'Newcastle', 'Sheffield', 'Liverpool', 'Leeds', 'Bristol', 'Edinburgh', 'Leicester', 'Coventry', 'Belfast', 'Cardiff', 'Nottingham', 'Southampton', 'Reading'],
+    'United Arab Emirates': ['Dubai', 'Abu Dhabi', 'Sharjah', 'Al Ain', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'],
+    'Kenya': ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Malindi', 'Kitale'],
+    'Nigeria': ['Lagos', 'Kano', 'Ibadan', 'Benin City', 'Port Harcourt', 'Jos', 'Ilorin', 'Abuja', 'Kaduna', 'Enugu'],
+    'South Africa': ['Johannesburg', 'Cape Town', 'Durban', 'Pretoria', 'Port Elizabeth', 'Bloemfontein', 'East London'],
+    'Germany': ['Berlin', 'Hamburg', 'Munich', 'Cologne', 'Frankfurt', 'Stuttgart', 'Düsseldorf', 'Leipzig', 'Dortmund', 'Essen'],
+    'France': ['Paris', 'Marseille', 'Lyon', 'Toulouse', 'Nice', 'Nantes', 'Montpellier', 'Strasbourg', 'Bordeaux', 'Lille'],
+    'India': ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Ahmedabad', 'Chennai', 'Kolkata', 'Surat', 'Pune', 'Jaipur'],
+    'China': ['Shanghai', 'Beijing', 'Guangzhou', 'Shenzhen', 'Tianjin', 'Wuhan', 'Dongguan', 'Chengdu', 'Foshan', 'Chongqing'],
+    'Canada': ['Toronto', 'Montreal', 'Vancouver', 'Ottawa', 'Calgary', 'Edmonton', 'Quebec City', 'Winnipeg', 'Hamilton'],
+  };
+
   // Extract referral code from URL parameters and track click
   useEffect(() => {
     const refParam = searchParams.get('ref');
@@ -196,8 +221,53 @@ export default function PublicEventRegister() {
             referrer: document.referrer
           });
           console.log('[Invitation] Click tracked successfully');
+          
+          // Fetch invitation details
+          const response = await api.get(`/public/invitations/${invParam}`);
+          const invData = response.data?.data || response.data;
+          setInvitationDetails(invData);
+          
+          // Pre-fill form if recipient details are available
+          if (invData.recipient_name) {
+            setForm(prev => ({
+              ...prev,
+              name: invData.recipient_name || prev.name,
+              email: invData.recipient_email || prev.email
+            }));
+          }
+
+          // Auto-select guest type based on invitation type
+          if (invData.invitation_type && guestTypes.length > 0) {
+            const mapping: Record<string, string[]> = {
+              'personalized': ['Regular', 'Standard'],
+              'generic': ['Visitor', 'Guest'],
+              'exhibitor': ['Exhibitor', 'Vendor', 'Sponsor', 'Booth'],
+              'speaker': ['Speaker', 'Presenter', 'Keynote'],
+              'vip': ['VIP', 'V.I.P', 'Very Important'],
+              'media': ['Media', 'Press', 'Journalist', 'News'],
+            };
+            
+            const variants = mapping[invData.invitation_type] || [invData.invitation_type];
+            const matchingType = guestTypes.find((gt: any) => 
+              variants.some(v => gt.name.toLowerCase().includes(v.toLowerCase()))
+            );
+            
+            if (matchingType) {
+              console.log('[Invitation] Auto-selecting guest type:', matchingType.name);
+              setSelectedGuestTypeId(matchingType.id);
+              
+              // Check if this type has a custom form
+              api.get(`/events/${event.id}/forms/by-guest-type/${matchingType.id}`)
+                .then(formRes => {
+                  if (formRes.data?.status === 'active') {
+                    setUseCustomForm(true);
+                  }
+                })
+                .catch(() => {});
+            }
+          }
         } catch (error) {
-          console.warn('[Invitation] Failed to track click:', error);
+          console.warn('[Invitation] Failed to track click or fetch details:', error);
         }
       };
 
@@ -261,6 +331,39 @@ export default function PublicEventRegister() {
       console.error('Error fetching guest types:', err);
     });
   }, [event]);
+  
+  // Sync selected guest type with invitation details when guest types are loaded
+  useEffect(() => {
+    if (invitationDetails?.invitation_type && guestTypes.length > 0) {
+      const mapping: Record<string, string[]> = {
+        'personalized': ['Regular', 'Standard'],
+        'generic': ['Visitor', 'Guest'],
+        'exhibitor': ['Exhibitor', 'Vendor', 'Sponsor', 'Booth'],
+        'speaker': ['Speaker', 'Presenter', 'Keynote'],
+        'vip': ['VIP', 'V.I.P', 'Very Important'],
+        'media': ['Media', 'Press', 'Journalist', 'News'],
+      };
+      
+      const variants = mapping[invitationDetails.invitation_type] || [invitationDetails.invitation_type];
+      const matchingType = guestTypes.find((gt: any) => 
+        variants.some(v => gt.name.toLowerCase().includes(v.toLowerCase()))
+      );
+      
+      if (matchingType) {
+        console.log('[Invitation Sync] Selecting guest type:', matchingType.name);
+        setSelectedGuestTypeId(matchingType.id);
+        
+        // Also check for custom form
+        api.get(`/events/${event.id}/forms/by-guest-type/${matchingType.id}`)
+          .then(formRes => {
+            if (formRes.data?.status === 'active') {
+              setUseCustomForm(true);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [invitationDetails, guestTypes, event?.id]);
 
 
   const checkExistingGuest = async (email: string, phone: string) => {
@@ -317,6 +420,19 @@ export default function PublicEventRegister() {
   };
 
   const handleFieldChange = (field: string, value: any) => {
+    if (field === 'profile_picture') {
+      const file = value;
+      if (file) {
+        setProfileImage(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setProfileImagePreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+      return;
+    }
+
     setForm(prev => ({ ...prev, [field]: value }));
     setTouchedFields(prev => ({ ...prev, [field]: true }));
 
@@ -340,35 +456,61 @@ export default function PublicEventRegister() {
     }
   };
 
+  const handleRsvp = async (status: 'accepted' | 'declined') => {
+    if (!invitationCode) return;
+    setRsvpLoading(true);
+    try {
+      await api.post('/invitations/rsvp', { 
+        invitation_code: invitationCode,
+        status 
+      });
+      setRsvpStatus(status);
+      if (status === 'accepted') {
+        toast.success("We're thrilled you can join us!");
+      } else {
+        toast.info("Thank you for letting us know.");
+      }
+    } catch (error) {
+      console.error('RSVP error:', error);
+      toast.error("Failed to update RSVP status.");
+    } finally {
+      setRsvpLoading(false);
+    }
+  };
+
   const validateField = (field: string, value: any): string => {
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const PHONE_CLEAN_REGEX = /[\s\-\(\)]/g;
+    const ETH_PHONE_REGEX = /^(0[97]\d{8}|\+251[97]\d{8}|[97]\d{8})$/;
+
     switch (field) {
       case 'name':
         return !value.trim() ? 'Please enter your full name' : '';
-      case 'email':
+      case 'email': {
         if (!value.trim()) return 'Please enter your email address';
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(value.trim())) return 'Please enter a valid email address';
+        if (!EMAIL_REGEX.test(value.trim())) return 'Please enter a valid email address';
         return '';
-      case 'phone':
+      }
+      case 'phone': {
         if (!value.trim()) return 'Please enter your phone number';
-        // Ethiopian phone validation - 09, 07, +251 9, +251 7, 9, 7 (9 digits total)
-        const cleanPhone = value.replace(/[\s\-\(\)]/g, '');
-        const ethiopianPhoneRegex = /^(0[97]\d{8}|\+251[97]\d{8}|[97]\d{8})$/;
-        if (!ethiopianPhoneRegex.test(cleanPhone)) {
+        const cleanPhone = value.replace(PHONE_CLEAN_REGEX, '');
+        if (!ETH_PHONE_REGEX.test(cleanPhone)) {
           return 'Please enter a valid Ethiopian phone number (09, 07, +251 9, +251 7, 9, or 7 format)';
         }
         return '';
+      }
       case 'company':
         return !value.trim() ? 'Please enter your company name' : '';
       case 'job_title':
         return !value.trim() ? 'Please enter your job title' : '';
       case 'gender':
         return !value.trim() ? 'Please select your gender' : '';
-      case 'age':
+      case 'age': {
         if (!value.toString().trim()) return 'Please enter your age';
         const ageNum = parseInt(value);
         if (isNaN(ageNum) || ageNum < 1 || ageNum > 120) return 'Please enter a valid age';
         return '';
+      }
       case 'country':
         return !value.trim() ? 'Please select your country' : '';
       case 'agree':
@@ -423,92 +565,59 @@ export default function PublicEventRegister() {
 
     setSubmitting(true);
     try {
-      // Check if we need FormData (for future file uploads)
-      const needsFormData = false;
+      // Always use FormData to support potential file uploads (like speaker profile pics)
+      const formData = new FormData();
+      
+      // Basic form fields
+      formData.append('name', form.name);
+      formData.append('email', form.email);
+      formData.append('phone', form.phone);
+      formData.append('company', form.company || '');
+      formData.append('job_title', form.job_title || '');
+      formData.append('gender', form.gender || '');
+      formData.append('country', form.country || '');
+      formData.append('city', form.city || '');
+      formData.append('age', form.age || '');
+      formData.append('dietary', form.dietary || '');
+      
+      // Guest type and registration metadata
+      formData.append('guest_type_id', (selectedGuestTypeId || visitorGuestTypeId)?.toString() || '');
+      if (referralCode) formData.append('referral_code', referralCode);
+      if (invitationCode) formData.append('invitation_code', invitationCode);
+      formData.append('registration_type', searchParams.get('type') || 'prereg');
+      if (turnstileToken) formData.append('cf_turnstile_response', turnstileToken);
 
-      if (needsFormData) {
-        // Use FormData for file uploads
-        const formData = new FormData();
-        formData.append('name', form.name);
-        formData.append('email', form.email);
-        formData.append('phone', form.phone);
-        formData.append('company', form.company || '');
-        formData.append('job_title', form.job_title || '');
-        formData.append('gender', form.gender || '');
-        formData.append('country', form.country || '');
-        formData.append('guest_type_id', (selectedGuestTypeId || visitorGuestTypeId)?.toString() || '');
-        if (referralCode) formData.append('referral_code', referralCode);
-        if (invitationCode) formData.append('invitation_code', invitationCode);
-        formData.append('registration_type', searchParams.get('type') || 'prereg');
-        if (turnstileToken) formData.append('cf_turnstile_response', turnstileToken);
-
-        const response = await api.post(`/public/events/${event.uuid}/register`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-
-        // Handle success response (same as below)
-        if (response.data?.attendee && response.data?.event) {
-          const params = new URLSearchParams({
-            attendeeId: response.data.attendee.id.toString(),
-            eventId: response.data.event.id.toString(),
-            eventName: response.data.event.name,
-            eventDate: response.data.event.start_date || '',
-            eventTime: response.data.event.start_date || '',
-            eventLocation: response.data.event.venue_name || response.data.event.location || '',
-            guestName: response.data.attendee.guest_name,
-            guestEmail: response.data.attendee.guest_email,
-            guestPhone: response.data.attendee.guest_phone,
-            guestCompany: response.data.attendee.guest_company,
-            guestJobTitle: response.data.attendee.guest_job_title,
-            guestGender: response.data.attendee.guest_gender,
-            guestCountry: response.data.attendee.guest_country,
-            guestUuid: response.data.attendee.guest_uuid || '',
-            guestTypeName: response.data.attendee.guest_type_name,
-          });
-          navigate(`/registration/success?${params.toString()}`);
-        } else {
-          toast.success('Registration successful!');
-          navigate('/registration/success');
-        }
-        return;
+      // Add profile picture if present
+      if (profileImage) {
+        formData.append('profile_picture', profileImage);
       }
 
-      // No file uploads, use regular JSON
-      const registrationData: any = {
-        ...form,
-        guest_type_id: selectedGuestTypeId || visitorGuestTypeId,
-        registration_type: searchParams.get('type') || 'prereg',
-        referral_code: referralCode,
-        invitation_code: invitationCode,
-        ...(turnstileToken ? { cf_turnstile_response: turnstileToken } : {}),
-      };
-
-      const response = await api.post(`/public/events/${event.uuid}/register`, registrationData);
+      const response = await api.post(`/public/events/${event.uuid}/register`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       // Track referral activity if referral code exists
-      if (referralCode) {
+      if (referralCode && response.data?.attendee) {
         try {
           await api.post('/vendor-referrals/track-activity', {
             referral_code: referralCode,
             activity_type: 'registration',
-            guest_id: response.data?.attendee?.guest_id,
-            attendee_id: response.data?.attendee?.id,
+            guest_id: response.data.attendee.guest_id,
+            attendee_id: response.data.attendee.id,
             metadata: {
               event_uuid: event.uuid,
               event_name: event.name,
               registration_date: new Date().toISOString(),
             }
           });
-          console.log('Referral activity tracked successfully');
-        } catch (trackingError) {
-          console.warn('Failed to track referral activity:', trackingError);
-          // Don't fail the registration if tracking fails
+        } catch (err) {
+          console.warn('Failed to track referral registration:', err);
         }
       }
 
-      // Navigate to confirmation page with registration data
+      // Handle success response
       if (response.data?.attendee && response.data?.event) {
         const params = new URLSearchParams({
           attendeeId: response.data.attendee.id.toString(),
@@ -529,12 +638,10 @@ export default function PublicEventRegister() {
           guestTypeName: response.data.attendee.guest_type_name,
           guestTypePrice: response.data.attendee.guest_type_price?.toString() || '0',
         });
-
         navigate(`/registration/success?${params.toString()}`);
       } else {
-        // Fallback to old success state if backend doesn't return expected data
-        setSuccess(true);
-        toast.success('Registration successful! Your confirmation email with e-badge is being sent. You can also view it on the confirmation page.');
+        toast.success('Registration successful!');
+        navigate('/registration/success');
       }
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Registration failed.');
@@ -668,6 +775,34 @@ export default function PublicEventRegister() {
     setPaymentStatus('pending');
   };
 
+  const handleRSVP = async (status: 'accepted' | 'declined') => {
+    if (!invitationCode) return;
+    
+    setRsvpLoading(true);
+    try {
+      await api.post('/invitations/rsvp', {
+        invitation_code: invitationCode,
+        status
+      });
+      
+      setInvitationDetails(prev => ({
+        ...prev,
+        rsvp_status: status,
+        is_rsvp_completed: true
+      }));
+
+      if (status === 'accepted') {
+        toast.success('Thank you for accepting the invitation! You can now complete your registration.');
+      } else {
+        toast.info('You have declined the invitation. We hope to see you at future events.');
+      }
+    } catch (err) {
+      toast.error('Failed to update RSVP. Please try again.');
+    } finally {
+      setRsvpLoading(false);
+    }
+  };
+
   const handleRetryPayment = () => {
     handleClosePaymentModal();
     setPurchaseStep('payment');
@@ -739,6 +874,9 @@ export default function PublicEventRegister() {
   }
 
   // Helper functions
+  const selectedGuestTypeName = guestTypes.find(gt => gt.id === selectedGuestTypeId)?.name?.toLowerCase() ?? '';
+  const isSpeakerOrPanelist = selectedGuestTypeName.includes('speaker') || selectedGuestTypeName.includes('panelist');
+
   const startDate = event.start_date ? new Date(event.start_date) : null;
   const endDate = event.end_date ? new Date(event.end_date) : null;
   const organizerName = event.organizer?.name || 'Event Organizer';
@@ -775,450 +913,376 @@ export default function PublicEventRegister() {
   const daysRemaining = getDaysRemaining();
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 py-6 sm:py-12 px-3 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto space-y-6 sm:space-y-10">
-        {/* Top Logos Header */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 sm:gap-10 animate-fade-in transition-all duration-700">
-          <Link to="/" className="inline-block group transition-transform hover:scale-105">
-            <div className="flex items-center gap-3">
-              <img src="/evella-logo.png" alt="Evella" className="w-10 h-10 object-contain shadow-lg shadow-primary/20 rounded-xl" />
-              <div className="flex flex-col">
-                <span className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-primary transition-colors">
-                  Evella
-                </span>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Event Platform</span>
-              </div>
+    <div className="min-h-screen bg-white sm:bg-slate-50 dark:bg-slate-950 sm:py-12 px-0 sm:px-6 lg:px-8" style={{ fontFamily: "'Outfit', sans-serif" }}>
+      <div className="max-w-4xl mx-auto w-full">
+        {/* Simplified Header - Hidden or simplified on mobile to focus on event */}
+        <div className="flex flex-col sm:flex-row items-center justify-between mb-0 sm:mb-12 gap-6 p-4 sm:p-0 bg-white sm:bg-transparent dark:bg-slate-950 sm:dark:bg-transparent border-b sm:border-none border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg border border-slate-100 dark:border-slate-800 overflow-hidden">
+              <img src="/evella-logo.png" alt="Evella" className="w-6 h-6 sm:w-8 sm:h-8 object-contain" />
             </div>
-          </Link>
+            <div>
+              <h1 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">Event Registration</h1>
+              <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Powered by Validity</p>
+            </div>
+          </div>
 
           {organizerName && (
-            <div className="flex items-center gap-4 bg-white/40 dark:bg-slate-800/40 backdrop-blur-md px-4 sm:px-5 py-2 sm:py-2.5 rounded-2xl border border-white/20 shadow-sm transition-all hover:shadow-md hover:bg-white/60 w-full sm:w-auto justify-center sm:justify-start">
-              <div className="flex flex-col items-center sm:items-end">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Organized by</span>
-                <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white max-w-[180px] sm:max-w-[200px] truncate">{organizerName}</span>
+            <div className="hidden sm:flex items-center gap-4 bg-white dark:bg-slate-900 px-5 py-2.5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 w-full sm:w-auto">
+              <div className="text-left sm:text-right flex-1 sm:flex-none">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Organizer</p>
+                <p className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[200px]">{organizerName}</p>
               </div>
               {event.organizer?.logo ? (
-                <img
-                  src={getImageUrl(event.organizer.logo)}
-                  alt={organizerName}
-                  className="h-9 w-9 sm:h-10 sm:w-10 object-contain rounded-xl shadow-sm border border-white/50"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/evella-logo.png';
-                  }}
-                />
+                <img src={getImageUrl(event.organizer.logo)} alt={organizerName} className="h-10 w-10 object-contain rounded-xl" />
               ) : (
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
-                  <Building className="w-5 h-5 text-primary" />
+                <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center border border-orange-100 dark:border-orange-800">
+                  <Building className="w-5 h-5 text-[#f97316]" />
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {/* Main Card */}
-        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/20 dark:border-slate-800 shadow-2xl rounded-3xl overflow-hidden animate-scale-in transition-all duration-500">
-          {/* Event Banner */}
-          <div className="relative h-48 sm:h-80 overflow-hidden">
+        {/* Main Event Card */}
+        <div className="bg-white dark:bg-slate-900 rounded-none sm:rounded-[3rem] shadow-none sm:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden border-none sm:border border-slate-100 dark:border-slate-800 mb-0 sm:mb-12">
+          {/* Banner */}
+          <div className="relative h-64 sm:h-96">
             {(event.event_image || event.image_url || event.image) ? (
               <img
                 src={getImageUrl(event.image_url || event.event_image || event.image)}
                 alt={event.name}
-                className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700"
+                className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full relative group bg-slate-900">
-                <img
-                  src="/event-placeholder.png"
-                  alt="Event Placeholder"
-                  className="w-full h-full object-cover opacity-60 dark:opacity-50 blur-[1px]"
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-transparent to-black/40">
-                  <Sparkles className="w-12 sm:w-20 h-12 sm:h-20 text-white/40 animate-pulse drop-shadow-[0_0_25px_rgba(255,255,255,0.3)]" />
-                </div>
+              <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                <Sparkles className="w-12 h-12 text-white/10" />
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent flex items-end p-5 sm:p-10">
-              <div className="w-full">
-                <div className="inline-flex items-center gap-2 bg-primary/20 backdrop-blur-md border border-primary/30 text-white px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.15em] mb-2 sm:mb-4">
-                  <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-yellow-400 fill-yellow-400" />
-                  <span>{event.category?.name || 'Featured Event'}</span>
-                </div>
-                <h1 className="text-xl sm:text-5xl font-extrabold text-white tracking-tight drop-shadow-2xl leading-tight">
-                  {event.name}
-                </h1>
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-80" />
+            <div className="absolute bottom-0 left-0 w-full p-6 sm:p-12">
+              <div className="inline-flex items-center gap-2 bg-[#f97316] text-white px-3 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest mb-2 sm:mb-4 shadow-lg">
+                <Star className="w-2.5 h-2.5 fill-white" />
+                {event.category?.name || 'Featured Event'}
               </div>
+              <h1 className="text-2xl sm:text-6xl font-black text-white tracking-tight leading-tight">
+                {event.name}
+              </h1>
             </div>
           </div>
 
-          {/* Quick Info Grid - Responsive stacking */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-200/50 dark:bg-slate-800 border-b border-white/10">
-            <div className="bg-white/50 dark:bg-slate-900/50 p-4 sm:p-6 text-center group hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/5 flex items-center justify-center mx-auto mb-2 sm:mb-3 group-hover:bg-primary/10 transition-colors">
-                <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary opacity-80 group-hover:opacity-100 transition-opacity" />
+          {/* Info bar - Responsive grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 border-b border-slate-50 dark:border-slate-800">
+            {[
+              { label: 'Date', value: startDate ? startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD', icon: Calendar },
+              { label: 'Time', value: event.time || 'Flexible', icon: Clock },
+              { label: 'Venue', value: event.venue_name || event.location || 'Online', icon: MapPin },
+              { label: 'Guest Type', value: invitationDetails?.invitation_type || 'Attendee', icon: Users },
+            ].map((item, i) => (
+              <div key={i} className={`p-4 sm:p-6 text-center border-slate-50 dark:border-slate-800 ${i % 2 === 0 ? 'border-r' : 'md:border-r'} ${i < 2 ? 'border-b md:border-b-0' : ''}`}>
+                <item.icon className="w-4 h-4 sm:w-5 sm:h-5 text-[#f97316] mx-auto mb-1.5 sm:mb-2 opacity-80" />
+                <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 sm:mb-1">{item.label}</p>
+                <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">{item.value}</p>
               </div>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Date</p>
-              <p className="text-[11px] sm:text-sm font-black text-slate-900 dark:text-white mt-0.5 sm:mt-1">
-                {startDate ? startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}
-              </p>
-            </div>
-            <div className="bg-white/50 dark:bg-slate-900/50 p-4 sm:p-6 text-center group hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/5 flex items-center justify-center mx-auto mb-2 sm:mb-3 group-hover:bg-primary/10 transition-colors">
-                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary opacity-80 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Time</p>
-              <p className="text-[11px] sm:text-sm font-black text-slate-900 dark:text-white mt-0.5 sm:mt-1">
-                {event.time || (startDate ? startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Flexible')}
-              </p>
-            </div>
-            <div className="bg-white/50 dark:bg-slate-900/50 p-4 sm:p-6 text-center group hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/5 flex items-center justify-center mx-auto mb-2 sm:mb-3 group-hover:bg-primary/10 transition-colors">
-                <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-primary opacity-80 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Venue</p>
-              <p className="text-[11px] sm:text-sm font-black text-slate-900 dark:text-white mt-0.5 sm:mt-1 truncate px-1" title={event.venue_name || event.location}>
-                {event.venue_name || event.location || 'Online'}
-              </p>
-            </div>
-            <div className="bg-white/50 dark:bg-slate-900/50 p-4 sm:p-6 text-center group hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-300">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/5 flex items-center justify-center mx-auto mb-3 group-hover:bg-primary/10 transition-colors">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary opacity-80 group-hover:opacity-100 transition-opacity" />
-              </div>
-              <p className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Capacity</p>
-              <p className="text-[11px] sm:text-sm font-black text-slate-900 dark:text-white mt-0.5 sm:mt-1">
-                {event.max_guests ? `${event.attendee_count || 0} / ${event.max_guests}` : 'Open'}
-              </p>
-            </div>
+            ))}
           </div>
 
-          <div className="p-5 sm:p-12">
-            {(event.latitude || event.longitude || event.venue_name || event.location || event.formatted_address) && (
-              <div className="mb-8">
-                <EventLocationMapCard
-                  latitude={event.latitude}
-                  longitude={event.longitude}
-                  venueName={event.venue_name}
-                  location={event.location}
-                  formattedAddress={event.formatted_address}
-                />
-              </div>
-            )}
-
-            {/* Description Card */}
+          <div className="p-4 sm:p-16">
+            {/* Description & RSVP Area */}
             {event.description && (
-              <div className="mb-8 sm:mb-12 text-center max-w-2xl mx-auto">
-                <div className="inline-block px-4 py-1.5 bg-slate-50 dark:bg-slate-800 rounded-full text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-3 sm:mb-4 uppercase tracking-widest border border-slate-100 dark:border-slate-700">
-                  About Event
-                </div>
-                <p className="text-sm sm:text-base leading-relaxed text-slate-600 dark:text-slate-300 italic font-medium px-2 sm:px-0">
+              <div className="mb-8 sm:mb-12 text-center max-w-2xl mx-auto px-4">
+                <p className="text-base sm:text-xl text-slate-600 dark:text-slate-400 font-medium italic leading-relaxed">
                   &ldquo;{event.description}&rdquo;
                 </p>
               </div>
             )}
 
-            {/* Registration/Ticket Flow */}
-            <div className="max-w-2xl mx-auto">
-              {useCustomForm && !isTicketedEvent && selectedGuestTypeId ? (
-                <div className="bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-slate-100 dark:border-slate-800 shadow-inner overflow-hidden">
-                  <DynamicFormRenderer
-                    eventId={Number(event?.id)}
-                    guestTypeId={selectedGuestTypeId}
-                    participantType={customFormParticipantType}
-                    onSuccess={handleCustomFormSuccess}
-                    onError={handleCustomFormError}
-                    onFallback={handleCustomFormFallback}
-                  />
+            {/* RSVP Section for Invitations */}
+            {invitationCode && rsvpStatus === 'pending' && (
+              <div className="max-w-2xl mx-auto mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 sm:p-12 border-2 border-[#f97316]/20 shadow-xl text-center">
+                  <div className="w-20 h-20 bg-[#f97316]/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <Mail className="w-10 h-10 text-[#f97316]" />
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-3">You're Invited!</h2>
+                  <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-md mx-auto leading-relaxed">
+                    Hello <span className="text-[#f97316] font-bold">{invitationDetails?.recipient_name || 'there'}</span>, 
+                    we've sent you a special invitation to join us. Would you like to attend?
+                  </p>
+                  
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <Button
+                      onClick={() => handleRsvp('accepted')}
+                      disabled={rsvpLoading}
+                      className="h-14 px-10 rounded-2xl bg-[#f97316] hover:bg-[#ea580c] text-white font-black shadow-lg shadow-orange-500/20 w-full sm:w-auto min-w-[180px]"
+                    >
+                      {rsvpLoading ? <SpinnerInline /> : 'Yes, I\'ll attend!'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleRsvp('declined')}
+                      disabled={rsvpLoading}
+                      className="h-14 px-10 rounded-2xl border-slate-200 dark:border-slate-800 text-slate-600 font-bold w-full sm:w-auto min-w-[180px]"
+                    >
+                      Declined
+                    </Button>
+                  </div>
                 </div>
-              ) : (
-                <div className="space-y-6 sm:space-y-10">
-                  {/* Ticketed Event View */}
-                  {isTicketedEvent && (
-                    <div className="animate-fade-in">
-                      {purchaseStep === 'tickets' && (
-                        <div className="space-y-6 sm:space-y-8">
-                          <div className="text-center">
-                            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Select Your Tickets</h2>
-                            <p className="text-xs sm:text-sm text-slate-500 mt-2">Choose the perfect pass for your experience</p>
-                          </div>
+              </div>
+            )}
 
-                          <PublicTicketSelector
-                            ticketTypes={ticketTypesData || []}
-                            selectedTickets={selectedTickets}
-                            onTicketChange={handleTicketChange}
-                          />
+            {/* Declined State */}
+            {invitationCode && rsvpStatus === 'declined' && (
+              <div className="max-w-2xl mx-auto mb-12 animate-in zoom-in duration-500">
+                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 sm:p-12 border border-slate-100 dark:border-slate-800 shadow-xl text-center">
+                  <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle className="w-10 h-10 text-slate-400" />
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-3">Response Received</h2>
+                  <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-md mx-auto leading-relaxed">
+                    Thank you for letting us know. We've recorded your response. 
+                    If you change your mind, you can still register below.
+                  </p>
+                  <Button
+                    onClick={() => setRsvpStatus('accepted')}
+                    variant="link"
+                    className="text-[#f97316] font-black uppercase tracking-widest text-xs"
+                  >
+                    I changed my mind, I want to attend
+                  </Button>
+                </div>
+              </div>
+            )}
 
-                          <Button
-                            onClick={() => setPurchaseStep('payment')}
-                            disabled={selectedTickets.length === 0}
-                            className="w-full h-12 sm:h-14 rounded-2xl bg-primary hover:bg-primary-hover text-white font-extrabold shadow-xl shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 mt-4 text-sm sm:text-base"
-                          >
-                            Proceed to Checkout
-                            <ArrowRight className="w-4 h-4 ml-2" />
-                          </Button>
+            {/* Registration Form Area */}
+            {(!invitationCode || rsvpStatus === 'accepted') && (
+              <div className="max-w-2xl mx-auto animate-in fade-in duration-500">
+                {useCustomForm && !isTicketedEvent && selectedGuestTypeId ? (
+                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-[1.5rem] sm:rounded-[2.5rem] p-6 sm:p-12 border border-slate-100 dark:border-slate-800 shadow-inner">
+                    <DynamicFormRenderer
+                      eventId={Number(event?.id)}
+                      guestTypeId={selectedGuestTypeId}
+                      invitationCode={invitationCode}
+                      participantType={customFormParticipantType}
+                      onSuccess={handleCustomFormSuccess}
+                      onError={handleCustomFormError}
+                      onFallback={handleCustomFormFallback}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-8 sm:space-y-12">
+                    <div className="text-center px-4">
+                      <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-2">Secure Your Spot</h2>
+                      <p className="text-xs sm:text-sm text-slate-500 font-medium">Please fill in your details to complete registration</p>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 sm:gap-y-8">
+                      {/* Profile Picture for Speaker/Panelist */}
+                      {isSpeakerOrPanelist && (
+                        <div className="sm:col-span-2 flex flex-col items-center justify-center p-8 mb-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/50 transition-all hover:border-[#f97316]/50 group">
+                          <Label className="w-full text-center cursor-pointer">
+                            <div className="relative w-28 h-28 mx-auto mb-4">
+                              {profileImagePreview ? (
+                                <img src={profileImagePreview} alt="Preview" className="w-full h-full object-cover rounded-[1.5rem] shadow-xl ring-4 ring-white dark:ring-slate-900" />
+                              ) : (
+                                <div className="w-full h-full bg-white dark:bg-slate-900 rounded-[1.5rem] flex items-center justify-center shadow-inner border border-slate-100 dark:border-slate-800">
+                                  <Users className="w-10 h-10 text-slate-300 group-hover:text-[#f97316] transition-colors" />
+                                </div>
+                              )}
+                              <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-[#f97316] rounded-2xl flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-900">
+                                <Sparkles className="w-4 h-4 text-white" />
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#f97316]">Upload Profile Photo</span>
+                            <p className="text-[9px] text-slate-400 mt-1 font-bold">Required for Speaker Badges</p>
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => handleFieldChange('profile_picture', e.target.files?.[0])}
+                            />
+                          </Label>
                         </div>
                       )}
 
-                      {purchaseStep === 'payment' && (
-                        <PublicPaymentSelector
-                          selected={selectedPaymentMethod}
-                          onSelect={setSelectedPaymentMethod}
-                          onBack={handleBackToTickets}
-                          onConfirm={handlePaymentConfirm}
-                          totalAmount={selectedTickets.reduce((sum, t) => sum + t.ticketType.price * t.quantity, 0)}
-                          loading={isProcessingPayment}
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label htmlFor="name" className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</Label>
+                        <Input
+                          id="name"
+                          value={form.name}
+                          onChange={(e) => handleFieldChange('name', e.target.value)}
+                          className={`h-14 sm:h-16 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-4 focus:ring-orange-500/10 transition-all font-bold text-base ${touchedFields.name && fieldErrors.name ? 'ring-2 ring-red-500/20 bg-red-50/50' : ''}`}
+                          placeholder="e.g. Abebe Bikila"
                         />
-                      )}
-
-                      {purchaseStep === 'confirmation' && (
-                        <PublicTicketDisplay
-                          tickets={purchasedTickets}
-                          event={{
-                            name: event.name,
-                            start_date: event.start_date,
-                            location: event.location || event.venue_name || 'TBD',
-                          }}
-                          guestInfo={{
-                            name: ticketGuestInfo.name,
-                            email: ticketGuestInfo.email,
-                          }}
-                        />
-                      )}
-                    </div>
-                  )}
-
-                  {/* Free Event View */}
-                  {!isTicketedEvent && (
-                    <div className="animate-fade-in space-y-8 sm:space-y-12">
-                      {/* Registration Header */}
-                      <div className="text-center px-4">
-                        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Secure Your Spot</h2>
-                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2">Registration is fast and takes less than a minute</p>
                       </div>
 
-                      {/* Referral Badge */}
-                      {referralCode && (
-                        <div className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800/50 p-5 rounded-3xl flex items-center gap-5">
-                          <div className="w-12 h-12 bg-white dark:bg-indigo-800 rounded-2xl flex items-center justify-center shadow-sm">
-                            <Sparkles className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-                          </div>
-                          <div>
-                            <p className="font-bold text-indigo-900 dark:text-indigo-100">Special Invitation</p>
-                            <p className="text-xs text-indigo-700/70 dark:text-indigo-300/70">Referred by code: <span className="font-mono font-bold">{referralCode}</span></p>
-                          </div>
-                        </div>
-                      )}
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={form.email}
+                          onChange={(e) => handleFieldChange('email', e.target.value)}
+                          className={`h-14 sm:h-16 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-4 focus:ring-orange-500/10 transition-all font-bold text-base ${touchedFields.email && fieldErrors.email ? 'ring-2 ring-red-500/20 bg-red-50/50' : ''}`}
+                          placeholder="abebe@example.com"
+                        />
+                      </div>
 
-                      {/* Form */}
-                      <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
-                        <div className="space-y-2 sm:col-span-2 md:col-span-1">
-                          <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-slate-500">Full Name</Label>
-                          <div className="relative group">
-                            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                            <Input
-                              id="name"
-                              value={form.name}
-                              onChange={(e) => handleFieldChange('name', e.target.value)}
-                              className={`pl-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all ${touchedFields.name && fieldErrors.name ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''}`}
-                              placeholder="e.g. Abebe Bikila"
-                            />
-                          </div>
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone" className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone</Label>
+                        <Input
+                          id="phone"
+                          value={form.phone}
+                          onChange={(e) => handleFieldChange('phone', e.target.value)}
+                          className={`h-14 sm:h-16 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-4 focus:ring-orange-500/10 transition-all font-bold text-base ${touchedFields.phone && fieldErrors.phone ? 'ring-2 ring-red-500/20 bg-red-50/50' : ''}`}
+                          placeholder="0911..."
+                        />
+                      </div>
 
-                        <div className="space-y-2 sm:col-span-2 md:col-span-1">
-                          <Label htmlFor="email" className="text-xs font-bold uppercase tracking-wider text-slate-500">Email Address</Label>
-                          <div className="relative group">
-                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                            <Input
-                              id="email"
-                              type="email"
-                              value={form.email}
-                              onChange={(e) => handleFieldChange('email', e.target.value)}
-                              className={`pl-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all ${touchedFields.email && fieldErrors.email ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''}`}
-                              placeholder="abebe@example.com"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="phone" className="text-xs font-bold uppercase tracking-wider text-slate-500">Phone</Label>
-                          <div className="relative group">
-                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                            <Input
-                              id="phone"
-                              value={form.phone}
-                              onChange={(e) => handleFieldChange('phone', e.target.value)}
-                              className={`pl-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all ${touchedFields.phone && fieldErrors.phone ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''}`}
-                              placeholder="0911..."
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="company" className="text-xs font-bold uppercase tracking-wider text-slate-500">Organization</Label>
-                          <div className="relative group">
-                            <Building className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                            <Input
-                              id="company"
-                              value={form.company}
-                              onChange={(e) => handleFieldChange('company', e.target.value)}
-                              className="pl-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all"
-                              placeholder="Company name"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="job_title" className="text-xs font-bold uppercase tracking-wider text-slate-500">Current Role</Label>
-                          <div className="relative group">
-                            <UserCog className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                            <Input
-                              id="job_title"
-                              value={form.job_title}
-                              onChange={(e) => handleFieldChange('job_title', e.target.value)}
-                              className="pl-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all"
-                              placeholder="Position"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="gender" className="text-xs font-bold uppercase tracking-wider text-slate-500">Gender</Label>
-                          <Select value={form.gender} onValueChange={(v) => handleFieldChange('gender', v)}>
-                            <SelectTrigger className={`h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:ring-4 focus:ring-primary/10 transition-all ${touchedFields.gender && fieldErrors.gender ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''}`}>
-                              <div className="flex items-center gap-3">
-                                <Users className="w-4 h-4 text-slate-400" />
-                                <SelectValue placeholder="Select Gender" />
-                              </div>
-                            </SelectTrigger>
-                            <SelectContent className="rounded-2xl border-slate-100 dark:border-slate-800">
-                              {genderOptions.map(opt => (
-                                <SelectItem key={opt} value={opt} className="rounded-xl focus:bg-primary/5">{opt}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="age" className="text-xs font-bold uppercase tracking-wider text-slate-500">Age</Label>
-                          <div className="relative group">
-                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-                            <Input
-                              id="age"
-                              type="number"
-                              min="1"
-                              max="120"
-                              value={form.age}
-                              onChange={(e) => handleFieldChange('age', e.target.value)}
-                              className={`pl-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all ${touchedFields.age && fieldErrors.age ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''}`}
-                              placeholder="Years"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="country" className="text-xs font-bold uppercase tracking-wider text-slate-500">Country</Label>
-                          <Select value={form.country} onValueChange={(v) => handleFieldChange('country', v)}>
-                            <SelectTrigger className="h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 border-transparent focus:ring-4 focus:ring-primary/10 transition-all">
-                              <SelectValue placeholder="Select location" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-2xl border-slate-100 dark:border-slate-800">
-                              {countryOptions.map(c => <SelectItem key={c} value={c} className="rounded-xl">{c}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="sm:col-span-2 pt-6 border-t border-slate-100 dark:border-slate-800">
-                          <div className="flex items-start gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
-                            <Checkbox
-                              id="agree"
-                              checked={form.agree}
-                              onCheckedChange={(v) => handleFieldChange('agree', v)}
-                              className="mt-1 rounded-md border-slate-300"
-                            />
-                            <Label htmlFor="agree" className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed cursor-pointer select-none">
-                              I certify that all information provided is accurate and I agree to the <Link to={`/terms?returnUrl=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="text-primary font-bold hover:underline">Terms of Service</Link> and <Link to={`/privacy?returnUrl=${encodeURIComponent(window.location.pathname + window.location.search)}`} className="text-primary font-bold hover:underline">Privacy Policy</Link>.
-                            </Label>
-                          </div>
-                          {touchedFields.agree && fieldErrors.agree && (
-                            <p className="mt-2 text-xs text-red-500 font-bold px-4">{fieldErrors.agree}</p>
-                          )}
-                        </div>
-
-                        <Button
-                          type="submit"
-                          disabled={submitting}
-                          className="sm:col-span-2 h-14 bg-primary hover:bg-primary-hover text-white font-extrabold text-lg rounded-2xl shadow-2xl shadow-primary/30 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 disabled:hover:scale-100"
-                        >
-                          {submitting ? (
-                            <div className="flex items-center gap-3">
-                              <SpinnerInline size="sm" />
-                              <span>Confirming...</span>
+                    <div className="space-y-2">
+                      <Label htmlFor="country" className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Country</Label>
+                      <Select value={form.country} onValueChange={(v) => {
+                        handleFieldChange('country', v);
+                        handleFieldChange('city', ''); // Reset city on country change
+                      }}>
+                        <SelectTrigger className="h-14 sm:h-16 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-4 focus:ring-orange-500/10 transition-all font-bold text-base">
+                          <SelectValue placeholder="Select Country" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px] rounded-2xl">
+                          <div className="p-2 border-b border-slate-50 sticky top-0 bg-white z-10">
+                            <div className="relative group">
+                              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                              <Input 
+                                placeholder="Search country..." 
+                                className="pl-9 h-10 bg-slate-50 border-none text-xs" 
+                                onChange={(e) => {
+                                  // This is a simple implementation, standard Radix Select doesn't support built-in search easily without cmdk
+                                  // but we can provide the full list and let the user scroll, or filter it manually if needed.
+                                }}
+                              />
                             </div>
-                          ) : (
-                            'Join Event'
-                          )}
-                        </Button>
-                        {turnstileSiteKey && (
-                          <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-white/70 p-3 dark:border-slate-700 dark:bg-slate-800/50">
-                            <CloudflareTurnstileWidget
-                              siteKey={turnstileSiteKey}
-                              onTokenChange={setTurnstileToken}
-                            />
                           </div>
-                        )}
-                      </form>
+                          {countryOptions.map(c => <SelectItem key={c} value={c} className="rounded-xl">{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="city" className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">City</Label>
+                      {form.country && CITY_DATA[form.country] ? (
+                        <Select value={form.city} onValueChange={(v) => handleFieldChange('city', v)}>
+                          <SelectTrigger className="h-14 sm:h-16 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-4 focus:ring-orange-500/10 transition-all font-bold text-base">
+                            <SelectValue placeholder="Select City" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[300px] rounded-2xl">
+                            {CITY_DATA[form.country].map(city => (
+                              <SelectItem key={city} value={city} className="rounded-xl">{city}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          id="city"
+                          value={form.city}
+                          disabled={!form.country}
+                          onChange={(e) => handleFieldChange('city', e.target.value)}
+                          className="h-14 sm:h-16 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-4 focus:ring-orange-500/10 transition-all font-bold text-base"
+                          placeholder={form.country ? "Enter your city" : "Select country first"}
+                        />
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="company" className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Organization</Label>
+                      <Input
+                        id="company"
+                        value={form.company}
+                        onChange={(e) => handleFieldChange('company', e.target.value)}
+                        className="h-14 sm:h-16 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-4 focus:ring-orange-500/10 transition-all font-bold text-base"
+                        placeholder="Company name"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="job_title" className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Role</Label>
+                      <Input
+                        id="job_title"
+                        value={form.job_title}
+                        onChange={(e) => handleFieldChange('job_title', e.target.value)}
+                        className="h-14 sm:h-16 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-4 focus:ring-orange-500/10 transition-all font-bold text-base"
+                        placeholder="Position"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="gender" className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Gender</Label>
+                      <Select value={form.gender} onValueChange={(v) => handleFieldChange('gender', v)}>
+                        <SelectTrigger className="h-14 sm:h-16 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-4 focus:ring-orange-500/10 transition-all font-bold text-base">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-2xl">
+                          {genderOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="age" className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Age</Label>
+                      <Input
+                        id="age"
+                        type="number"
+                        value={form.age}
+                        onChange={(e) => handleFieldChange('age', e.target.value)}
+                        className="h-14 sm:h-16 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800 border-none focus:ring-4 focus:ring-orange-500/10 transition-all font-bold text-base"
+                        placeholder="Years"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2 pt-4 sm:pt-6">
+                      <div className="flex items-start gap-4 p-5 bg-orange-50/50 dark:bg-orange-900/10 rounded-[1.25rem] sm:rounded-2xl border border-orange-100/50 dark:border-orange-800/30">
+                        <Checkbox
+                          id="agree"
+                          checked={form.agree}
+                          onCheckedChange={(v) => handleFieldChange('agree', v)}
+                          className="mt-1 border-orange-200 data-[state=checked]:bg-[#f97316] data-[state=checked]:border-[#f97316]"
+                        />
+                        <Label htmlFor="agree" className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                          I agree to the <Link to="/terms" className="text-[#f97316] font-bold">Terms of Service</Link> and <Link to="/privacy" className="text-[#f97316] font-bold">Privacy Policy</Link>. I certify that the information provided is accurate.
+                        </Label>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={submitting}
+                      className="sm:col-span-2 h-14 sm:h-18 bg-[#f97316] hover:bg-[#ea580c] text-white font-black text-lg sm:text-xl rounded-xl sm:rounded-2xl shadow-xl shadow-orange-500/20 transition-all active:scale-[0.98] mt-2 sm:mt-4"
+                    >
+                      {submitting ? <SpinnerInline size="sm" /> : 'Confirm Registration'}
+                    </Button>
+
+                    {turnstileSiteKey && (
+                      <div className="sm:col-span-2 flex justify-center mt-4">
+                        <CloudflareTurnstileWidget siteKey={turnstileSiteKey} onTokenChange={setTurnstileToken} />
+                      </div>
+                    )}
+                  </form>
                 </div>
               )}
             </div>
           </div>
-
-          {/* Clean Footer */}
-          <div className="bg-slate-50/80 dark:bg-slate-800/20 p-12 text-center backdrop-blur-sm">
-            <div className="flex items-center justify-center gap-2 text-slate-400 dark:text-slate-500 text-xs font-semibold mb-8">
-              <Mail className="w-4 h-4" />
-              <span>Your confirmation email with e-badge PDF will be sent automatically after registration</span>
-            </div>
-
-            {/* Powered by Validity Section */}
-            <div className="flex flex-col items-center gap-5 border-t border-slate-100 dark:border-slate-800 pt-8 mt-4">
-              <div className="flex flex-col items-center gap-3">
-                <span className="text-[10px] text-slate-400 uppercase tracking-[0.3em] font-bold">Powered by</span>
-                <div className="flex items-center gap-4">
-                  <a href="https://validity.et" target="_blank" rel="noopener noreferrer" className="transition-all duration-500 hover:scale-105">
-                    <img
-                      src="/Validity_logo.png"
-                      alt="Validity logo"
-                      className="h-10 object-contain grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-500"
-                    />
-                  </a>
-                  <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
-                  <a href="https://validity.et" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-slate-500 dark:text-slate-400 tracking-tight hover:text-primary transition-colors">
-                    Validity Event and Marketing
-                  </a>
-                </div>
-              </div>
-              <p className="text-[10px] text-slate-400/40 uppercase tracking-widest font-bold mt-4">
-                Professional Registration & Badge Management System
-              </p>
-            </div>
+          
+          {/* Subtle Footer inside card */}
+          <div className="bg-slate-50 dark:bg-slate-800/30 p-8 sm:p-10 text-center border-t border-slate-100 dark:border-slate-800">
+            <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-2">Powered by Validity System</p>
+            <p className="text-xs text-slate-500 font-medium italic">A confirmation email will be sent immediately upon successful registration.</p>
           </div>
         </div>
 
         {/* Support Links */}
-        <div className="mt-12 flex flex-wrap justify-center gap-x-12 gap-y-4 animate-fade-in" style={{ animationDelay: '0.4s' }}>
-          <a href="/help" className="text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-primary transition-colors flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full"></div>
-            Online Support
-          </a>
-          <a href="/contact" className="text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-primary transition-colors flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full"></div>
-            Contact Organizer
-          </a>
-          <a href="/privacy" className="text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-primary transition-colors flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full"></div>
-            Data Policy
-          </a>
+        <div className="flex justify-center gap-8 pb-8">
+          <a href="/help" className="text-xs font-bold text-slate-400 hover:text-[#f97316] transition-colors">Support</a>
+          <a href="/privacy" className="text-xs font-bold text-slate-400 hover:text-[#f97316] transition-colors">Privacy</a>
+          <a href="/terms" className="text-xs font-bold text-slate-400 hover:text-[#f97316] transition-colors">Terms</a>
         </div>
       </div>
 

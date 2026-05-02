@@ -209,6 +209,7 @@ export interface UpdateFormFieldRequest extends Partial<CreateFormFieldRequest> 
 
 export interface FormSubmissionRequest {
   submission_data: Record<string, any>;
+  invitation_code?: string;
 }
 
 export interface FormPreviewData {

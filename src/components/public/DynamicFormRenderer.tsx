@@ -39,6 +39,7 @@ import type {
 interface DynamicFormRendererProps {
   eventId: number;
   guestTypeId: number;
+  invitationCode?: string | null;
   participantType?: string; // Deprecated - kept for backward compatibility
   onSuccess?: (result: SubmissionResult) => void;
   onError?: (error: string) => void;
@@ -48,6 +49,7 @@ interface DynamicFormRendererProps {
 export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   eventId,
   guestTypeId,
+  invitationCode,
   participantType,
   onSuccess,
   onError,
@@ -273,7 +275,8 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
         // For forms with payment fields, redirect to payment flow
         // This would integrate with the existing payment system
         const submissionData: FormSubmissionRequest = {
-          submission_data: formValues
+          submission_data: formValues,
+          invitation_code: invitationCode || undefined
         };
 
         // First create the form submission
@@ -293,9 +296,27 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
         });
       } else {
         // Regular form submission without payment
-        const submissionData: FormSubmissionRequest = {
-          submission_data: formValues
-        };
+        const hasFiles = Object.values(formValues).some(v => v instanceof File);
+        
+        let submissionData: any;
+        if (hasFiles) {
+          const formData = new FormData();
+          if (invitationCode) formData.append('invitation_code', invitationCode);
+          
+          Object.entries(formValues).forEach(([key, value]) => {
+            if (value instanceof File) {
+              formData.append(`submission_data[${key}]`, value);
+            } else if (value !== null && value !== undefined) {
+              formData.append(`submission_data[${key}]`, typeof value === 'object' ? JSON.stringify(value) : value);
+            }
+          });
+          submissionData = formData;
+        } else {
+          submissionData = {
+            submission_data: formValues,
+            invitation_code: invitationCode || undefined
+          };
+        }
 
         const result = await formSubmissionApi.submitForm(activeForm.id, submissionData);
         onSuccess?.(result);
@@ -475,6 +496,12 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
           <div className="relative">
             <Input
               type="file"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  handleInputChange(fieldKey, file);
+                }
+              }}
               className={commonClasses}
               required={field.is_required}
             />

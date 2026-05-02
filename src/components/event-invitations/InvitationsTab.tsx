@@ -1,13 +1,19 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { InvitationGenerator } from './InvitationGenerator';
 import { SocialShareButtons } from './SocialShareButtons';
 import { InvitationAnalytics } from './InvitationAnalytics';
 import { InvitationsList } from './InvitationsList';
 import { useAuth } from '@/hooks/use-auth';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { AlertCircle, ExternalLink, Sparkles } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  Link as LinkIcon,
+  UserCheck, 
+  TrendingUp,
+  Briefcase,
+  Crown
+} from 'lucide-react';
+import { useInvitationStats } from '@/lib/api/invitations';
 
 interface InvitationsTabProps {
   eventId: number;
@@ -25,101 +31,114 @@ export function InvitationsTab({
   isOrganizer
 }: InvitationsTabProps) {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const { data: stats } = useInvitationStats(eventId);
   const [currentInvitation, setCurrentInvitation] = useState<{
     code: string;
     url: string;
   } | null>(null);
 
-  // State to hold generated invitation for sharing
   const handleInvitationGenerated = (invitation: { code: string; url: string }) => {
     setCurrentInvitation(invitation);
   };
 
   return (
     <div className="space-y-6">
-      {/* Info Banner */}
-      <Card className="p-4 bg-info/10 border-info/30">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-info mt-0.5" />
-          <div className="flex-1">
-            <h4 className="font-semibold text-info dark:text-info mb-1">Invitation Tracking</h4>
-            <p className="text-sm text-info/80 dark:text-info/70">
-              Generate unique invitation links to track who clicks, shares, and registers for your event.
-              {eventType === 'ticketed' 
-                ? ' Track ticket purchases from your invitations!' 
-                : ' Registered guests will automatically be assigned as "Visitor" type.'}
-            </p>
+      {/* Minimal Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Links', value: stats?.total_invitations || 0, icon: LinkIcon, color: 'text-blue-500' },
+          { label: 'Clicks', value: stats?.total_clicks || 0, icon: TrendingUp, color: 'text-indigo-500' },
+          { label: 'RSVP Responses', value: stats?.total_registrations || 0, icon: UserCheck, color: 'text-emerald-500' },
+          { label: 'Conversion', value: `${stats?.conversion_rate || 0}%`, icon: UserCheck, color: 'text-amber-500' },
+        ].map((stat, i) => (
+          <div key={i} className="p-4 bg-card border border-border rounded-xl">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-tight">{stat.label}</p>
+            <p className="text-2xl font-bold mt-1">{stat.value}</p>
           </div>
-        </div>
-      </Card>
-
-      {/* Custom Registration Button for Event ID 33 */}
-      {eventId === 33 && (
-        <Card className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 dark:from-blue-950/20 dark:to-indigo-950/20 dark:border-blue-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h4 className="font-semibold text-blue-900 dark:text-blue-100">Custom Registration Form</h4>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  Access the specialized registration form for this event with enhanced fields and document uploads
-                </p>
-              </div>
-            </div>
-            <Button
-              onClick={() => navigate(`/event/custom-register/${eventId}`)}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white flex items-center gap-2"
-            >
-              <ExternalLink className="w-4 h-4" />
-              Open Custom Registration
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Generator and Share Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <InvitationGenerator
-          eventId={eventId}
-          eventUuid={eventUuid}
-          eventName={eventName}
-          isOrganizer={isOrganizer}
-        />
-
-        {currentInvitation ? (
-          <SocialShareButtons
-            invitationUrl={currentInvitation.url}
-            invitationCode={currentInvitation.code}
-            eventName={eventName}
-            eventType={eventType}
-          />
-        ) : (
-          <Card className="p-6 flex items-center justify-center bg-muted/50">
-            <div className="text-center text-muted-foreground">
-              <p className="font-medium">Generate an invitation link first</p>
-              <p className="text-sm mt-1">Then share it via social media</p>
-            </div>
-          </Card>
-        )}
+        ))}
       </div>
 
-      {/* Analytics Dashboard */}
-      <InvitationAnalytics
-        eventId={eventId}
-        userId={user?.id ? parseInt(user.id) : undefined}
-        isOrganizer={isOrganizer}
-      />
+      <Tabs defaultValue="all" className="w-full">
+        <TabsList className="bg-transparent border-b border-border rounded-none h-auto p-0 w-full justify-start gap-6">
+          <TabsTrigger value="all" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-0 py-2">
+            All Invitations
+          </TabsTrigger>
+          <TabsTrigger value="exhibitors" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-0 py-2">
+            Exhibitors
+          </TabsTrigger>
+          <TabsTrigger value="vip-media" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-0 py-2">
+            VIP & Media
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-0 py-2">
+            Analytics
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Invitations List */}
-      <InvitationsList
-        eventId={eventId}
-        userId={!isOrganizer && user?.id ? parseInt(user.id) : undefined}
-        isOrganizer={isOrganizer}
-      />
+        <div className="mt-6 space-y-6">
+          <TabsContent value="all" className="space-y-6 mt-0">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1">
+                <InvitationGenerator
+                  eventId={eventId}
+                  eventUuid={eventUuid}
+                  eventName={eventName}
+                  isOrganizer={isOrganizer}
+                  onGenerated={handleInvitationGenerated}
+                />
+              </div>
+              <div className="lg:col-span-2">
+                <InvitationsList
+                  eventId={eventId}
+                  isOrganizer={isOrganizer}
+                />
+              </div>
+            </div>
+            
+            {currentInvitation && (
+              <Card className="p-4 bg-muted/20 border-border border-dashed">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Recently generated: <code className="text-primary">{currentInvitation.code}</code></p>
+                  <SocialShareButtons
+                    invitationUrl={currentInvitation.url}
+                    invitationCode={currentInvitation.code}
+                    eventName={eventName}
+                    eventType={eventType}
+                  />
+                </div>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="exhibitors" className="mt-0">
+            <InvitationsList
+              eventId={eventId}
+              isOrganizer={isOrganizer}
+              filterType="exhibitor"
+              title="Exhibitor Invitations"
+            />
+          </TabsContent>
+
+          <TabsContent value="vip-media" className="mt-0">
+            <InvitationsList
+              eventId={eventId}
+              isOrganizer={isOrganizer}
+              filterType={['vip', 'media', 'speaker']}
+              title="VIP & Press Invitations"
+            />
+          </TabsContent>
+
+          <TabsContent value="analytics" className="mt-0">
+            <InvitationAnalytics
+              eventId={eventId}
+              userId={user?.id ? parseInt(user.id) : undefined}
+              isOrganizer={isOrganizer}
+            />
+          </TabsContent>
+        </div>
+      </Tabs>
     </div>
   );
 }
+
+
 

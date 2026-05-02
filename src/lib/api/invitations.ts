@@ -9,15 +9,45 @@ export const useGenerateInvitation = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (data: { eventId: number; type: 'generic' | 'personalized' }) => {
+    mutationFn: async (data: { 
+      eventId: number; 
+      type: 'generic' | 'personalized' | 'exhibitor' | 'speaker' | 'vip' | 'media';
+      recipientName?: string;
+      recipientEmail?: string;
+      expiresAt?: string;
+    }) => {
       const response = await api.post(`/events/${data.eventId}/invitations/generate`, {
-        invitation_type: data.type
+        invitation_type: data.type,
+        recipient_name: data.recipientName,
+        recipient_email: data.recipientEmail,
+        expires_at: data.expiresAt,
       });
       const responseData = response.data?.data || response.data;
       console.log('[Invitations] Invitation generated:', responseData);
       return responseData;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invitations'] });
+      queryClient.invalidateQueries({ queryKey: ['invitation-analytics'] });
+    }
+  });
+};
+
+/**
+ * Update RSVP status
+ */
+export const useRSVPInvitation = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: { invitationCode: string; status: 'accepted' | 'declined' }) => {
+      const response = await api.post('/invitations/rsvp', {
+        invitation_code: data.invitationCode,
+        status: data.status
+      });
+      return response.data?.data || response.data;
+    },
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['invitations'] });
       queryClient.invalidateQueries({ queryKey: ['invitation-analytics'] });
     }
@@ -117,3 +147,29 @@ export const useRevokeInvitation = () => {
   });
 };
 
+/**
+ * Bulk generate invitations
+ */
+export const useBulkGenerateInvitations = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: { 
+      eventId: number; 
+      invitations: Array<{
+        name: string;
+        email: string;
+        type: string;
+      }>;
+    }) => {
+      const response = await api.post(`/events/${data.eventId}/invitations/bulk-generate`, {
+        invitations: data.invitations
+      });
+      return response.data?.data || response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invitations'] });
+      queryClient.invalidateQueries({ queryKey: ['invitation-analytics'] });
+    }
+  });
+};

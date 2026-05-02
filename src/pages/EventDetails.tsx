@@ -1172,7 +1172,8 @@ export default function EventDetails() {
           if (created && created.length > 0) {
             // Refetch the attendee list from the backend to ensure it's up-to-date
             const res = await api.get(`/events/${Number(eventId)}/attendees`)
-            setAttendees(res.data)
+            const attendeesData = res.data?.data || res.data
+            setAttendees(Array.isArray(attendeesData) ? attendeesData : [])
             toast.success(`${created.length} attendees imported successfully.`)
           }
           if (errors && errors.length > 0) {
@@ -1572,7 +1573,8 @@ export default function EventDetails() {
 
         // Refresh attendees list and event data to get updated attendee count
         const res = await api.get(`/events/${Number(eventId)}/attendees`)
-        setAttendees(res.data || [])
+        const attendeesData = res.data?.data || res.data
+        setAttendees(Array.isArray(attendeesData) ? attendeesData : [])
 
         // Refresh event data to get updated attendee count
         const eventRes = await api.get(`/events/${Number(eventId)}`)
@@ -1989,7 +1991,7 @@ export default function EventDetails() {
   const [badgeSelectedAttendees, setBadgeSelectedAttendees] = useState<Set<number>>(new Set());
 
   // Add filteredBadgesAttendees for the badges tab
-  const filteredBadgesAttendees = attendees.filter((attendee) => {
+  const filteredBadgesAttendees = (Array.isArray(attendees) ? attendees : []).filter((attendee) => {
     const matchesSearch =
       (attendee.guest?.name?.toLowerCase() || '').includes(badgeSearchTerm.toLowerCase()) ||
       (attendee.guest?.email?.toLowerCase() || '').includes(badgeSearchTerm.toLowerCase()) ||
@@ -2210,7 +2212,7 @@ export default function EventDetails() {
         `}</style>
         <div id="print-area">
           {printing && selectedAttendees.size > 0 ? (
-            attendees
+            (Array.isArray(attendees) ? attendees : [])
               .filter(attendee => selectedAttendees.has(attendee.id))
               .map(attendee => (
                 <div key={attendee.id} className="printable-badge-batch">
@@ -2354,7 +2356,7 @@ export default function EventDetails() {
                             'Team',
                             'Forms',
                             'Sessions',
-                            ...(eventData?.event_type !== 'ticketed' ? ['Invitations'] : []),
+                            'Invitations',
                             'Analytics'
                           ].map((tab) => {
                             const val = tab.toLowerCase().replace(/ /g, '-');
@@ -4381,7 +4383,6 @@ export default function EventDetails() {
                     <EventSessions eventId={Number(eventId)} />
                   </div>
                 </TabsContent>
-                {eventData?.event_type !== 'ticketed' && (
                   <TabsContent value="invitations">
                     <InvitationsTab
                       eventId={Number(eventId)}
@@ -4391,7 +4392,6 @@ export default function EventDetails() {
                       isOrganizer={user?.role === 'organizer' || user?.role === 'organizer_admin' || user?.role === 'admin' || user?.role === 'superadmin'}
                     />
                   </TabsContent>
-                )}
                 {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin') && eventData?.event_type !== 'ticketed' ? (
                   <TabsContent value="bulk-badges">
                     <BulkBadgesTab
@@ -4682,31 +4682,88 @@ export default function EventDetails() {
                               className="rounded-xl border-muted-foreground/20 shadow-sm"
                             />
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="edit_guest_types_custom">Guest Types (Comma Separated)</Label>
-                            <Input
-                              id="edit_guest_types_custom"
-                              value={Array.isArray(editForm.guest_types) ? editForm.guest_types.join(', ') : (editForm.guest_types || '')}
-                              onChange={e => {
-                                handleEditInput('guest_types', e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean));
-                              }}
-                              placeholder="e.g. VIP, Regular, Speaker"
-                              className="rounded-xl border-muted-foreground/20 shadow-sm"
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            {Array.isArray(editForm.guest_types) && editForm.guest_types.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-1">
-                                {editForm.guest_types.map((gt: any, index: number) => {
+
+                          <div className="sm:col-span-2 space-y-3">
+                            <Label className="text-sm font-semibold flex items-center gap-2">
+                              Guest Types
+                              <Badge variant="outline" className="text-[10px] uppercase font-bold py-0 h-4 border-primary/20 text-primary">Managed</Badge>
+                            </Label>
+                            
+                            {/* Tags Container */}
+                            <div className="flex flex-wrap gap-2 p-3 min-h-[48px] border border-muted-foreground/20 rounded-xl bg-muted/20">
+                              {Array.isArray(editForm.guest_types) && editForm.guest_types.length > 0 ? (
+                                editForm.guest_types.map((gt: any, index: number) => {
                                   const guestTypeName = typeof gt === 'object' && gt !== null && gt.name ? gt.name : String(gt);
                                   return (
-                                    <Badge key={index} variant="secondary" className="px-3 py-1 bg-primary/5 text-primary border border-primary/10 rounded-lg font-medium transition-colors hover:bg-primary/10">
+                                    <Badge 
+                                      key={index} 
+                                      className="pl-3 pr-1.5 py-1.5 bg-primary text-primary-foreground border-none rounded-lg font-medium flex items-center gap-2 animate-in zoom-in-95 duration-200"
+                                    >
                                       {guestTypeName}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newTypes = editForm.guest_types.filter((_: any, i: number) => i !== index);
+                                          handleEditInput('guest_types', newTypes);
+                                        }}
+                                        className="hover:bg-white/20 rounded-md p-0.5 transition-colors"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
                                     </Badge>
                                   );
-                                })}
+                                })
+                              ) : (
+                                <div className="flex flex-col items-center justify-center w-full py-2 opacity-50">
+                                  <Users className="w-4 h-4 mb-1 text-muted-foreground" />
+                                  <span className="text-[10px] font-bold uppercase tracking-tighter">No Guest Types Added</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {/* Quick Select */}
+                              <Select
+                                onValueChange={(val) => {
+                                  if (val && !editForm.guest_types?.includes(val)) {
+                                    handleEditInput('guest_types', [...(editForm.guest_types || []), val]);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="rounded-xl border-muted-foreground/20 h-11 bg-background/50">
+                                  <SelectValue placeholder="Add common type..." />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-[300px]">
+                                  {PREDEFINED_GUEST_TYPES.filter(t => !editForm.guest_types?.includes(t)).map(type => (
+                                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              {/* Custom Input */}
+                              <div className="relative group">
+                                <Input
+                                  placeholder="Type custom & press Enter"
+                                  className="rounded-xl border-muted-foreground/20 h-11 bg-background/50 pr-12"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      const val = e.currentTarget.value.trim();
+                                      if (val && !editForm.guest_types?.includes(val)) {
+                                        handleEditInput('guest_types', [...(editForm.guest_types || []), val]);
+                                        e.currentTarget.value = '';
+                                      }
+                                    }
+                                  }}
+                                />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground/50 opacity-0 group-focus-within:opacity-100 transition-opacity uppercase tracking-widest pointer-events-none">
+                                  Enter
+                                </div>
                               </div>
-                            )}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground font-medium px-1 italic">
+                              Add guest types like VIP, Speaker, or Exhibitor to categorize your attendees.
+                            </p>
                           </div>
                         </div>
                       </div>

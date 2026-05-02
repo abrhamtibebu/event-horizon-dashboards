@@ -6,10 +6,15 @@ export interface Invitation {
   invitation_code: string;
   invitation_url: string;
   qr_code_url: string;
-  invitation_type: 'generic' | 'personalized';
+  invitation_type: 'generic' | 'personalized' | 'exhibitor' | 'speaker' | 'vip' | 'media';
   status: 'active' | 'expired' | 'revoked';
+  rsvp_status: 'pending' | 'accepted' | 'declined';
+  recipient_name: string | null;
+  recipient_email: string | null;
   created_at: string;
   expires_at: string | null;
+  rsvp_at: string | null;
+  is_rsvp_completed: boolean;
   stats: {
     total_clicks: number;
     total_shares: number;
