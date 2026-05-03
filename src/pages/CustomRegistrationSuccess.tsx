@@ -10,7 +10,8 @@ import {
   Clock,
   Sparkles,
   Home,
-  FileText
+  FileText,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,8 +25,8 @@ const CustomRegistrationSuccess: React.FC = () => {
 
   if (!registrationData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
-        <Alert className="max-w-md">
+      <div className="min-h-screen overflow-x-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center p-4">
+        <Alert className="max-w-md w-full">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             No registration data found. Please complete the registration process.
@@ -68,14 +69,14 @@ const CustomRegistrationSuccess: React.FC = () => {
       </section>
 
       {/* Content Section */}
-      <section className="relative -mt-16 z-10 px-4 pb-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden">
-            <div className="p-8">
+      <section className="relative -mt-12 sm:-mt-16 z-10 px-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
+        <div className="max-w-6xl mx-auto min-w-0">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-gray-100 overflow-hidden">
+            <div className="p-4 sm:p-8">
               {/* Success Message */}
-              <div className="text-center mb-12">
-                <h2 className="text-4xl font-bold text-gray-900 mb-4">Congratulations!</h2>
-                <p className="text-xl text-gray-600 mb-6">
+              <div className="text-center mb-8 sm:mb-12">
+                <h2 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-3 sm:mb-4 break-words">Congratulations!</h2>
+                <p className="text-base sm:text-xl text-gray-600 mb-6 break-words">
                   Your registration for {eventData?.name || 'the event'} has been successfully completed.
                 </p>
                 <div className="inline-flex items-center gap-3 bg-accent border border-border rounded-2xl px-6 py-4">
@@ -145,7 +146,7 @@ const CustomRegistrationSuccess: React.FC = () => {
                   </div>
 
                   {/* Next Steps */}
-                  <div className="bg-accent rounded-2xl p-8 border border-border">
+                  <div className="bg-accent rounded-2xl p-4 sm:p-8 border border-border min-w-0">
                     <div className="flex items-center gap-3 mb-6">
                       <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
                         <Sparkles className="w-6 h-6 text-primary-foreground" />
@@ -195,10 +196,10 @@ const CustomRegistrationSuccess: React.FC = () => {
               )}
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8 border-t border-border">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-6 sm:pt-8 border-t border-border">
                 <Button
                   onClick={() => navigate('/')}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 px-8 rounded-xl flex items-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="w-full sm:w-auto min-h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 px-8 rounded-xl justify-center flex items-center gap-2 shadow-lg hover:shadow-xl transition-all duration-200"
                 >
                   <Home className="w-5 h-5" />
                   Go to Dashboard
@@ -207,7 +208,7 @@ const CustomRegistrationSuccess: React.FC = () => {
                 <Button
                   variant="outline"
                   onClick={() => window.print()}
-                  className="border-border hover:border-primary hover:bg-accent font-semibold py-3 px-8 rounded-xl flex items-center gap-2 transition-all duration-200"
+                  className="w-full sm:w-auto min-h-12 border-border hover:border-primary hover:bg-accent font-semibold py-3 px-8 rounded-xl justify-center flex items-center gap-2 transition-all duration-200"
                 >
                   <Download className="w-5 h-5" />
                   Print Confirmation

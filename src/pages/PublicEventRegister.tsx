@@ -15,12 +15,13 @@ import { PublicPaymentSelector } from '@/components/public/PublicPaymentSelector
 import { PublicTicketDisplay } from '@/components/public/PublicTicketDisplay';
 import { PaymentProcessingModal } from '@/components/payments/PaymentProcessingModal';
 import DynamicFormRenderer from '@/components/public/DynamicFormRenderer';
+import type { SubmissionResult } from '@/types/forms';
+import { QRCodeSVG } from 'qrcode.react';
 import { usePublicEventTickets, useInitiateGuestPayment } from '@/lib/api/publicTickets';
 import { useAuth } from '@/hooks/use-auth';
 import type { PaymentMethod, PaymentStatus } from '@/types/tickets';
 import type { PublicTicketType } from '@/types/publicTickets';
 import { SpinnerInline } from '@/components/ui/spinner';
-import EventLocationMapCard from '@/components/EventLocationMapCard';
 import CloudflareTurnstileWidget from '@/components/CloudflareTurnstileWidget';
 import { getTurnstileSiteKey } from '@/config/env';
 
@@ -52,6 +53,7 @@ export default function PublicEventRegister() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [successGuestUuid, setSuccessGuestUuid] = useState<string | null>(null);
   const [visitorGuestTypeId, setVisitorGuestTypeId] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
@@ -75,8 +77,12 @@ export default function PublicEventRegister() {
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
 
-  const handleCustomFormSuccess = useCallback(() => {
+  const handleCustomFormSuccess = useCallback((result?: SubmissionResult) => {
     setSuccess(true);
+    const u =
+      result?.attendee?.guest?.uuid?.trim() ||
+      (result?.attendee as { guest_uuid?: string } | undefined)?.guest_uuid?.trim();
+    setSuccessGuestUuid(u || null);
     toast.success('Registration successful! Your e-badge is on its way.');
   }, []);
 
@@ -882,6 +888,19 @@ export default function PublicEventRegister() {
             </p>
           </div>
 
+          {successGuestUuid ? (
+            <div className="flex flex-col items-center mb-6">
+              <p className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Guest check-in QR</p>
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                <QRCodeSVG value={successGuestUuid.slice(0, 8)} size={160} level="M" includeMargin />
+              </div>
+              <p className="text-xs font-semibold text-gray-500 mt-4 mb-1 uppercase tracking-wide">Guest code</p>
+              <p className="text-lg font-mono font-bold tracking-wider text-gray-900">
+                {successGuestUuid.slice(0, 8)}
+              </p>
+            </div>
+          ) : null}
+
           <div className="text-xs text-muted-foreground/70">
             You will receive a confirmation email shortly with all the event details.
           </div>
@@ -930,37 +949,8 @@ export default function PublicEventRegister() {
   const daysRemaining = getDaysRemaining();
 
   return (
-    <div className="min-h-screen bg-white sm:bg-slate-50 dark:bg-slate-950 sm:py-12 px-0 sm:px-6 lg:px-8" style={{ fontFamily: "'Outfit', sans-serif" }}>
-      <div className="max-w-4xl mx-auto w-full">
-        {/* Simplified Header - Hidden or simplified on mobile to focus on event */}
-        <div className="flex flex-col sm:flex-row items-center justify-between mb-0 sm:mb-12 gap-6 p-4 sm:p-0 bg-white sm:bg-transparent dark:bg-slate-950 sm:dark:bg-transparent border-b sm:border-none border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg border border-slate-100 dark:border-slate-800 overflow-hidden">
-              <img src="/evella-logo.png" alt="Evella" className="w-6 h-6 sm:w-8 sm:h-8 object-contain" />
-            </div>
-            <div>
-              <h1 className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">Event Registration</h1>
-              <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Powered by Validity</p>
-            </div>
-          </div>
-
-          {organizerName && (
-            <div className="hidden sm:flex items-center gap-4 bg-white dark:bg-slate-900 px-5 py-2.5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 w-full sm:w-auto">
-              <div className="text-left sm:text-right flex-1 sm:flex-none">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Organizer</p>
-                <p className="text-sm font-bold text-slate-900 dark:text-white truncate max-w-[200px]">{organizerName}</p>
-              </div>
-              {event.organizer?.logo ? (
-                <img src={getImageUrl(event.organizer.logo)} alt={organizerName} className="h-10 w-10 object-contain rounded-xl" />
-              ) : (
-                <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center border border-orange-100 dark:border-orange-800">
-                  <Building className="w-5 h-5 text-[#f97316]" />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
+    <div className="min-h-screen overflow-x-hidden bg-white sm:bg-slate-50 dark:bg-slate-950 sm:py-12 px-0 sm:px-6 lg:px-8" style={{ fontFamily: "'Outfit', sans-serif" }}>
+      <div className="max-w-4xl mx-auto w-full min-w-0">
         {/* Main Event Card */}
         <div className="bg-white dark:bg-slate-900 rounded-none sm:rounded-[3rem] shadow-none sm:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden border-none sm:border border-slate-100 dark:border-slate-800 mb-0 sm:mb-12">
           {/* Banner */}
@@ -982,27 +972,50 @@ export default function PublicEventRegister() {
                 <Star className="w-2.5 h-2.5 fill-white" />
                 {event.category?.name || 'Featured Event'}
               </div>
-              <h1 className="text-2xl sm:text-6xl font-black text-white tracking-tight leading-tight">
+              <h1 className="text-2xl sm:text-6xl font-black text-white tracking-tight leading-tight break-words hyphens-auto">
                 {event.name}
               </h1>
             </div>
           </div>
 
           {/* Info bar - Responsive grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 border-b border-slate-50 dark:border-slate-800">
+          <div className="grid grid-cols-2 md:grid-cols-4 border-b border-slate-50 dark:border-slate-800 min-w-0">
             {[
               { label: 'Date', value: startDate ? startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD', icon: Calendar },
               { label: 'Time', value: event.time || 'Flexible', icon: Clock },
               { label: 'Venue', value: event.venue_name || event.location || 'Online', icon: MapPin },
               { label: 'Guest Type', value: invitationDetails?.invitation_type || 'Attendee', icon: Users },
             ].map((item, i) => (
-              <div key={i} className={`p-4 sm:p-6 text-center border-slate-50 dark:border-slate-800 ${i % 2 === 0 ? 'border-r' : 'md:border-r'} ${i < 2 ? 'border-b md:border-b-0' : ''}`}>
-                <item.icon className="w-4 h-4 sm:w-5 sm:h-5 text-[#f97316] mx-auto mb-1.5 sm:mb-2 opacity-80" />
+              <div key={i} className={`min-w-0 p-3 sm:p-6 text-center border-slate-50 dark:border-slate-800 ${i % 2 === 0 ? 'border-r' : 'md:border-r'} ${i < 2 ? 'border-b md:border-b-0' : ''}`}>
+                <item.icon className="w-4 h-4 sm:w-5 sm:h-5 text-[#f97316] mx-auto mb-1.5 sm:mb-2 opacity-80 shrink-0" />
                 <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 sm:mb-1">{item.label}</p>
-                <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">{item.value}</p>
+                <p className="text-[11px] sm:text-sm font-bold text-slate-900 dark:text-white break-words hyphens-auto line-clamp-3 leading-snug">{item.value}</p>
               </div>
             ))}
           </div>
+
+          {/* Organizer — shown with event details (not in top header) */}
+          {organizerName && (
+            <div className="border-b border-slate-50 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-800/50 px-4 py-5 sm:px-8 sm:py-6">
+              <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-4 max-w-2xl mx-auto sm:mx-0 sm:max-w-none text-center sm:text-left">
+                {event.organizer?.logo ? (
+                  <img
+                    src={getImageUrl(event.organizer.logo)}
+                    alt=""
+                    className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 object-contain rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1"
+                  />
+                ) : (
+                  <div className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-2xl bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center border border-orange-100 dark:border-orange-800">
+                    <Building className="w-7 h-7 sm:w-8 sm:h-8 text-[#f97316]" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Organizer</p>
+                  <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white break-words">{organizerName}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="p-4 sm:p-16">
             {/* Description & RSVP Area */}
@@ -1289,18 +1302,23 @@ export default function PublicEventRegister() {
             )}
           </div>
           
-          {/* Subtle Footer inside card */}
+          {/* Confirmation note inside card */}
           <div className="bg-slate-50 dark:bg-slate-800/30 p-8 sm:p-10 text-center border-t border-slate-100 dark:border-slate-800">
-            <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-2">Powered by Validity System</p>
             <p className="text-xs text-slate-500 font-medium italic">A confirmation email will be sent immediately upon successful registration.</p>
           </div>
         </div>
 
-        {/* Support Links */}
-        <div className="flex justify-center gap-8 pb-8">
-          <a href="/help" className="text-xs font-bold text-slate-400 hover:text-[#f97316] transition-colors">Support</a>
-          <a href="/privacy" className="text-xs font-bold text-slate-400 hover:text-[#f97316] transition-colors">Privacy</a>
-          <a href="/terms" className="text-xs font-bold text-slate-400 hover:text-[#f97316] transition-colors">Terms</a>
+        {/* Support Links + platform branding */}
+        <div className="flex flex-col items-center gap-6 px-4 pt-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+            <a href="/help" className="text-xs font-bold text-slate-400 hover:text-[#f97316] transition-colors min-h-11 inline-flex items-center">Support</a>
+            <a href="/privacy" className="text-xs font-bold text-slate-400 hover:text-[#f97316] transition-colors min-h-11 inline-flex items-center">Privacy</a>
+            <a href="/terms" className="text-xs font-bold text-slate-400 hover:text-[#f97316] transition-colors min-h-11 inline-flex items-center">Terms</a>
+          </div>
+          <div className="flex flex-col items-center gap-2 text-center pt-4 border-t border-slate-200 dark:border-slate-800 w-full max-w-md">
+            <img src="/evella-logo.png" alt="" className="h-9 w-9 sm:h-10 sm:w-10 object-contain opacity-90 dark:opacity-95" />
+            <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Powered by Validity</p>
+          </div>
         </div>
       </div>
 

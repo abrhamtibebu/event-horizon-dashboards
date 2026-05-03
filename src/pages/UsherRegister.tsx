@@ -319,7 +319,7 @@ export default function UsherRegister() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background pb-20 sm:pb-0">
+    <div className="min-h-screen overflow-x-hidden flex flex-col bg-background pb-20 sm:pb-0">
       {/* Header matching system theme */}
       <div className="w-full bg-card/95 backdrop-blur-md border-b border-border sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">

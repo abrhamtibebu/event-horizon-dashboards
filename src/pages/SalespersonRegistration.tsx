@@ -294,7 +294,7 @@ const SalespersonRegistration: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 relative overflow-hidden">
+    <div className="min-h-screen min-w-0 overflow-x-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 relative">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-40" style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
@@ -333,7 +333,7 @@ const SalespersonRegistration: React.FC = () => {
         </div>
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+      <div className="relative max-w-7xl mx-auto min-w-0 px-4 sm:px-6 lg:px-8 py-8 sm:py-12 pb-[max(2rem,env(safe-area-inset-bottom))]">
         {/* Job Information Card */}
         {invitation && (
           <div className="group relative mb-8 sm:mb-12">
@@ -372,7 +372,7 @@ const SalespersonRegistration: React.FC = () => {
                           </div>
                           <div>
                             <p className="text-xs font-medium text-blue-700 uppercase tracking-wide">Location</p>
-                            <p className="text-sm font-semibold text-blue-800 truncate">{invitation.job.location}</p>
+                            <p className="text-sm font-semibold text-blue-800 break-words">{invitation.job.location}</p>
                           </div>
                         </div>
                       )}

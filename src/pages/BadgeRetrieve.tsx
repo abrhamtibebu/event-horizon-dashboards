@@ -130,7 +130,7 @@ export default function BadgeRetrieve() {
             <Button
               type="submit"
               disabled={lookingUp}
-              className="w-full h-14 bg-[#f97316] hover:bg-[#ea580c] text-white font-black text-base rounded-2xl shadow-[0_10px_20px_rgba(249,115,22,0.25)]"
+              className="w-full min-h-14 h-14 bg-[#f97316] hover:bg-[#ea580c] text-white font-black text-base rounded-2xl shadow-[0_10px_20px_rgba(249,115,22,0.25)]"
             >
               {lookingUp ? (
                 <SpinnerInline size="sm" />
@@ -158,9 +158,9 @@ export default function BadgeRetrieve() {
                 </p>
               </div>
 
-              <div className="flex justify-center">
-                <div className="bg-white rounded-3xl p-5 shadow-inner border border-slate-100">
-                  <QRCodeSVG value={lookupResult.qrCode} size={180} />
+              <div className="flex justify-center px-2 w-full overflow-hidden">
+                <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-inner border border-slate-100 w-[min(12.5rem,calc(100vw-4rem))] aspect-square flex items-center justify-center">
+                  <QRCodeSVG value={lookupResult.qrCode} size={168} />
                 </div>
               </div>
 

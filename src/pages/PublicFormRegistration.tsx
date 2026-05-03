@@ -10,12 +10,12 @@ import {
   CheckCircle,
   Loader2,
   ArrowLeft,
-  Building2
+  Building2,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Spinner } from '@/components/ui/spinner';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -91,6 +91,10 @@ export default function PublicFormRegistration() {
       if (form?.event_id) params.set('eventId', form.event_id.toString());
       if (form?.name) params.set('eventName', form.name);
       if (guest?.name) params.set('guestName', guest.name);
+      const guestUuidVal =
+        (guest as { uuid?: string; guest_uuid?: string } | undefined)?.uuid ||
+        (guest as { uuid?: string; guest_uuid?: string } | undefined)?.guest_uuid;
+      if (guestUuidVal) params.set('guestUuid', String(guestUuidVal).trim());
       if (guest?.email) params.set('guestEmail', guest.email);
       if (guest?.phone) params.set('guestPhone', guest.phone || '');
       if (guest?.company) params.set('guestCompany', guest.company);
@@ -156,72 +160,16 @@ export default function PublicFormRegistration() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
-        {/* Modern Loading Header */}
-        <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-center">
-              {/* Enhanced Evella Logo */}
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 overflow-hidden bg-background">
-                    <img
-                      src="/evella-logo.png"
-                      alt="Evella Logo"
-                      className="w-full h-full object-contain p-2"
-                      onError={(e) => {
-                        // Fallback to text if image fails to load
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        if (!target.nextElementSibling) {
-                          const fallback = document.createElement('div');
-                          fallback.className = 'w-full h-full bg-gradient-to-br from-primary via-primary to-primary/80 flex items-center justify-center text-white font-bold';
-                          fallback.textContent = 'E';
-                          target.parentElement?.appendChild(fallback);
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-xl text-foreground">
-                    Evella
-                  </span>
-                  <span className="text-xs text-muted-foreground font-medium">
-                    Event Management Platform
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="min-h-[80vh] flex items-center justify-center p-3 sm:p-4">
+      <div className="min-h-screen overflow-x-hidden bg-gradient-to-br from-background via-background to-muted/10 flex flex-col">
+        <div className="flex-1 min-h-[80vh] flex items-center justify-center p-3 sm:p-4">
           <div className="relative w-full max-w-lg">
             <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 via-primary/10 to-warning/20 rounded-3xl blur-xl opacity-50 animate-pulse"></div>
             <Card className="relative bg-card/80 backdrop-blur-xl border-0 shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden">
               <div className="h-1 bg-gradient-to-r from-primary via-warning to-primary"></div>
               <CardContent className="p-6 sm:p-8">
                 <div className="flex flex-col items-center justify-center space-y-4 sm:space-y-6">
-                  <div className="relative">
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center shadow-lg bg-background overflow-hidden">
-                      <img
-                        src="/evella-logo.png"
-                        alt="Evella Logo"
-                        className="w-full h-full object-contain p-3 animate-pulse"
-                        onError={(e) => {
-                          // Fallback to text if image fails to load
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          if (!target.nextElementSibling) {
-                            const fallback = document.createElement('div');
-                            fallback.className = 'w-full h-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-2xl';
-                            fallback.textContent = 'E';
-                            target.parentElement?.appendChild(fallback);
-                          }
-                        }}
-                      />
-                    </div>
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center shadow-lg bg-primary/10">
+                    <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 text-primary animate-spin" />
                   </div>
 
                   <div className="text-center space-y-2 sm:space-y-3">
@@ -240,37 +188,18 @@ export default function PublicFormRegistration() {
             </Card>
           </div>
         </div>
+        <div className="py-8 flex flex-col items-center gap-2 text-center px-4 border-t border-border/30">
+          <img src="/evella-logo.png" alt="" className="h-9 w-9 object-contain opacity-90" />
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Powered by Validity</p>
+        </div>
       </div>
     );
   }
 
   if (error || !form) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
-        {/* Error Header */}
-        <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-center">
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="w-12 h-12 bg-gradient-to-br from-destructive/20 to-destructive/10 rounded-xl flex items-center justify-center shadow-lg">
-                    <AlertCircle className="w-6 h-6 text-destructive" />
-                  </div>
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-xl text-foreground">
-                    Registration Error
-                  </span>
-                  <span className="text-xs text-muted-foreground font-medium">
-                    Unable to load form
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="min-h-[80vh] flex items-center justify-center p-3 sm:p-4">
+      <div className="min-h-screen overflow-x-hidden bg-gradient-to-br from-background via-background to-muted/10 flex flex-col">
+        <div className="flex-1 min-h-[70vh] flex items-center justify-center p-3 sm:p-4">
           <div className="relative w-full max-w-lg">
             <div className="absolute -inset-4 bg-gradient-to-r from-destructive/20 via-destructive/10 to-destructive/20 rounded-3xl blur-xl opacity-50"></div>
             <Card className="relative bg-card/80 backdrop-blur-xl border-0 shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden">
@@ -317,6 +246,10 @@ export default function PublicFormRegistration() {
             </Card>
           </div>
         </div>
+        <div className="py-8 flex flex-col items-center gap-2 text-center px-4 border-t border-border/30 mt-auto">
+          <img src="/evella-logo.png" alt="" className="h-9 w-9 object-contain opacity-90" />
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Powered by Validity</p>
+        </div>
       </div>
     );
   }
@@ -330,31 +263,8 @@ export default function PublicFormRegistration() {
 
   if (form.status !== 'active') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
-        {/* Status Header */}
-        <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-center">
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="w-12 h-12 bg-gradient-to-br from-warning/20 to-warning/10 rounded-xl flex items-center justify-center shadow-lg">
-                    <Clock className="w-6 h-6 text-warning" />
-                  </div>
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-xl text-foreground">
-                    Form Unavailable
-                  </span>
-                  <span className="text-xs text-muted-foreground font-medium">
-                    Registration temporarily closed
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="min-h-[80vh] flex items-center justify-center p-3 sm:p-4">
+      <div className="min-h-screen overflow-x-hidden bg-gradient-to-br from-background via-background to-muted/10 flex flex-col">
+        <div className="flex-1 min-h-[70vh] flex items-center justify-center p-3 sm:p-4">
           <div className="relative w-full max-w-lg">
             <div className="absolute -inset-4 bg-gradient-to-r from-warning/20 via-warning/10 to-warning/20 rounded-3xl blur-xl opacity-50"></div>
             <Card className="relative bg-card/80 backdrop-blur-xl border-0 shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden">
@@ -403,70 +313,16 @@ export default function PublicFormRegistration() {
             </Card>
           </div>
         </div>
+        <div className="py-8 flex flex-col items-center gap-2 text-center px-4 border-t border-border/30 mt-auto">
+          <img src="/evella-logo.png" alt="" className="h-9 w-9 object-contain opacity-90" />
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Powered by Validity</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/10">
-      {/* Modern Header with Enhanced Branding */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
-          <div className="flex items-center justify-between min-h-[60px] sm:min-h-[64px]">
-            {/* Enhanced Evella Logo */}
-            <div className="flex items-center gap-2 sm:gap-4 group flex-shrink-0">
-              <div className="relative">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 group-hover:shadow-primary/30 transition-all duration-300 bg-background overflow-hidden">
-                  <img
-                    src="/evella-logo.png"
-                    alt="Evella Logo"
-                    className="w-full h-full object-contain p-2"
-                    onError={(e) => {
-                      // Fallback to text if image fails to load
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      if (!target.nextElementSibling) {
-                        const fallback = document.createElement('div');
-                        fallback.className = 'w-full h-full bg-gradient-to-br from-primary via-primary to-primary/80 flex items-center justify-center text-white font-bold';
-                        fallback.textContent = 'E';
-                        target.parentElement?.appendChild(fallback);
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="font-bold text-lg sm:text-xl text-foreground group-hover:text-primary transition-colors duration-300 truncate">
-                  Evella
-                </span>
-                <span className="text-xs text-muted-foreground font-medium hidden xs:block sm:block">
-                  Event Management Platform
-                </span>
-              </div>
-            </div>
-
-            {/* Organizer Logo with Enhanced Styling */}
-            {organizerLogo && (
-              <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                <div className="text-xs sm:text-sm text-muted-foreground hidden md:block font-medium">
-                  Powered by
-                </div>
-                <div className="relative">
-                  <img
-                    src={organizerLogo}
-                    alt={organizerName}
-                    className="h-8 sm:h-10 max-w-[100px] sm:max-w-[140px] object-contain rounded-lg bg-card/50 p-1 sm:p-2 shadow-sm border border-border/50 hover:shadow-md transition-all duration-300"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-br from-background via-background to-muted/10 flex flex-col">
       {/* Modern Hero Section with Event Details */}
       {event && (
         <div className="relative overflow-hidden">
@@ -580,6 +436,37 @@ export default function PublicFormRegistration() {
                     </div>
                   </div>
                 )}
+
+                {/* Organizer */}
+                {organizerName && (
+                  <div className="group relative bg-card/60 backdrop-blur-xl rounded-2xl p-4 sm:p-6 border border-border/50 shadow-lg sm:col-span-2 lg:col-span-3">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-2xl" />
+                    <div className="relative flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-4 text-center sm:text-left">
+                      {organizerLogo ? (
+                        <img
+                          src={organizerLogo}
+                          alt=""
+                          className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 object-contain rounded-xl border border-border/50 bg-background/80 p-1"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 rounded-xl bg-primary/15 flex items-center justify-center border border-primary/25">
+                          <Building2 className="w-7 h-7 sm:w-8 sm:h-8 text-primary" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                          Organizer
+                        </div>
+                        <div className="text-base sm:text-lg font-bold text-foreground break-words">
+                          {organizerName}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -598,23 +485,8 @@ export default function PublicFormRegistration() {
             <CardHeader className="bg-gradient-to-r from-card/50 to-card/30 border-b border-border/30 px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
               <div className="flex items-center gap-3 sm:gap-4">
                 <div className="relative flex-shrink-0">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shadow-lg bg-background overflow-hidden">
-                    <img
-                      src="/evella-logo.png"
-                      alt="Evella Logo"
-                      className="w-full h-full object-contain p-3"
-                      onError={(e) => {
-                        // Fallback to text if image fails to load
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        if (!target.nextElementSibling) {
-                          const fallback = document.createElement('div');
-                          fallback.className = 'w-full h-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-xl';
-                          fallback.textContent = 'E';
-                          target.parentElement?.appendChild(fallback);
-                        }
-                      }}
-                    />
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center shadow-lg bg-primary/10 border border-primary/20">
+                    <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
                   </div>
                 </div>
                 <div className="flex-1 space-y-1 sm:space-y-2 min-w-0">
@@ -744,37 +616,12 @@ export default function PublicFormRegistration() {
           </Card>
         </div>
 
-        {/* Enhanced Footer */}
-        <div className="mt-12 sm:mt-16 text-center space-y-4 px-4 sm:px-0">
-          <div className="flex items-center justify-center gap-2 text-muted-foreground">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center bg-background overflow-hidden">
-              <img
-                src="/evella-logo.png"
-                alt="Evella Logo"
-                className="w-full h-full object-contain p-1.5"
-                onError={(e) => {
-                  // Fallback to text if image fails to load
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  if (!target.nextElementSibling) {
-                    const fallback = document.createElement('div');
-                    fallback.className = 'w-full h-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold text-xs';
-                    fallback.textContent = 'E';
-                    target.parentElement?.appendChild(fallback);
-                  }
-                }}
-              />
-            </div>
-            <span className="font-semibold text-foreground text-base sm:text-lg">Evella</span>
+        {/* Evella / Validity + trust (organizer lives in event details above) */}
+        <div className="mt-12 sm:mt-16 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center space-y-4 px-4 sm:px-0">
+          <div className="flex flex-col items-center gap-2 pt-6 border-t border-border/30">
+            <img src="/evella-logo.png" alt="" className="h-10 w-10 object-contain opacity-90" />
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Powered by Validity</p>
           </div>
-          <p className="text-muted-foreground font-medium text-sm sm:text-base">
-            Event Management Platform
-          </p>
-          {organizerName && (
-            <p className="text-sm text-muted-foreground mt-3 sm:mt-4">
-              Organized by <span className="font-semibold text-foreground">{organizerName}</span>
-            </p>
-          )}
 
           {/* Trust Indicators */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 lg:gap-8 mt-6 sm:mt-8 pt-6 sm:pt-8 border-t border-border/30">

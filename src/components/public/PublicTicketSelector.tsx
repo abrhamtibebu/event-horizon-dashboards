@@ -144,7 +144,7 @@ export function PublicTicketSelector({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       {/* Ticket Types */}
       <div className="space-y-4">
         <div className="flex items-center gap-3 mb-4">
@@ -165,14 +165,14 @@ export function PublicTicketSelector({
             return (
               <div
                 key={ticketType.id}
-                className={`bg-white rounded-xl shadow-sm border border-gray-200 p-6 transition-all ${
+                className={`bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 transition-all max-w-full ${
                   quantity > 0 ? 'ring-2 ring-yellow-500 border-yellow-500' : ''
                 } ${isSoldOut ? 'opacity-60' : ''}`}
               >
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-semibold text-lg text-gray-900">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 min-w-0">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="font-semibold text-lg text-gray-900 break-words">
                         {ticketType.name}
                       </h4>
                       {getAvailabilityBadge(ticketType)}
@@ -205,22 +205,23 @@ export function PublicTicketSelector({
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end gap-3 md:min-w-[200px]">
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-yellow-600">
+                  <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:min-w-[200px] md:items-end">
+                    <div className="text-left md:text-right">
+                      <div className="text-xl sm:text-2xl font-bold text-yellow-600">
                         ETB {Number(ticketType.price).toFixed(2)}
                       </div>
                       <div className="text-xs text-gray-500">per ticket</div>
                     </div>
 
                     {!isSoldOut && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center gap-2 sm:justify-end">
                         <Button
                           variant="outline"
                           size="sm"
+                          type="button"
                           onClick={() => handleQuantityChange(ticketType, quantity - 1)}
                           disabled={quantity === 0 || loading}
-                          className="h-8 w-8 p-0"
+                          className="min-h-11 min-w-11 shrink-0 p-0"
                         >
                           <Minus className="w-4 h-4" />
                         </Button>
@@ -268,7 +269,7 @@ export function PublicTicketSelector({
       </div>
 
       {/* Guest Information */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 max-w-full min-w-0">
         <h3 className="text-lg font-bold text-gray-900 mb-4">Your Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
@@ -327,16 +328,16 @@ export function PublicTicketSelector({
 
       {/* Order Summary & Continue */}
       {selections.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 sm:p-6 min-w-0">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 min-w-0">
+            <div className="min-w-0">
               <h3 className="text-lg font-bold text-gray-900">Order Summary</h3>
               <p className="text-sm text-gray-600">
                 {totalQuantity} {totalQuantity === 1 ? 'ticket' : 'tickets'} selected
               </p>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-yellow-600">
+            <div className="text-left sm:text-right shrink-0">
+              <div className="text-xl sm:text-2xl font-bold text-yellow-600">
                 ETB {totalAmount.toFixed(2)}
               </div>
               <div className="text-xs text-gray-500">Total amount</div>
@@ -344,9 +345,10 @@ export function PublicTicketSelector({
           </div>
 
           <Button
+            type="button"
             onClick={handleContinue}
             disabled={loading}
-            className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-3 text-lg"
+            className="w-full min-h-12 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-3 text-base sm:text-lg"
           >
             Continue to Payment
           </Button>

@@ -1,26 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { CheckCircle, Download, ArrowLeft, Calendar, Clock, Mail, User, Building, Briefcase, Users, ShieldCheck } from 'lucide-react';
+import { CheckCircle, Download } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import api, { resendRegistrationEmail, getBadgePreview } from '@/lib/api';
-import Badge from '@/components/Badge';
+import api from '@/lib/api';
 import { SpinnerInline } from '@/components/ui/spinner';
 
 export default function RegistrationSuccess() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [downloading, setDownloading] = useState(false);
 
   // Get registration data from URL params
   const attendeeId = searchParams.get('attendeeId');
   const eventId = searchParams.get('eventId');
   const eventName = searchParams.get('eventName');
-  const guestName = searchParams.get('guestName');
-  const guestUuid = searchParams.get('guestUuid');
+  const guestUuid = searchParams.get('guestUuid')?.trim() ?? '';
+  const qrValue = guestUuid.slice(0, 8);
 
   useEffect(() => {
     if (!attendeeId || !eventId || !eventName) {
@@ -33,14 +31,14 @@ export default function RegistrationSuccess() {
     setDownloading(true);
     try {
       const response = await api.get(`/public/events/${eventId}/attendees/${attendeeId}/badge`, {
-        params: { guestUuid },
+        params: { guestUuid: guestUuid || undefined },
         responseType: 'blob'
       });
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${guestName?.replace(/\s+/g, '-') || 'badge'}.pdf`;
+      link.download = qrValue.length > 0 ? `e-badge-${qrValue}.pdf` : 'e-badge.pdf';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -54,14 +52,14 @@ export default function RegistrationSuccess() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 font-['Outfit']">
+    <div className="min-h-screen overflow-x-hidden bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 sm:p-6 font-['Outfit'] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <motion.div 
         initial={{ opacity: 0, y: 20 }} 
         animate={{ opacity: 1, y: 0 }} 
         transition={{ duration: 0.5 }}
-        className="max-w-md w-full"
+        className="max-w-md w-full min-w-0"
       >
-        <Card className="bg-white dark:bg-slate-900 border-none shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-12 text-center rounded-[3rem] overflow-hidden relative">
+        <Card className="bg-white dark:bg-slate-900 border-none shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-6 sm:p-12 text-center rounded-[2rem] sm:rounded-[3rem] overflow-hidden relative">
           {/* Subtle Orange Accent at top */}
           <div className="absolute top-0 left-0 w-full h-2 bg-[#f97316]" />
           
@@ -73,15 +71,25 @@ export default function RegistrationSuccess() {
             Success!
           </h1>
           
-          <p className="text-slate-500 dark:text-slate-400 mb-8 leading-relaxed font-medium px-4">
-            You've successfully registered for <span className="text-[#f97316] font-bold">"{eventName}"</span>. 
+          <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mb-8 leading-relaxed font-medium px-1 sm:px-4 break-words">
+            You've successfully registered for <span className="text-[#f97316] font-bold">&ldquo;{eventName}&rdquo;</span>. 
             A confirmation email with your details has been sent to your inbox.
           </p>
 
-          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-6 mb-10 border border-slate-100 dark:border-slate-800">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Guest Name</p>
-            <p className="text-slate-900 dark:text-white font-bold text-lg">{guestName}</p>
-          </div>
+          {guestUuid.length > 0 ? (
+            <div className="flex flex-col items-center mb-10 px-2">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                Guest check-in QR
+              </p>
+              <div className="bg-white dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-inner">
+                <QRCodeSVG value={qrValue} size={176} level="M" includeMargin />
+              </div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-6 mb-1">Guest code</p>
+              <p className="text-lg font-mono font-bold tracking-wider text-slate-900 dark:text-white">
+                {qrValue}
+              </p>
+            </div>
+          ) : null}
 
           <div className="space-y-4">
             <Button
@@ -105,23 +113,6 @@ export default function RegistrationSuccess() {
             </p>
           </div>
         </Card>
-
-        {/* Home Link */}
-        <motion.div 
-          initial={{ opacity: 0 }} 
-          animate={{ opacity: 1 }} 
-          transition={{ delay: 0.6 }}
-          className="text-center mt-8"
-        >
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/')}
-            className="text-slate-400 hover:text-[#f97316] font-bold text-sm transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Button>
-        </motion.div>
       </motion.div>
     </div>
   );

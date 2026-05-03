@@ -454,7 +454,7 @@ const CustomEventRegistration: React.FC = () => {
                 </p>
               </div>
 
-              <div className="border-2 border-slate-200 rounded-lg p-6 mb-6 bg-slate-50">
+              <div className="border-2 border-slate-200 rounded-lg p-4 sm:p-6 mb-6 bg-slate-50">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Mail className="w-6 h-6 text-primary" />
@@ -475,7 +475,7 @@ const CustomEventRegistration: React.FC = () => {
               </div>
 
               {eventData && (
-                <div className="border-2 border-slate-300 rounded-lg p-6 bg-white">
+                <div className="border-2 border-slate-300 rounded-lg p-4 sm:p-6 bg-white">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Event Details</h3>
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
@@ -584,12 +584,12 @@ const CustomEventRegistration: React.FC = () => {
       </section>
 
       {/* Main Content */}
-      <section className="py-8 px-4">
-        <div className="max-w-7xl mx-auto">
+      <section className="py-8 px-4 overflow-x-hidden">
+        <div className="max-w-7xl mx-auto min-w-0">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Event Info Sidebar - Compact */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg border-2 border-slate-300 p-6 shadow-sm sticky top-6">
+            <div className="lg:col-span-1 min-w-0">
+              <div className="bg-white rounded-lg border-2 border-slate-300 p-4 sm:p-6 shadow-sm lg:sticky lg:top-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4 pb-3 border-b-2 border-primary">Event Details</h3>
 
                 <div className="space-y-5">
@@ -654,16 +654,16 @@ const CustomEventRegistration: React.FC = () => {
             </div>
 
             {/* Registration Form */}
-            <div className="lg:col-span-3">
-              <div className="bg-white rounded-lg border-2 border-slate-300 shadow-sm">
+            <div className="lg:col-span-3 min-w-0">
+              <div className="bg-white rounded-lg border-2 border-slate-300 shadow-sm overflow-hidden">
                 {/* Form Header */}
-                <div className="border-b-2 border-primary bg-primary/5 px-6 py-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">Registration Form</h2>
+                <div className="border-b-2 border-primary bg-primary/5 px-4 py-4 sm:px-6">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 min-w-0">
+                    <div className="min-w-0">
+                      <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Registration Form</h2>
                       <p className="text-sm text-slate-700 mt-1">Complete all required fields to register</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-left sm:text-right shrink-0">
                       <div className="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Progress</div>
                       <div className="text-lg font-bold text-primary">{Math.round(calculateProgress())}%</div>
                     </div>
@@ -678,11 +678,11 @@ const CustomEventRegistration: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="p-6">
+                <div className="p-4 sm:p-6">
 
                   <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Personal Information */}
-                    <div className="border-2 border-slate-300 rounded-lg p-6">
+                    <div className="border-2 border-slate-300 rounded-lg p-4 sm:p-6">
                       <div className="flex items-center gap-3 mb-5 pb-4 border-b-2 border-slate-300">
                         <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                           <User className="w-5 h-5 text-primary-foreground" />
@@ -807,7 +807,7 @@ const CustomEventRegistration: React.FC = () => {
                     </div>
 
                     {/* Participation Details */}
-                    <div className="border-2 border-slate-300 rounded-lg p-6">
+                    <div className="border-2 border-slate-300 rounded-lg p-4 sm:p-6">
                       <div className="flex items-center gap-3 mb-5 pb-4 border-b-2 border-slate-300">
                         <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                           <Building className="w-5 h-5 text-primary-foreground" />
@@ -919,7 +919,7 @@ const CustomEventRegistration: React.FC = () => {
                     </div>
 
                     {/* Support Requirements */}
-                    <div className="border-2 border-slate-300 rounded-lg p-6">
+                    <div className="border-2 border-slate-300 rounded-lg p-4 sm:p-6">
                       <div className="flex items-center gap-3 mb-5 pb-4 border-b-2 border-slate-300">
                         <div className="w-10 h-10 bg-success rounded-lg flex items-center justify-center">
                           <HelpCircle className="w-5 h-5 text-white" />
@@ -982,7 +982,7 @@ const CustomEventRegistration: React.FC = () => {
                     </div>
 
                     {/* Document Uploads */}
-                    <div className="border-2 border-slate-300 rounded-lg p-6">
+                    <div className="border-2 border-slate-300 rounded-lg p-4 sm:p-6">
                       <div className="flex items-center gap-3 mb-5 pb-4 border-b-2 border-slate-300">
                         <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
                           <Upload className="w-5 h-5 text-primary-foreground" />

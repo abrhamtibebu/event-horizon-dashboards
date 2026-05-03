@@ -207,9 +207,9 @@ export default function TicketPurchasePage() {
   const startDate = event?.start_date ? new Date(event.start_date) : null;
 
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors duration-500">
+    <div className="min-h-screen overflow-x-hidden bg-background text-foreground transition-colors duration-500">
       {/* Dynamic Header / Banner */}
-      <div className="relative h-[30vh] md:h-[40vh] overflow-hidden">
+      <div className="relative min-h-[28vh] h-[28vh] sm:h-[30vh] md:h-[40vh] overflow-hidden">
         {event?.image_url || event?.image || event?.event_image ? (
           <img src={getImageUrl(event.image_url || event.image || event.event_image)} alt={event.name} className="w-full h-full object-cover" />
         ) : (
@@ -217,25 +217,25 @@ export default function TicketPurchasePage() {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
 
-        <div className="absolute bottom-0 left-0 w-full p-6 md:p-12">
-          <div className="max-w-6xl mx-auto">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="absolute bottom-0 left-0 w-full p-4 sm:p-6 md:p-12 min-w-0">
+          <div className="max-w-6xl mx-auto min-w-0">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="min-w-0">
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20 mb-3">
                 <ShieldCheck className="w-3 h-3 mr-1" /> Official Event Sales
               </span>
-              <h1 className="text-3xl md:text-5xl font-black tracking-tighter mb-4">{event?.name}</h1>
-              <div className="flex flex-wrap gap-4 text-sm font-medium text-muted-foreground">
+              <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tighter mb-3 sm:mb-4 break-words hyphens-auto leading-tight">{event?.name}</h1>
+              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm font-medium text-muted-foreground">
                 {startDate && (
-                  <div className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-primary" /> {format(startDate, 'PPPP')}</div>
+                  <div className="flex items-start gap-1.5 min-w-0"><Calendar className="w-4 h-4 text-primary shrink-0 mt-0.5" /> <span className="break-words">{format(startDate, 'PPPP')}</span></div>
                 )}
-                <div className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-primary" /> {event?.venue_name || event?.location}</div>
+                <div className="flex items-start gap-1.5 min-w-0"><MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" /> <span className="break-words">{event?.venue_name || event?.location}</span></div>
               </div>
             </motion.div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-12 -mt-8 relative z-10">
+      <div className="max-w-6xl mx-auto min-w-0 px-4 sm:px-6 py-8 sm:py-12 -mt-6 sm:-mt-8 relative z-10">
         {(event?.latitude || event?.longitude || event?.venue_name || event?.location || event?.formatted_address) && (
           <div className="mb-8">
             <EventLocationMapCard
@@ -248,16 +248,16 @@ export default function TicketPurchasePage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
 
           {/* Main Checkout Flow */}
-          <div className="lg:col-span-8 space-y-8">
+          <div className="lg:col-span-8 space-y-6 sm:space-y-8 min-w-0">
             {/* Step Progress */}
-            <div className="flex items-center justify-between px-2">
+            <div className="flex items-center justify-between px-1 sm:px-2 gap-1 min-w-0">
               <ProgressDot active={step === 'select'} completed={step !== 'select'} label="Tickets" />
-              <div className="flex-1 h-px bg-border mx-4" />
+              <div className="flex-1 h-px bg-border mx-2 sm:mx-4 min-w-[8px]" />
               <ProgressDot active={step === 'details'} completed={step === 'payment'} label="Details" />
-              <div className="flex-1 h-px bg-border mx-4" />
+              <div className="flex-1 h-px bg-border mx-2 sm:mx-4 min-w-[8px]" />
               <ProgressDot active={step === 'payment'} completed={false} label="Secure Pay" />
             </div>
 
@@ -280,11 +280,11 @@ export default function TicketPurchasePage() {
                             ${isSoldOut ? 'opacity-60 grayscale cursor-not-allowed' : ''}
                           `}
                         >
-                          <CardContent className="p-6">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h3 className="text-xl font-bold tracking-tight">{type.name}</h3>
+                          <CardContent className="p-4 sm:p-6">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 min-w-0">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <h3 className="text-lg sm:text-xl font-bold tracking-tight break-words">{type.name}</h3>
                                   {isSoldOut && <span className="bg-destructive/10 text-destructive text-[10px] uppercase font-bold px-2 py-0.5 rounded">Sold Out</span>}
                                 </div>
                                 <p className="text-muted-foreground text-sm leading-relaxed mb-3 line-clamp-2">{type.description}</p>
@@ -299,7 +299,7 @@ export default function TicketPurchasePage() {
                               </div>
                               <div className="text-left md:text-right shrink-0">
                                 <div className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Price per Ticket</div>
-                                <div className="text-3xl font-black tracking-tighter">ETB {Number(type.price).toLocaleString()}</div>
+                                <div className="text-2xl sm:text-3xl font-black tracking-tighter">ETB {Number(type.price).toLocaleString()}</div>
                                 {isSelected && (
                                   <div className="mt-2 text-primary font-bold flex items-center md:justify-end text-sm">
                                     Selected <CheckCircle2 className="w-4 h-4 ml-1.5" />
@@ -319,7 +319,7 @@ export default function TicketPurchasePage() {
               {step === 'details' && (
                 <motion.div key="step-details" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
                   <Card>
-                    <CardContent className="p-8 space-y-6">
+                    <CardContent className="p-4 sm:p-8 space-y-6">
                       <div className="flex items-center gap-3 p-4 bg-primary/5 rounded-xl border border-primary/10 text-primary">
                         <Info className="w-5 h-5 shrink-0" />
                         <p className="text-sm font-medium">Please provide accurate info. Your tickets will be delivered to this email.</p>
@@ -426,10 +426,10 @@ export default function TicketPurchasePage() {
             </AnimatePresence>
           </div>
 
-          {/* Checkout Sticky Summary */}
-          <div className="lg:col-span-4 lg:sticky lg:top-24">
+          {/* Checkout Sticky Summary — sticky from lg only */}
+          <div className="lg:col-span-4 lg:sticky lg:top-24 min-w-0">
             <Card className="shadow-2xl border-primary/10 overflow-hidden">
-              <div className="p-6 border-b bg-muted/30">
+              <div className="p-4 sm:p-6 border-b bg-muted/30">
                 <h2 className="font-bold flex items-center gap-2">
                   <Ticket className="w-5 h-5 text-primary" /> Purchase Summary
                 </h2>
@@ -443,17 +443,21 @@ export default function TicketPurchasePage() {
                           <p className="font-bold text-lg">{selectedTicketType.name}</p>
                           <p className="text-sm text-muted-foreground">ETB {Number(selectedTicketType.price).toLocaleString()} / ticket</p>
                         </div>
-                        <div className="flex items-center gap-3 bg-muted rounded-lg p-1">
+                        <div className="flex items-center gap-2 sm:gap-3 bg-muted rounded-lg p-1 shrink-0">
                           <button
+                            type="button"
+                            aria-label="Decrease quantity"
                             onClick={() => setQuantity(q => Math.max(1, q - 1))}
                             disabled={step !== 'select'}
-                            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-background disabled:opacity-50 transition-colors"
+                            className="min-h-11 min-w-11 flex items-center justify-center rounded-md hover:bg-background disabled:opacity-50 transition-colors text-lg font-bold"
                           >-</button>
-                          <span className="font-bold min-w-[20px] text-center">{quantity}</span>
+                          <span className="font-bold min-w-[28px] text-center tabular-nums">{quantity}</span>
                           <button
+                            type="button"
+                            aria-label="Increase quantity"
                             onClick={() => setQuantity(q => Math.min(10, q + 1))}
                             disabled={step !== 'select'}
-                            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-background disabled:opacity-50 transition-colors"
+                            className="min-h-11 min-w-11 flex items-center justify-center rounded-md hover:bg-background disabled:opacity-50 transition-colors text-lg font-bold"
                           >+</button>
                         </div>
                       </div>
@@ -560,12 +564,12 @@ function PaymentOption({ id, label, description, icon, selected, onClick }: any)
     <Card
       onClick={onClick}
       className={`
-        cursor-pointer transition-all duration-300 border-2
+        cursor-pointer transition-all duration-300 border-2 touch-manipulation min-h-[3.25rem]
         ${selected ? 'border-primary bg-primary/[0.03] shadow-inner shadow-primary/5' : 'hover:border-primary/30'}
       `}
     >
-      <CardContent className="p-5">
-        <div className="flex items-center gap-4">
+      <CardContent className="p-4 sm:p-5 min-w-0">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           <div className={`
             w-12 h-12 rounded-2xl flex items-center justify-center transition-colors
             ${selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}

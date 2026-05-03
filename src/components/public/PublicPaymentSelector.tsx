@@ -53,22 +53,24 @@ export function PublicPaymentSelector({
   loading = false,
 }: PublicPaymentSelectorProps) {
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3 min-w-0">
         <Button
           variant="ghost"
           size="sm"
+          type="button"
           onClick={onBack}
           disabled={loading}
-          className="p-2"
+          className="min-h-11 min-w-11 shrink-0 p-0"
+          aria-label="Back"
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <div>
-          <div className="flex items-center gap-3">
-            <CreditCard className="w-5 h-5 text-yellow-600" />
-            <h3 className="text-xl font-bold text-gray-900">Select Payment Method</h3>
+        <div className="min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <CreditCard className="w-5 h-5 shrink-0 text-yellow-600" />
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 break-words">Select Payment Method</h3>
           </div>
           <p className="text-sm text-gray-600 mt-1">
             Choose how you'd like to pay for your tickets
@@ -77,24 +79,32 @@ export function PublicPaymentSelector({
       </div>
 
       {/* Payment Methods Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
         {paymentMethods.map((method) => (
           <div
             key={method.id}
+            role="button"
+            tabIndex={0}
             onClick={() => !loading && onSelect(method.id)}
-            className={`bg-white rounded-xl shadow-sm border-2 p-6 cursor-pointer transition-all ${
+            onKeyDown={(e) => {
+              if ((e.key === 'Enter' || e.key === ' ') && !loading) {
+                e.preventDefault();
+                onSelect(method.id);
+              }
+            }}
+            className={`bg-white rounded-xl shadow-sm border-2 p-4 sm:p-6 cursor-pointer transition-all min-h-[3.5rem] touch-manipulation max-w-full min-w-0 ${
               selected === method.id
                 ? 'border-yellow-500 ring-2 ring-yellow-500 ring-opacity-50'
                 : 'border-gray-200 hover:border-yellow-300'
             } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <div className="flex items-center gap-4">
-              <div className="text-4xl">{method.icon}</div>
-              <div className="flex-1">
-                <h4 className="font-semibold text-lg text-gray-900">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <div className="text-3xl sm:text-4xl shrink-0" aria-hidden>{method.icon}</div>
+              <div className="min-w-0 flex-1">
+                <h4 className="font-semibold text-base sm:text-lg text-gray-900 break-words">
                   {method.name}
                 </h4>
-                <p className="text-sm text-gray-600">{method.description}</p>
+                <p className="text-sm text-gray-600 break-words">{method.description}</p>
               </div>
               {selected === method.id && (
                 <div className="flex-shrink-0">
@@ -129,8 +139,8 @@ export function PublicPaymentSelector({
               {selected ? `Paying with ${paymentMethods.find(m => m.id === selected)?.name}` : 'Select a payment method'}
             </p>
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-yellow-600">
+          <div className="text-left sm:text-right shrink-0">
+            <div className="text-xl sm:text-2xl font-bold text-yellow-600">
               ETB {totalAmount.toFixed(2)}
             </div>
             <div className="text-xs text-gray-500">Total amount</div>
@@ -138,9 +148,10 @@ export function PublicPaymentSelector({
         </div>
 
         <Button
+          type="button"
           onClick={onConfirm}
           disabled={!selected || loading}
-          className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-3 text-lg"
+          className="w-full min-h-12 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-3 text-base sm:text-lg"
         >
           {loading ? (
             <>
