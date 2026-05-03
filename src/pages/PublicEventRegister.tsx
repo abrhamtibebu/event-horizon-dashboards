@@ -644,6 +644,23 @@ export default function PublicEventRegister() {
         navigate('/registration/success');
       }
     } catch (err: any) {
+      const isAlreadyRegistered =
+        err.response?.status === 409 &&
+        err.response?.data?.duplicate_type === 'event_registration';
+
+      if (isAlreadyRegistered && event?.uuid) {
+        const identifier = form.email || form.phone;
+        const params = new URLSearchParams();
+
+        if (identifier) {
+          params.set('identifier', identifier);
+        }
+
+        toast.info('You are already registered. Retrieve your e-badge here.');
+        navigate(`/event/${event.uuid}/badge-retrieve${params.toString() ? `?${params.toString()}` : ''}`);
+        return;
+      }
+
       toast.error(err.response?.data?.error || 'Registration failed.');
     } finally {
       setSubmitting(false);

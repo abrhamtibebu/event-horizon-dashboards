@@ -2420,7 +2420,7 @@ export default function EventDetails() {
                         <span className="sm:hidden">QR</span>
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-[95vw] sm:max-w-xl bg-popover border-border text-popover-foreground rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl">
+                    <DialogContent className="max-w-[95vw] sm:max-w-4xl bg-popover border-border text-popover-foreground rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-xl font-bold">
                           <QrCode className="w-5 h-5 text-primary" />
@@ -2432,7 +2432,7 @@ export default function EventDetails() {
                       </DialogHeader>
 
                       {eventData?.uuid ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
                           {/* Pre-Registration Section */}
                           <div className="space-y-4 p-4 rounded-xl border border-border bg-muted/30">
                             <div className="flex items-center justify-between">
@@ -2537,6 +2537,55 @@ export default function EventDetails() {
                                     : `${window.location.origin}/event/register/${eventData.uuid}?type=onsite`;
                                   navigator.clipboard.writeText(url);
                                   toast.success('Onsite registration link copied!');
+                                }} 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 w-8 p-0"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* E-Badge Retrieval Section */}
+                          <div className="space-y-4 p-4 rounded-xl border border-border bg-muted/30">
+                            <div className="flex items-center justify-between">
+                              <h3 className="text-sm font-bold uppercase tracking-wider text-blue-500">Retrieve E-Badge</h3>
+                              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20 text-[10px]">Guest Lookup</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">For registered guests who need to download their e-badge again.</p>
+                            
+                            <div className="flex flex-col items-center gap-3 p-3 bg-white rounded-lg">
+                              <QRCode 
+                                id="qr-badge-retrieve"
+                                value={`${window.location.origin}/event/${eventData.uuid}/badge-retrieve`}
+                                size={140}
+                              />
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-[10px] h-6 text-blue-500 hover:bg-blue-500/5"
+                                onClick={() => {
+                                  const url = `${window.location.origin}/event/${eventData.uuid}/badge-retrieve`;
+                                  downloadQRCode(url, `badge-retrieve-${eventData.name}`);
+                                }}
+                              >
+                                <Download className="w-3 h-3 mr-1" />
+                                Download QR
+                              </Button>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <Input
+                                value={`${window.location.origin}/event/${eventData.uuid}/badge-retrieve`}
+                                readOnly
+                                className="bg-background border-border text-[10px] h-8"
+                              />
+                              <Button 
+                                onClick={() => {
+                                  const url = `${window.location.origin}/event/${eventData.uuid}/badge-retrieve`;
+                                  navigator.clipboard.writeText(url);
+                                  toast.success('E-badge retrieval link copied!');
                                 }} 
                                 variant="outline" 
                                 size="sm" 
