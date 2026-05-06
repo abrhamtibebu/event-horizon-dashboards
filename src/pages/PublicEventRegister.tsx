@@ -1,5 +1,5 @@
 // Trigger HMR
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,8 +22,6 @@ import { useAuth } from '@/hooks/use-auth';
 import type { PaymentMethod, PaymentStatus } from '@/types/tickets';
 import type { PublicTicketType } from '@/types/publicTickets';
 import { SpinnerInline } from '@/components/ui/spinner';
-import CloudflareTurnstileWidget from '@/components/CloudflareTurnstileWidget';
-import { getTurnstileSiteKey } from '@/config/env';
 
 export default function PublicEventRegister() {
   const { eventUuid } = useParams();
@@ -69,13 +67,21 @@ export default function PublicEventRegister() {
   const [customFormParticipantType, setCustomFormParticipantType] = useState<string>('attendee'); // Deprecated - kept for backward compatibility
   const [existingGuestInfo, setExistingGuestInfo] = useState<any>(null);
   const [guestTypes, setGuestTypes] = useState<any[]>([]);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const turnstileSiteKey = getTurnstileSiteKey();
 
   // RSVP and Speaker states
   const [rsvpStatus, setRsvpStatus] = useState<'pending' | 'accepted' | 'declined'>('pending');
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
+  const profileImageObjectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (profileImageObjectUrlRef.current) {
+        URL.revokeObjectURL(profileImageObjectUrlRef.current);
+        profileImageObjectUrlRef.current = null;
+      }
+    };
+  }, []);
 
   const handleCustomFormSuccess = useCallback((result?: SubmissionResult) => {
     setSuccess(true);
@@ -135,7 +141,7 @@ export default function PublicEventRegister() {
     }
   }, [isTicketedEvent, event, navigate, searchParams]);
 
-  const genderOptions = ['Male', 'Female', 'Other'];
+  const genderOptions = ['Male', 'Female'];
   const countryOptions = [
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
     'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi',
@@ -427,15 +433,23 @@ export default function PublicEventRegister() {
 
   const handleFieldChange = (field: string, value: any) => {
     if (field === 'profile_picture') {
-      const file = value;
-      if (file) {
-        setProfileImage(file);
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setProfileImagePreview(reader.result as string);
-        };
-        reader.readAsDataURL(file);
+      const file = value as File | null | undefined;
+
+      if (profileImageObjectUrlRef.current) {
+        URL.revokeObjectURL(profileImageObjectUrlRef.current);
+        profileImageObjectUrlRef.current = null;
       }
+
+      if (!file) {
+        setProfileImage(null);
+        setProfileImagePreview(null);
+        return;
+      }
+
+      setProfileImage(file);
+      const objectUrl = URL.createObjectURL(file);
+      profileImageObjectUrlRef.current = objectUrl;
+      setProfileImagePreview(objectUrl);
       return;
     }
 
@@ -564,11 +578,6 @@ export default function PublicEventRegister() {
       return;
     }
 
-    if (turnstileSiteKey && !turnstileToken) {
-      toast.error('Please complete the security challenge.');
-      return;
-    }
-
     setSubmitting(true);
     try {
       // Always use FormData to support potential file uploads (like speaker profile pics)
@@ -591,7 +600,6 @@ export default function PublicEventRegister() {
       if (referralCode) formData.append('referral_code', referralCode);
       if (invitationCode) formData.append('invitation_code', invitationCode);
       formData.append('registration_type', searchParams.get('type') || 'prereg');
-      if (turnstileToken) formData.append('cf_turnstile_response', turnstileToken);
 
       // Add profile picture if present
       if (profileImage) {
@@ -667,7 +675,32 @@ export default function PublicEventRegister() {
         return;
       }
 
-      toast.error(err.response?.data?.error || 'Registration failed.');
+      const status = err.response?.status;
+      const data = err.response?.data;
+
+      if (status === 422) {
+        const backendErrors: Record<string, string[] | string> | undefined = data?.errors;
+        if (backendErrors && typeof backendErrors === 'object') {
+          const flattened: Record<string, string> = {};
+          Object.entries(backendErrors).forEach(([key, value]) => {
+            if (Array.isArray(value)) flattened[key] = value[0] || '';
+            else if (typeof value === 'string') flattened[key] = value;
+          });
+          if (Object.keys(flattened).length > 0) {
+            setFieldErrors(prev => ({ ...prev, ...flattened }));
+            setTouchedFields(prev => {
+              const next = { ...prev };
+              Object.keys(flattened).forEach(k => {
+                next[k] = true;
+              });
+              return next;
+            });
+          }
+        }
+        toast.error(data?.error || 'Please check the highlighted fields.');
+      } else {
+        toast.error(data?.error || 'Registration failed.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -688,11 +721,6 @@ export default function PublicEventRegister() {
       toast.error('Please complete all required fields');
       return;
     }
-    if (turnstileSiteKey && !turnstileToken) {
-      toast.error('Please complete the security challenge');
-      return;
-    }
-
     setIsProcessingPayment(true);
     setPaymentStatus('pending');
     setPaymentMessage('Processing your payment...');
@@ -724,7 +752,6 @@ export default function PublicEventRegister() {
           agreed_to_terms: true,
         },
         payment_method: selectedPaymentMethod,
-        ...(turnstileToken ? { cf_turnstile_response: turnstileToken } : {}),
       });
 
       if (!paymentResponse.data?.success) {
@@ -1107,35 +1134,44 @@ export default function PublicEventRegister() {
                     </div>
 
                     <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 sm:gap-y-8">
-                      {/* Profile Picture for Speaker/Panelist */}
-                      {isSpeakerOrPanelist && (
-                        <div className="sm:col-span-2 flex flex-col items-center justify-center p-8 mb-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/50 transition-all hover:border-[#f97316]/50 group">
-                          <Label className="w-full text-center cursor-pointer">
-                            <div className="relative w-28 h-28 mx-auto mb-4">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                          Profile Photo <span className="text-slate-300 dark:text-slate-600 font-black">(optional)</span>
+                        </Label>
+                        <Label className="cursor-pointer block">
+                          <div className="relative w-full h-14 sm:h-16 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center px-4 overflow-hidden border border-slate-100 dark:border-slate-700 hover:border-[#f97316]/40 transition-colors group">
+                            <div className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-700 shadow-inner overflow-hidden flex items-center justify-center shrink-0">
                               {profileImagePreview ? (
-                                <img src={profileImagePreview} alt="Preview" className="w-full h-full object-cover rounded-[1.5rem] shadow-xl ring-4 ring-white dark:ring-slate-900" />
+                                <img src={profileImagePreview} alt="Profile preview" className="w-full h-full object-cover" />
                               ) : (
-                                <div className="w-full h-full bg-white dark:bg-slate-900 rounded-[1.5rem] flex items-center justify-center shadow-inner border border-slate-100 dark:border-slate-800">
-                                  <Users className="w-10 h-10 text-slate-300 group-hover:text-[#f97316] transition-colors" />
-                                </div>
+                                <User className="w-5 h-5 text-slate-300 group-hover:text-[#f97316] transition-colors" />
                               )}
-                              <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-[#f97316] rounded-2xl flex items-center justify-center shadow-lg border-4 border-white dark:border-slate-900">
-                                <Sparkles className="w-4 h-4 text-white" />
-                              </div>
+                              {profileImagePreview ? (
+                                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#f97316] rounded-xl flex items-center justify-center shadow border-2 border-white dark:border-slate-900">
+                                  <Sparkles className="w-3 h-3 text-white" />
+                                </div>
+                              ) : null}
                             </div>
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#f97316]">Upload Profile Photo</span>
-                            <p className="text-[9px] text-slate-400 mt-1 font-bold">Required for Speaker Badges</p>
-                            <Input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => handleFieldChange('profile_picture', e.target.files?.[0])}
-                            />
-                          </Label>
-                        </div>
-                      )}
+                            <div className="ml-3 min-w-0">
+                              <p className="text-xs font-black text-slate-700 dark:text-slate-200 truncate">
+                                {profileImage ? profileImage.name : 'Tap to upload'}
+                              </p>
+                              <p className="text-[10px] font-bold text-slate-400 truncate">
+                                Used on your share banner
+                                {isSpeakerOrPanelist ? ' • Required for speaker badges' : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleFieldChange('profile_picture', e.target.files?.[0])}
+                          />
+                        </Label>
+                      </div>
 
-                      <div className="space-y-2 sm:col-span-2">
+                      <div className="space-y-2">
                         <Label htmlFor="name" className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</Label>
                         <Input
                           id="name"
@@ -1179,20 +1215,11 @@ export default function PublicEventRegister() {
                           <SelectValue placeholder="Select Country" />
                         </SelectTrigger>
                         <SelectContent className="max-h-[300px] rounded-2xl">
-                          <div className="p-2 border-b border-slate-50 sticky top-0 bg-white z-10">
-                            <div className="relative group">
-                              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                              <Input 
-                                placeholder="Search country..." 
-                                className="pl-9 h-10 bg-slate-50 border-none text-xs" 
-                                onChange={(e) => {
-                                  // This is a simple implementation, standard Radix Select doesn't support built-in search easily without cmdk
-                                  // but we can provide the full list and let the user scroll, or filter it manually if needed.
-                                }}
-                              />
-                            </div>
-                          </div>
-                          {countryOptions.map(c => <SelectItem key={c} value={c} className="rounded-xl">{c}</SelectItem>)}
+                          {countryOptions.map((c) => (
+                            <SelectItem key={c} value={c} className="rounded-xl">
+                              {c}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1290,11 +1317,6 @@ export default function PublicEventRegister() {
                       {submitting ? <SpinnerInline size="sm" /> : 'Confirm Registration'}
                     </Button>
 
-                    {turnstileSiteKey && (
-                      <div className="sm:col-span-2 flex justify-center mt-4">
-                        <CloudflareTurnstileWidget siteKey={turnstileSiteKey} onTokenChange={setTurnstileToken} />
-                      </div>
-                    )}
                   </form>
                 </div>
               )}

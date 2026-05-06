@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import { echo } from '../lib/echo'
+import { echo, isPusherConfigured } from '../lib/echo'
 import type { Message } from '../types/message'
 import { shouldUseWebsocket, getPollingInterval } from '@/config/messaging'
 
@@ -276,7 +276,7 @@ export const usePaginatedMessages = ({
   }, [conversationId, queryClient, pageSize])
 
   useEffect(() => {
-    if (!shouldUseWebsocket || !conversationId || !currentUserId) {
+    if (!shouldUseWebsocket || !isPusherConfigured || !conversationId || !currentUserId) {
       return
     }
 

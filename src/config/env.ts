@@ -30,6 +30,19 @@ export function getApiBaseURLForStorage(): string {
 }
 
 /**
+ * Base URL for social share OG preview pages (Laravel /share/... routes), no trailing slash.
+ * Prefer VITE_SHARE_PREVIEW_URL when the API/storage host differs from the share host; otherwise mirrors API origin without /api.
+ */
+export function getSharePreviewBaseURL(): string {
+  const explicit = import.meta.env.VITE_SHARE_PREVIEW_URL
+  if (explicit && typeof explicit === 'string') {
+    const t = explicit.trim().replace(/\/$/, '')
+    if (t) return t
+  }
+  return getApiBaseURLForStorage()
+}
+
+/**
  * Optional: Google Maps API key (VITE_GOOGLE_MAPS_API_KEY)
  */
 export function getGoogleMapsApiKey(): string | undefined {
@@ -43,4 +56,30 @@ export function getGoogleMapsApiKey(): string | undefined {
 export function getTurnstileSiteKey(): string | undefined {
   const key = import.meta.env.VITE_TURNSTILE_SITE_KEY
   return typeof key === 'string' && key ? key : undefined
+}
+
+/**
+ * Public frontend origin for share/register links (no trailing slash).
+ * Prefer VITE_PUBLIC_URL in deploy env; fallback to browser origin.
+ */
+export function getPublicSiteURL(): string {
+  const fromEnv = import.meta.env.VITE_PUBLIC_URL
+  if (fromEnv && typeof fromEnv === 'string') {
+    return fromEnv.replace(/\/$/, '').trim() || window.location.origin
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin
+  }
+  return ''
+}
+
+/**
+ * Optional backend origin serving OG/share bridge routes (trimmed, no trailing slash).
+ * Set VITE_REGISTRATION_SHARE_BRIDGE_ORIGIN when previews should use a dedicated host.
+ */
+export function getRegistrationShareBridgeOrigin(): string | null {
+  const raw = import.meta.env.VITE_REGISTRATION_SHARE_BRIDGE_ORIGIN
+  if (raw === undefined || raw === null || typeof raw !== 'string') return null
+  const t = raw.trim().replace(/\/$/, '')
+  return t || null
 }

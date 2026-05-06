@@ -76,10 +76,10 @@ export function EventDetailsTabs({
               </>
             ) : (
               <div className="flex flex-wrap gap-x-6">
-                {['Details', 'Attendees', 'Ushers', 'Badges', 'Bulk Badges', 'Team', 'Forms', 'Sessions', 'Invitations', 'Analytics'].map((tab) => {
+                {['Details', 'Attendees', 'Ushers', 'Badges', 'Bulk Badges', 'Team', 'Forms', 'Survey', 'Sessions', 'Invitations', 'Analytics'].map((tab) => {
                   const val = tab.toLowerCase().replace(/ /g, '-')
                   // Filter tabs based on role permissions
-                  if (val === 'bulk-badges' || val === 'forms' || val === 'ushers' || val === 'analytics' || val === 'invitations' || val === 'team') {
+                  if (val === 'bulk-badges' || val === 'forms' || val === 'survey' || val === 'ushers' || val === 'analytics' || val === 'invitations' || val === 'team') {
                     if (!canManageEvent) return null
                   }
                   return (

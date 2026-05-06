@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { echo } from '../lib/echo'
+import { echo, isPusherConfigured } from '../lib/echo'
 import { api } from '../lib/api'
 import { useAuth } from './use-auth'
 import type { Message, Conversation } from '../types/message'
@@ -124,6 +124,12 @@ export const useWebSocketMessages = ({
     }
 
     loadInitialData()
+
+    if (!isPusherConfigured) {
+      return () => {
+        channelRef.current = null
+      }
+    }
 
     // Set up WebSocket listeners
     const channel = echo.private(`user.${user.id}`)

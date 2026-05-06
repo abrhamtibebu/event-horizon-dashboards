@@ -868,6 +868,9 @@ export const deleteSession = (sessionId: number) =>
 export const cancelSession = (sessionId: number) =>
   api.post(`/sessions/${sessionId}/cancel`)
 
+export const listSessionAttendances = (sessionId: number, params?: { page?: number; per_page?: number }) =>
+  api.get(`/sessions/${sessionId}/attendances`, { params })
+
 // Session Attendance
 export const createSessionAttendance = (sessionId: number, data: any) =>
   api.post(`/sessions/${sessionId}/attendances`, data)

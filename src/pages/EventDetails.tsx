@@ -112,6 +112,7 @@ import EventSessions from '@/components/EventSessions'
 import { InvitationsTab } from '@/components/event-invitations/InvitationsTab'
 import { BulkBadgesTab } from '@/components/BulkBadgesTab'
 import FormsList from '@/components/forms/FormsList'
+import EventSurveyPanel from '@/components/surveys/EventSurveyPanel'
 import { FormAnalytics } from '@/components/forms/FormAnalytics'
 import { useAuth } from '@/hooks/use-auth'
 import { usePermissionCheck } from '@/hooks/use-permission-check'
@@ -581,17 +582,27 @@ export default function EventDetails() {
       .then(async (sessionsRes) => {
         const sessions = sessionsRes.data.data || []
 
+        const sessionKey = (s: any) => s.id ?? s.session_id
+        const sessionTitle = (s: any) => s.name ?? s.session_name ?? 'Session'
+
         // Fetch attendance data for each session
         const sessionCheckInPromises = sessions.map(async (session: any) => {
+          const sid = sessionKey(session)
           try {
-            const attendanceRes = await api.get(`/sessions/${session.session_id}/attendances`)
-            const attendances = attendanceRes.data.data || []
-            const checkedInCount = attendances.filter((att: any) => att.checked_in).length
+            const attendanceRes = await api.get(`/sessions/${sid}/attendances`, {
+              params: { per_page: 500 },
+            })
+            const attendances = attendanceRes.data?.data ?? []
+            const checkedInCount = attendances.filter(
+              (att: any) =>
+                ['present', 'late'].includes(String(att.attendance_status || '')) ||
+                Boolean(att.check_in_time),
+            ).length
             const totalAttendances = attendances.length
 
             return {
-              session_id: session.session_id,
-              session_name: session.session_name,
+              session_id: sid,
+              session_name: sessionTitle(session),
               session_type: session.session_type,
               start_time: session.start_time,
               end_time: session.end_time,
@@ -602,10 +613,10 @@ export default function EventDetails() {
               check_in_rate: totalAttendances > 0 ? Math.round((checkedInCount / totalAttendances) * 100) : 0,
             }
           } catch (err) {
-            console.error(`Error fetching attendance for session ${session.session_id}:`, err)
+            console.error(`Error fetching attendance for session ${sid}:`, err)
             return {
-              session_id: session.session_id,
-              session_name: session.session_name,
+              session_id: sid,
+              session_name: sessionTitle(session),
               session_type: session.session_type,
               start_time: session.start_time,
               end_time: session.end_time,
@@ -1253,14 +1264,16 @@ export default function EventDetails() {
     setSessionGuestsLoading(true)
 
     try {
-      // Fetch session attendees (checked-in guests)
-      const response = await api.get(`/sessions/${session.session_id}/attendances`)
-      const attendances = response.data.data || []
+      const sid = session.id ?? session.session_id
+      const response = await api.get(`/sessions/${sid}/attendances`, { params: { per_page: 500 } })
+      const attendances = response.data?.data || []
 
-      // Filter only checked-in attendees
-      const checkedInAttendances = attendances.filter((attendance: any) => attendance.checked_in)
+      const checkedInAttendances = attendances.filter(
+        (attendance: any) =>
+          ['present', 'late'].includes(String(attendance.attendance_status || '')) ||
+          Boolean(attendance.check_in_time),
+      )
 
-      // Extract guest information
       const guests = checkedInAttendances.map((attendance: any) => ({
         id: attendance.attendee?.id,
         name: attendance.attendee?.guest?.name,
@@ -1272,7 +1285,7 @@ export default function EventDetails() {
         country: attendance.attendee?.guest?.country,
         guest_type: attendance.attendee?.guestType?.name,
         check_in_time: attendance.check_in_time,
-        session_name: session.session_name
+        session_name: session.name ?? session.session_name,
       }))
 
       setSessionGuests(guests)
@@ -1309,7 +1322,10 @@ export default function EventDetails() {
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
     link.setAttribute('href', url)
-    link.setAttribute('download', `${selectedSession?.session_name || 'session'}_checked_in_guests.csv`)
+    link.setAttribute(
+      'download',
+      `${selectedSession?.name ?? selectedSession?.session_name ?? 'session'}_checked_in_guests.csv`,
+    )
     link.style.visibility = 'hidden'
     document.body.appendChild(link)
     link.click()
@@ -2355,13 +2371,14 @@ export default function EventDetails() {
                             ...(eventData?.event_type !== 'ticketed' ? ['Bulk Badges'] : []),
                             'Team',
                             'Forms',
+                            'Survey',
                             'Sessions',
                             'Invitations',
                             'Analytics'
                           ].map((tab) => {
                             const val = tab.toLowerCase().replace(/ /g, '-');
                             // Filter tabs based on role permissions
-                            if (val === 'bulk-badges' || val === 'tickets' || val === 'forms' || val === 'ushers' || val === 'analytics' || val === 'invitations' || val === 'team') {
+                            if (val === 'bulk-badges' || val === 'tickets' || val === 'forms' || val === 'survey' || val === 'ushers' || val === 'analytics' || val === 'invitations' || val === 'team') {
                               if (!canManageEvent) return null;
                             }
                             return (
@@ -4427,6 +4444,11 @@ export default function EventDetails() {
                     />
                   </div>
                 </TabsContent>
+                <TabsContent value="survey">
+                  <div className="min-h-screen bg-background">
+                    <EventSurveyPanel eventId={Number(eventId)} />
+                  </div>
+                </TabsContent>
                 <TabsContent value="sessions">
                   <div className="min-h-[200px]">
                     <EventSessions eventId={Number(eventId)} />
@@ -5917,7 +5939,7 @@ export default function EventDetails() {
                     <div className="flex items-center justify-between">
                       <div>
                         <DialogTitle className="text-2xl font-bold text-gray-900">
-                          Checked-in Guests - {selectedSession?.session_name}
+                          Checked-in Guests - {selectedSession?.name ?? selectedSession?.session_name}
                         </DialogTitle>
                         <DialogDescription className="text-gray-600 mt-1">
                           View and export checked-in guests for this session

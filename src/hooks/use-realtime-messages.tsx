@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNotifications } from '../contexts/NotificationContext'
 import { useAuth } from '../hooks/use-auth'
-import { echo } from '../lib/echo'
+import { echo, isPusherConfigured } from '../lib/echo'
 import { showMessageNotification, requestNotificationPermission } from '../lib/notifications'
 import { playMessageReceived, playMessageSent } from '../lib/sounds'
 import { showMessageToast } from '../components/ui/ModernToast'
@@ -23,7 +23,7 @@ export const useRealtimeMessages = () => {
   const isConnected = useRef(false)
 
   useEffect(() => {
-    if (!shouldUseWebsocket || !user?.id || isConnected.current) return
+    if (!shouldUseWebsocket || !isPusherConfigured || !user?.id || isConnected.current) return
 
     isConnected.current = true
     console.log(`Connecting to real-time messaging for user ${user.id}`)

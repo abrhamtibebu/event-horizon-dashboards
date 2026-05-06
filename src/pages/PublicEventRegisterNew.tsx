@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import api from '@/lib/api';
+import { useRegistrationShareMeta } from '@/lib/registrationShareMeta';
 import { toast } from 'sonner';
 import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle } from 'lucide-react';
 import { SpinnerInline } from '@/components/ui/spinner';
@@ -42,7 +43,7 @@ export default function PublicEventRegisterNew() {
   });
   const [existingGuestInfo, setExistingGuestInfo] = useState<any>(null);
   
-  const genderOptions = ['Male', 'Female', 'Other'];
+  const genderOptions = ['Male', 'Female'];
   const countryOptions = [
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
     'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi',
@@ -78,6 +79,13 @@ export default function PublicEventRegisterNew() {
       .catch(() => setError('Event not found or not accepting registrations.'))
       .finally(() => setLoading(false));
   }, [eventUuid]);
+
+  useRegistrationShareMeta({
+    enabled: Boolean(event && !loading && !error && event.name),
+    title: event?.name,
+    description: typeof event?.description === 'string' ? event.description : undefined,
+    imageRaw: event?.image ?? event?.image_url ?? event?.event_image,
+  });
 
   useEffect(() => {
     if (!event || !event.uuid) return;
@@ -256,6 +264,7 @@ export default function PublicEventRegisterNew() {
         const params = new URLSearchParams({
           attendeeId: response.data.attendee.id.toString(),
           eventId: response.data.event.id.toString(),
+          eventUuid: response.data.event.uuid,
           eventName: response.data.event.name,
           eventDate: response.data.event.start_date || '',
           eventTime: response.data.event.start_date || '',

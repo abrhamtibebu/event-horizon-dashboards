@@ -283,6 +283,16 @@ const AppWithRealtime = () => {
             }
           />
           <Route
+            path="/events/:eventId/survey"
+            element={
+              <PublicRoute>
+                <Lazy>
+                  <P.PublicEventSurveyPage />
+                </Lazy>
+              </PublicRoute>
+            }
+          />
+          <Route
             path="/reg"
             element={
               <PublicRoute>

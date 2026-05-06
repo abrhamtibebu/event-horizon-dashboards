@@ -83,7 +83,15 @@ export function InvitationGenerator({
         onGenerated({ code: invitationData.code, url: invitationData.url });
       }
 
-      toast.success(recipientName ? 'Personalized invitation created!' : 'Generic registration link created!');
+      if (recipientEmail?.trim()) {
+        toast.success(
+          `Invitation created — email sent to ${recipientEmail.trim()}`,
+        );
+      } else if (recipientName) {
+        toast.success('Personalized invitation created!');
+      } else {
+        toast.success('Registration link created!');
+      }
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to generate link');
     }

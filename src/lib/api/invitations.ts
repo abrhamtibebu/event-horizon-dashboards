@@ -148,6 +148,26 @@ export const useRevokeInvitation = () => {
 };
 
 /**
+ * Resend invitation email to the stored recipient (or override address).
+ */
+export const useResendInvitationEmail = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { invitationId: number; email?: string }) => {
+      const response = await api.post(`/invitations/${params.invitationId}/resend-email`, {
+        email: params.email || undefined,
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invitations'] });
+      queryClient.invalidateQueries({ queryKey: ['invitation-analytics'] });
+    },
+  });
+};
+
+/**
  * Bulk generate invitations
  */
 export const useBulkGenerateInvitations = () => {

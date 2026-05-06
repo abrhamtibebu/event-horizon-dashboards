@@ -15,12 +15,12 @@ import {
 import { Spinner, SpinnerInline } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { useRegistrationShareMeta } from '@/lib/registrationShareMeta';
 import type { PaymentMethod } from '@/types/tickets';
 import type { TicketType } from '@/types';
 import { format } from 'date-fns';
 import EventLocationMapCard from '@/components/EventLocationMapCard';
-import CloudflareTurnstileWidget from '@/components/CloudflareTurnstileWidget';
-import { getTurnstileSiteKey } from '@/config/env';
+import { getImageUrl } from '@/lib/utils';
 
 type Step = 'select' | 'details' | 'payment';
 
@@ -39,8 +39,6 @@ export default function TicketPurchasePage() {
   const [paymentMessage, setPaymentMessage] = useState('');
   const [progress, setProgress] = useState(0);
   const [paymentPhoneNumber, setPaymentPhoneNumber] = useState('');
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const turnstileSiteKey = getTurnstileSiteKey();
 
   // Attendee details
   const [attendeeDetails, setAttendeeDetails] = useState({
@@ -67,6 +65,13 @@ export default function TicketPurchasePage() {
 
   const event = eventResult?.event;
   const ticketTypes = eventResult?.ticket_types || [];
+
+  useRegistrationShareMeta({
+    enabled: Boolean(!eventLoading && event?.name),
+    title: event?.name,
+    description: typeof event?.description === 'string' ? event.description : undefined,
+    imageRaw: event?.image_url || event?.image || event?.event_image,
+  });
 
   // Real-time Inventory Polling
   const { data: availabilityData, refetch: refetchTickets } = useQuery({
@@ -105,9 +110,6 @@ export default function TicketPurchasePage() {
       if (!selectedTicketType || !selectedPaymentMethod) {
         throw new Error('Please select a ticket type and payment method');
       }
-      if (turnstileSiteKey && !turnstileToken) {
-        throw new Error('Please complete the security challenge');
-      }
 
       const response = await api.post('/guest/payments/initiate', {
         event_uuid: event?.uuid,
@@ -122,7 +124,6 @@ export default function TicketPurchasePage() {
         phone_number: paymentPhoneNumber,
         registration_type: searchParams.get('type') || 'prereg',
         invitation_code: invitationCode || undefined,
-        ...(turnstileToken ? { cf_turnstile_response: turnstileToken } : {}),
       });
 
       return response.data.data;
@@ -410,14 +411,6 @@ export default function TicketPurchasePage() {
                             </p>
                           </CardContent>
                         </Card>
-                        {turnstileSiteKey && (
-                          <div className="mt-4 rounded-xl border border-border bg-background/60 p-3">
-                            <CloudflareTurnstileWidget
-                              siteKey={turnstileSiteKey}
-                              onTokenChange={setTurnstileToken}
-                            />
-                          </div>
-                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -492,7 +485,7 @@ export default function TicketPurchasePage() {
                       ) : (
                         <Button
                           onClick={() => purchaseMutation.mutate()}
-                          disabled={(!selectedPaymentMethod || purchaseMutation.isPending || (turnstileSiteKey ? !turnstileToken : false))}
+                          disabled={!selectedPaymentMethod || purchaseMutation.isPending}
                           size="lg"
                           className="w-full h-14 text-lg font-bold bg-green-600 hover:bg-green-700 shadow-xl shadow-green-600/20"
                         >

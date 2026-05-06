@@ -1,14 +1,16 @@
 import React, { useMemo, useState } from 'react'
+import { Textarea } from '@/components/ui/textarea'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import api, { getEventSessions, createEventSession, updateSession, deleteSession, createSessionAttendance, updateSessionAttendance, getSessionById, cancelSession } from '@/lib/api'
 import { Switch } from '@/components/ui/switch'
-import { Plus, Calendar, Clock, MapPin, Trash2, XCircle } from 'lucide-react'
+import { Mic, Plus, Calendar, MapPin, Trash2, UserRound, XCircle } from 'lucide-react'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Calendar as UiCalendar } from '@/components/ui/calendar'
 import { toast } from 'sonner'
@@ -17,6 +19,54 @@ import SessionUsherAssignmentDialog from '@/components/SessionUsherAssignmentDia
 
 interface EventSessionsProps {
   eventId: number | string
+}
+
+type SpeakerDraft = {
+  speaker_name: string
+  speaker_title: string
+  speaker_company: string
+  speaker_bio: string
+  speaker_email: string
+  speaker_phone: string
+  is_primary_speaker: boolean
+}
+
+function emptySpeaker(): SpeakerDraft {
+  return {
+    speaker_name: '',
+    speaker_title: '',
+    speaker_company: '',
+    speaker_bio: '',
+    speaker_email: '',
+    speaker_phone: '',
+    is_primary_speaker: false,
+  }
+}
+
+function speakersPayload(rows: SpeakerDraft[]) {
+  return rows
+    .filter((s) => s.speaker_name.trim())
+    .map((s) => ({
+      speaker_name: s.speaker_name.trim(),
+      speaker_title: s.speaker_title.trim() || undefined,
+      speaker_company: s.speaker_company.trim() || undefined,
+      speaker_bio: s.speaker_bio.trim() || undefined,
+      speaker_email: s.speaker_email.trim() || undefined,
+      speaker_phone: s.speaker_phone.trim() || undefined,
+      is_primary_speaker: Boolean(s.is_primary_speaker),
+    }))
+}
+
+function mapApiSpeaker(sp: Record<string, unknown>): SpeakerDraft {
+  return {
+    speaker_name: typeof sp.speaker_name === 'string' ? sp.speaker_name : '',
+    speaker_title: typeof sp.speaker_title === 'string' ? sp.speaker_title : '',
+    speaker_company: typeof sp.speaker_company === 'string' ? sp.speaker_company : '',
+    speaker_bio: typeof sp.speaker_bio === 'string' ? sp.speaker_bio : '',
+    speaker_email: typeof sp.speaker_email === 'string' ? sp.speaker_email : '',
+    speaker_phone: typeof sp.speaker_phone === 'string' ? sp.speaker_phone : '',
+    is_primary_speaker: Boolean(sp.is_primary_speaker),
+  }
 }
 
 export default function EventSessions({ eventId }: EventSessionsProps) {
@@ -30,6 +80,7 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
     location: '',
     max_capacity: '',
     status: 'scheduled',
+    speakers: [emptySpeaker()] as SpeakerDraft[],
   })
   const [editingId, setEditingId] = useState<number | null>(null)
 
@@ -59,7 +110,16 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['event-sessions', eventId] })
       setOpen(false)
-      setForm({ name: '', session_type: 'seminar', start_time: '', end_time: '', location: '', max_capacity: '', status: 'scheduled' })
+      setForm({
+        name: '',
+        session_type: 'seminar',
+        start_time: '',
+        end_time: '',
+        location: '',
+        max_capacity: '',
+        status: 'scheduled',
+        speakers: [emptySpeaker()],
+      })
       setEditingId(null)
       setFormErrors({})
       toast.success('Session created')
@@ -80,7 +140,16 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['event-sessions', eventId] })
       setOpen(false)
-      setForm({ name: '', session_type: 'seminar', start_time: '', end_time: '', location: '', max_capacity: '', status: 'scheduled' })
+      setForm({
+        name: '',
+        session_type: 'seminar',
+        start_time: '',
+        end_time: '',
+        location: '',
+        max_capacity: '',
+        status: 'scheduled',
+        speakers: [emptySpeaker()],
+      })
       setEditingId(null)
       setFormErrors({})
       toast.success('Session updated')
@@ -134,8 +203,12 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
     setAttendanceLoading(true)
     try {
       // Load event attendees
-      const attendeesRes = await api.get(`/events/${Number(eventId)}/attendees`)
-      setAttendees(attendeesRes.data || [])
+      const attendeesRes = await api.get(`/events/${Number(eventId)}/attendees`, {
+        params: { per_page: 500 },
+      })
+      const raw = attendeesRes.data as { data?: unknown[] } | unknown[]
+      const list = Array.isArray(raw) ? raw : raw?.data ?? []
+      setAttendees(Array.isArray(list) ? list : [])
       // Load session attendances with attendee
       const sess = await getSessionById(Number(session.id)).then(r => r.data?.data || r.data)
       const map: Record<number, any> = {}
@@ -153,32 +226,44 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
   const toggleAttendance = async (attendee: any, present: boolean) => {
     if (!attendanceSession) return
     const existing = attendancesByAttendeeId[attendee.id]
-    if (present) {
-      if (existing) {
-        const updated = await updateSessionAttendance(attendanceSession.id, existing.id, {
-          attendance_status: 'present',
-          check_in_time: existing.check_in_time || new Date().toISOString(),
-        })
-        setAttendancesByAttendeeId(prev => ({ ...prev, [attendee.id]: updated.data?.data || updated.data }))
-      } else {
-        const created = await createSessionAttendance(attendanceSession.id, {
-          attendee_id: attendee.id,
-          attendance_status: 'present',
-          check_in_time: new Date().toISOString(),
-        })
-        const rec = created.data?.data || created.data
-        setAttendancesByAttendeeId(prev => ({ ...prev, [attendee.id]: rec }))
-      }
-    } else {
-      if (existing) {
+    try {
+      if (present) {
+        if (existing) {
+          const updated = await updateSessionAttendance(attendanceSession.id, existing.id, {
+            attendance_status: 'present',
+            check_in_time: existing.check_in_time || new Date().toISOString(),
+          })
+          setAttendancesByAttendeeId((prev) => ({
+            ...prev,
+            [attendee.id]: updated.data?.data || updated.data,
+          }))
+        } else {
+          const created = await createSessionAttendance(attendanceSession.id, {
+            attendee_id: attendee.id,
+            attendance_status: 'present',
+            check_in_time: new Date().toISOString(),
+          })
+          const rec = created.data?.data || created.data
+          setAttendancesByAttendeeId((prev) => ({ ...prev, [attendee.id]: rec }))
+        }
+      } else if (existing) {
         const updated = await updateSessionAttendance(attendanceSession.id, existing.id, {
           attendance_status: 'absent',
           check_out_time: new Date().toISOString(),
         })
-        setAttendancesByAttendeeId(prev => ({ ...prev, [attendee.id]: updated.data?.data || updated.data }))
+        setAttendancesByAttendeeId((prev) => ({
+          ...prev,
+          [attendee.id]: updated.data?.data || updated.data,
+        }))
       }
+      queryClient.invalidateQueries({ queryKey: ['event-sessions', eventId] })
+    } catch (e: unknown) {
+      console.error(e)
+      toast.error('Could not update attendance')
     }
   }
+
+  const sessionNeedsSpeakers = (t: string) => t === 'seminar' || t === 'panel_discussion'
 
   return (
     <div className="space-y-4">
@@ -187,7 +272,24 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
           <h3 className="text-xl font-semibold">Sessions</h3>
           <p className="text-sm text-muted-foreground">Manage seminars, panels, and more</p>
         </div>
-        <Button onClick={() => setOpen(true)} disabled={authError}>
+        <Button
+          onClick={() => {
+            setEditingId(null)
+            setForm({
+              name: '',
+              session_type: 'seminar',
+              start_time: '',
+              end_time: '',
+              location: '',
+              max_capacity: '',
+              status: 'scheduled',
+              speakers: [emptySpeaker()],
+            })
+            setFormErrors({})
+            setOpen(true)
+          }}
+          disabled={authError}
+        >
           <Plus className="h-4 w-4 mr-2" />
           New Session
         </Button>
@@ -225,7 +327,14 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                 <TableBody>
                   {sessions.map((s) => (
                     <TableRow key={s.id}>
-                      <TableCell className="font-medium">{s.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <div>{s.name}</div>
+                        {Array.isArray(s.speakers) && s.speakers.length > 0 ? (
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {s.speakers.length} speaker{s.speakers.length !== 1 ? 's' : ''}
+                          </div>
+                        ) : null}
+                      </TableCell>
                       <TableCell className="capitalize">{String(s.session_type).replace('_',' ')}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -261,14 +370,21 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                             size="sm"
                             onClick={() => {
                               setEditingId(s.id)
+                              const st = s.session_type || 'seminar'
+                              const spk = Array.isArray(s.speakers) && s.speakers.length > 0
+                                ? s.speakers.map((sp: Record<string, unknown>) => mapApiSpeaker(sp))
+                                : sessionNeedsSpeakers(st)
+                                  ? [emptySpeaker()]
+                                  : []
                               setForm({
                                 name: s.name || '',
-                                session_type: s.session_type || 'seminar',
+                                session_type: st,
                                 start_time: s.start_time ? new Date(s.start_time).toISOString() : '',
                                 end_time: s.end_time ? new Date(s.end_time).toISOString() : '',
                                 location: s.location || '',
                                 max_capacity: s.max_capacity?.toString?.() || '',
                                 status: s.status || 'scheduled',
+                                speakers: spk,
                               })
                               setOpen(true)
                             }}
@@ -293,7 +409,7 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
       </Card>
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditingId(null) } }}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? 'Edit Session' : 'Create Session'}</DialogTitle>
             <DialogDescription>{editingId ? 'Update the session details' : 'Define a new session for this event'}</DialogDescription>
@@ -301,7 +417,18 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
           <div className="space-y-3">
             <Input placeholder="Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             {formErrors.name && <div className="text-xs text-red-600">{formErrors.name}</div>}
-            <Select value={form.session_type} onValueChange={v => setForm({ ...form, session_type: v })}>
+            <Select
+              value={form.session_type}
+              onValueChange={(v) =>
+                setForm((prev) => {
+                  const next = { ...prev, session_type: v }
+                  if ((v === 'seminar' || v === 'panel_discussion') && prev.speakers.length === 0) {
+                    next.speakers = [emptySpeaker()]
+                  }
+                  return next
+                })
+              }
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
@@ -429,32 +556,186 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
             {formErrors.end_time && <div className="text-xs text-red-600">{formErrors.end_time}</div>}
             <Input placeholder="Location" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
             <Input placeholder="Max capacity" value={form.max_capacity} onChange={e => setForm({ ...form, max_capacity: e.target.value })} />
-            {/* Sessions are optional by default; no extra flags */}
+            {sessionNeedsSpeakers(form.session_type) && (
+              <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/20">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Mic className="h-4 w-4" />
+                  Speakers
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Add one or more speakers for this {form.session_type === 'panel_discussion' ? 'panel' : 'seminar'}.
+                </p>
+                {form.speakers.map((row, idx) => (
+                  <div key={idx} className="space-y-2 rounded-md border border-border/60 bg-background p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                        <UserRound className="h-3.5 w-3.5" />
+                        Speaker {idx + 1}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-muted-foreground">Primary</Label>
+                        <Switch
+                          checked={row.is_primary_speaker}
+                          onCheckedChange={(on) => {
+                            setForm((prev) => ({
+                              ...prev,
+                              speakers: prev.speakers.map((s, i) =>
+                                i === idx
+                                  ? { ...s, is_primary_speaker: on }
+                                  : { ...s, is_primary_speaker: on ? false : s.is_primary_speaker },
+                              ),
+                            }))
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              speakers: prev.speakers.filter((_, i) => i !== idx),
+                            }))
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <Input
+                      placeholder="Name *"
+                      value={row.speaker_name}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          speakers: prev.speakers.map((s, i) =>
+                            i === idx ? { ...s, speaker_name: e.target.value } : s,
+                          ),
+                        }))
+                      }
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Title"
+                        value={row.speaker_title}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            speakers: prev.speakers.map((s, i) =>
+                              i === idx ? { ...s, speaker_title: e.target.value } : s,
+                            ),
+                          }))
+                        }
+                      />
+                      <Input
+                        placeholder="Company"
+                        value={row.speaker_company}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            speakers: prev.speakers.map((s, i) =>
+                              i === idx ? { ...s, speaker_company: e.target.value } : s,
+                            ),
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Email"
+                        type="email"
+                        value={row.speaker_email}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            speakers: prev.speakers.map((s, i) =>
+                              i === idx ? { ...s, speaker_email: e.target.value } : s,
+                            ),
+                          }))
+                        }
+                      />
+                      <Input
+                        placeholder="Phone"
+                        value={row.speaker_phone}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            speakers: prev.speakers.map((s, i) =>
+                              i === idx ? { ...s, speaker_phone: e.target.value } : s,
+                            ),
+                          }))
+                        }
+                      />
+                    </div>
+                    <Textarea
+                      placeholder="Bio (optional)"
+                      rows={2}
+                      value={row.speaker_bio}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          speakers: prev.speakers.map((s, i) =>
+                            i === idx ? { ...s, speaker_bio: e.target.value } : s,
+                          ),
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setForm((prev) => ({ ...prev, speakers: [...prev.speakers, emptySpeaker()] }))}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add speaker
+                </Button>
+              </div>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
               {editingId ? (
-                <Button onClick={() => updateMutation.mutate({
-                  id: editingId,
-                  payload: {
-                    name: form.name,
-                    session_type: form.session_type,
-                    start_time: form.start_time,
-                    end_time: form.end_time,
-                    location: form.location || null,
-                    max_capacity: form.max_capacity ? Number(form.max_capacity) : null,
-                  }
-                })} disabled={updateMutation.isPending || !form.name || !form.start_time || !form.end_time}>
+                <Button
+                  onClick={() => {
+                    const base = {
+                      name: form.name,
+                      session_type: form.session_type,
+                      start_time: form.start_time,
+                      end_time: form.end_time,
+                      location: form.location || null,
+                      max_capacity: form.max_capacity ? Number(form.max_capacity) : null,
+                    }
+                    const payload =
+                      sessionNeedsSpeakers(form.session_type)
+                        ? { ...base, speakers: speakersPayload(form.speakers) }
+                        : base
+                    updateMutation.mutate({ id: editingId, payload })
+                  }}
+                  disabled={updateMutation.isPending || !form.name || !form.start_time || !form.end_time}
+                >
                   Save
                 </Button>
               ) : (
-                <Button onClick={() => createMutation.mutate({
-                  name: form.name,
-                  session_type: form.session_type,
-                  start_time: form.start_time,
-                  end_time: form.end_time,
-                  location: form.location || null,
-                  max_capacity: form.max_capacity ? Number(form.max_capacity) : null,
-                })} disabled={createMutation.isPending || !form.name || !form.start_time || !form.end_time}>
+                <Button
+                  onClick={() => {
+                    const base = {
+                      name: form.name,
+                      session_type: form.session_type,
+                      start_time: form.start_time,
+                      end_time: form.end_time,
+                      location: form.location || null,
+                      max_capacity: form.max_capacity ? Number(form.max_capacity) : null,
+                    }
+                    const payload =
+                      sessionNeedsSpeakers(form.session_type)
+                        ? { ...base, speakers: speakersPayload(form.speakers) }
+                        : base
+                    createMutation.mutate(payload)
+                  }}
+                  disabled={createMutation.isPending || !form.name || !form.start_time || !form.end_time}
+                >
                   Create
                 </Button>
               )}
@@ -485,9 +766,16 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {attendees.map(a => {
+                  {attendees.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="p-6 text-center text-sm text-muted-foreground">
+                        No attendees registered for this event yet. Add attendees on the Attendees tab first.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    attendees.map(a => {
                     const attendance = attendancesByAttendeeId[a.id]
-                    const present = attendance?.attendance_status === 'present'
+                    const present = ['present', 'late'].includes(String(attendance?.attendance_status || ''))
                     return (
                       <TableRow key={a.id}>
                         <TableCell>
@@ -503,7 +791,8 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                         </TableCell>
                       </TableRow>
                     )
-                  })}
+                  })
+                  )}
                 </TableBody>
               </Table>
             </div>

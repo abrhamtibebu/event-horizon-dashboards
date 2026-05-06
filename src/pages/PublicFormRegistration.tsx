@@ -89,6 +89,8 @@ export default function PublicFormRegistration() {
       const params = new URLSearchParams();
       if (attendee?.id) params.set('attendeeId', attendee.id.toString());
       if (form?.event_id) params.set('eventId', form.event_id.toString());
+      const formEventUuid = form?.event && typeof form.event === 'object' ? (form.event as { uuid?: string }).uuid : undefined;
+      if (formEventUuid) params.set('eventUuid', String(formEventUuid).trim());
       if (form?.name) params.set('eventName', form.name);
       if (guest?.name) params.set('guestName', guest.name);
       const guestUuidVal =

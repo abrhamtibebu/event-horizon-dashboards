@@ -24,16 +24,23 @@ export default function SessionUsherAssignmentDialog({ eventId, sessionId, open,
         getEventUshers(eventId),
         getSessionUshers(sessionId),
       ])
-      const assignedArr = Array.isArray(sessionUshersRes.data) ? sessionUshersRes.data : (sessionUshersRes.data?.data ?? [])
-      setAssigned(assignedArr)
-      const assignedIds = new Set(assignedArr.map((u: any) => u.id))
-      const eventUshers = Array.isArray(eventUshersRes.data) ? eventUshersRes.data : (eventUshersRes.data?.data ?? [])
-      setAvailable(eventUshers.filter((u: any) => !assignedIds.has(u.id)))
+      const sessionPayload = sessionUshersRes.data as { data?: unknown[] } | unknown[]
+      const assignedArr = Array.isArray(sessionPayload)
+        ? sessionPayload
+        : (sessionPayload?.data ?? [])
+      setAssigned(assignedArr as any[])
+      const assignedIds = new Set((assignedArr as any[]).map((u: any) => u.id))
+      const eventPayload = eventUshersRes.data as { data?: unknown[] } | unknown[]
+      const eventUshers = Array.isArray(eventPayload) ? eventPayload : (eventPayload?.data ?? [])
+      setAvailable((eventUshers as any[]).filter((u: any) => !assignedIds.has(u.id)))
     } catch (e) {
       console.error(e)
+      toast.error('Could not load ushers for this session')
     }
   }
-  useEffect(() => { if (open) load() }, [open])
+  useEffect(() => {
+    if (open) load()
+  }, [open, eventId, sessionId])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

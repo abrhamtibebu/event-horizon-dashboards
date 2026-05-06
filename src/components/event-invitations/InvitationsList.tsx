@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
-import { useInvitations, useRevokeInvitation } from '@/lib/api/invitations';
+import { useInvitations, useResendInvitationEmail, useRevokeInvitation } from '@/lib/api/invitations';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { 
@@ -55,6 +55,8 @@ export function InvitationsList({
 }: InvitationsListProps) {
   const { data: invitations, isLoading } = useInvitations(eventId, userId);
   const revokeMutation = useRevokeInvitation();
+  const resendMutation = useResendInvitationEmail();
+  const [resendingId, setResendingId] = useState<number | null>(null);
   const [selectedQR, setSelectedQR] = useState<{ url: string; code: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -73,12 +75,29 @@ export function InvitationsList({
     }
   };
 
+  const handleResendEmail = async (invitationId: number, recipientEmail: string | null | undefined) => {
+    if (!recipientEmail?.trim()) {
+      toast.error('This invitation has no recipient email. Generate a new invitation with an email address.');
+      return;
+    }
+    setResendingId(invitationId);
+    try {
+      await resendMutation.mutateAsync({ invitationId });
+      toast.success(`Invitation email sent to ${recipientEmail.trim()}`);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to resend email');
+    } finally {
+      setResendingId(null);
+    }
+  };
+
   const filteredInvitations = useMemo(() => {
     if (!invitations) return [];
     return invitations.filter((inv) => {
       const matchesSearch = 
         inv.invitation_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (inv.recipient_name?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+        (inv.recipient_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+        (inv.recipient_email?.toLowerCase() || '').includes(searchTerm.toLowerCase());
       if (!matchesSearch) return false;
       if (filterType) {
         const types = Array.isArray(filterType) ? filterType : [filterType];
@@ -132,6 +151,11 @@ export function InvitationsList({
                 <TableCell className="py-3">
                   <p className="text-sm font-medium">{inv.recipient_name || 'Public Link'}</p>
                   <p className="text-[11px] text-muted-foreground font-mono">{inv.invitation_code}</p>
+                  {inv.recipient_email ? (
+                    <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[200px]" title={inv.recipient_email}>
+                      {inv.recipient_email}
+                    </p>
+                  ) : null}
                 </TableCell>
                 <TableCell className="py-3">
                   <span className="text-[11px] font-semibold text-muted-foreground uppercase">{inv.invitation_type}</span>
@@ -153,6 +177,15 @@ export function InvitationsList({
                       <DropdownMenuItem onClick={() => setSelectedQR({ url: inv.qr_code_url, code: inv.invitation_code })}>
                         <QrCode className="w-3.5 h-3.5 mr-2" /> QR Code
                       </DropdownMenuItem>
+                      {isOrganizer && inv.status === 'active' && (
+                        <DropdownMenuItem
+                          disabled={resendingId === inv.id || !inv.recipient_email}
+                          onClick={() => handleResendEmail(inv.id, inv.recipient_email)}
+                        >
+                          <Mail className="w-3.5 h-3.5 mr-2" />
+                          {resendingId === inv.id ? 'Sending…' : 'Resend email'}
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuSeparator />
                       {isOrganizer && (
                         <DropdownMenuItem onClick={() => handleRevoke(inv.id)} className="text-rose-600">
