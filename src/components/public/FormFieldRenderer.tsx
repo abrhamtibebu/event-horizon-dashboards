@@ -320,12 +320,32 @@ const renderFieldInput = (
                       required={field.is_required}
                       className="text-primary"
                     />
-                    <span className="text-sm capitalize">
-                      {method.replace('_', ' ')}
-                      {method === 'telebirr' && ' 📱'}
-                      {method === 'cbe_birr' && ' 🏦'}
-                      {method === 'card' && ' 💳'}
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      <img 
+                        src={
+                          method === 'telebirr' ? '/TeleBirr Logo.png' :
+                          method === 'cbe_birr' ? '/CBE Birr ( No background ) Logo.png' :
+                          '/Chapa Logo.png' // default fallback
+                        }
+                        alt={method.replace('_', ' ')}
+                        className="w-6 h-6 object-contain"
+                        onError={(e) => {
+                          // Fallback to emoji if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const fallback = target.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = 'inline';
+                        }}
+                      />
+                      <span className="text-sm capitalize" style={{ display: 'none' }}>
+                        {method === 'telebirr' ? '📱' :
+                         method === 'cbe_birr' ? '🏦' :
+                         method === 'card' ? '💳' : '💳'}
+                      </span>
+                      <span className="text-sm capitalize">
+                        {method.replace('_', ' ')}
+                      </span>
+                    </div>
                   </label>
                 ))}
               </div>

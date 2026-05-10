@@ -84,7 +84,8 @@ export interface PaymentInitiationRequest {
     quantity: number;
   }[];
   attendee_details: AttendeeDetails;
-  payment_method: 'telebirr' | 'cbe_birr' | 'dashen_superapp' | 'bank';
+  payment_method: 'telebirr' | 'cbe_birr';
+  phone_number?: string;
   reservation_token?: string;
 }
 

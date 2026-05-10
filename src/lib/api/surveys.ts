@@ -169,6 +169,13 @@ export const surveyApi = {
     })
     return data
   },
+
+  downloadLottoNumbers: async (surveyId: number): Promise<Blob> => {
+    const { data } = await api.get(`/surveys/${surveyId}/download-lotto-numbers`, {
+      responseType: 'blob',
+    })
+    return data
+  },
 }
 
 export async function fetchPublicSurvey(
@@ -186,11 +193,16 @@ export async function fetchPublicSurvey(
 
 export async function submitPublicSurvey(
   surveyId: number,
-  body: { attendee_id?: number | null; answers: { question_id: number; value: unknown }[] },
+  body: {
+    attendee_id?: number | null
+    respondent_name?: string | null
+    respondent_phone?: string | null
+    answers: { question_id: number; value: unknown }[]
+  },
   query?: { eligible?: boolean },
-): Promise<{ message: string; response_id: number }> {
+): Promise<{ message: string; response_id: number; lotto_number?: string }> {
   const { data } = await api.post(`/public/surveys/${surveyId}/submit`, body, {
     params: query?.eligible ? { eligible: '1' } : undefined,
   })
-  return data as { message: string; response_id: number }
+  return data as { message: string; response_id: number; lotto_number?: string }
 }

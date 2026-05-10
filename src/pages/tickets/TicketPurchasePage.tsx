@@ -15,6 +15,7 @@ import {
 import { Spinner, SpinnerInline } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { getPaymentMethods } from '@/lib/api/payments';
 import { useRegistrationShareMeta } from '@/lib/registrationShareMeta';
 import type { PaymentMethod } from '@/types/tickets';
 import type { TicketType } from '@/types';
@@ -39,6 +40,9 @@ export default function TicketPurchasePage() {
   const [paymentMessage, setPaymentMessage] = useState('');
   const [progress, setProgress] = useState(0);
   const [paymentPhoneNumber, setPaymentPhoneNumber] = useState('');
+  
+  // Get all available payment methods
+  const availablePaymentMethods = getPaymentMethods();
 
   // Attendee details
   const [attendeeDetails, setAttendeeDetails] = useState({
@@ -366,28 +370,20 @@ export default function TicketPurchasePage() {
               {step === 'payment' && (
                 <motion.div key="step-payment" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <PaymentOption
-                      id="chapa"
-                      label="Chapa"
-                      description="Cards, Mobile Money & More"
-                      icon={<Wallet className="w-6 h-6" />}
-                      selected={selectedPaymentMethod === 'chapa'}
-                      onClick={() => {
-                        setSelectedPaymentMethod('chapa');
-                        setPaymentPhoneNumber(attendeeDetails.phone);
-                      }}
-                    />
-                    <PaymentOption
-                      id="telebirr"
-                      label="Telebirr"
-                      description="Instant Mobile Checkout"
-                      icon={<Smartphone className="w-6 h-6" />}
-                      selected={selectedPaymentMethod === 'telebirr'}
-                      onClick={() => {
-                        setSelectedPaymentMethod('telebirr');
-                        setPaymentPhoneNumber(attendeeDetails.phone);
-                      }}
-                    />
+                    {availablePaymentMethods.map((method) => (
+                      <PaymentOption
+                        key={method.id}
+                        id={method.id}
+                        label={method.name}
+                        description={method.description}
+                        icon={method.icon}
+                        selected={selectedPaymentMethod === method.id}
+                        onClick={() => {
+                          setSelectedPaymentMethod(method.id);
+                          setPaymentPhoneNumber(attendeeDetails.phone);
+                        }}
+                      />
+                    ))}
                   </div>
 
                   <AnimatePresence>
@@ -564,10 +560,28 @@ function PaymentOption({ id, label, description, icon, selected, onClick }: any)
       <CardContent className="p-4 sm:p-5 min-w-0">
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           <div className={`
-            w-12 h-12 rounded-2xl flex items-center justify-center transition-colors
-            ${selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}
+            w-12 h-12 rounded-2xl flex items-center justify-center transition-colors bg-white border
+            ${selected ? 'border-primary shadow-sm' : 'border-gray-200'}
           `}>
-            {icon}
+            <img 
+              src={icon} 
+              alt={label}
+              className="w-10 h-10 object-contain"
+              onError={(e) => {
+                // Fallback to emoji if image fails to load
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const fallback = target.nextElementSibling as HTMLElement;
+                if (fallback) fallback.style.display = 'flex';
+              }}
+            />
+            <div className="w-10 h-10 items-center justify-center" style={{ display: 'none' }}>
+              {id === 'telebirr' ? <Smartphone className="w-6 h-6" /> :
+               id === 'cbe_birr' ? <Wallet className="w-6 h-6" /> :
+               id === 'chapa' ? <CreditCard className="w-6 h-6" /> :
+               id === 'm_pesa' ? <Smartphone className="w-6 h-6" /> :
+               <Wallet className="w-6 h-6" />}
+            </div>
           </div>
           <div>
             <h4 className="font-bold">{label}</h4>

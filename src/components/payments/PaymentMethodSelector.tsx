@@ -1,21 +1,32 @@
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Phone } from 'lucide-react';
 import type { PaymentMethod } from '@/types/tickets';
 import { getPaymentMethods } from '@/lib/api/payments';
 
 interface PaymentMethodSelectorProps {
   selected: PaymentMethod | null;
   onSelect: (method: PaymentMethod) => void;
+  onPhoneNumberChange?: (phoneNumber: string) => void;
   className?: string;
 }
 
 export function PaymentMethodSelector({
   selected,
   onSelect,
+  onPhoneNumberChange,
   className,
 }: PaymentMethodSelectorProps) {
+  const [phoneNumber, setPhoneNumber] = useState('');
   const paymentMethods = getPaymentMethods();
+
+  const handlePhoneNumberChange = (value: string) => {
+    setPhoneNumber(value);
+    onPhoneNumberChange?.(value);
+  };
 
   return (
     <div className={className}>
@@ -39,7 +50,24 @@ export function PaymentMethodSelector({
                     disabled={!method.is_available}
                   />
                   <div className="flex-1 flex items-center space-x-3">
-                    <span className="text-3xl">{method.icon}</span>
+                    <img 
+                      src={method.icon} 
+                      alt={method.name}
+                      className="w-12 h-12 object-contain"
+                      onError={(e) => {
+                        // Fallback to emoji if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const fallback = target.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = 'block';
+                      }}
+                    />
+                    <span className="text-3xl" style={{ display: 'none' }}>
+                      {method.id === 'telebirr' ? '📱' : 
+                       method.id === 'cbe_birr' ? '🏦' : 
+                       method.id === 'chapa' ? '💳' : 
+                       method.id === 'm_pesa' ? '�' : '🏛️'}
+                    </span>
                     <div className="flex-1">
                       <Label
                         htmlFor={method.id}
@@ -66,6 +94,29 @@ export function PaymentMethodSelector({
           ))}
         </div>
       </RadioGroup>
+      
+      {/* Phone Number Input - Show when payment method is selected */}
+      {selected && (
+        <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
+          <div className="flex items-center space-x-2 mb-2">
+            <Phone className="w-4 h-4 text-gray-600" />
+            <Label htmlFor="payment-phone" className="text-sm font-medium text-gray-700">
+              Payment Phone Number
+            </Label>
+          </div>
+          <Input
+            id="payment-phone"
+            type="tel"
+            placeholder="Enter phone number for payment"
+            value={phoneNumber}
+            onChange={(e) => handlePhoneNumberChange(e.target.value)}
+            className="w-full"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Enter the phone number associated with your {paymentMethods.find(m => m.id === selected)?.name} account
+          </p>
+        </div>
+      )}
     </div>
   );
 }

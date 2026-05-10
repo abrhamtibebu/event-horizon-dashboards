@@ -33,6 +33,7 @@ export interface Survey {
   description: string | null
   trigger_type: SurveyTriggerType
   is_active: boolean
+  is_lotto_enabled?: boolean
   created_by: number | null
   created_at?: string
   updated_at?: string
@@ -45,6 +46,7 @@ export interface CreateSurveyRequest {
   description?: string | null
   trigger_type: SurveyTriggerType
   is_active?: boolean
+  is_lotto_enabled?: boolean
 }
 
 /** Payload for POST /events/{event}/surveys (no event_id). */
@@ -55,6 +57,7 @@ export interface UpdateSurveyRequest {
   description?: string | null
   trigger_type?: SurveyTriggerType
   is_active?: boolean
+  is_lotto_enabled?: boolean
 }
 
 export interface CreateSurveyQuestionRequest {
@@ -83,6 +86,9 @@ export interface SurveyResponseRow {
   id: number
   survey_id: number
   attendee_id: number | null
+  respondent_name?: string | null
+  respondent_phone?: string | null
+  lotto_number?: string | null
   submitted_at: string
   answers?: {
     id: number

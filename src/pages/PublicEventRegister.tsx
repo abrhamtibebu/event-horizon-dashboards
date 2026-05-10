@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle, Building, UserCog, Mail, Phone, X, Mic2, ArrowRight } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle, Building, UserCog, Mail, Phone as PhoneIcon, X, Mic2, ArrowRight } from 'lucide-react';
 import { getImageUrl } from '@/lib/utils';
 import { PublicTicketSelector } from '@/components/public/PublicTicketSelector';
 import { PublicPaymentSelector } from '@/components/public/PublicPaymentSelector';
@@ -109,6 +109,7 @@ export default function PublicEventRegister() {
     ticketType: PublicTicketType;
   }>>([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [paymentPhoneNumber, setPaymentPhoneNumber] = useState('');
   const [purchasedTickets, setPurchasedTickets] = useState<any[]>([]);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('pending');
@@ -752,6 +753,7 @@ export default function PublicEventRegister() {
           agreed_to_terms: true,
         },
         payment_method: selectedPaymentMethod,
+        phone_number: paymentPhoneNumber,
       });
 
       if (!paymentResponse.data?.success) {
@@ -1114,6 +1116,146 @@ export default function PublicEventRegister() {
             {/* Registration Form Area */}
             {(!invitationCode || rsvpStatus === 'accepted') && (
               <div className="max-w-2xl mx-auto animate-in fade-in duration-500">
+                {/* Payment Step for Selected Tickets */}
+                {purchaseStep === 'payment' && selectedTickets.length > 0 && (
+                  <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 sm:p-12 border-2 border-slate-100 dark:border-slate-800 shadow-xl mb-8">
+                    <div className="text-center mb-8">
+                      <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-3">Select Payment Method</h2>
+                      <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-md mx-auto leading-relaxed">
+                        Choose how you'd like to pay for your tickets
+                      </p>
+                    </div>
+
+                    {/* Payment Methods Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-8">
+                      {[
+                        {
+                          id: 'telebirr' as PaymentMethod,
+                          name: 'Telebirr',
+                          description: 'Pay with Telebirr mobile wallet',
+                          icon: '/TeleBirr Logo.png',
+                        },
+                        {
+                          id: 'cbe_birr' as PaymentMethod,
+                          name: 'CBE Birr',
+                          description: 'Commercial Bank of Ethiopia mobile banking',
+                          icon: '/CBE Birr ( No background ) Logo.png',
+                        },
+                      ].map((method) => (
+                        <div
+                          key={method.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSelectedPaymentMethod(method.id)}
+                          onKeyDown={(e) => {
+                            if ((e.key === 'Enter' || e.key === ' ') && !isProcessingPayment) {
+                              e.preventDefault();
+                              setSelectedPaymentMethod(method.id);
+                            }
+                          }}
+                          className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm border-2 p-4 sm:p-6 cursor-pointer transition-all min-h-[3.5rem] touch-manipulation max-w-full min-w-0 ${
+                            selectedPaymentMethod === method.id
+                              ? 'border-[#f97316] ring-2 ring-[#f97316] ring-opacity-50'
+                              : 'border-slate-200 dark:border-slate-700 hover:border-[#f97316]/30'
+                          } ${isProcessingPayment ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                            <img 
+                              src={method.icon} 
+                              alt={method.name}
+                              className="w-12 h-12 sm:w-14 sm:h-14 object-contain shrink-0"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const fallback = target.nextElementSibling as HTMLElement;
+                                if (fallback) fallback.style.display = 'block';
+                              }}
+                            />
+                            <div className="text-3xl sm:text-4xl shrink-0" style={{ display: 'none' }} aria-hidden>
+                              {method.id === 'telebirr' ? '📱' : 
+                               method.id === 'cbe_birr' ? '🏦' : '🏛️'}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-semibold text-base sm:text-lg text-slate-900 dark:text-white break-words">
+                                {method.name}
+                              </h4>
+                              <p className="text-sm text-slate-600 dark:text-slate-400 break-words">{method.description}</p>
+                            </div>
+                            {selectedPaymentMethod === method.id && (
+                              <div className="flex-shrink-0">
+                                <div className="w-6 h-6 bg-[#f97316] rounded-full flex items-center justify-center">
+                                  <svg
+                                    className="w-4 h-4 text-white"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M5 13l4 4L19 7"
+                                    />
+                                  </svg>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Phone Number Input - Show when payment method is selected */}
+                    {selectedPaymentMethod && (
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6 mb-8">
+                        <div className="flex items-center space-x-2 mb-3">
+                          <PhoneIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          <h4 className="font-semibold text-blue-900 dark:text-blue-100">Payment Phone Number</h4>
+                        </div>
+                        <Input
+                          type="tel"
+                          placeholder="Enter phone number for payment"
+                          value={paymentPhoneNumber}
+                          onChange={(e) => setPaymentPhoneNumber(e.target.value)}
+                          className="w-full mb-2 h-14 text-lg font-bold"
+                          disabled={isProcessingPayment}
+                        />
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          Enter phone number associated with your {selectedPaymentMethod === 'telebirr' ? 'Telebirr' : 'CBE Birr'} account
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Payment Actions */}
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <Button
+                        type="button"
+                        onClick={handleBackToTickets}
+                        disabled={isProcessingPayment}
+                        variant="outline"
+                        className="flex-1 h-14 border-slate-200 dark:border-slate-700 text-slate-600 font-bold"
+                      >
+                        Back to Tickets
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handlePaymentConfirm}
+                        disabled={!selectedPaymentMethod || !paymentPhoneNumber || isProcessingPayment}
+                        className="flex-1 h-14 bg-[#f97316] hover:bg-[#ea580c] text-white font-bold shadow-lg shadow-orange-500/20"
+                      >
+                        {isProcessingPayment ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-transparent animate-spin rounded-full mr-2"></div>
+                            Processing Payment...
+                          </>
+                        ) : (
+                          'Confirm & Pay'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {useCustomForm && !isTicketedEvent && selectedGuestTypeId ? (
                   <div className="bg-slate-50 dark:bg-slate-800/50 rounded-[1.5rem] sm:rounded-[2.5rem] p-6 sm:p-12 border border-slate-100 dark:border-slate-800 shadow-inner">
                     <DynamicFormRenderer
@@ -1126,7 +1268,7 @@ export default function PublicEventRegister() {
                       onFallback={handleCustomFormFallback}
                     />
                   </div>
-                ) : (
+                ) : purchaseStep !== 'payment' && (
                   <div className="space-y-8 sm:space-y-12">
                     <div className="text-center px-4">
                       <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-2">Secure Your Spot</h2>

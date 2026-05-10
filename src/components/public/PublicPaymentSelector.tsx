@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { CreditCard, ArrowLeft, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { CreditCard, ArrowLeft, Loader2, Phone } from 'lucide-react';
 import type { PaymentMethod } from '@/types/tickets';
 
 interface PublicPaymentSelectorProps {
@@ -8,6 +9,7 @@ interface PublicPaymentSelectorProps {
   onSelect: (method: PaymentMethod) => void;
   onBack: () => void;
   onConfirm: () => void;
+  onPhoneNumberChange?: (phoneNumber: string) => void;
   totalAmount: number;
   loading?: boolean;
 }
@@ -22,25 +24,13 @@ const paymentMethods: Array<{
     id: 'telebirr',
     name: 'Telebirr',
     description: 'Pay with Telebirr mobile wallet',
-    icon: '📱',
+    icon: '/TeleBirr Logo.png',
   },
   {
     id: 'cbe_birr',
     name: 'CBE Birr',
     description: 'Commercial Bank of Ethiopia mobile banking',
-    icon: '🏦',
-  },
-  {
-    id: 'dashen_superapp',
-    name: 'Dashen SuperApp',
-    description: 'Pay with Dashen Bank SuperApp',
-    icon: '💳',
-  },
-  {
-    id: 'bank',
-    name: 'Bank Transfer',
-    description: 'Direct bank transfer',
-    icon: '🏛️',
+    icon: '/CBE Birr ( No background ) Logo.png',
   },
 ];
 
@@ -49,9 +39,16 @@ export function PublicPaymentSelector({
   onSelect,
   onBack,
   onConfirm,
+  onPhoneNumberChange,
   totalAmount,
   loading = false,
 }: PublicPaymentSelectorProps) {
+  const [phoneNumber, setPhoneNumber] = useState('');
+
+  const handlePhoneNumberChange = (value: string) => {
+    setPhoneNumber(value);
+    onPhoneNumberChange?.(value);
+  };
   return (
     <div className="min-w-0 space-y-6">
       {/* Header */}
@@ -99,7 +96,23 @@ export function PublicPaymentSelector({
             } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-              <div className="text-3xl sm:text-4xl shrink-0" aria-hidden>{method.icon}</div>
+              <img 
+                src={method.icon} 
+                alt={method.name}
+                className="w-12 h-12 sm:w-14 sm:h-14 object-contain shrink-0"
+                onError={(e) => {
+                  // Fallback to emoji if image fails to load
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const fallback = target.nextElementSibling as HTMLElement;
+                  if (fallback) fallback.style.display = 'block';
+                }}
+              />
+              <div className="text-3xl sm:text-4xl shrink-0" style={{ display: 'none' }} aria-hidden>
+                {method.id === 'telebirr' ? '📱' : 
+                 method.id === 'cbe_birr' ? '🏦' : 
+                 '🏛️'}
+              </div>
               <div className="min-w-0 flex-1">
                 <h4 className="font-semibold text-base sm:text-lg text-gray-900 break-words">
                   {method.name}
@@ -130,6 +143,27 @@ export function PublicPaymentSelector({
         ))}
       </div>
 
+      {/* Phone Number Input - Show when payment method is selected */}
+      {selected && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+          <div className="flex items-center space-x-2 mb-3">
+            <Phone className="w-5 h-5 text-blue-600" />
+            <h4 className="font-semibold text-blue-900">Payment Phone Number</h4>
+          </div>
+          <Input
+            type="tel"
+            placeholder="Enter phone number for payment"
+            value={phoneNumber}
+            onChange={(e) => handlePhoneNumberChange(e.target.value)}
+            className="w-full mb-2"
+            disabled={loading}
+          />
+          <p className="text-sm text-blue-700">
+            Enter the phone number associated with your {paymentMethods.find(m => m.id === selected)?.name} account
+          </p>
+        </div>
+      )}
+
       {/* Payment Summary */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
@@ -150,7 +184,7 @@ export function PublicPaymentSelector({
         <Button
           type="button"
           onClick={onConfirm}
-          disabled={!selected || loading}
+          disabled={!selected || !phoneNumber || loading}
           className="w-full min-h-12 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-3 text-base sm:text-lg"
         >
           {loading ? (

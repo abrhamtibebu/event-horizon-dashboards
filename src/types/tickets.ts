@@ -6,7 +6,7 @@
 
 export type TicketStatus = 'confirmed' | 'pending' | 'cancelled' | 'used' | 'refunded';
 export type PaymentStatus = 'pending' | 'success' | 'failed' | 'cancelled';
-export type PaymentMethod = 'telebirr' | 'chapa' | 'bank' | 'dashen_superapp';
+export type PaymentMethod = 'telebirr' | 'chapa' | 'cbe_birr' | 'm_pesa';
 export type ValidationStatus = 'valid' | 'invalid' | 'expired' | 'already_used' | 'refunded' | 'cancelled' | 'pending' | 'too_early';
 
 /**
@@ -38,6 +38,7 @@ export interface Payment {
 export interface PaymentInitiationRequest {
   ticket_purchase_id: number;
   amount: number;
+  phone_number?: string;
   return_url?: string;
 }
 

@@ -32,25 +32,7 @@ export const initiateCBEBirrPayment = async (
   return response.data.data;
 };
 
-/**
- * Initiate Dashen SuperApp payment
- */
-export const initiateDashenSuperAppPayment = async (
-  data: PaymentInitiationRequest
-): Promise<PaymentInitiationResponse> => {
-  const response = await api.post('/payments/dashen-superapp/initiate', data);
-  return response.data.data;
-};
 
-/**
- * Initiate Bank Transfer
- */
-export const initiateBankPayment = async (
-  data: PaymentInitiationRequest
-): Promise<PaymentInitiationResponse> => {
-  const response = await api.post('/payments/bank/initiate', data);
-  return response.data.data;
-};
 
 /**
  * Generic payment initiation based on payment method
@@ -64,10 +46,6 @@ export const initiatePayment = async (
       return initiateTelebirrPayment(data);
     case 'cbe_birr':
       return initiateCBEBirrPayment(data);
-    case 'dashen_superapp':
-      return initiateDashenSuperAppPayment(data);
-    case 'bank':
-      return initiateBankPayment(data);
     default:
       throw new Error(`Unsupported payment method: ${method}`);
   }
@@ -147,7 +125,7 @@ export const getPaymentMethods = () => {
       id: 'telebirr' as PaymentMethod,
       name: 'Telebirr',
       description: 'Pay with Telebirr mobile wallet',
-      icon: '📱',
+      icon: '/TeleBirr Logo.png',
       processing_fee: 0,
       is_available: true,
     },
@@ -155,23 +133,23 @@ export const getPaymentMethods = () => {
       id: 'cbe_birr' as PaymentMethod,
       name: 'CBE Birr',
       description: 'Commercial Bank of Ethiopia mobile banking',
-      icon: '🏦',
+      icon: '/CBE Birr ( No background ) Logo.png',
       processing_fee: 0,
       is_available: true,
     },
     {
-      id: 'dashen_superapp' as PaymentMethod,
-      name: 'Dashen SuperApp',
-      description: 'Pay with Dashen Bank SuperApp',
-      icon: '💳',
+      id: 'chapa' as PaymentMethod,
+      name: 'Chapa',
+      description: 'Cards, Mobile Money & More',
+      icon: '/Chapa Logo.png',
       processing_fee: 0,
       is_available: true,
     },
     {
-      id: 'bank' as PaymentMethod,
-      name: 'Bank Transfer',
-      description: 'Direct bank transfer',
-      icon: '🏛️',
+      id: 'm_pesa' as PaymentMethod,
+      name: 'M-PESA',
+      description: 'Mobile money transfer service',
+      icon: '/M-PESA_LOGO-01.svg.png',
       processing_fee: 0,
       is_available: true,
     },

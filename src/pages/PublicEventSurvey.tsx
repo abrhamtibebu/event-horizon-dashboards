@@ -14,6 +14,7 @@ import { fetchPublicSurvey, submitPublicSurvey } from '@/lib/api/surveys'
 import type { PublicSurveyPayload, SurveyQuestion } from '@/types/survey'
 import { toast } from 'sonner'
 import { Slider } from '@/components/ui/slider'
+import { Input } from '@/components/ui/input'
 
 export default function PublicEventSurveyPage() {
   const { eventId } = useParams<{ eventId: string }>()
@@ -28,6 +29,14 @@ export default function PublicEventSurveyPage() {
 
   const [step, setStep] = useState(0)
   const [values, setValues] = useState<Record<number, unknown>>({})
+  const [lottoNumber, setLottoNumber] = useState<string | null>(null)
+  const [respondentName, setRespondentName] = useState('')
+  const [respondentPhone, setRespondentPhone] = useState('')
+  const [showLottoDetails, setShowLottoDetails] = useState(false)
+
+  // Use a separate state to track if we've moved past the lotto info step
+  const [hasLottoDetails, setHasLottoDetails] = useState(false)
+  const [contactErrors, setContactErrors] = useState<{ name?: string; phone?: string }>({})
 
   const {
     data: survey,
@@ -44,6 +53,9 @@ export default function PublicEventSurveyPage() {
     enabled: Number.isFinite(numericEventId),
   })
 
+  // Determine if we need to show the Lotto info step first
+  const needsLottoDetails = !!survey?.is_lotto_enabled && !hasLottoDetails
+
   const questions = survey?.questions ?? []
   const current = questions[step]
   const progress = questions.length ? ((step + 1) / questions.length) * 100 : 0
@@ -59,13 +71,18 @@ export default function PublicEventSurveyPage() {
         survey.id,
         {
           attendee_id: Number.isFinite(attendeeId) ? attendeeId : null,
+          respondent_name: respondentName || null,
+          respondent_phone: respondentPhone || null,
           answers,
         },
         { eligible: !!eligible },
       )
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success('Thank you — your responses were submitted.')
+      if (data.lotto_number) {
+        setLottoNumber(data.lotto_number)
+      }
       setStep(questions.length)
     },
     onError: (e: unknown) => {
@@ -93,6 +110,40 @@ export default function PublicEventSurveyPage() {
   }
 
   const next = () => {
+    if (needsLottoDetails) {
+      const newErrors: { name?: string; phone?: string } = {}
+      if (!respondentName.trim()) {
+        newErrors.name = 'Please enter your full name.'
+      }
+      
+      if (!respondentPhone.trim()) {
+        newErrors.phone = 'Please enter your phone number.'
+      } else {
+        // Strip all non-digits to check core length and pattern
+        const digits = respondentPhone.replace(/\D/g, '')
+        const isEthiopian = 
+          (digits.startsWith('251') && digits.length === 12) || 
+          (digits.startsWith('0') && digits.length === 10) || 
+          (digits.length === 9)
+        
+        const last9 = digits.slice(-9)
+        const validStart = ['7', '9'].includes(last9[0])
+
+        if (!isEthiopian || !validStart) {
+          newErrors.phone = 'Enter a valid Ethiopian number (e.g. 09... or 07...)'
+        }
+      }
+
+      if (Object.keys(newErrors).length > 0) {
+        setContactErrors(newErrors)
+        return
+      }
+
+      setContactErrors({})
+      setHasLottoDetails(true)
+      return
+    }
+
     if (!canAdvance()) {
       toast.error('Please answer this question.')
       return
@@ -104,7 +155,13 @@ export default function PublicEventSurveyPage() {
     }
   }
 
-  const back = () => setStep((s) => Math.max(0, s - 1))
+  const back = () => {
+    if (!needsLottoDetails && step === 0 && survey?.is_lotto_enabled) {
+      setHasLottoDetails(false)
+      return
+    }
+    setStep((s) => Math.max(0, s - 1))
+  }
 
   if (!Number.isFinite(numericEventId)) {
     return (
@@ -143,6 +200,77 @@ export default function PublicEventSurveyPage() {
     )
   }
 
+  if (needsLottoDetails) {
+    return (
+      <div className="min-h-[100dvh] bg-muted/40 flex flex-col items-center px-4 py-8 pb-16">
+        <div className="w-full max-w-lg space-y-4">
+          <div className="text-center space-y-1 px-2">
+            <div className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-2">
+              Lotto Enabled
+            </div>
+            <h1 className="text-xl font-bold leading-tight">{survey.title}</h1>
+            <p className="text-sm text-muted-foreground">
+              Please provide your contact details to receive your Lotto number after completing the survey.
+            </p>
+          </div>
+          
+          <Card className="shadow-md border-border">
+            <CardHeader>
+              <CardTitle className="text-lg">Contact Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Full Name</Label>
+                <Input
+                  id="name"
+                  placeholder="Enter your name"
+                  value={respondentName}
+                  onChange={(e) => {
+                    setRespondentName(e.target.value)
+                    if (contactErrors.name) setContactErrors(prev => ({ ...prev, name: undefined }))
+                  }}
+                  className={contactErrors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
+                />
+                {contactErrors.name && (
+                  <p className="text-[11px] font-medium text-destructive mt-1 animate-in fade-in slide-in-from-top-1">
+                    {contactErrors.name}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  placeholder="e.g. 0912345678"
+                  value={respondentPhone}
+                  onChange={(e) => {
+                    setRespondentPhone(e.target.value)
+                    if (contactErrors.phone) setContactErrors(prev => ({ ...prev, phone: undefined }))
+                  }}
+                  className={contactErrors.phone ? 'border-destructive focus-visible:ring-destructive' : ''}
+                />
+                {contactErrors.phone ? (
+                  <p className="text-[11px] font-medium text-destructive mt-1 animate-in fade-in slide-in-from-top-1">
+                    {contactErrors.phone}
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground">
+                    Format: 09... or 07... (one entry per phone number)
+                  </p>
+                )}
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-end pt-4 border-t bg-muted/20">
+              <Button type="button" onClick={next}>
+                Start Survey
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   if (step >= questions.length) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center p-8">
@@ -150,7 +278,18 @@ export default function PublicEventSurveyPage() {
           <CardHeader>
             <CardTitle>Submitted</CardTitle>
           </CardHeader>
-          <CardContent className="text-muted-foreground text-sm">Thank you for your feedback.</CardContent>
+          <CardContent className="space-y-6">
+            <p className="text-muted-foreground text-sm">Thank you for your feedback.</p>
+            {lottoNumber && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6 space-y-2">
+                <p className="text-xs uppercase tracking-widest font-bold text-amber-600">Your Lotto Number</p>
+                <div className="text-4xl font-mono tracking-[0.25em] font-bold text-foreground">
+                  {lottoNumber}
+                </div>
+                <p className="text-xs text-muted-foreground">Please keep this number for the draw.</p>
+              </div>
+            )}
+          </CardContent>
         </Card>
       </div>
     )

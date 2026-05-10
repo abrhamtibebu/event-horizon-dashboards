@@ -119,6 +119,7 @@ export default function NewSurveyDialog({
   const [description, setDescription] = useState('')
   const [triggerType, setTriggerType] = useState<SurveyTriggerType>('manual')
   const [isActive, setIsActive] = useState(true)
+  const [isLottoEnabled, setIsLottoEnabled] = useState(false)
   const [questions, setQuestions] = useState<DraftQuestion[]>(() => [
     {
       key: newKey(),
@@ -137,6 +138,7 @@ export default function NewSurveyDialog({
     setDescription('')
     setTriggerType('manual')
     setIsActive(true)
+    setIsLottoEnabled(false)
     setQuestions([
       {
         key: newKey(),
@@ -175,6 +177,7 @@ export default function NewSurveyDialog({
         description: description.trim() ? description.trim() : null,
         trigger_type: triggerType,
         is_active: isActive,
+        is_lotto_enabled: isLottoEnabled,
       })
 
       for (let i = 0; i < questions.length; i++) {
@@ -321,21 +324,25 @@ export default function NewSurveyDialog({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex items-center gap-2 pt-8">
-                    <Switch id="survey-active" checked={isActive} onCheckedChange={setIsActive} />
-                    <Label htmlFor="survey-active" className="text-sm font-normal cursor-pointer">
-                      Active survey for this event
-                    </Label>
+                  <div className="flex flex-col gap-4 pt-8">
+                    <div className="flex items-center gap-2">
+                      <Switch id="survey-active" checked={isActive} onCheckedChange={setIsActive} />
+                      <Label htmlFor="survey-active" className="text-sm font-normal cursor-pointer">
+                        Active survey for this event
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch id="survey-lotto" checked={isLottoEnabled} onCheckedChange={setIsLottoEnabled} />
+                      <Label htmlFor="survey-lotto" className="text-sm font-normal cursor-pointer">
+                        Enable 8-digit Lotto generation
+                      </Label>
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between pb-2">
                     <Label className="text-base">Questions</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addQuestionRow}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add question
-                    </Button>
                   </div>
 
                   {questions.map((q, idx) => (
@@ -475,6 +482,12 @@ export default function NewSurveyDialog({
                       )}
                     </div>
                   ))}
+                  <div className="flex justify-center pt-2 pb-4">
+                    <Button type="button" variant="outline" size="sm" onClick={addQuestionRow}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add question
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowDown,
+  ArrowLeft,
   ArrowUp,
   ClipboardList,
   Copy,
@@ -126,12 +127,8 @@ export default function EventSurveyPanel({ eventId }: EventSurveyPanelProps) {
   )
 
   useEffect(() => {
-    if (surveys.length === 0) {
+    if (selectedId !== null && !surveys.some((s) => s.id === selectedId)) {
       setSelectedId(null)
-      return
-    }
-    if (selectedId === null || !surveys.some((s) => s.id === selectedId)) {
-      setSelectedId(surveys[0].id)
     }
   }, [surveys, selectedId])
 
@@ -236,17 +233,15 @@ export default function EventSurveyPanel({ eventId }: EventSurveyPanelProps) {
   const handleEditSurvey = useCallback(
     (s: Survey) => {
       setSelectedId(s.id)
-      scrollToQuestions()
     },
-    [scrollToQuestions],
+    [],
   )
 
   const handleViewResponses = useCallback(
     (s: Survey) => {
       setSelectedId(s.id)
-      scrollToResponses()
     },
-    [scrollToResponses],
+    [],
   )
 
   const handleDeleteSurvey = useCallback(
@@ -263,22 +258,159 @@ export default function EventSurveyPanel({ eventId }: EventSurveyPanelProps) {
     )
   }
 
-  return (
-    <div className="space-y-6 p-4 md:p-6 max-w-4xl mx-auto">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <ClipboardList className="h-6 w-6 text-primary" />
-            Event surveys
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Build feedback forms per event. Only one survey can be active at a time.
-          </p>
+  if (selected) {
+    return (
+      <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={() => setSelectedId(null)} className="h-9 w-9 p-0 rounded-full">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight">{selected.title}</h2>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                <Badge variant="outline" className="text-[10px] uppercase font-bold py-0 h-4">
+                  {triggerLabel(selected.trigger_type)}
+                </Badge>
+                {selected.is_active && (
+                  <Badge className="bg-success/10 text-success border-success/20 text-[10px] uppercase font-bold py-0 h-4">
+                    Active
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShareTarget(selected)}
+              className="h-9"
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              Share
+            </Button>
+          </div>
         </div>
-        <Button type="button" onClick={() => setNewSurveyOpen(true)}>
+
+        <SurveyShareDialog
+          open={shareTarget !== null}
+          onOpenChange={(o) => {
+            if (!o) setShareTarget(null)
+          }}
+          title={shareTarget?.title ?? ''}
+          url={shareDialogUrl}
+          onCopy={() => copyToClipboard(shareDialogUrl)}
+        />
+
+        <div className="grid gap-6">
+          <Card ref={responsesSectionRef} className="border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Responses</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Submissions for <span className="font-medium text-foreground">{selected.title}</span>
+              </p>
+            </CardHeader>
+            <CardContent>
+              <SurveyResponsesPanel survey={selected} />
+            </CardContent>
+          </Card>
+
+          <Card ref={questionsSectionRef} className="border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Questions</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Edit the form shown to attendees. Use Share to get links and QR codes.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-4">
+                {(selected.questions ?? [])
+                  .slice()
+                  .sort((a, b) => a.order_index - b.order_index)
+                  .map((q) => (
+                    <QuestionEditorCard
+                      key={q.id}
+                      question={q}
+                      onPatch={(patch) => saveQuestionPatch(q, patch)}
+                      onDelete={() => removeQuestion.mutate(q.id)}
+                      onMoveUp={() => moveQuestion(q, -1)}
+                      onMoveDown={() => moveQuestion(q, 1)}
+                    />
+                  ))}
+              </div>
+              <div className="flex justify-center pt-2">
+                <Button size="sm" variant="secondary" onClick={() => addQuestion.mutate()}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add question
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  const activeSurveys = surveys.filter(s => s.is_active).length
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-200">
+      {/* Tab Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-card rounded-xl flex items-center justify-center border border-border shadow-sm">
+            <ClipboardList className="w-7 h-7 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Event Surveys</h1>
+            <p className="text-sm text-muted-foreground">
+              Build and manage feedback forms for your event.
+            </p>
+          </div>
+        </div>
+        <Button type="button" onClick={() => setNewSurveyOpen(true)} className="w-full md:w-auto shadow-sm">
           <Plus className="h-4 w-4 mr-2" />
           New survey
         </Button>
+      </div>
+
+      {/* Stats Summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card className="border-border shadow-sm">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Total Surveys</p>
+              <ClipboardList className="h-4 w-4 text-primary opacity-70" />
+            </div>
+            <div className="mt-2">
+              <h3 className="text-2xl font-bold">{surveys.length}</h3>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border shadow-sm">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Active Surveys</p>
+              <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
+            </div>
+            <div className="mt-2">
+              <h3 className="text-2xl font-bold">{activeSurveys}</h3>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border shadow-sm">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Lotto Rewards</p>
+              <div className="text-[10px] font-bold text-amber-500 border border-amber-500/30 px-1 rounded">ON</div>
+            </div>
+            <div className="mt-2">
+              <h3 className="text-2xl font-bold">{surveys.filter(s => s.is_lotto_enabled).length}</h3>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <NewSurveyDialog
@@ -310,14 +442,15 @@ export default function EventSurveyPanel({ eventId }: EventSurveyPanelProps) {
         </Card>
       ) : (
         <>
-          <Card className="border-border overflow-hidden">
+        <Card className="border-border overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[140px]">Survey</TableHead>
-                  <TableHead className="hidden md:table-cell w-[140px]">When</TableHead>
-                  <TableHead className="w-[88px]">Active</TableHead>
-                  <TableHead className="text-right w-[1%]">Actions</TableHead>
+                <TableRow className="bg-muted/50 border-b border-border">
+                  <TableHead className="font-semibold text-foreground text-xs uppercase py-4 min-w-[200px]">Survey Details</TableHead>
+                  <TableHead className="hidden md:table-cell font-semibold text-foreground text-xs uppercase py-4 w-[160px]">Trigger</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase py-4 w-[100px]">Status</TableHead>
+                  <TableHead className="text-right font-semibold text-foreground text-xs uppercase py-4 w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -328,17 +461,31 @@ export default function EventSurveyPanel({ eventId }: EventSurveyPanelProps) {
                     className="cursor-pointer"
                     onClick={() => setSelectedId(s.id)}
                   >
-                    <TableCell className="font-medium max-w-[220px] md:max-w-md">
-                      <div className="truncate" title={s.title}>
-                        {s.title}
+                    <TableCell className="py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-primary">
+                          {s.title.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="max-w-[220px] md:max-w-md">
+                          <div className="font-semibold text-foreground truncate" title={s.title}>
+                            {s.title}
+                          </div>
+                          {s.is_lotto_enabled && (
+                            <div className="text-[10px] font-bold text-amber-600 uppercase tracking-tight mt-0.5">
+                              Lotto Entry Enabled
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground">
-                      {triggerLabel(s.trigger_type)}
+                    <TableCell className="hidden md:table-cell py-4">
+                      <div className="text-sm text-muted-foreground">
+                        {triggerLabel(s.trigger_type)}
+                      </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={s.is_active ? 'default' : 'secondary'}>
-                        {s.is_active ? 'Yes' : 'No'}
+                    <TableCell className="py-4">
+                      <Badge variant={s.is_active ? 'default' : 'secondary'} className={s.is_active ? 'bg-success/10 text-success border-success/20 hover:bg-success/20' : ''}>
+                        {s.is_active ? 'Active' : 'Inactive'}
                       </Badge>
                     </TableCell>
                     <TableCell
@@ -398,61 +545,10 @@ export default function EventSurveyPanel({ eventId }: EventSurveyPanelProps) {
                 ))}
               </TableBody>
             </Table>
-          </Card>
-
-          {selected && (
-            <>
-              <Card ref={responsesSectionRef} className="border-border scroll-mt-4">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Responses</CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Submissions for <span className="font-medium text-foreground">{selected.title}</span>
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <SurveyResponsesPanel
-                    surveyId={selected.id}
-                    surveyTitle={selected.title}
-                    questions={selected.questions ?? []}
-                  />
-                </CardContent>
-              </Card>
-
-              <Card ref={questionsSectionRef} className="border-border scroll-mt-4">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">Questions</CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Edit the form shown to attendees. Use Share in the table for links and QR codes.
-                  </p>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-end">
-                    <Button size="sm" variant="secondary" onClick={() => addQuestion.mutate()}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add question
-                    </Button>
-                  </div>
-                  <div className="space-y-4">
-                    {(selected.questions ?? [])
-                      .slice()
-                      .sort((a, b) => a.order_index - b.order_index)
-                      .map((q) => (
-                        <QuestionEditorCard
-                          key={q.id}
-                          question={q}
-                          onPatch={(patch) => saveQuestionPatch(q, patch)}
-                          onDelete={() => removeQuestion.mutate(q.id)}
-                          onMoveUp={() => moveQuestion(q, -1)}
-                          onMoveDown={() => moveQuestion(q, 1)}
-                        />
-                      ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
-        </>
-      )}
+          </div>
+        </Card>
+      </>
+    )}
     </div>
   )
 }
@@ -540,22 +636,52 @@ function QuestionEditorCard({
   onMoveDown,
 }: {
   question: SurveyQuestion
-  onPatch: (patch: Partial<SurveyQuestion>) => void
+  onPatch: (patch: Partial<SurveyQuestion>) => Promise<void>
   onDelete: () => void
   onMoveUp: () => void
   onMoveDown: () => void
 }) {
+  const [type, setType] = useState<SurveyQuestionType>(q.type)
+  const [questionText, setQuestionText] = useState(q.question_text)
+  const [isRequired, setIsRequired] = useState(q.is_required)
+  const [options, setOptions] = useState<SurveyQuestionOptions | null>(q.options)
   const [choices, setChoices] = useState<SurveyChoiceOption[]>(
     () => q.options?.choices ?? [{ label: '', value: '' }],
   )
 
-  useEffect(() => {
-    setChoices(q.options?.choices ?? [{ label: '', value: '' }])
-  }, [q.id, q.type, q.options])
+  const [isDirty, setIsDirty] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
-  const syncChoices = (next: SurveyChoiceOption[]) => {
-    setChoices(next)
-    onPatch({ options: { ...q.options, choices: next } })
+  useEffect(() => {
+    setType(q.type)
+    setQuestionText(q.question_text)
+    setIsRequired(q.is_required)
+    setOptions(q.options)
+    setChoices(q.options?.choices ?? [{ label: '', value: '' }])
+    setIsDirty(false)
+  }, [q])
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    const patchOpts = { ...options }
+    if (type === 'multiple_choice' || type === 'checkbox') {
+      patchOpts.choices = choices
+    }
+    await onPatch({
+      type,
+      question_text: questionText,
+      is_required: isRequired,
+      options: patchOpts,
+    })
+    setIsSaving(false)
+    setIsDirty(false)
+    toast.success('Question saved')
+  }
+
+  const handleTypeChange = (newType: SurveyQuestionType) => {
+    setType(newType)
+    setOptions(defaultOptions(newType) ?? q.options)
+    setIsDirty(true)
   }
 
   return (
@@ -578,19 +704,14 @@ function QuestionEditorCard({
         <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-2">
             <Label className="text-xs">Type</Label>
-            <Select
-              value={q.type}
-              onValueChange={(type: SurveyQuestionType) =>
-                onPatch({ type, options: defaultOptions(type) ?? q.options })
-              }
-            >
+            <Select value={type} onValueChange={handleTypeChange}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {QUESTION_TYPES.map((t) => (
                   <SelectItem key={t} value={t}>
-                    {t}
+                    {t.replace(/_/g, ' ')}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -598,8 +719,11 @@ function QuestionEditorCard({
           </div>
           <div className="flex items-center gap-2 mt-6">
             <Switch
-              checked={q.is_required}
-              onCheckedChange={(on) => onPatch({ is_required: on })}
+              checked={isRequired}
+              onCheckedChange={(on) => {
+                setIsRequired(on)
+                setIsDirty(true)
+              }}
             />
             <span className="text-sm">Required</span>
           </div>
@@ -608,34 +732,27 @@ function QuestionEditorCard({
         <div className="space-y-2">
           <Label className="text-xs">Question</Label>
           <Textarea
-            defaultValue={q.question_text}
-            key={`qt-${q.id}`}
+            value={questionText}
             rows={2}
-            onBlur={(e) => {
-              if (e.target.value !== q.question_text) {
-                onPatch({ question_text: e.target.value })
-              }
+            onChange={(e) => {
+              setQuestionText(e.target.value)
+              setIsDirty(true)
             }}
           />
         </div>
 
-        {q.type === 'rating' && (
+        {type === 'rating' && (
           <div className="flex gap-4">
             <div className="space-y-1">
               <Label className="text-xs">Min</Label>
               <Input
                 type="number"
                 className="w-20"
-                defaultValue={q.options?.min ?? 1}
-                onBlur={(e) =>
-                  onPatch({
-                    options: {
-                      ...(q.options ?? {}),
-                      min: Number(e.target.value),
-                      max: q.options?.max ?? 5,
-                    },
-                  })
-                }
+                value={options?.min ?? 1}
+                onChange={(e) => {
+                  setOptions({ ...(options ?? {}), min: Number(e.target.value) })
+                  setIsDirty(true)
+                }}
               />
             </div>
             <div className="space-y-1">
@@ -643,22 +760,17 @@ function QuestionEditorCard({
               <Input
                 type="number"
                 className="w-20"
-                defaultValue={q.options?.max ?? 5}
-                onBlur={(e) =>
-                  onPatch({
-                    options: {
-                      ...(q.options ?? {}),
-                      min: q.options?.min ?? 1,
-                      max: Number(e.target.value),
-                    },
-                  })
-                }
+                value={options?.max ?? 5}
+                onChange={(e) => {
+                  setOptions({ ...(options ?? {}), max: Number(e.target.value) })
+                  setIsDirty(true)
+                }}
               />
             </div>
           </div>
         )}
 
-        {(q.type === 'multiple_choice' || q.type === 'checkbox') && (
+        {(type === 'multiple_choice' || type === 'checkbox') && (
           <div className="space-y-2">
             <Label className="text-xs">Choices</Label>
             {choices.map((c, idx) => (
@@ -669,7 +781,8 @@ function QuestionEditorCard({
                   onChange={(e) => {
                     const next = [...choices]
                     next[idx] = { ...next[idx], label: e.target.value }
-                    syncChoices(next)
+                    setChoices(next)
+                    setIsDirty(true)
                   }}
                 />
                 <Input
@@ -678,14 +791,18 @@ function QuestionEditorCard({
                   onChange={(e) => {
                     const next = [...choices]
                     next[idx] = { ...next[idx], value: e.target.value }
-                    syncChoices(next)
+                    setChoices(next)
+                    setIsDirty(true)
                   }}
                 />
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => syncChoices(choices.filter((_, i) => i !== idx))}
+                  onClick={() => {
+                    setChoices(choices.filter((_, i) => i !== idx))
+                    setIsDirty(true)
+                  }}
                 >
                   ×
                 </Button>
@@ -695,12 +812,27 @@ function QuestionEditorCard({
               type="button"
               size="sm"
               variant="secondary"
-              onClick={() => syncChoices([...choices, { label: '', value: '' }])}
+              onClick={() => {
+                setChoices([...choices, { label: '', value: '' }])
+                setIsDirty(true)
+              }}
             >
               Add choice
             </Button>
           </div>
         )}
+
+        <div className="flex justify-end pt-2 border-t mt-4 border-border/50">
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleSave}
+            disabled={!isDirty || isSaving}
+            variant={isDirty ? 'default' : 'secondary'}
+          >
+            {isSaving ? 'Saving…' : isDirty ? 'Save question' : 'Saved'}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )
@@ -727,32 +859,32 @@ function answerTextForCsv(a: SurveyAnswerRow | undefined): string {
   return ''
 }
 
-function buildResponsesCsv(rows: SurveyResponseRow[], orderedQuestions: SurveyQuestion[]): string {
-  const qSorted = [...orderedQuestions].sort((a, b) => a.order_index - b.order_index)
-  const headers = ['response_id', 'submitted_at', 'attendee_id', ...qSorted.map((q) => q.question_text)]
-  const lines = [headers.map((h) => csvEscape(h)).join(',')]
-  for (const r of rows) {
+function buildResponsesCsv(rows: SurveyResponseRow[], questions: SurveyQuestion[]) {
+  const header = ['Submitted At', 'Respondent Name', 'Respondent Phone', 'Lotto', ...questions.map((q) => q.question_text)]
+  const lines = [header.map(csvEscape).join(',')]
+
+  rows.forEach((r) => {
     const byQ = new Map((r.answers ?? []).map((an) => [an.question_id, an]))
-    const cells = [
-      csvEscape(String(r.id)),
-      csvEscape(r.submitted_at),
-      csvEscape(r.attendee_id != null ? String(r.attendee_id) : ''),
-      ...qSorted.map((q) => csvEscape(answerTextForCsv(byQ.get(q.id)))),
+    const row = [
+      csvEscape(new Date(r.submitted_at).toLocaleString()),
+      csvEscape(r.respondent_name || ''),
+      csvEscape(r.respondent_phone || ''),
+      csvEscape(r.lotto_number || ''),
+      ...questions.map((q) => csvEscape(answerTextForCsv(byQ.get(q.id)))),
     ]
-    lines.push(cells.join(','))
-  }
+    lines.push(row.join(','))
+  })
   return lines.join('\r\n')
 }
 
 function SurveyResponsesPanel({
-  surveyId,
-  surveyTitle,
-  questions,
+  survey,
 }: {
-  surveyId: number
-  surveyTitle: string
-  questions: SurveyQuestion[]
+  survey: Survey
 }) {
+  const surveyId = survey.id
+  const surveyTitle = survey.title
+  const questions = survey.questions ?? []
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
   const perPage = 20
@@ -798,6 +930,21 @@ function SurveyResponsesPanel({
     toast.success('Download started')
   }
 
+  const downloadLottoCsv = async () => {
+    try {
+      const blob = await surveyApi.downloadLottoNumbers(surveyId)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `lotto-numbers-${surveyId}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Lotto numbers downloaded')
+    } catch (e) {
+      toast.error('Could not download lotto numbers')
+    }
+  }
+
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['survey-responses', surveyId] })
   }
@@ -805,6 +952,8 @@ function SurveyResponsesPanel({
   if (isLoading) {
     return <p className="text-sm text-muted-foreground py-6">Loading responses…</p>
   }
+
+  const hasAnyLotto = rows.some((r) => !!r.lotto_number) || !!survey.is_lotto_enabled
 
   return (
     <div className="space-y-4">
@@ -823,6 +972,12 @@ function SurveyResponsesPanel({
           )}
         </p>
         <div className="flex flex-wrap gap-2">
+          {hasAnyLotto && (
+            <Button type="button" size="sm" variant="secondary" className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border-amber-500/20" onClick={downloadLottoCsv}>
+              <Download className="h-3.5 w-3.5 mr-1.5" />
+              Lotto List
+            </Button>
+          )}
           <Button type="button" size="sm" variant="outline" onClick={refresh} disabled={isFetching}>
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
@@ -841,7 +996,8 @@ function SurveyResponsesPanel({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[100px] whitespace-nowrap">When</TableHead>
-                  <TableHead className="w-[90px] hidden sm:table-cell">Attendee</TableHead>
+                  <TableHead className="w-[180px] hidden sm:table-cell">Respondent</TableHead>
+                  {hasAnyLotto && <TableHead className="w-[100px]">Lotto</TableHead>}
                   <TableHead>Answers</TableHead>
                 </TableRow>
               </TableHeader>
@@ -852,8 +1008,14 @@ function SurveyResponsesPanel({
                       {new Date(r.submitted_at).toLocaleString()}
                     </TableCell>
                     <TableCell className="align-top text-xs hidden sm:table-cell">
-                      {r.attendee_id != null ? r.attendee_id : '—'}
+                      <div className="font-medium text-foreground">{r.respondent_name || 'Anonymous'}</div>
+                      <div className="text-muted-foreground mt-0.5">{r.respondent_phone || '—'}</div>
                     </TableCell>
+                    {hasAnyLotto && (
+                      <TableCell className="align-top text-xs font-mono font-medium">
+                        {r.lotto_number || '—'}
+                      </TableCell>
+                    )}
                     <TableCell className="align-top">
                       <ul className="space-y-1.5 text-sm">
                         {(r.answers ?? []).map((a) => (
