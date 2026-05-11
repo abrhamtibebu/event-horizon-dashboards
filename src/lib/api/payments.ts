@@ -46,6 +46,16 @@ export const initiatePayment = async (
       return initiateTelebirrPayment(data);
     case 'cbe_birr':
       return initiateCBEBirrPayment(data);
+    case 'm_pesa': {
+      // MPESA is initiated via a separate endpoint and doesn't match PaymentInitiationResponse.
+      // Keep this call for consumers that need to kick off MPESA, but they must handle response shape.
+      const response = await api.post('/mpesa/init', {
+        phoneNumber: data.phone_number,
+        amount: data.amount,
+        clientId: null,
+      });
+      return response.data;
+    }
     default:
       throw new Error(`Unsupported payment method: ${method}`);
   }
