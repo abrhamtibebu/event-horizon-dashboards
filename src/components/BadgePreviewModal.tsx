@@ -159,7 +159,7 @@ const BadgePreviewModal: React.FC<BadgePreviewModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">Your Event Badge</DialogTitle>
           <DialogDescription>
@@ -169,9 +169,13 @@ const BadgePreviewModal: React.FC<BadgePreviewModalProps> = ({
 
         <div className="space-y-6">
           {/* Badge Preview */}
-          <div className="flex justify-center items-center bg-muted/30 rounded-lg p-8 min-h-[400px]">
-            <div ref={badgeRef} className="printable-badge">
-              <Badge attendee={attendee} />
+          <div className="flex justify-center items-center bg-muted/30 rounded-lg p-4 sm:p-8 min-h-[320px] sm:min-h-[400px] overflow-hidden">
+            <div className="w-full flex justify-center">
+              <div className="scale-[0.75] sm:scale-100 origin-top">
+                <div ref={badgeRef} className="printable-badge">
+                  <Badge attendee={attendee} />
+                </div>
+              </div>
             </div>
           </div>
 

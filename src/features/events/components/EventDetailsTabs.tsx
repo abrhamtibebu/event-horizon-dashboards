@@ -127,7 +127,7 @@ export function EventDetailsTabs({
                 Registration
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl bg-popover border-border text-popover-foreground rounded-2xl p-6 shadow-xl">
+            <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto bg-popover border-border text-popover-foreground rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-xl font-bold">
                   <QrCode className="w-5 h-5 text-primary" />
