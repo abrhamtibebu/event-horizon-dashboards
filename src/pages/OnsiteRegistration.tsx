@@ -695,7 +695,7 @@ export default function OnsiteRegistration() {
       </main>
 
       <Dialog open={guestDialogOpen} onOpenChange={setGuestDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <form onSubmit={handleAddGuest}>
             <DialogHeader>
               <DialogTitle>Add Onsite Guest</DialogTitle>
@@ -761,7 +761,7 @@ export default function OnsiteRegistration() {
       />
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="w-[95vw] max-w-xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <form onSubmit={handleEditGuest}>
             <DialogHeader>
               <DialogTitle>Edit Badge Data</DialogTitle>

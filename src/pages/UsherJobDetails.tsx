@@ -103,7 +103,7 @@ export default function UsherJobDetails() {
       </div>
       {/* Reject Reason Dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Reject Job</DialogTitle>
             <div className="text-sm text-gray-500">Provide a reason for rejecting this job assignment.</div>

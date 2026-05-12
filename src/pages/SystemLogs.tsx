@@ -404,7 +404,7 @@ export default function SystemLogs() {
 
       {/* View Log Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Log Details</DialogTitle>
             <DialogDescription>Detailed information about this log entry.</DialogDescription>

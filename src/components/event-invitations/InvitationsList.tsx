@@ -205,7 +205,7 @@ export function InvitationsList({
       </div>
 
       <Dialog open={!!selectedQR} onOpenChange={(open) => !open && setSelectedQR(null)}>
-        <DialogContent className="max-w-xs rounded-xl p-6">
+        <DialogContent className="w-[95vw] max-w-xs max-h-[90vh] overflow-y-auto rounded-xl p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold">Invitation QR</DialogTitle>
           </DialogHeader>

@@ -31,7 +31,7 @@ export function TicketQRCodeModal({ ticket, open, onOpenChange }: TicketQRCodeMo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Ticket QR Code</DialogTitle>
         </DialogHeader>

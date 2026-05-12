@@ -475,7 +475,7 @@ export default function NotificationTemplates() {
           setSelectedTemplate(null)
         }
       }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>{editDialogOpen ? 'Edit Template' : 'Create Template'}</DialogTitle>
             <DialogDescription>
@@ -571,7 +571,7 @@ export default function NotificationTemplates() {
 
       {/* Preview Dialog */}
       <Dialog open={previewDialogOpen} onOpenChange={setPreviewDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Template Preview</DialogTitle>
             <DialogDescription>Preview of {selectedTemplate?.name}</DialogDescription>

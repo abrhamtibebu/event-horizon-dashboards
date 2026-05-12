@@ -912,7 +912,7 @@ export default function AdminAdvertisingPage() {
       </Dialog>
 
       <Dialog open={creativeDialog} onOpenChange={setCreativeDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>{editingCreative ? 'Edit creative' : 'New creative'}</DialogTitle>
           </DialogHeader>
@@ -991,7 +991,7 @@ export default function AdminAdvertisingPage() {
       </Dialog>
 
       <Dialog open={easyDialogOpen} onOpenChange={setEasyDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ImageIcon className="h-5 w-5" />

@@ -634,7 +634,7 @@ function ItemRow({
       </tr>
 
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-lg bg-card border-border text-foreground">
+        <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto bg-card border-border text-foreground p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Item Details</DialogTitle>
             <DialogDescription className="text-muted-foreground">

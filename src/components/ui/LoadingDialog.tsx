@@ -49,7 +49,7 @@ export function LoadingDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <div className="flex flex-col items-center justify-center py-8">
           <div className="mb-6">
             {getStatusIcon()}
