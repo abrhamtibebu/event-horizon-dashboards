@@ -1,351 +1,426 @@
-import React, { useState, useEffect } from 'react';
+// Badge Design Page - Production-ready drag-and-drop badge designer
+import React, { useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { 
-  ArrowLeft, 
-  Save, 
-  Eye, 
-  Printer,
-  Settings,
-  Palette
+import { Input } from '@/components/ui/input';
+import {
+  ArrowLeft,
+  Save,
+  Download,
+  Upload,
+  Palette,
+  Loader2,
+  X,
 } from 'lucide-react';
-import BadgeTemplateManager from '@/components/BadgeTemplateManager';
-import SimpleBadge from '@/components/SimpleBadge';
-import { Attendee } from '@/types/attendee';
+import { Label } from '@/components/ui/label';
+import { toast } from '@/components/ui/use-toast';
+import { BadgeCanvas, DesignerToolbar, PropertyPanel, LayersPanel } from '@/components/badge-designer';
+import { useBadgeDesigner, createTextElement, createDynamicFieldElement, createImageElement, createQRCodeElement, createShapeElement } from '@/hooks/useBadgeDesigner';
+import type { DynamicFieldKey, BadgeLayout, BadgeSizeKey } from '@/types/badge-designer';
+import { DEFAULT_SAMPLE_DATA, BADGE_SIZES, COLOR_PRESETS } from '@/types/badge-designer';
 import api from '@/lib/api';
-
-interface BadgeTemplate {
-  id: string;
-  name: string;
-  elements: BadgeElement[];
-  createdAt: string;
-  updatedAt: string;
-}
 
 const BadgeDesignPage: React.FC = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('design');
-  const [selectedTemplate, setSelectedTemplate] = useState<BadgeTemplate | null>(null);
-  const [event, setEvent] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [sampleAttendee, setSampleAttendee] = useState<Attendee | null>(null);
 
-  // Load event data and sample attendee
+  const {
+    state,
+    actions,
+    activeElements,
+    selectedElements,
+    canUndo,
+    canRedo,
+    badgeSize,
+  } = useBadgeDesigner();
+
+  const activeSide = state.layout[state.activeSide];
+
+  // ── Keyboard Shortcuts ───────────────────────────────────────────────────
+
   useEffect(() => {
-    if (eventId) {
-      loadEventData();
-    }
-  }, [eventId]);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(
+        (e.target as HTMLElement)?.tagName
+      );
+      if (isInput) return;
 
-  const loadEventData = async () => {
-    try {
-      setLoading(true);
-      
-      // Load event details
-      const eventResponse = await api.get(`/events/${eventId}`);
-      setEvent(eventResponse.data);
-
-      // Load a sample attendee for preview
-      const attendeesResponse = await api.get(`/events/${eventId}/attendees?limit=1`);
-      if (attendeesResponse.data.data && attendeesResponse.data.data.length > 0) {
-        setSampleAttendee(attendeesResponse.data.data[0]);
-      } else {
-        // Create a sample attendee if none exist
-        setSampleAttendee({
-          id: 1,
-          guest: {
-            id: 1,
-            name: 'John Doe',
-            company: 'Tech Corp',
-            jobtitle: 'Software Engineer',
-            email: 'john@techcorp.com',
-            phone: '+1 (555) 123-4567',
-            uuid: 'sample-uuid-123'
-          },
-          guest_type: { id: 1, name: 'VIP' },
-          event_id: parseInt(eventId || '1'),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
+      // Delete
+      if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedElementIds.length > 0) {
+        e.preventDefault();
+        actions.deleteElements(state.selectedElementIds);
       }
-    } catch (error) {
-      console.error('Error loading event data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      // Undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        actions.undo();
+      }
+      // Redo
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        actions.redo();
+      }
+      // Duplicate
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault();
+        if (state.selectedElementIds.length > 0) {
+          actions.duplicateElements(state.selectedElementIds);
+        }
+      }
+      // Select all
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault();
+        actions.selectElements(activeElements.map((el) => el.id));
+      }
+      // Tool shortcuts
+      if (e.key === 'v' || e.key === 'V') actions.setTool('select');
+      // Escape
+      if (e.key === 'Escape') actions.clearSelection();
+    };
 
-  const handleTemplateSelect = (template: BadgeTemplate) => {
-    setSelectedTemplate(template);
-  };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [state.selectedElementIds, activeElements, actions]);
 
-  const saveEventTemplate = async (template: BadgeTemplate) => {
-    if (!eventId) return;
+  // ── Element Insertion Handlers ─────────────────────────────────────────
 
+  const handleAddText = useCallback(() => {
+    actions.addElement(createTextElement());
+  }, [actions]);
+
+  const handleAddDynamicField = useCallback(
+    (fieldKey: DynamicFieldKey) => {
+      actions.addElement(createDynamicFieldElement(fieldKey));
+    },
+    [actions]
+  );
+
+  const handleAddImage = useCallback(() => {
+    actions.addElement(createImageElement());
+  }, [actions]);
+
+  const handleAddQRCode = useCallback(() => {
+    actions.addElement(createQRCodeElement());
+  }, [actions]);
+
+  const handleAddShape = useCallback(
+    (shapeType: 'rectangle' | 'ellipse' | 'circle') => {
+      actions.addElement(createShapeElement({ shapeType }));
+    },
+    [actions]
+  );
+
+  // ── Save / Load ───────────────────────────────────────────────────────────
+
+  const handleSaveTemplate = useCallback(async () => {
     try {
-      // Save template to event
-      await api.post(`/events/${eventId}/badge-template`, {
-        template_id: template.id,
-        template_name: template.name,
-        template_data: template.elements
-      });
+      const templateJson = JSON.stringify(state.layout);
 
-      // Update local state
-      setSelectedTemplate(template);
-      
-      alert('Badge template assigned to event successfully!');
+      if (eventId) {
+        // Save to backend
+        const payload = {
+          name: state.templateName,
+          template_json: templateJson,
+          is_default: true,
+        };
+
+        if (state.templateId) {
+          await api.put(`/events/${eventId}/badge-templates/${state.templateId}`, payload);
+        } else {
+          const res = await api.post(`/events/${eventId}/badge-templates`, payload);
+          actions.setTemplateMeta(String(res.data.id), state.templateName);
+        }
+        toast({ title: 'Badge template saved to event!' });
+      } else {
+        // Save to localStorage for global mode
+        const savedTemplates = JSON.parse(localStorage.getItem('badge-designer-templates') || '[]');
+        const existing = savedTemplates.findIndex((t: any) => t.id === state.templateId);
+        const entry = {
+          id: state.templateId || `tpl_${Date.now()}`,
+          name: state.templateName,
+          layout: state.layout,
+          updatedAt: new Date().toISOString(),
+        };
+        if (existing >= 0) {
+          savedTemplates[existing] = entry;
+        } else {
+          savedTemplates.push(entry);
+          actions.setTemplateMeta(entry.id, entry.name);
+        }
+        localStorage.setItem('badge-designer-templates', JSON.stringify(savedTemplates));
+        toast({ title: 'Badge template saved locally!' });
+      }
+
+      actions.markClean();
     } catch (error) {
-      console.error('Error saving event template:', error);
-      alert('Error saving badge template. Please try again.');
+      console.error('Save failed:', error);
+      toast({ title: 'Failed to save template', description: 'Please try again.', variant: 'destructive' });
     }
-  };
+  }, [state, eventId, actions]);
 
-  const printSampleBadge = () => {
-    if (!selectedTemplate || !sampleAttendee) return;
+  const handleExportJSON = useCallback(() => {
+    const data = {
+      name: state.templateName,
+      layout: state.layout,
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${state.templateName.replace(/\s+/g, '_')}_badge_template.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Template exported!' });
+  }, [state]);
 
-    // Create a hidden print area
-    const printArea = document.createElement('div');
-    printArea.style.position = 'absolute';
-    printArea.style.left = '-9999px';
-    printArea.style.top = '-9999px';
-    printArea.innerHTML = `
-      <div style="width: 400px; height: 400px; margin: 20px;">
-        ${document.querySelector('.badge-preview')?.innerHTML || ''}
-      </div>
-    `;
-    
-    document.body.appendChild(printArea);
-    
-    // Print
-    window.print();
-    
-    // Cleanup
-    document.body.removeChild(printArea);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading event data...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleImportJSON = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target?.result as string);
+          if (data.layout) {
+            actions.setLayout(data.layout as BadgeLayout);
+            if (data.name) actions.setTemplateName(data.name);
+            toast({ title: 'Template imported!' });
+          } else {
+            toast({ title: 'Invalid template file', variant: 'destructive' });
+          }
+        } catch {
+          toast({ title: 'Failed to parse template file', variant: 'destructive' });
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }, [actions]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(-1)}
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Badge Design</h1>
-              <p className="text-sm text-gray-600">
-                {event ? `Event: ${event.name}` : 'Design badges for your event'}
-              </p>
-            </div>
-          </div>
+    <div className="flex flex-col h-[calc(100vh-64px)] bg-background overflow-hidden">
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card shrink-0">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <div className="flex items-center gap-2">
-            {selectedTemplate && (
-              <Badge variant="default">
-                <Palette className="w-3 h-3 mr-1" />
-                {selectedTemplate.name}
-              </Badge>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={printSampleBadge}
-              disabled={!selectedTemplate || !sampleAttendee}
-            >
-              <Printer className="w-4 h-4 mr-2" />
-              Print Sample
-            </Button>
+            <Palette className="h-5 w-5 text-primary" />
+            <Input
+              value={state.templateName}
+              onChange={(e) => actions.setTemplateName(e.target.value)}
+              className="h-8 text-sm font-semibold border-none bg-transparent px-1 hover:bg-muted/50 focus:bg-muted/50 w-48"
+            />
           </div>
+          {state.isDirty && (
+            <span className="text-[10px] bg-amber-500/10 text-amber-600 px-2 py-0.5 rounded-full font-medium">
+              Unsaved
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={handleImportJSON}>
+            <Upload className="h-4 w-4 mr-1.5" />
+            Import
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleExportJSON}>
+            <Download className="h-4 w-4 mr-1.5" />
+            Export
+          </Button>
+          <Button size="sm" onClick={handleSaveTemplate} className="bg-brand-gradient text-primary-foreground">
+            <Save className="h-4 w-4 mr-1.5" />
+            Save
+          </Button>
         </div>
       </div>
 
-      <div className="p-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="design">Design Badge</TabsTrigger>
-            <TabsTrigger value="templates">Manage Templates</TabsTrigger>
-            <TabsTrigger value="preview">Preview & Test</TabsTrigger>
-          </TabsList>
+      {/* ── Toolbar ────────────────────────────────────────────────────────── */}
+      <div className="px-4 py-2 border-b border-border bg-card/50 shrink-0">
+        <DesignerToolbar
+          activeTool={state.activeTool}
+          zoom={state.zoom}
+          showGrid={state.showGrid}
+          snapToGrid={state.snapToGrid}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          badgeSize={state.layout.size}
+          activeSide={state.activeSide}
+          selectedCount={state.selectedElementIds.length}
+          onSetTool={actions.setTool}
+          onSetZoom={actions.setZoom}
+          onToggleGrid={actions.toggleGrid}
+          onToggleSnap={actions.toggleSnap}
+          onUndo={actions.undo}
+          onRedo={actions.redo}
+          onSetBadgeSize={actions.setBadgeSize}
+          onSetActiveSide={actions.setActiveSide}
+          onAddText={handleAddText}
+          onAddDynamicField={handleAddDynamicField}
+          onAddImage={handleAddImage}
+          onAddQRCode={handleAddQRCode}
+          onAddShape={handleAddShape}
+          onDeleteSelected={() => actions.deleteElements(state.selectedElementIds)}
+          onDuplicateSelected={() => actions.duplicateElements(state.selectedElementIds)}
+        />
+      </div>
 
-          <TabsContent value="design" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* ── Main Editor Area ───────────────────────────────────────────────── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Panel: Layers */}
+        <div className="w-56 border-r border-border bg-card overflow-y-auto shrink-0">
+          <LayersPanel
+            elements={activeElements}
+            selectedElementIds={state.selectedElementIds}
+            onSelectElement={actions.selectElements}
+            onUpdateElement={actions.updateElement}
+          />
 
-              {/* Quick Actions */}
-              <div className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button
-                      className="w-full"
-                      onClick={() => setActiveTab('templates')}
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Template
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => setActiveTab('preview')}
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      Preview Badge
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={printSampleBadge}
-                      disabled={!selectedTemplate || !sampleAttendee}
-                    >
-                      <Printer className="w-4 h-4 mr-2" />
-                      Print Sample
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Event Info */}
-                {event && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Event Info</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Event Name</p>
-                        <p className="text-sm text-gray-600">{event.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Date</p>
-                        <p className="text-sm text-gray-600">
-                          {event.start_date ? new Date(event.start_date).toLocaleDateString() : 'TBD'}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Location</p>
-                        <p className="text-sm text-gray-600">{event.location || 'TBD'}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+          {/* Background Controls */}
+          <div className="border-t border-border p-3 space-y-3">
+            <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              Background
+            </h4>
+            
+            {/* Color Picker */}
+            <div className="space-y-1.5">
+              <Label className="text-[10px] text-muted-foreground uppercase font-bold">Color</Label>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <input
+                    type="color"
+                    value={activeSide.backgroundColor}
+                    onChange={(e) => actions.setBackgroundColor(e.target.value)}
+                    className="w-7 h-7 rounded border border-border cursor-pointer p-0"
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground font-mono uppercase">{activeSide.backgroundColor}</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {['#FFFFFF', '#f8fafc', '#f1f5f9', '#e2e8f0', '#1e293b', '#0f172a'].map((c) => (
+                  <button
+                    key={c}
+                    className="w-5 h-5 rounded-sm border border-border/50 hover:scale-110 transition-transform"
+                    style={{ backgroundColor: c }}
+                    onClick={() => actions.setBackgroundColor(c)}
+                  />
+                ))}
               </div>
             </div>
-          </TabsContent>
 
-          <TabsContent value="templates" className="space-y-6">
-            <BadgeTemplateManager
-              eventId={eventId}
-              onTemplateSelect={handleTemplateSelect}
-              selectedTemplateId={selectedTemplate?.id}
-            />
-          </TabsContent>
-
-          <TabsContent value="preview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Badge Preview */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Eye className="w-5 h-5" />
-                    Badge Preview
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {selectedTemplate && sampleAttendee ? (
-                    <div className="flex justify-center bg-gray-50 rounded-lg p-8">
-                      <div className="badge-preview">
-                        <SimpleBadge 
-                          attendee={sampleAttendee} 
-                          template={selectedTemplate.elements} 
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <div className="text-4xl mb-4">🎨</div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No Template Selected</h3>
-                      <p className="text-gray-600 mb-4">Select a template to preview the badge</p>
-                      <Button onClick={() => setActiveTab('templates')}>
-                        Choose Template
+            {/* Image Upload */}
+            <div className="space-y-1.5 pt-1">
+              <Label className="text-[10px] text-muted-foreground uppercase font-bold">Image</Label>
+              {activeSide.backgroundImage ? (
+                <div className="space-y-2">
+                  <div className="relative rounded border border-border bg-muted/30 aspect-video overflow-hidden group">
+                    <img 
+                      src={activeSide.backgroundImage} 
+                      alt="Background" 
+                      className="w-full h-full object-cover" 
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-7 w-7 text-white hover:bg-white/20"
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'image/*';
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) => actions.setBackgroundImage(ev.target?.result as string);
+                            reader.readAsDataURL(file);
+                          };
+                          input.click();
+                        }}
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-7 w-7 text-white hover:bg-destructive"
+                        onClick={() => actions.setBackgroundImage(null)}
+                      >
+                        <X className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Template Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Template Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {selectedTemplate ? (
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Template Name</p>
-                        <p className="text-lg font-semibold">{selectedTemplate.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Elements</p>
-                        <p className="text-sm text-gray-600">{selectedTemplate.elements.length} elements</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Created</p>
-                        <p className="text-sm text-gray-600">
-                          {new Date(selectedTemplate.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">Last Updated</p>
-                        <p className="text-sm text-gray-600">
-                          {new Date(selectedTemplate.updatedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="pt-4 border-t">
-                        <Button
-                          className="w-full"
-                          onClick={() => saveEventTemplate(selectedTemplate)}
-                        >
-                          <Save className="w-4 h-4 mr-2" />
-                          Assign to Event
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <div className="text-4xl mb-4">📋</div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No Template Selected</h3>
-                      <p className="text-gray-600 mb-4">Choose a template to see its details</p>
-                      <Button onClick={() => setActiveTab('templates')}>
-                        Browse Templates
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-16 border-dashed text-[10px] uppercase font-bold flex flex-col gap-1 text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-primary/5"
+                  onClick={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => actions.setBackgroundImage(ev.target?.result as string);
+                      reader.readAsDataURL(file);
+                    };
+                    input.click();
+                  }}
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload Background
+                </Button>
+              )}
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
+
+        {/* Center: Canvas */}
+        <div className="flex-1 overflow-auto">
+          <BadgeCanvas
+            elements={activeElements}
+            selectedElementIds={state.selectedElementIds}
+            badgeSize={badgeSize}
+            backgroundColor={activeSide.backgroundColor}
+            backgroundImage={activeSide.backgroundImage}
+            zoom={state.zoom}
+            showGrid={state.showGrid}
+            snapToGrid={state.snapToGrid}
+            gridSize={state.gridSize}
+            sampleData={DEFAULT_SAMPLE_DATA}
+            onSelectElement={actions.selectElements}
+            onUpdateElement={actions.updateElement}
+            onClearSelection={actions.clearSelection}
+          />
+        </div>
+
+        {/* Right Panel: Properties */}
+        <div className="w-64 border-l border-border bg-card overflow-y-auto shrink-0">
+          <div className="px-3 py-2 border-b border-border">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              Properties
+            </h3>
+          </div>
+          <PropertyPanel
+            selectedElements={selectedElements}
+            onUpdateElement={actions.updateElement}
+            onDeleteElements={actions.deleteElements}
+            onDuplicateElements={actions.duplicateElements}
+            onMoveLayer={actions.moveElementLayer}
+          />
+        </div>
       </div>
     </div>
   );

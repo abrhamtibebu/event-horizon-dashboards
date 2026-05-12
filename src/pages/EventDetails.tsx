@@ -4465,11 +4465,31 @@ export default function EventDetails() {
                   </TabsContent>
                 {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin') && eventData?.event_type !== 'ticketed' ? (
                   <TabsContent value="bulk-badges">
-                    <BulkBadgesTab
-                      eventId={Number(eventId)}
-                      guestTypes={guestTypes || []}
-                      eventName={eventData?.name}
-                    />
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between bg-card rounded-xl p-4 border border-border shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Palette className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-foreground">Badge Designer</h3>
+                            <p className="text-xs text-muted-foreground">Create and customize the badge template for this event</p>
+                          </div>
+                        </div>
+                        <Button 
+                          onClick={() => navigate(`/dashboard/badge-designer?eventId=${eventId}`)}
+                          className="bg-brand-gradient text-primary-foreground font-bold"
+                        >
+                          <Palette className="w-4 h-4 mr-2" />
+                          Open Designer
+                        </Button>
+                      </div>
+                      <BulkBadgesTab
+                        eventId={Number(eventId)}
+                        guestTypes={guestTypes || []}
+                        eventName={eventData?.name}
+                      />
+                    </div>
                   </TabsContent>
                 ) : null}
                 {eventData?.event_type === 'ticketed' && (

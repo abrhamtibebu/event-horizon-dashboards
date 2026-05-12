@@ -115,16 +115,6 @@ export default function TicketPurchasePage() {
         throw new Error('Please select a ticket type and payment method');
       }
 
-      // MPESA uses a separate backend endpoint (/api/mpesa/init)
-      if (selectedPaymentMethod === 'm_pesa') {
-        const response = await api.post('/mpesa/init', {
-          phoneNumber: paymentPhoneNumber,
-          amount: total,
-          clientId: null,
-        });
-        return response.data;
-      }
-
       const response = await api.post('/guest/payments/initiate', {
         event_uuid: event?.uuid,
         tickets: [{ ticket_type_id: selectedTicketType.id, quantity }],
@@ -142,18 +132,11 @@ export default function TicketPurchasePage() {
 
       return response.data.data;
     },
-    onSuccess: async (payment: any) => {
+    onSuccess: async (payment) => {
       setIsProcessing(true);
       setPaymentStatus('pending');
       setPaymentMessage('Securely processing your payment...');
       setProgress(20);
-
-      // MPESA success response shape: { status: "OK", result: ..., ref: ... }
-      if (payment?.status === 'OK' && payment?.ref) {
-        setPaymentMessage('M-PESA request sent. Please approve the payment on your phone.');
-        setProgress(60);
-        return;
-      }
 
       // Polling for Chapa/Telebirr status if it's integrated via backend
       // Or redirect if it returns a checkout URL

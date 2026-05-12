@@ -164,6 +164,7 @@ export const TeamPage = lazy(() => import('@/pages/Team'))
 // Badges (standalone routes)
 export const BadgePage = lazy(() => import('@/pages/BadgePage'))
 export const BatchBadgePage = lazy(() => import('@/pages/BatchBadgePage'))
+export const BadgeDesignPage = lazy(() => import('@/pages/BadgeDesignPage'))
 
 // Audit/system
 export const AuditLogsPage = lazy(() => import('@/pages/AuditLogs'))

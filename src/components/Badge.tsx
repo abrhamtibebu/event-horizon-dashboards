@@ -157,6 +157,31 @@ const LegacyBadge: React.FC<{ attendee: Attendee }> = ({ attendee }) => {
   );
 };
 
+/**
+ * Detect if a template_json is the new BadgeLayout format from the Konva designer.
+ * The designer format has { size, orientation, front: { elements: [...] }, back: { elements: [...] } }
+ */
+function isDesignerLayout(json: any): boolean {
+  if (!json || typeof json !== 'object') return false;
+  // String → parse it
+  const parsed = typeof json === 'string' ? (() => { try { return JSON.parse(json); } catch { return null; } })() : json;
+  if (!parsed) return false;
+  return (
+    parsed.front && typeof parsed.front === 'object' &&
+    Array.isArray(parsed.front.elements) &&
+    typeof parsed.size === 'string'
+  );
+}
+
+/**
+ * Parse template_json into the designer layout format.
+ */
+function parseDesignerLayout(json: any): any | null {
+  const parsed = typeof json === 'string' ? (() => { try { return JSON.parse(json); } catch { return null; } })() : json;
+  if (!parsed || !isDesignerLayout(parsed)) return null;
+  return parsed;
+}
+
 const Badge: React.FC<BadgeProps> = ({ attendee, template, customTemplate }) => {
   // Validate attendee data
   if (!attendee || !attendee.guest) {
@@ -175,9 +200,18 @@ const Badge: React.FC<BadgeProps> = ({ attendee, template, customTemplate }) => 
   // Use official badge template if provided
   if (template && template.template_json) {
     try {
-      const templateElements = Array.isArray(template.template_json) 
-        ? template.template_json 
-        : template.template_json.elements || [];
+      const rawJson = template.template_json;
+
+      // ── NEW: Detect designer layout format ────────────────────────────
+      const designerLayout = parseDesignerLayout(rawJson);
+      if (designerLayout) {
+        return <SimpleBadge attendee={attendee} designerLayout={designerLayout} side="front" />;
+      }
+
+      // ── LEGACY: Flat element array format ─────────────────────────────
+      const templateElements = Array.isArray(rawJson) 
+        ? rawJson 
+        : rawJson.elements || [];
       
       if (templateElements.length > 0) {
         return <SimpleBadge attendee={attendee} template={templateElements} />;
@@ -191,4 +225,4 @@ const Badge: React.FC<BadgeProps> = ({ attendee, template, customTemplate }) => 
   return <LegacyBadge attendee={attendee} />;
 };
 
-export default Badge; 
+export default Badge;

@@ -1166,6 +1166,24 @@ const AppWithRealtime = () => {
                 </Lazy>
               }
             />
+            <Route
+              path="badge-designer"
+              element={
+                <RoleProtectedRoute
+                  allowedRoles={[
+                    'superadmin',
+                    'admin',
+                    'organizer',
+                    'organizer_admin',
+                    'event_manager',
+                  ]}
+                >
+                  <Lazy>
+                    <P.BadgeDesignPage />
+                  </Lazy>
+                </RoleProtectedRoute>
+              }
+            />
           </Route>
 
           {/* Standalone protected routes (without layout) */}

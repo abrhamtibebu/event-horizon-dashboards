@@ -42,6 +42,7 @@ import {
   Clock,
   History,
   Megaphone,
+  Palette,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -241,6 +242,13 @@ const navigationCategories = [
         icon: Users2,
         roles: ['organizer', 'organizer_admin'],
         permission: 'team.manage',
+      },
+      {
+        title: 'Badge Designer',
+        url: '/dashboard/badge-designer',
+        icon: Palette,
+        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'event_manager'],
+        permission: 'badges.manage',
       },
     ],
   },
@@ -466,37 +474,30 @@ export function AppSidebar() {
       {/* Header */}
       <SidebarHeader className={cn(
         "flex items-center transition-all duration-300 border-b border-border/50 bg-background",
-        isCollapsed ? 'p-3 justify-center' : 'px-5 py-5'
+        isCollapsed ? 'p-3 justify-center' : 'px-5 py-6'
       )}>
-        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 w-full'}`}>
+        <div className={cn(
+          "flex items-center w-full",
+          isCollapsed ? "justify-center" : "justify-between gap-4"
+        )}>
           <div className={cn(
             "flex items-center justify-center transition-all duration-300 shrink-0",
-            isCollapsed ? "w-9 h-9" : "w-10 h-10"
+            isCollapsed ? "w-7 h-7" : "h-11 w-auto"
           )}>
             <img
-              src="/evella-logo.png"
+              src={isCollapsed ? "/favicon.ico" : "/evella-logo.png"}
               alt="Evella Logo"
-              className="w-full h-full object-contain"
+              className="h-full w-auto object-contain"
             />
           </div>
           {!isCollapsed && (
-            <>
-              <div className="flex flex-col flex-1 min-w-0">
-                <span className="text-lg font-semibold text-foreground tracking-tight">
-                  Evella
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  {isOrganizer ? 'Organizer' : 'Admin'}
-                </span>
-              </div>
-              <button
-                onClick={toggleSidebar}
-                className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                title="Collapse sidebar"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-            </>
+            <button
+              onClick={toggleSidebar}
+              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title="Collapse sidebar"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
           )}
         </div>
       </SidebarHeader>

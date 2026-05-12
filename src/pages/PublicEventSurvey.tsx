@@ -186,24 +186,27 @@ export default function PublicEventSurveyPage() {
       if (typeof m === 'string') msg = m
     }
     return (
-      <div className="min-h-[50vh] flex items-center justify-center p-6 text-center max-w-md mx-auto">
-        <Card className="w-full border-destructive/30">
-          <CardHeader>
-            <CardTitle className="text-lg">Survey unavailable</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {(typeof msg === 'string' && msg) ||
-              'There is no active survey for this event, or it is not available yet.'}
-          </CardContent>
-        </Card>
+      <div className="min-h-[100dvh] flex flex-col bg-muted/40">
+        <div className="flex-1 flex items-center justify-center p-6 text-center max-w-md mx-auto">
+          <Card className="w-full border-destructive/30">
+            <CardHeader>
+              <CardTitle className="text-lg">Survey unavailable</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              {(typeof msg === 'string' && msg) ||
+                'There is no active survey for this event, or it is not available yet.'}
+            </CardContent>
+          </Card>
+        </div>
+        <SurveyBrandedFooter />
       </div>
     )
   }
 
   if (needsLottoDetails) {
     return (
-      <div className="min-h-[100dvh] bg-muted/40 flex flex-col items-center px-4 py-8 pb-16">
-        <div className="w-full max-w-lg space-y-4">
+      <div className="min-h-[100dvh] bg-muted/40 flex flex-col items-center px-4 py-8">
+        <div className="w-full max-w-lg space-y-4 flex-1">
           <div className="text-center space-y-1 px-2">
             <div className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-2">
               Lotto Enabled
@@ -267,37 +270,41 @@ export default function PublicEventSurveyPage() {
             </CardFooter>
           </Card>
         </div>
+        <SurveyBrandedFooter />
       </div>
     )
   }
 
   if (step >= questions.length) {
     return (
-      <div className="min-h-[50vh] flex items-center justify-center p-8">
-        <Card className="max-w-md w-full text-center shadow-lg">
-          <CardHeader>
-            <CardTitle>Submitted</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <p className="text-muted-foreground text-sm">Thank you for your feedback.</p>
-            {lottoNumber && (
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6 space-y-2">
-                <p className="text-xs uppercase tracking-widest font-bold text-amber-600">Your Lotto Number</p>
-                <div className="text-4xl font-mono tracking-[0.25em] font-bold text-foreground">
-                  {lottoNumber}
+      <div className="min-h-[100dvh] flex flex-col bg-muted/40 items-center px-4 py-8">
+        <div className="flex-1 flex items-center justify-center w-full">
+          <Card className="max-w-md w-full text-center shadow-lg">
+            <CardHeader>
+              <CardTitle>Submitted</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <p className="text-muted-foreground text-sm">Thank you for your feedback.</p>
+              {lottoNumber && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6 space-y-2">
+                  <p className="text-xs uppercase tracking-widest font-bold text-amber-600">Your Lotto Number</p>
+                  <div className="text-4xl font-mono tracking-[0.25em] font-bold text-foreground">
+                    {lottoNumber}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Please keep this number for the draw.</p>
                 </div>
-                <p className="text-xs text-muted-foreground">Please keep this number for the draw.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        <SurveyBrandedFooter />
       </div>
     )
   }
 
   return (
-    <div className="min-h-[100dvh] bg-muted/40 flex flex-col items-center px-4 py-8 pb-16">
-      <div className="w-full max-w-lg space-y-4">
+    <div className="min-h-[100dvh] bg-muted/40 flex flex-col items-center px-4 py-8">
+      <div className="w-full max-w-lg space-y-4 flex-1">
         <div className="text-center space-y-1 px-2">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary">Feedback</p>
           <h1 className="text-xl font-bold leading-tight">{survey.title}</h1>
@@ -330,7 +337,34 @@ export default function PublicEventSurveyPage() {
           </CardFooter>
         </Card>
       </div>
+      <SurveyBrandedFooter />
     </div>
+  )
+}
+
+function SurveyBrandedFooter() {
+  return (
+    <footer className="mt-8 py-6 flex flex-col items-center gap-3 text-center w-full max-w-lg border-t border-border/40">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">Powered by</span>
+        <a 
+          href="https://evella.et" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="flex items-center gap-1.5 group transition-all"
+        >
+          <img src="/evella-logo.png" alt="Evella Logo" className="h-5 w-auto" />
+        </a>
+      </div>
+      <a 
+        href="https://evella.et" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="text-[11px] font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+      >
+        Browse more amazing events on <span className="underline underline-offset-2 decoration-primary/30 group-hover:decoration-primary">evella.et</span>
+      </a>
+    </footer>
   )
 }
 
