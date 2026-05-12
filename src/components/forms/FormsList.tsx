@@ -754,7 +754,7 @@ export const FormsList: React.FC<FormsListProps> = ({
 
       {/* Form Builder Dialog */}
       <Dialog open={showFormBuilder} onOpenChange={setShowFormBuilder}>
-        <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden">
+        <DialogContent className="w-[95vw] max-w-7xl max-h-[90vh] overflow-hidden p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>
               {selectedForm ? `Edit: ${selectedForm.name}` : 'Create New Form'}
@@ -780,7 +780,7 @@ export const FormsList: React.FC<FormsListProps> = ({
 
       {/* Submissions Viewer Dialog */}
       <Dialog open={showSubmissionsViewer} onOpenChange={setShowSubmissionsViewer}>
-        <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden">
+        <DialogContent className="w-[95vw] max-w-7xl max-h-[90vh] overflow-hidden p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>
               {selectedForm ? `Submissions: ${selectedForm.name}` : 'Form Submissions'}

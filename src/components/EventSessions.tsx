@@ -746,7 +746,7 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
 
       {/* Attendance Dialog */}
       <Dialog open={attendanceOpen} onOpenChange={setAttendanceOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Session Attendance</DialogTitle>
             <DialogDescription>

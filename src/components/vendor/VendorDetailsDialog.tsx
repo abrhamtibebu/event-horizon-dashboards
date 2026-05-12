@@ -265,7 +265,7 @@ export default function VendorDetailsDialog({ vendorId, isOpen, onClose }: Vendo
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader className="pb-4 border-b border-border/50">
             <div className="flex items-center justify-between">
               <div>

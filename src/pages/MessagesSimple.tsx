@@ -332,7 +332,7 @@ export default function MessagesSimple() {
 
       {/* New Conversation Dialog */}
       <Dialog open={isNewConversationOpen} onOpenChange={setIsNewConversationOpen}>
-        <DialogContent className="max-w-md bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
           <DialogHeader>
             <DialogTitle className="text-slate-900 dark:text-white">New Conversation</DialogTitle>
           </DialogHeader>

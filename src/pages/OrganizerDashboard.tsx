@@ -1195,7 +1195,7 @@ export default function OrganizerDashboard() {
 
       {/* Assign Ushers Dialog */}
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Assign Ushers to Event</DialogTitle>
             <DialogDescription>
@@ -1292,7 +1292,7 @@ export default function OrganizerDashboard() {
 
       {/* Detailed Event Performance Chart Modal */}
       <Dialog open={showDetailedChart} onOpenChange={setShowDetailedChart}>
-        <DialogContent className="max-w-6xl h-[95vh] flex flex-col overflow-hidden">
+        <DialogContent className="w-[95vw] max-w-6xl h-[95vh] max-h-[90vh] flex flex-col overflow-hidden p-4 sm:p-6">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <CalendarIcon2 className="w-5 h-5" />

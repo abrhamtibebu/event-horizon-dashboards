@@ -617,7 +617,7 @@ export default function OrganizerProfile() {
                   Create Event
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg w-full">
+              <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
                 <DialogHeader>
                   <DialogTitle>Create Event</DialogTitle>
                   <DialogDescription>

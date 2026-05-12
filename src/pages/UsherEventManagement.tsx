@@ -54,6 +54,7 @@ import { useAuth } from '@/hooks/use-auth'
 import api from '@/lib/api'
 import { getGuestTypeBadgeClasses, getCheckInBadgeClasses } from '@/lib/utils'
 import { useReactToPrint } from 'react-to-print'
+import { DashboardCard } from '@/components/DashboardCard'
 import BadgePrint from '@/components/Badge'
 import BadgeTest from '@/components/BadgeTest'
 import {
@@ -371,7 +372,7 @@ export default function UsherEventManagement() {
   const printRef = useRef<HTMLDivElement>(null)
 
   const handleSinglePrint = useReactToPrint({
-    content: () => singlePrintRef.current,
+    contentRef: singlePrintRef,
     onAfterPrint: () => {
       setSinglePrintAttendee(null)
       if (singlePrintRef.current) {
@@ -386,12 +387,10 @@ export default function UsherEventManagement() {
         singlePrintRef.current.style.visibility = 'hidden'
       }
     },
-    removeAfterPrint: true,
-    suppressErrors: false,
   })
 
   const handlePrintBadges = useReactToPrint({
-    content: () => printRef.current,
+    contentRef: printRef,
     onAfterPrint: () => {
       setPrinting(false)
       if (printRef.current) {
@@ -406,8 +405,6 @@ export default function UsherEventManagement() {
         printRef.current.style.visibility = 'hidden'
       }
     },
-    removeAfterPrint: true,
-    suppressErrors: false,
   })
 
   // Fetch event data
@@ -1604,19 +1601,9 @@ export default function UsherEventManagement() {
                         handleSinglePrint()
                       }
                     }, 500)
-                    toast({
-                      title: 'Walk-in registered!',
-                      description:
-                        'Badge is printing and attendee list updated.',
-                      variant: 'success',
-                    })
+                    showSuccess('Walk-in registered!', 'Badge is printing and attendee list updated.')
                   } catch (err: any) {
-                    toast({
-                      title: 'Failed to register walk-in',
-                      description:
-                        err.response?.data?.error || 'Please try again.',
-                      variant: 'destructive',
-                    })
+                    showError('Failed to register walk-in', err.response?.data?.error || 'Please try again.')
                   } finally {
                     setAddAttendeeLoading(false)
                   }
@@ -2301,7 +2288,7 @@ export default function UsherEventManagement() {
       {/* Test badge display */}
       {showTestBadge && testAttendee && (
         <Dialog open={showTestBadge} onOpenChange={setShowTestBadge}>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle>Badge Preview</DialogTitle>
               <DialogDescription>
@@ -2359,7 +2346,7 @@ export default function UsherEventManagement() {
       {/* Badge Assignment Dialog */}
       {/* QR Scanner Dialog */}
       <Dialog open={qrScannerOpen} onOpenChange={setQrScannerOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Scan QR Code for Check-in</DialogTitle>
             <DialogDescription>
@@ -2390,7 +2377,7 @@ export default function UsherEventManagement() {
         eventId={Number(eventId)}
         onSuccess={() => {
           // Refresh attendees list after assignment
-          fetchAttendees()
+          fetchAttendeesWithFilters()
         }}
       />
     </div>

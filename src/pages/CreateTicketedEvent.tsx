@@ -1580,7 +1580,7 @@ export default function CreateTicketedEvent() {
 
         {/* Ticket Type Creation Dialog */}
         <Dialog open={showTicketTypeDialog} onOpenChange={setShowTicketTypeDialog}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-hidden p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">

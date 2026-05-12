@@ -93,7 +93,7 @@ export function MarketingOnboarding({ onClose, onSkip }: MarketingOnboardingProp
   if (showWelcome) {
     return (
       <Dialog open={true} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-3xl font-bold text-center flex items-center justify-center gap-3">
               <div className="p-3 bg-blue-100 rounded-full">

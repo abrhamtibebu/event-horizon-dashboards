@@ -141,7 +141,7 @@ export function CampaignWizard({ open, onClose, onComplete }: CampaignWizardProp
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto p-0">
+      <DialogContent className="w-[95vw] max-w-5xl max-h-[90vh] overflow-y-auto p-0">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b z-10">
           <div className="px-6 py-5">

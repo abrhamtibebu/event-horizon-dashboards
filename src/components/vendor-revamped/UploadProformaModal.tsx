@@ -216,7 +216,7 @@ export default function UploadProformaModal({ isOpen, onClose, prId, prTitle, pr
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !processing && handleClose()}>
-            <DialogContent className="max-w-6xl p-0 gap-0 bg-background border-border shadow-2xl overflow-hidden rounded-[1rem]">
+            <DialogContent className="w-[95vw] max-w-6xl max-h-[90vh] p-0 gap-0 bg-background border-border shadow-2xl overflow-hidden rounded-[1rem]">
                 <div className="flex flex-col h-[90vh]">
                     {/* Header */}
                     <div className="px-8 py-6 border-b border-border/50 bg-background/95 backdrop-blur-sm flex items-center justify-between sticky top-0 z-10">

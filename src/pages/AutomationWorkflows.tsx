@@ -449,7 +449,7 @@ export default function AutomationWorkflows() {
 
       {/* Create Workflow Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Create Workflow</DialogTitle>
             <DialogDescription>
