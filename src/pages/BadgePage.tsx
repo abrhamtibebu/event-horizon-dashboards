@@ -11,6 +11,7 @@ import { getBadgeTemplates, getOfficialBadgeTemplate } from '@/lib/badgeTemplate
 import { calculateNameFontSize, calculateCompanyFontSize, calculateJobTitleFontSize } from '@/lib/nameSizing';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import PrintBadgeTemplateDialog, { type PrintBadgeTemplateChoice } from '@/components/PrintBadgeTemplateDialog';
 
 // Default template for demonstration - Updated for 4"x4" (100mm x 100mm) without header/footer
 // Note: Dynamic sizing is handled in the Badge component, templates use base sizes
@@ -46,6 +47,8 @@ const BadgePage = () => {
   const [error, setError] = useState<string | null>(null);
   const [template, setTemplate] = useState<BadgeTemplate | null>(null);
   const [templateError, setTemplateError] = useState<string | null>(null);
+  const [printTemplateDialogOpen, setPrintTemplateDialogOpen] = useState(false);
+  const [printTemplateChoice, setPrintTemplateChoice] = useState<PrintBadgeTemplateChoice>('assigned');
   
   const badgeRef = useRef<HTMLDivElement>(null);
   
@@ -136,6 +139,18 @@ const BadgePage = () => {
 
   return (
     <div className="bg-background min-h-screen flex flex-col items-center justify-center p-4">
+      <PrintBadgeTemplateDialog
+        open={printTemplateDialogOpen}
+        onOpenChange={setPrintTemplateDialogOpen}
+        attendeeForPreview={attendee}
+        assignedTemplate={template}
+        onChoose={(choice) => {
+          setPrintTemplateChoice(choice);
+          setTimeout(() => {
+            void handlePrint();
+          }, 0);
+        }}
+      />
       <style type="text/css" media="print">
         {`
           @page { size: auto; margin: 0; }
@@ -150,7 +165,7 @@ const BadgePage = () => {
         `}
       </style>
       <div className="no-print mb-4">
-        <Button onClick={handlePrint} className="flex items-center gap-2">
+        <Button onClick={() => setPrintTemplateDialogOpen(true)} className="flex items-center gap-2">
           <Printer className="w-4 h-4" />
           Print Badge
         </Button>
@@ -174,7 +189,10 @@ const BadgePage = () => {
           }
         `}</style>
         <div id="single-badge-page-print-area">
-          <Badge attendee={attendee} />
+          <Badge
+            attendee={attendee}
+            template={printTemplateChoice === 'assigned' ? template : null}
+          />
         </div>
       </div>
     </div>

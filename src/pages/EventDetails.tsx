@@ -145,6 +145,7 @@ import BadgePrint from '@/components/Badge'
 import BadgeTest from '@/components/BadgeTest'
 import { getOfficialBadgeTemplate, getBadgeTemplates } from '@/lib/badgeTemplates'
 import { BadgeTemplate } from '@/types/badge'
+import PrintBadgeTemplateDialog, { type PrintBadgeTemplateChoice } from '@/components/PrintBadgeTemplateDialog'
 import { TicketManagementTab } from '@/components/tickets/TicketManagementTab'
 import { DateRange } from 'react-date-range'
 import { useModernAlerts } from '@/hooks/useModernAlerts'
@@ -292,6 +293,11 @@ export default function EventDetails() {
   // Badge template state
   const [badgeTemplate, setBadgeTemplate] = useState<BadgeTemplate | null>(null)
   const [badgeTemplateLoading, setBadgeTemplateLoading] = useState(false)
+
+  // Print-template selection (Default vs Assigned)
+  const [printTemplateDialogOpen, setPrintTemplateDialogOpen] = useState(false)
+  const [printTemplateChoice, setPrintTemplateChoice] = useState<PrintBadgeTemplateChoice>('default')
+  const [pendingPrintIds, setPendingPrintIds] = useState<Set<number>>(new Set())
 
   const { user } = useAuth()
   const { hasPermission, hasRole, checkPermission } = usePermissionCheck()
@@ -884,6 +890,22 @@ export default function EventDetails() {
     } else {
       setSelectedAttendees(new Set(filteredAttendees.map((a) => a.id)))
     }
+  }
+
+  const attendeeForPrintPreview = (() => {
+    const firstId = Array.from(pendingPrintIds)[0]
+    if (!firstId) return null
+    const a = (Array.isArray(attendees) ? attendees : []).find((x) => x?.id === firstId)
+    return a || null
+  })()
+
+  const startBatchPrintFlow = (ids: Set<number>) => {
+    if (ids.size === 0) {
+      toast.error('No attendees selected for printing.')
+      return
+    }
+    setPendingPrintIds(ids)
+    setPrintTemplateDialogOpen(true)
   }
 
   // Optimized batch badge printing with batching and performance improvements
@@ -2232,7 +2254,7 @@ export default function EventDetails() {
               .filter(attendee => selectedAttendees.has(attendee.id))
               .map(attendee => (
                 <div key={attendee.id} className="printable-badge-batch">
-                  <BadgePrint attendee={attendee} />
+                  <BadgePrint attendee={attendee} template={printTemplateChoice === 'assigned' ? badgeTemplate : null} />
                 </div>
               ))
           ) : (
@@ -2240,6 +2262,19 @@ export default function EventDetails() {
           )}
         </div>
       </div>
+      <PrintBadgeTemplateDialog
+        open={printTemplateDialogOpen}
+        onOpenChange={setPrintTemplateDialogOpen}
+        attendeeForPreview={attendeeForPrintPreview}
+        assignedTemplate={badgeTemplate}
+        onChoose={(choice) => {
+          setPrintTemplateChoice(choice)
+          // Run print after state is set
+          const ids = new Set(pendingPrintIds)
+          // Defer to next tick so the hidden print area uses the chosen template
+          setTimeout(() => handleBatchPrintBadges(ids), 0)
+        }}
+      />
       <div className="space-y-6">
         {eventLoading ? (
           <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
@@ -3131,7 +3166,7 @@ export default function EventDetails() {
                         {selectedAttendees.size > 0 && (
                           <Button
                             variant="outline"
-                            onClick={() => handleBatchPrintBadges()}
+                            onClick={() => startBatchPrintFlow(new Set(selectedAttendees))}
                             disabled={selectedAttendees.size === 0}
                             className="bg-background border-border hover:bg-accent text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
                           >
@@ -3395,7 +3430,7 @@ export default function EventDetails() {
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => handleBatchPrintBadges(new Set([attendee.id]))}
+                                        onClick={() => startBatchPrintFlow(new Set([attendee.id]))}
                                         className="h-7 w-7 p-0 hover:bg-primary/10 hover:text-primary"
                                       >
                                         <Printer className="w-3.5 h-3.5" />
@@ -3493,7 +3528,7 @@ export default function EventDetails() {
                             .filter(attendee => selectedAttendees.has(attendee.id))
                             .map(attendee => (
                               <div key={attendee.id} className="printable-badge-batch">
-                                <BadgePrint attendee={attendee} />
+                                <BadgePrint attendee={attendee} template={printTemplateChoice === 'assigned' ? badgeTemplate : null} />
                               </div>
                             ))
                         ) : null}
@@ -5526,6 +5561,7 @@ export default function EventDetails() {
                       // Include attendee ID for the badge
                       id: singlePrintAttendee.id,
                     }}
+                    template={printTemplateChoice === 'assigned' ? badgeTemplate : null}
                   />
                 </div>
               )}
@@ -5947,6 +5983,7 @@ export default function EventDetails() {
                         // Include attendee ID for the badge
                         id: singlePrintAttendee?.id,
                       }}
+                      template={printTemplateChoice === 'assigned' ? badgeTemplate : null}
                     />
                   </div>
                 </>

@@ -1,5 +1,5 @@
 // Badge Design Page - Production-ready drag-and-drop badge designer
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,10 +19,12 @@ import { useBadgeDesigner, createTextElement, createDynamicFieldElement, createI
 import type { DynamicFieldKey, BadgeLayout, BadgeSizeKey } from '@/types/badge-designer';
 import { DEFAULT_SAMPLE_DATA, BADGE_SIZES, COLOR_PRESETS } from '@/types/badge-designer';
 import api from '@/lib/api';
+import AssignToEventDialog from '@/components/badge-designer/AssignToEventDialog';
 
 const BadgeDesignPage: React.FC = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
 
   const {
     state,
@@ -149,6 +151,8 @@ const BadgeDesignPage: React.FC = () => {
         }
         localStorage.setItem('badge-designer-templates', JSON.stringify(savedTemplates));
         toast({ title: 'Badge template saved locally!' });
+        // Prompt organizer to attach this design to an event
+        setAssignDialogOpen(true);
       }
 
       actions.markClean();
@@ -203,6 +207,16 @@ const BadgeDesignPage: React.FC = () => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-background overflow-hidden">
+      <AssignToEventDialog
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
+        templateName={state.templateName}
+        layout={state.layout}
+        onAssigned={(assignedEventId) => {
+          toast({ title: 'Assigned! Opening event…' });
+          navigate(`/dashboard/events/${assignedEventId}`);
+        }}
+      />
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card shrink-0">
         <div className="flex items-center gap-3">

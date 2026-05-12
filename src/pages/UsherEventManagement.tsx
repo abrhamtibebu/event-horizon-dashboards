@@ -61,6 +61,7 @@ import {
   getBadgeTemplates,
 } from '@/lib/badgeTemplates'
 import { BadgeTemplate } from '@/types/badge'
+import PrintBadgeTemplateDialog, { type PrintBadgeTemplateChoice } from '@/components/PrintBadgeTemplateDialog'
 import React, { Suspense } from 'react'
 import Papa from 'papaparse';
 import { postAttendeesBatch } from '@/lib/api';
@@ -130,6 +131,10 @@ export default function UsherEventManagement() {
   const [printing, setPrinting] = useState(false)
   const [showTestBadge, setShowTestBadge] = useState(false)
   const [testAttendee, setTestAttendee] = useState<any>(null)
+  const [printTemplateDialogOpen, setPrintTemplateDialogOpen] = useState(false)
+  const [printTemplateChoice, setPrintTemplateChoice] = useState<PrintBadgeTemplateChoice>('assigned')
+  const [pendingPrintKind, setPendingPrintKind] = useState<'single' | 'batch' | null>(null)
+  const [pendingSingleAttendee, setPendingSingleAttendee] = useState<any>(null)
 
 
   // CSV Upload State
@@ -787,9 +792,7 @@ export default function UsherEventManagement() {
 
   // Generate single badge (matches attendees tab)
   const generateBadge = async (attendee: any) => {
-    if (!validateBadgeTemplate(badgeTemplate)) {
-      return
-    }
+    if (printTemplateChoice === 'assigned' && !validateBadgeTemplate(badgeTemplate)) return
 
     if (!attendee || !attendee.guest) {
       showError('Error', 'Invalid attendee data. Please try again.')
@@ -827,9 +830,7 @@ export default function UsherEventManagement() {
 
   // Handle batch print badges
   const handleBatchPrintBadges = async () => {
-    if (!validateBadgeTemplate(badgeTemplate)) {
-      return
-    }
+    if (printTemplateChoice === 'assigned' && !validateBadgeTemplate(badgeTemplate)) return
     if (selectedAttendees.size === 0) {
       showError('Error', 'Please select at least one attendee to print badges for.')
       return
@@ -932,6 +933,27 @@ export default function UsherEventManagement() {
 
   return (
     <div className="space-y-6 px-3 md:px-6 max-w-[1400px] mx-auto w-full">
+      <PrintBadgeTemplateDialog
+        open={printTemplateDialogOpen}
+        onOpenChange={setPrintTemplateDialogOpen}
+        attendeeForPreview={
+          pendingSingleAttendee ||
+          attendees.find((a) => selectedAttendees.has(a.id)) ||
+          null
+        }
+        assignedTemplate={badgeTemplate}
+        onChoose={(choice) => {
+          setPrintTemplateChoice(choice)
+          const kind = pendingPrintKind
+          const single = pendingSingleAttendee
+          setPendingPrintKind(null)
+          setPendingSingleAttendee(null)
+          setTimeout(() => {
+            if (kind === 'single' && single) void generateBadge(single)
+            if (kind === 'batch') void handleBatchPrintBadges()
+          }, 0)
+        }}
+      />
       {/* Breadcrumbs */}
       <Breadcrumbs 
         items={[
@@ -1047,8 +1069,11 @@ export default function UsherEventManagement() {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={handleBatchPrintBadges}
-                    disabled={selectedAttendees.size === 0 || !badgeTemplate}
+                    onClick={() => {
+                      setPendingPrintKind('batch')
+                      setPrintTemplateDialogOpen(true)
+                    }}
+                    disabled={selectedAttendees.size === 0}
                     className="flex items-center gap-2"
                   >
                     <Printer className="w-4 h-4" />
@@ -1194,8 +1219,11 @@ export default function UsherEventManagement() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => generateBadge(attendee)}
-                                disabled={!badgeTemplate}
+                                onClick={() => {
+                                  setPendingPrintKind('single')
+                                  setPendingSingleAttendee(attendee)
+                                  setPrintTemplateDialogOpen(true)
+                                }}
                                 title="Print Badge"
                               >
                                 <Printer className="h-4 w-4" />
@@ -1204,7 +1232,7 @@ export default function UsherEventManagement() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => testBadge(attendee)}
-                                disabled={!badgeTemplate}
+                                disabled={false}
                                 title="Preview badge"
                               >
                                 <Eye className="h-4 w-4" />
@@ -1379,7 +1407,7 @@ export default function UsherEventManagement() {
                       <Button
                         variant="outline"
                         className="w-full"
-                        disabled={!badgeTemplate}
+                        disabled={false}
                       >
                         <Printer className="mr-2 h-4 w-4" />
                         Print Single Badge
@@ -1398,7 +1426,10 @@ export default function UsherEventManagement() {
                       <Button
                         variant="outline"
                         className="w-full"
-                        onClick={handleBatchPrintBadges}
+                        onClick={() => {
+                          setPendingPrintKind('batch')
+                          setPrintTemplateDialogOpen(true)
+                        }}
                         disabled={
                           selectedAttendees.size === 0 || !badgeTemplate
                         }
@@ -2210,6 +2241,7 @@ export default function UsherEventManagement() {
           <div className="printable-badge-batch">
             <BadgePrint
               attendee={singlePrintAttendee}
+              template={printTemplateChoice === 'assigned' ? badgeTemplate : null}
             />
           </div>
         )}
@@ -2260,7 +2292,7 @@ export default function UsherEventManagement() {
             .filter((attendee) => selectedAttendees.has(attendee.id))
             .map((attendee) => (
               <div key={attendee.id} className="printable-badge-batch">
-                <BadgePrint attendee={attendee} />
+                <BadgePrint attendee={attendee} template={printTemplateChoice === 'assigned' ? badgeTemplate : null} />
               </div>
             ))}
         </div>

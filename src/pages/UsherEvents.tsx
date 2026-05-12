@@ -17,6 +17,9 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Label } from '@/components/ui/label'
 import { useSearchParams } from 'react-router-dom'
+import { getBadgeTemplates, getOfficialBadgeTemplate } from '@/lib/badgeTemplates'
+import type { BadgeTemplate } from '@/types/badge'
+import PrintBadgeTemplateDialog, { type PrintBadgeTemplateChoice } from '@/components/PrintBadgeTemplateDialog'
 
 export default function UsherEvents() {
   const { toast } = useToast()
@@ -43,6 +46,10 @@ export default function UsherEvents() {
   const [searching, setSearching] = useState(false)
   const searchTimeout = useRef<NodeJS.Timeout | null>(null)
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  const [badgeTemplate, setBadgeTemplate] = useState<BadgeTemplate | null>(null)
+  const [printTemplateDialogOpen, setPrintTemplateDialogOpen] = useState(false)
+  const [printTemplateChoice, setPrintTemplateChoice] = useState<PrintBadgeTemplateChoice>('default')
+  const [pendingPrintAttendee, setPendingPrintAttendee] = useState<any>(null)
 
   // Add form state
   const [addForm, setAddForm] = useState({
@@ -129,6 +136,21 @@ export default function UsherEvents() {
         setAttendees([])
       })
       .finally(() => setLoading(false))
+  }, [selectedEventId])
+
+  // Fetch badge template for selected event (assigned template option)
+  useEffect(() => {
+    if (!selectedEventId) {
+      setBadgeTemplate(null)
+      return
+    }
+    getOfficialBadgeTemplate(Number(selectedEventId))
+      .then((res) => setBadgeTemplate(res.data))
+      .catch(() => {
+        getBadgeTemplates(Number(selectedEventId))
+          .then((res) => setBadgeTemplate(res.data?.[0] ?? null))
+          .catch(() => setBadgeTemplate(null))
+      })
   }, [selectedEventId])
 
   // Debounce search for smoother UX
@@ -421,6 +443,11 @@ export default function UsherEvents() {
 
   // Print badge handler (matches attendees tab)
   const handlePrintBadge = async (attendee: any) => {
+    setPendingPrintAttendee(attendee)
+    setPrintTemplateDialogOpen(true)
+  }
+
+  const runPrintBadge = async (attendee: any) => {
     setSinglePrintAttendee(attendee);
     // Wait for the badge to render in the hidden printRef
     setTimeout(async () => {
@@ -493,6 +520,20 @@ export default function UsherEvents() {
 
   return (
     <div className="min-h-screen bg-background">
+      <PrintBadgeTemplateDialog
+        open={printTemplateDialogOpen}
+        onOpenChange={setPrintTemplateDialogOpen}
+        attendeeForPreview={pendingPrintAttendee}
+        assignedTemplate={badgeTemplate}
+        onChoose={(choice) => {
+          setPrintTemplateChoice(choice)
+          const attendee = pendingPrintAttendee
+          setPendingPrintAttendee(null)
+          setTimeout(() => {
+            if (attendee) void runPrintBadge(attendee)
+          }, 0)
+        }}
+      />
       <div className="container mx-auto px-4 py-6 max-w-7xl">
         {/* Breadcrumbs */}
         <div className="mb-6">
@@ -785,6 +826,7 @@ export default function UsherEvents() {
                 // Include attendee ID for the badge
                 id: singlePrintAttendee.id,
               }} 
+              template={printTemplateChoice === 'assigned' ? badgeTemplate : null}
             />
           </div>
         )}

@@ -11,6 +11,7 @@ import { getBadgeTemplates, getOfficialBadgeTemplate } from '@/lib/badgeTemplate
 import { calculateNameFontSize, calculateCompanyFontSize, calculateJobTitleFontSize } from '@/lib/nameSizing';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import PrintBadgeTemplateDialog, { type PrintBadgeTemplateChoice } from '@/components/PrintBadgeTemplateDialog';
 
 // Default template for demonstration - Updated for 4"x4" (100mm x 100mm) without header/footer
 const createDefaultTemplate = (): BadgeTemplate => ({
@@ -45,6 +46,8 @@ const BatchBadgePage = () => {
   const [error, setError] = useState<string | null>(null);
   const [template, setTemplate] = useState<BadgeTemplate | null>(null);
   const [templateError, setTemplateError] = useState<string | null>(null);
+  const [printTemplateDialogOpen, setPrintTemplateDialogOpen] = useState(false);
+  const [printTemplateChoice, setPrintTemplateChoice] = useState<PrintBadgeTemplateChoice>('assigned');
 
   const printRef = useRef<HTMLDivElement>(null);
   
@@ -146,6 +149,18 @@ const BatchBadgePage = () => {
 
   return (
     <div className="bg-gray-100">
+      <PrintBadgeTemplateDialog
+        open={printTemplateDialogOpen}
+        onOpenChange={setPrintTemplateDialogOpen}
+        attendeeForPreview={attendees[0] ?? null}
+        assignedTemplate={template}
+        onChoose={(choice) => {
+          setPrintTemplateChoice(choice);
+          setTimeout(() => {
+            void handlePrint();
+          }, 0);
+        }}
+      />
        <style type="text/css" media="print">
         {`
           @page { size: A6; margin: 0; }
@@ -164,7 +179,7 @@ const BatchBadgePage = () => {
         `}
       </style>
        <div className="no-print p-4 text-center">
-        <Button onClick={handlePrint} className="flex items-center gap-2">
+        <Button onClick={() => setPrintTemplateDialogOpen(true)} className="flex items-center gap-2">
           <Printer className="w-4 h-4" />
           Print Selected Badges
         </Button>
@@ -198,7 +213,7 @@ const BatchBadgePage = () => {
         <div id="batch-page-print-area">
           {attendees.map(attendee => (
             <div key={attendee.id} className="printable-badge-batch">
-              <Badge attendee={attendee} />
+              <Badge attendee={attendee} template={printTemplateChoice === 'assigned' ? template : null} />
             </div>
           ))}
         </div>
