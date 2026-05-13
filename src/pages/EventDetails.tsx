@@ -836,6 +836,7 @@ export default function EventDetails() {
         'Job Title': attendee.guest?.jobtitle || 'N/A',
         'Gender': attendee.guest?.gender || 'N/A',
         'Country': attendee.guest?.country || 'N/A',
+        'City': attendee.guest?.city || 'N/A',
         'Guest Type': guestTypeName,
         'Reg Type': attendee.registration_type === 'onsite' ? 'Onsite' : 'Pre-Reg',
         'Registration Date': attendee.created_at
@@ -2161,6 +2162,7 @@ export default function EventDetails() {
         'Job Title': attendee.guest?.jobtitle || 'N/A',
         'Gender': attendee.guest?.gender || 'N/A',
         'Country': attendee.guest?.country || 'N/A',
+        'City': attendee.guest?.city || 'N/A',
         'Guest Type': guestTypeName,
         'Registration Date': attendee.created_at
           ? format(parseISO(attendee.created_at), 'MMM d, yyyy, h:mm a')
@@ -2315,7 +2317,7 @@ export default function EventDetails() {
             <div className="relative w-full h-[300px] rounded-3xl overflow-hidden mb-8 shadow-lg border border-border">
               {(eventData.event_image || eventData.image_url || eventData.image) ? (
                 <img
-                  src={getImageUrl(eventData.image_url || eventData.event_image || eventData.image)}
+                  src={getImageUrl(eventData.image_url || eventData.event_image || eventData.image, eventData.id)}
                   alt={eventData.name}
                   className="object-cover w-full h-full transition-transform duration-700"
                 />
@@ -3345,6 +3347,7 @@ export default function EventDetails() {
                               <TableHead className="px-3">Name</TableHead>
                               <TableHead className="hidden md:table-cell px-3">Company / Job Title</TableHead>
                               <TableHead className="w-[140px] px-2">Phone</TableHead>
+                              <TableHead className="hidden lg:table-cell w-[160px] px-2">Location</TableHead>
                               <TableHead className="hidden xl:table-cell w-[200px] px-2">Email</TableHead>
                               <TableHead className="w-[110px] px-2">Reg Type</TableHead>
                               <TableHead className="w-[130px] px-2">Status</TableHead>
@@ -3395,6 +3398,17 @@ export default function EventDetails() {
 
                                   <TableCell className="truncate px-2 text-sm w-[140px]">
                                     {attendee.guest?.phone || '-'}
+                                  </TableCell>
+
+                                  <TableCell className="hidden lg:table-cell max-w-[160px] px-2">
+                                    <div className="flex flex-col min-w-0">
+                                      <div className="font-medium truncate text-sm">
+                                        {attendee.guest?.city || '-'}
+                                      </div>
+                                      <div className="text-[11px] text-muted-foreground truncate">
+                                        {attendee.guest?.country || '-'}
+                                      </div>
+                                    </div>
                                   </TableCell>
 
                                   <TableCell className="hidden xl:table-cell max-w-[180px] truncate px-2 text-sm">

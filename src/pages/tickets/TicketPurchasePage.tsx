@@ -71,10 +71,11 @@ export default function TicketPurchasePage() {
   const ticketTypes = eventResult?.ticket_types || [];
 
   useRegistrationShareMeta({
-    enabled: Boolean(!eventLoading && event?.name),
+    enabled: !!event,
     title: event?.name,
-    description: typeof event?.description === 'string' ? event.description : undefined,
+    description: event?.description,
     imageRaw: event?.image_url || event?.image || event?.event_image,
+    eventId: event?.id,
   });
 
   // Real-time Inventory Polling
@@ -216,7 +217,7 @@ export default function TicketPurchasePage() {
       {/* Dynamic Header / Banner */}
       <div className="relative min-h-[28vh] h-[28vh] sm:h-[30vh] md:h-[40vh] overflow-hidden">
         {event?.image_url || event?.image || event?.event_image ? (
-          <img src={getImageUrl(event.image_url || event.image || event.event_image)} alt={event.name} className="w-full h-full object-cover" />
+          <img src={getImageUrl(event.image_url || event.image || event.event_image, event.id)} alt={event.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/5 to-background" />
         )}

@@ -261,7 +261,7 @@ export default function PublicFormRegistration() {
   const endDate = event?.end_date ? new Date(event.end_date) : null;
   const organizerName = event?.organizer?.name || 'Event Organizer';
   const organizerLogo = event?.organizer?.logo ? getImageUrl(event.organizer.logo) : null;
-  const eventImage = (event?.event_image || event?.image_url) ? getImageUrl(event.event_image || event.image_url) : null;
+  const eventImage = (event?.event_image || event?.image_url) ? getImageUrl(event.event_image || event.image_url, event.id) : null;
 
   if (form.status !== 'active') {
     return (

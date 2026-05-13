@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { compressImage } from '@/lib/utils';
 import {
   AlignLeft,
   AlignCenter,
@@ -466,10 +467,11 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                     return;
                   }
                   const reader = new FileReader();
-                  reader.onload = (ev) => {
+                  reader.onload = async (ev) => {
                     const dataUrl = ev.target?.result as string;
                     if (dataUrl) {
-                      update({ src: dataUrl } as any);
+                      const compressed = await compressImage(dataUrl);
+                      update({ src: compressed } as any);
                     }
                   };
                   reader.readAsDataURL(file);
@@ -488,9 +490,12 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                   return;
                 }
                 const reader = new FileReader();
-                reader.onload = (ev) => {
+                reader.onload = async (ev) => {
                   const dataUrl = ev.target?.result as string;
-                  if (dataUrl) update({ src: dataUrl } as any);
+                  if (dataUrl) {
+                    const compressed = await compressImage(dataUrl);
+                    update({ src: compressed } as any);
+                  }
                 };
                 reader.readAsDataURL(file);
               }}

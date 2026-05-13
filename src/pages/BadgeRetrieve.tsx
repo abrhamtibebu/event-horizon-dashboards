@@ -85,13 +85,30 @@ export default function BadgeRetrieve() {
     }
   }
 
+  const isTelebirr = eventUuid === '56'
+  const telebirrColors = {
+    deepGreen: '#8DC63F',
+    lightGreen: '#8DC63F',
+    blue: '#005BAA',
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 font-['Outfit']">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 font-['Outfit']">
+      {isTelebirr && (
+        <div className="w-full max-w-lg mb-8 flex items-center justify-between px-4">
+          <img src="/ethio_telecom_logo.png" alt="Ethio Telecom" className="h-10 md:h-12 object-contain" />
+          <img src="/telebirr5th year logo.png" alt="Telebirr" className="h-12 md:h-16 object-contain" />
+        </div>
+      )}
       <Card className="w-full max-w-lg bg-white dark:bg-slate-900 border-none shadow-[0_20px_50px_rgba(0,0,0,0.1)] rounded-[2rem] sm:rounded-[3rem] overflow-hidden">
-        <div className="h-2 bg-[#f97316]" />
+        <div className="h-2" style={{ backgroundColor: isTelebirr ? telebirrColors.deepGreen : '#f97316' }} />
         <CardContent className="p-8 sm:p-12">
-          <div className="w-20 h-20 bg-orange-50 dark:bg-orange-900/20 rounded-3xl flex items-center justify-center mx-auto mb-8 border border-orange-100 dark:border-orange-800">
-            <ShieldCheck className="w-10 h-10 text-[#f97316]" />
+          <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-8 border"
+               style={{ 
+                 backgroundColor: isTelebirr ? 'rgba(141, 198, 63, 0.1)' : 'rgba(249, 115, 22, 0.05)',
+                 borderColor: isTelebirr ? 'rgba(141, 198, 63, 0.2)' : 'rgba(249, 115, 22, 0.1)'
+               }}>
+            <ShieldCheck className="w-10 h-10" style={{ color: isTelebirr ? telebirrColors.deepGreen : '#f97316' }} />
           </div>
 
           <div className="text-center mb-8">
@@ -130,7 +147,8 @@ export default function BadgeRetrieve() {
             <Button
               type="submit"
               disabled={lookingUp}
-              className="w-full min-h-14 h-14 bg-[#f97316] hover:bg-[#ea580c] text-white font-black text-base rounded-2xl shadow-[0_10px_20px_rgba(249,115,22,0.25)]"
+              className="w-full min-h-14 h-14 text-white font-black text-base rounded-2xl shadow-lg transition-all active:scale-95"
+              style={{ backgroundColor: isTelebirr ? telebirrColors.deepGreen : '#f97316' }}
             >
               {lookingUp ? (
                 <SpinnerInline size="sm" />
@@ -146,7 +164,7 @@ export default function BadgeRetrieve() {
           {lookupResult && (
             <div className="mt-8 space-y-6">
               <div className="rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 p-6 text-center">
-                <CheckCircle className="w-8 h-8 text-[#f97316] mx-auto mb-3" />
+                <CheckCircle className="w-8 h-8 mx-auto mb-3" style={{ color: isTelebirr ? telebirrColors.deepGreen : '#f97316' }} />
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
                   Registration Found
                 </p>

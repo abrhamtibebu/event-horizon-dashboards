@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import api from '@/lib/api';
 import { useRegistrationShareMeta } from '@/lib/registrationShareMeta';
 import { toast } from 'sonner';
-import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, AlertCircle, Lamp, User, CheckCircle } from 'lucide-react';
 import { SpinnerInline } from '@/components/ui/spinner';
 
 export default function PublicEventRegisterNew() {
@@ -81,10 +81,11 @@ export default function PublicEventRegisterNew() {
   }, [eventUuid]);
 
   useRegistrationShareMeta({
-    enabled: Boolean(event && !loading && !error && event.name),
+    enabled: !!event,
     title: event?.name,
-    description: typeof event?.description === 'string' ? event.description : undefined,
+    description: event?.description,
     imageRaw: event?.image ?? event?.image_url ?? event?.event_image,
+    eventId: event?.id,
   });
 
   useEffect(() => {

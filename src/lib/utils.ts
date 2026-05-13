@@ -199,9 +199,15 @@ export function getStatusColor(status: string): string {
 /**
  * Constructs a proper image URL from a storage path
  * @param imagePath - The image path from the backend (e.g., "/storage/image.png")
+ * @param eventId - Optional event ID for hardwiring specific event banners
  * @returns The full URL to the image
  */
-export const getImageUrl = (imagePath: string | null | undefined | any): string => {
+export const getImageUrl = (imagePath: string | null | undefined | any, eventId?: number | string | null): string => {
+  // Hardwire for Telebirr 5th Anniversary (Event 56)
+  if (eventId === 56 || eventId === '56' || (typeof imagePath === 'string' && imagePath.includes('telebirr'))) {
+    return '/tele birr event banner.png'
+  }
+
   if (!imagePath || typeof imagePath !== 'string') {
     return '/placeholder.svg' // Default placeholder
   }
@@ -223,4 +229,52 @@ export const getImageUrl = (imagePath: string | null | undefined | any): string 
   }
 
   return imagePath
+}
+
+/**
+ * Compresses a base64 image string to a target width/height and quality.
+ * Returns a promise that resolves to the compressed base64 string.
+ */
+export async function compressImage(
+  base64Str: string,
+  maxWidth = 1200,
+  maxHeight = 1200,
+  quality = 0.7
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // If not a data URL or already small, skip
+    if (!base64Str.startsWith('data:image/') || base64Str.length < 500000) {
+      return resolve(base64Str);
+    }
+
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height *= maxWidth / width;
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width *= maxHeight / height;
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve(base64Str);
+      
+      ctx.drawImage(img, 0, 0, width, height);
+      const result = canvas.toDataURL('image/jpeg', quality);
+      resolve(result);
+    };
+    img.onerror = () => reject(new Error('Failed to load image for compression'));
+  });
 }

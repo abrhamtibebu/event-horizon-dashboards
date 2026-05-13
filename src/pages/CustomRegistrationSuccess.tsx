@@ -8,7 +8,6 @@ import {
   Users,
   MapPin,
   Clock,
-  Sparkles,
   Home,
   FileText,
   AlertCircle,
@@ -61,7 +60,7 @@ const CustomRegistrationSuccess: React.FC = () => {
             </p>
 
             <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-6 py-3 text-white border border-white/30">
-              <Sparkles className="w-5 h-5" />
+              <CheckCircle className="w-5 h-5" />
               <span className="font-semibold">You're all set!</span>
             </div>
           </div>
@@ -149,7 +148,7 @@ const CustomRegistrationSuccess: React.FC = () => {
                   <div className="bg-accent rounded-2xl p-4 sm:p-8 border border-border min-w-0">
                     <div className="flex items-center gap-3 mb-6">
                       <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
-                        <Sparkles className="w-6 h-6 text-primary-foreground" />
+                        <CheckCircle className="w-6 h-6 text-primary-foreground" />
                       </div>
                       <h3 className="text-xl font-bold text-foreground">What's Next?</h3>
                     </div>

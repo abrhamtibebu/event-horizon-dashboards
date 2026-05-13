@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle, Building, UserCog, Mail, Phone as PhoneIcon, X, Mic2, ArrowRight } from 'lucide-react';
+import { useRegistrationShareMeta } from '@/lib/registrationShareMeta';
 import { getImageUrl } from '@/lib/utils';
 import { PublicTicketSelector } from '@/components/public/PublicTicketSelector';
 import { PublicPaymentSelector } from '@/components/public/PublicPaymentSelector';
@@ -99,6 +100,14 @@ export default function PublicEventRegister() {
   const handleCustomFormFallback = useCallback(() => {
     setUseCustomForm(false);
   }, []);
+
+  useRegistrationShareMeta({
+    enabled: Boolean(event && !loading && !error && event.name),
+    title: event?.name,
+    description: typeof event?.description === 'string' ? event.description : undefined,
+    imageRaw: event?.image ?? event?.image_url ?? event?.event_image,
+    eventId: event?.id,
+  });
 
   // Ticketing state
   const { isAuthenticated } = useAuth();
@@ -296,6 +305,13 @@ export default function PublicEventRegister() {
         // Handle both data and data.data response structures
         const eventData = res.data?.data || res.data;
         console.log('[PublicEventRegister] Event data received:', eventData);
+        
+        // Custom redirect for Telebirr 5th Anniversary (Event ID 56)
+        if (eventData?.id === 56 || eventData?.id === '56' || eventUuid === '094a5f9c-879c-468c-afd5-932521c50076') {
+          navigate(`/event/telebirr-register/56${window.location.search}`, { replace: true });
+          return;
+        }
+
         setEvent(eventData);
         // Set guest types from event data
         if (eventData?.guestTypes) {
@@ -986,19 +1002,17 @@ export default function PublicEventRegister() {
           <div className="relative h-64 sm:h-96">
             {(event.event_image || event.image_url || event.image) ? (
               <img
-                src={getImageUrl(event.image_url || event.event_image || event.image)}
+                src={getImageUrl(event.image_url || event.event_image || event.image, event.id)}
                 alt={event.name}
                 className="w-full h-full object-cover"
               />
             ) : (
               <div className="w-full h-full bg-slate-900 flex items-center justify-center">
-                <Sparkles className="w-12 h-12 text-white/10" />
               </div>
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-80" />
             <div className="absolute bottom-0 left-0 w-full p-6 sm:p-12">
               <div className="inline-flex items-center gap-2 bg-[#f97316] text-white px-3 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest mb-2 sm:mb-4 shadow-lg">
-                <Star className="w-2.5 h-2.5 fill-white" />
                 {event.category?.name || 'Featured Event'}
               </div>
               <h1 className="text-2xl sm:text-6xl font-black text-white tracking-tight leading-tight break-words hyphens-auto">
@@ -1290,7 +1304,6 @@ export default function PublicEventRegister() {
                               )}
                               {profileImagePreview ? (
                                 <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#f97316] rounded-xl flex items-center justify-center shadow border-2 border-white dark:border-slate-900">
-                                  <Sparkles className="w-3 h-3 text-white" />
                                 </div>
                               ) : null}
                             </div>

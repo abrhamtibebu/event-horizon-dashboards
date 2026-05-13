@@ -29,7 +29,7 @@ export function TicketCard({ ticket, onViewQR, onDownload, onRefund, className }
           </div>
           {(ticket.event?.image || ticket.event?.image_url || ticket.event?.event_image) && (
             <img
-              src={getImageUrl(ticket.event.image || ticket.event.image_url || ticket.event.event_image)}
+              src={getImageUrl(ticket.event.image || ticket.event.image_url || ticket.event.event_image, ticket.event.id)}
               alt={ticket.event.title}
               className="w-16 h-16 rounded object-cover ml-3"
             />

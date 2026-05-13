@@ -20,6 +20,7 @@ import type { DynamicFieldKey, BadgeLayout, BadgeSizeKey } from '@/types/badge-d
 import { DEFAULT_SAMPLE_DATA, BADGE_SIZES, COLOR_PRESETS } from '@/types/badge-designer';
 import api from '@/lib/api';
 import AssignToEventDialog from '@/components/badge-designer/AssignToEventDialog';
+import { compressImage } from '@/lib/utils';
 
 const BadgeDesignPage: React.FC = () => {
   const { eventId } = useParams();
@@ -114,6 +115,22 @@ const BadgeDesignPage: React.FC = () => {
 
   // ── Save / Load ───────────────────────────────────────────────────────────
 
+  const handleExportJSON = useCallback(() => {
+    const data = {
+      name: state.templateName,
+      layout: state.layout,
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${state.templateName.replace(/\s+/g, '_')}_badge_template.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Template exported!' });
+  }, [state]);
+
   const handleSaveTemplate = useCallback(async () => {
     try {
       const templateJson = JSON.stringify(state.layout);
@@ -158,25 +175,23 @@ const BadgeDesignPage: React.FC = () => {
       actions.markClean();
     } catch (error) {
       console.error('Save failed:', error);
-      toast({ title: 'Failed to save template', description: 'Please try again.', variant: 'destructive' });
+      
+      if (error instanceof Error && error.name === 'QuotaExceededError') {
+        toast({ 
+          title: 'Storage Quota Exceeded', 
+          description: 'The template is too large for local storage. Please assign it to an event or use smaller images.', 
+          variant: 'destructive',
+          action: (
+            <Button variant="outline" size="sm" onClick={handleExportJSON}>
+              Export JSON
+            </Button>
+          )
+        });
+      } else {
+        toast({ title: 'Failed to save template', description: 'Please try again.', variant: 'destructive' });
+      }
     }
-  }, [state, eventId, actions]);
-
-  const handleExportJSON = useCallback(() => {
-    const data = {
-      name: state.templateName,
-      layout: state.layout,
-      exportedAt: new Date().toISOString(),
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${state.templateName.replace(/\s+/g, '_')}_badge_template.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: 'Template exported!' });
-  }, [state]);
+  }, [state, eventId, actions, handleExportJSON]);
 
   const handleImportJSON = useCallback(() => {
     const input = document.createElement('input');
@@ -355,7 +370,10 @@ const BadgeDesignPage: React.FC = () => {
                             const file = (e.target as HTMLInputElement).files?.[0];
                             if (!file) return;
                             const reader = new FileReader();
-                            reader.onload = (ev) => actions.setBackgroundImage(ev.target?.result as string);
+                          reader.onload = async (ev) => {
+                            const compressed = await compressImage(ev.target?.result as string);
+                            actions.setBackgroundImage(compressed);
+                          };
                             reader.readAsDataURL(file);
                           };
                           input.click();
@@ -387,7 +405,10 @@ const BadgeDesignPage: React.FC = () => {
                       const file = (e.target as HTMLInputElement).files?.[0];
                       if (!file) return;
                       const reader = new FileReader();
-                      reader.onload = (ev) => actions.setBackgroundImage(ev.target?.result as string);
+                      reader.onload = async (ev) => {
+                        const compressed = await compressImage(ev.target?.result as string);
+                        actions.setBackgroundImage(compressed);
+                      };
                       reader.readAsDataURL(file);
                     };
                     input.click();

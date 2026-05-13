@@ -53,6 +53,7 @@ export function useRegistrationShareMeta(opts: {
   title: string | null | undefined;
   description?: string | null | undefined;
   imageRaw: string | null | undefined;
+  eventId?: number | string | null;
 }) {
   const location = useLocation();
 
@@ -67,7 +68,7 @@ export function useRegistrationShareMeta(opts: {
     const pageOrigin = window.location.origin;
     const canonicalUrl = `${pageOrigin}${location.pathname}${location.search}`;
 
-    const resolved = opts.imageRaw ? getImageUrl(opts.imageRaw) : '';
+    const resolved = opts.imageRaw ? getImageUrl(opts.imageRaw, opts.eventId) : '';
     const ogImage = resolved ? toAbsoluteOgImage(resolved, pageOrigin) : null;
 
     const backup: BackupEntry[] = [];

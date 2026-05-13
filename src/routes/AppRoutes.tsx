@@ -253,6 +253,26 @@ const AppWithRealtime = () => {
             }
           />
           <Route
+            path="/event/telebirr-register/:eventId"
+            element={
+              <PublicRoute>
+                <Lazy>
+                  <P.TelebirrRegistrationPage />
+                </Lazy>
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/event/telebirr-register/:eventId/success"
+            element={
+              <PublicRoute>
+                <Lazy>
+                  <P.TelebirrRegistrationSuccessPage />
+                </Lazy>
+              </PublicRoute>
+            }
+          />
+          <Route
             path="/form/register/:formId"
             element={
               <PublicRoute>

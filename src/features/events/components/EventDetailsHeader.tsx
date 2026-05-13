@@ -15,7 +15,7 @@ export function EventDetailsHeader({ event, attendeeCount, organizerName }: Even
     <div className="relative w-full h-[300px] rounded-3xl overflow-hidden mb-8 shadow-lg border border-border">
       {(event.event_image || event.image_url || event.image) ? (
         <img
-          src={getImageUrl(event.image_url || event.event_image || event.image)}
+          src={getImageUrl(event.image_url || event.event_image || event.image, event.id)}
           alt={event.name}
           className="object-cover w-full h-full transition-transform duration-700"
         />

@@ -570,7 +570,7 @@ export default function Events() {
                               <div className="relative h-48 w-full overflow-hidden">
                                 {(event.event_image || event.image_url || event.image) ? (
                                   <img
-                                    src={getImageUrl(event.image_url || event.event_image || event.image)}
+                                    src={getImageUrl(event.image_url || event.event_image || event.image, event.id)}
                                     alt={event.name}
                                     className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
                                   />

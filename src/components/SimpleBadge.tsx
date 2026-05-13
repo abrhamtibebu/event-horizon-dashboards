@@ -223,8 +223,10 @@ const SimpleBadge: React.FC<SimpleBadgeProps> = ({ attendee, template, designerL
         width: element.width,
         height: element.height,
         transform: element.rotation ? `rotate(${element.rotation}deg)` : undefined,
+        transformOrigin: '0 0',
         opacity: element.opacity ?? 1,
         zIndex: element.zIndex ?? 0,
+        boxSizing: 'border-box',
       };
 
       switch (element.type) {
@@ -291,14 +293,16 @@ const SimpleBadge: React.FC<SimpleBadgeProps> = ({ attendee, template, designerL
                   ...baseStyle,
                   backgroundImage: fieldValue ? `url(${fieldValue})` : 'none',
                   backgroundColor: fieldValue ? 'transparent' : '#f3f4f6',
-                  backgroundSize: 'cover',
+                  backgroundSize: element.objectFit === 'fill' ? '100% 100%' : (element.objectFit || 'cover'),
                   backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
                   borderRadius: element.borderRadius ?? 0,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#9ca3af',
                   fontSize: 12,
+                  overflow: 'hidden',
                 }}
               >
                 {!fieldValue && 'Photo'}
@@ -340,11 +344,12 @@ const SimpleBadge: React.FC<SimpleBadgeProps> = ({ attendee, template, designerL
                 ...baseStyle,
                 backgroundImage: element.src ? `url(${element.src})` : 'none',
                 backgroundColor: element.src ? 'transparent' : '#f3f4f6',
-                backgroundSize: element.objectFit || 'cover',
+                backgroundSize: element.objectFit === 'fill' ? '100% 100%' : (element.objectFit || 'cover'),
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
                 borderRadius: element.borderRadius ?? 0,
                 border: element.borderWidth ? `${element.borderWidth}px solid ${element.borderColor || '#d1d5db'}` : 'none',
+                overflow: 'hidden',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

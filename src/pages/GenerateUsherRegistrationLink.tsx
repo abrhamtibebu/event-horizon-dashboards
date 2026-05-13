@@ -317,7 +317,7 @@ export default function GenerateUsherRegistrationLink() {
     { id: 1, name: 'Event Selection', icon: Calendar },
     { id: 2, name: 'Payment Details', icon: DollarSign },
     { id: 3, name: 'Requirements', icon: FileText },
-    { id: 4, name: 'Review & Generate', icon: Sparkles },
+    { id: 4, name: 'Review & Generate', icon: Link2 },
   ]
 
   const nextStep = () => {
@@ -793,7 +793,7 @@ export default function GenerateUsherRegistrationLink() {
                 <div className="p-6 sm:p-8">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-2xl flex items-center justify-center">
-                      <Sparkles className="w-6 h-6 text-white" />
+                      <Link2 className="w-6 h-6 text-white" />
                     </div>
                     <div>
                       <h3 className="text-xl font-bold text-foreground">Review & Generate</h3>
@@ -848,7 +848,7 @@ export default function GenerateUsherRegistrationLink() {
                           </>
                         ) : (
                           <>
-                            <Sparkles className="w-5 h-5 mr-2" />
+                            <Link2 className="w-5 h-5 mr-2" />
                             Generate Registration Link
                           </>
                         )}

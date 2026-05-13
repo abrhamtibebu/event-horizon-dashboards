@@ -41,6 +41,12 @@ export const CustomEventRegistrationPage = lazy(
 export const CustomRegistrationSuccessPage = lazy(
   () => import('@/pages/CustomRegistrationSuccess'),
 )
+export const TelebirrRegistrationPage = lazy(
+  () => import('@/pages/TelebirrRegistration'),
+)
+export const TelebirrRegistrationSuccessPage = lazy(
+  () => import('@/pages/TelebirrRegistrationSuccess'),
+)
 export const PublicFormRegistrationPage = lazy(
   () => import('@/pages/PublicFormRegistration'),
 )
