@@ -7,7 +7,7 @@
 export type TicketStatus = 'confirmed' | 'pending' | 'cancelled' | 'used' | 'refunded';
 export type PaymentStatus = 'pending' | 'success' | 'failed' | 'cancelled';
 export type PaymentMethod = 'telebirr' | 'chapa' | 'cbe_birr' | 'm_pesa';
-export type ValidationStatus = 'valid' | 'invalid' | 'expired' | 'already_used' | 'refunded' | 'cancelled' | 'pending' | 'too_early';
+export type ValidationStatus = 'valid' | 'invalid' | 'expired' | 'already_used' | 'refunded' | 'cancelled' | 'pending' | 'too_early' | 'not_event_checked_in' | 'tampered';
 
 /**
  * Payment interface
@@ -62,6 +62,7 @@ export interface PaymentInitiationResponse {
 export interface TicketValidationRequest {
   ticket_identifier: string; // ticket number or QR data
   event_id: number;
+  session_id?: number;
 }
 
 /**

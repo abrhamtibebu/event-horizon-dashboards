@@ -151,7 +151,7 @@ const navigationCategories = [
         title: 'Tasks',
         url: '/dashboard/tasks',
         icon: CheckSquare,
-        roles: ['organizer', 'organizer_admin', 'usher', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'attendee', 'sales'],
+        roles: ['organizer', 'organizer_admin', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'sales'],
         accessibleToAll: true,
         permission: 'tasks.view',
       },
@@ -387,9 +387,9 @@ export function AppSidebar() {
       items: category.items.filter((item) => {
         if (!user) return false
 
-        // Items accessible to all authenticated users
+        // Skip permission checks but still enforce role-based access
         if (item.accessibleToAll) {
-          return true
+          return hasRole(item.roles)
         }
 
         // Guests menu is only for organizers, not for admin/superadmin

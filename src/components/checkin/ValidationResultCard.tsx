@@ -13,7 +13,7 @@ interface ValidationResultCardProps {
 
 export function ValidationResultCard({ result, onBulkCheckIn }: ValidationResultCardProps) {
   const isValid = result.validation_status === 'valid';
-  const isWarning = ['already_used', 'too_early', 'pending'].includes(result.validation_status);
+  const isWarning = ['already_used', 'too_early', 'pending', 'not_event_checked_in'].includes(result.validation_status);
   const isError = ['invalid', 'expired', 'refunded', 'cancelled'].includes(result.validation_status);
 
   // Helper for group check-in

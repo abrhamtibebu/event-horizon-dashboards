@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,14 @@ export default function TicketRedemption() {
         },
     });
 
+    // Auto-select when usher has exactly one assigned event
+    useEffect(() => {
+        if (assignedEvents?.length === 1 && selectedEventId == null) {
+            setSelectedEventId(assignedEvents[0].id);
+            setSelectedSessionId('default');
+        }
+    }, [assignedEvents, selectedEventId]);
+
     const validateMutation = useMutation({
         mutationFn: (id: string) => validateTicket({
             ticket_identifier: id,
@@ -46,7 +54,12 @@ export default function TicketRedemption() {
             setLastResult(data);
             setHistory(prev => [data, ...prev].slice(0, 10)); // Keep last 10
             if (data.validation_status === 'valid') {
-                toast.success('Ticket Validated Successfully');
+                toast.success(data.message || 'Check-in successful');
+            } else if (data.validation_status === 'not_event_checked_in') {
+                toast.error(
+                    data.message ||
+                        'Check in at Main Event Entry first, or register walk-ins under Guests.',
+                );
             } else {
                 toast.error(data.message || 'Validation Failed');
             }
@@ -54,7 +67,16 @@ export default function TicketRedemption() {
             setIsScanning(false);
         },
         onError: (error: any) => {
-            toast.error(error.response?.data?.message || 'Error validating ticket');
+            const status = error.response?.data?.validation_status;
+            const message = error.response?.data?.message;
+            if (status === 'not_event_checked_in') {
+                toast.error(
+                    message ||
+                        'Check in at Main Event Entry first, or register walk-ins under Guests.',
+                );
+            } else {
+                toast.error(message || 'Error validating ticket');
+            }
         }
     });
 
@@ -154,30 +176,38 @@ export default function TicketRedemption() {
 
                                         {selectedEventId === event.id && event.sessions && event.sessions.length > 0 && (
                                             <div className="pl-4 pr-1 py-2 space-y-2 bg-white/5 rounded-xl border border-white/5 animate-in slide-in-from-top-2">
-                                                <p className="text-[9px] font-black uppercase text-muted-foreground px-2">Monitor Session Attendance</p>
+                                                <p className="text-[9px] font-black uppercase text-muted-foreground px-2">Check-in mode</p>
+                                                <p className="text-[10px] text-muted-foreground px-2 leading-snug">
+                                                    Main Event Entry checks guests in and supports walk-ins (via Guests tab).
+                                                    Sessions only admit guests already checked in at the event.
+                                                </p>
                                                 <div className="grid grid-cols-1 gap-2">
                                                     <Button
                                                         variant={selectedSessionId === 'default' ? "secondary" : "ghost"}
                                                         size="sm"
-                                                        className="h-8 justify-between text-[10px] font-bold uppercase"
+                                                        className="h-auto min-h-8 py-2 justify-between text-[10px] font-bold uppercase text-left"
                                                         onClick={() => setSelectedSessionId('default')}
                                                     >
-                                                        Main Event Entry
-                                                        {selectedSessionId === 'default' && <CheckCircle className="w-3 h-3 text-primary" />}
+                                                        <span>
+                                                            Main Event Entry
+                                                            <span className="block text-[8px] font-medium normal-case opacity-70">Event check-in &amp; walk-ins</span>
+                                                        </span>
+                                                        {selectedSessionId === 'default' && <CheckCircle className="w-3 h-3 text-primary shrink-0" />}
                                                     </Button>
                                                     {event.sessions.map((session: any) => (
                                                         <Button
                                                             key={session.id}
                                                             variant={selectedSessionId === String(session.id) ? "secondary" : "ghost"}
                                                             size="sm"
-                                                            className="h-10 justify-between text-[10px] font-bold uppercase"
+                                                            className="h-auto min-h-10 py-2 justify-between text-[10px] font-bold uppercase text-left"
                                                             onClick={() => setSelectedSessionId(String(session.id))}
                                                         >
                                                             <div className="flex flex-col items-start">
                                                                 <span>{session.name}</span>
+                                                                <span className="text-[8px] font-medium normal-case opacity-60">Session entry only</span>
                                                                 <span className="text-[8px] opacity-60">Live: {session.current_attendance || 0} checked-in</span>
                                                             </div>
-                                                            {selectedSessionId === String(session.id) && <CheckCircle className="w-3 h-3 text-primary" />}
+                                                            {selectedSessionId === String(session.id) && <CheckCircle className="w-3 h-3 text-primary shrink-0" />}
                                                         </Button>
                                                     ))}
                                                 </div>

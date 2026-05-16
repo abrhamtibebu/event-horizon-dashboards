@@ -74,6 +74,7 @@ export default function Profile() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Sync form when user loads or updates
   useEffect(() => {

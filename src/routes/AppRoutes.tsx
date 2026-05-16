@@ -596,11 +596,31 @@ const AppWithRealtime = () => {
             <Route
               path="tasks"
               element={
-                <ProtectedRoute>
+                <RoleProtectedRoute
+                  allowedRoles={[
+                    'superadmin',
+                    'admin',
+                    'organizer',
+                    'organizer_admin',
+                    'event_manager',
+                    'marketing_specialist',
+                    'finance_manager',
+                    'procurement_manager',
+                    'operations_manager',
+                    'purchase_requester',
+                    'purchase_approver',
+                    'proforma_manager',
+                    'proforma_approver',
+                    'purchase_order_issuer',
+                    'payment_requester',
+                    'payment_approver',
+                    'sales',
+                  ]}
+                >
                   <Lazy>
                     <P.TasksPage />
                   </Lazy>
-                </ProtectedRoute>
+                </RoleProtectedRoute>
               }
             />
             <Route
@@ -1039,6 +1059,10 @@ const AppWithRealtime = () => {
                   </Lazy>
                 </RoleProtectedRoute>
               }
+            />
+            <Route
+              path="usher"
+              element={<Navigate to="/dashboard" replace />}
             />
             <Route
               path="usher/redemption"
