@@ -25,6 +25,7 @@ export default function TicketRedemption() {
     const [selectedSessionId, setSelectedSessionId] = useState<string>('default');
     const [isScanning, setIsScanning] = useState(false);
     const [activeTab, setActiveTab] = useState('scanner');
+    const [scanFeedback, setScanFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     const queryClient = useQueryClient();
 
@@ -51,29 +52,20 @@ export default function TicketRedemption() {
             setLastResult(data);
             setHistory(prev => [data, ...prev].slice(0, 10)); // Keep last 10
             if (data.validation_status === 'valid') {
-                toast.success(data.message || 'Check-in successful');
+                setScanFeedback({ type: 'success', message: data.attendee?.guest?.name || data.message || 'Check-in successful' });
             } else if (data.validation_status === 'not_event_checked_in') {
-                toast.error(
-                    data.message ||
-                        'Check in at Main Event Entry first, or register walk-ins under Guests.',
-                );
+                setScanFeedback({ type: 'error', message: 'Not checked in at main entry' });
             } else {
-                toast.error(data.message || 'Validation Failed');
+                setScanFeedback({ type: 'error', message: data.message || 'Validation failed' });
             }
             setTicketNumber('');
-            setIsScanning(false);
+            // Auto-dismiss feedback after 2 seconds
+            setTimeout(() => setScanFeedback(null), 2000);
         },
         onError: (error: any) => {
-            const status = error.response?.data?.validation_status;
-            const message = error.response?.data?.message;
-            if (status === 'not_event_checked_in') {
-                toast.error(
-                    message ||
-                        'Check in at Main Event Entry first, or register walk-ins under Guests.',
-                );
-            } else {
-                toast.error(message || 'Error validating ticket');
-            }
+            const message = error.response?.data?.message || 'Error validating ticket';
+            setScanFeedback({ type: 'error', message });
+            setTimeout(() => setScanFeedback(null), 2000);
         }
     });
 
@@ -305,18 +297,40 @@ export default function TicketRedemption() {
                                         <div className="relative">
                                             <QrScanner
                                                 onScan={(decodedText) => {
-                                                    // Auto-validate the scanned code
-                                                    validateMutation.mutate(decodedText);
+                                                    if (!validateMutation.isPending) {
+                                                        validateMutation.mutate(decodedText);
+                                                    }
                                                 }}
                                                 onError={(err) => {
                                                     console.error('Scanner error:', err);
                                                 }}
                                                 onClose={() => setIsScanning(false)}
-                                                paused={validateMutation.isPending}
                                             />
-                                            {validateMutation.isPending && (
-                                                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-40 rounded-2xl gap-3">
-                                                    <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                            {/* Scan feedback overlay — flashes on top of camera */}
+                                            {scanFeedback && (
+                                                <div className={cn(
+                                                    "absolute inset-x-0 bottom-0 z-40 p-4 flex items-center gap-3 animate-in slide-in-from-bottom duration-200",
+                                                    scanFeedback.type === 'success' ? 'bg-green-600/90' : 'bg-red-600/90'
+                                                )}>
+                                                    {scanFeedback.type === 'success' ? (
+                                                        <CheckCircle className="w-6 h-6 text-white flex-shrink-0" />
+                                                    ) : (
+                                                        <AlertCircle className="w-6 h-6 text-white flex-shrink-0" />
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <span className="block text-[9px] font-bold uppercase tracking-widest text-white/70">
+                                                            {scanFeedback.type === 'success' ? 'Checked In' : 'Failed'}
+                                                        </span>
+                                                        <span className="block text-sm font-bold text-white truncate">
+                                                            {scanFeedback.message}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {/* Validating spinner */}
+                                            {validateMutation.isPending && !scanFeedback && (
+                                                <div className="absolute inset-x-0 bottom-0 z-40 p-4 bg-black/70 flex items-center justify-center gap-3">
+                                                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                                                     <span className="text-xs font-bold uppercase tracking-widest text-white">
                                                         Validating...
                                                     </span>
