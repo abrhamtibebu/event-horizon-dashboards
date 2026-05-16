@@ -914,3 +914,39 @@
     padding-right: 2.5rem;
   }
 }
+/* QR Scanner Styles */
+@keyframes scan-line {
+  0% { top: 0; opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { top: 100%; opacity: 0.4; }
+}
+
+.animate-scan-line {
+  animation: scan-line 2s ease-in-out infinite;
+}
+
+.border-3 { border-width: 3px; }
+.border-t-3 { border-top-width: 3px; }
+.border-b-3 { border-bottom-width: 3px; }
+.border-l-3 { border-left-width: 3px; }
+.border-r-3 { border-right-width: 3px; }
+
+/* html5-qrcode library overrides for dark theme */
+#qr-scanner-region {
+  border: none !important;
+}
+
+#qr-scanner-region video {
+  border-radius: 1rem !important;
+  object-fit: cover !important;
+}
+
+#qr-scanner-region img[alt="Info icon"],
+#qr-scanner-region a,
+#qr-scanner-region > span {
+  display: none !important;
+}
+
+#qr-shaded-region {
+  border-color: rgba(var(--primary-rgb), 0.5) !important;
+}

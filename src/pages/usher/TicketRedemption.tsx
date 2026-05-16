@@ -14,8 +14,7 @@ import type { ValidationResult } from '@/types/tickets';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { UsherMobileLayout } from '@/components/UsherMobileLayout';
-// Note: In a real app, we'd use a QR scanner library like react-qr-reader or html5-qrcode
-// For this demo, we'll use a placeholder UI for scanning
+import QrScanner from '@/components/QrScanner';
 
 export default function TicketRedemption() {
     const [step, setStep] = useState<'selection' | 'validator'>('selection');
@@ -292,35 +291,37 @@ export default function TicketRedemption() {
                                             </div>
                                             <div className="text-center space-y-1 px-8">
                                                 <h3 className="text-xl font-bold text-white">Ready to Scan</h3>
-                                                <p className="text-xs text-gray-500 font-medium">Position the QR code within the frame.</p>
+                                                <p className="text-xs text-gray-500 font-medium">Tap below to open camera and scan QR codes.</p>
                                             </div>
                                             <Button
                                                 onClick={() => setIsScanning(true)}
                                                 className="px-8 h-12 rounded-xl font-bold uppercase tracking-widest bg-primary hover:bg-primary/90"
                                             >
                                                 <Camera className="w-4 h-4 mr-2" />
-                                                Open Scanner
+                                                Open Camera
                                             </Button>
                                         </div>
                                     ) : (
-                                        <div className="aspect-square relative bg-black flex items-center justify-center">
-                                            <div className="absolute inset-0 border-[30px] border-black/60 z-10" />
-                                            <div className="w-56 h-56 border border-white/30 rounded-2xl relative z-10">
-                                                <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-primary rounded-tl-lg" />
-                                                <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-primary rounded-tr-lg" />
-                                                <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-primary rounded-bl-lg" />
-                                                <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-primary rounded-br-lg" />
-                                            </div>
-                                            <div className="absolute bottom-6 left-0 right-0 text-center z-20 px-6">
-                                                <Button
-                                                    variant="secondary"
-                                                    size="sm"
-                                                    className="w-full h-10 rounded-xl bg-white/10 backdrop-blur-md text-white border-0 font-bold uppercase text-[9px] tracking-wider"
-                                                    onClick={() => setIsScanning(false)}
-                                                >
-                                                    <X className="w-3 h-3 mr-2" /> Cancel
-                                                </Button>
-                                            </div>
+                                        <div className="relative">
+                                            <QrScanner
+                                                onScan={(decodedText) => {
+                                                    // Auto-validate the scanned code
+                                                    validateMutation.mutate(decodedText);
+                                                }}
+                                                onError={(err) => {
+                                                    console.error('Scanner error:', err);
+                                                }}
+                                                onClose={() => setIsScanning(false)}
+                                                paused={validateMutation.isPending}
+                                            />
+                                            {validateMutation.isPending && (
+                                                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-40 rounded-2xl gap-3">
+                                                    <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                                    <span className="text-xs font-bold uppercase tracking-widest text-white">
+                                                        Validating...
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </CardContent>
