@@ -35,7 +35,7 @@ const TelebirrRegistrationSuccess: React.FC = () => {
   const guestUuid = registrationData?.guest_uuid || '';
   const qrValue = guestUuid; // Use full UUID for reliable check-in
   const eventUuid = eventData?.uuid || '094a5f9c-879c-468c-afd5-932521c50076';
-  const eventName = eventData?.name || 'Tele birr 5th Year Anniversary Exhibition';
+  const eventName = eventData?.title || eventData?.name || 'Event';
 
   const [showShareSection, setShowShareSection] = React.useState(false);
 
@@ -115,7 +115,7 @@ const TelebirrRegistrationSuccess: React.FC = () => {
               You're Going!
             </h2>
             <p className="text-xl text-gray-600 mb-10 max-w-2xl mx-auto font-medium">
-              Your registration for <span className="font-bold text-gray-900">{eventData?.name || 'Tele birr 5th Year Anniversary Exhibition'}</span> is successfully confirmed.
+              Your registration for <span className="font-bold text-gray-900">{eventName}</span> is successfully confirmed.
             </p>
 
 

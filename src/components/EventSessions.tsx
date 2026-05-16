@@ -15,6 +15,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar as UiCalendar } from '@/components/ui/calendar'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import SessionUsherAssignmentDialog from '@/components/SessionUsherAssignmentDialog'
 
 interface EventSessionsProps {
@@ -86,7 +87,7 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
 
   const [authError, setAuthError] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['event-sessions', eventId],
     queryFn: async () => {
       try {
@@ -101,6 +102,7 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
         throw err
       }
     },
+    refetchInterval: 10000, // Poll every 10 seconds for live attendance updates
   })
 
   const sessions = useMemo(() => (data?.data ?? []) as any[], [data])
@@ -197,10 +199,13 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
   }
 
+  const [showOnlyCheckedIn, setShowOnlyCheckedIn] = useState(true)
+
   const openAttendance = async (session: any) => {
     setAttendanceOpen(true)
     setAttendanceSession(session)
     setAttendanceLoading(true)
+    setShowOnlyCheckedIn(true) // Reset to live check-ins only by default
     try {
       // Load event attendees
       const attendeesRes = await api.get(`/events/${Number(eventId)}/attendees`, {
@@ -756,45 +761,89 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
           {attendanceLoading ? (
             <div className="text-sm text-muted-foreground">Loading attendees...</div>
           ) : (
-            <div className="max-h-[60vh] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Attendee</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="w-40">Present</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {attendees.length === 0 ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center space-x-2">
+                    <Switch 
+                      id="show-checked-in" 
+                      checked={showOnlyCheckedIn} 
+                      onCheckedChange={setShowOnlyCheckedIn} 
+                    />
+                    <Label htmlFor="show-checked-in" className="text-sm font-bold uppercase cursor-pointer">
+                      Live Check-ins Only
+                    </Label>
+                  </div>
+                </div>
+                <div className="text-xs font-bold text-muted-foreground uppercase">
+                  Total: {Object.values(attendancesByAttendeeId).filter(a => ['present', 'late'].includes(a.attendance_status)).length} present
+                </div>
+              </div>
+
+              <div className="max-h-[60vh] overflow-y-auto border rounded-xl">
+                <Table>
+                  <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableCell colSpan={3} className="p-6 text-center text-sm text-muted-foreground">
-                        No attendees registered for this event yet. Add attendees on the Attendees tab first.
-                      </TableCell>
+                      <TableHead className="font-bold uppercase text-[10px]">Attendee</TableHead>
+                      <TableHead className="font-bold uppercase text-[10px]">Type</TableHead>
+                      <TableHead className="w-40 font-bold uppercase text-[10px]">Status</TableHead>
                     </TableRow>
-                  ) : (
-                    attendees.map(a => {
-                    const attendance = attendancesByAttendeeId[a.id]
-                    const present = ['present', 'late'].includes(String(attendance?.attendance_status || ''))
-                    return (
-                      <TableRow key={a.id}>
-                        <TableCell>
-                          <div className="font-medium">{a.guest?.name || a.name || `Guest #${a.id}`}</div>
-                          <div className="text-xs text-muted-foreground">{a.guest?.email || a.email}</div>
-                        </TableCell>
-                        <TableCell>{a.guest_type?.name || a.guest_type_name || '—'}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Switch checked={present} onCheckedChange={(v) => toggleAttendance(a, v)} />
-                            <span className={`text-xs ${present ? 'text-green-600' : 'text-gray-500'}`}>{present ? 'Present' : 'Absent'}</span>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      const filtered = attendees.filter(a => {
+                        if (!showOnlyCheckedIn) return true;
+                        const attendance = attendancesByAttendeeId[a.id];
+                        return ['present', 'late'].includes(String(attendance?.attendance_status || ''));
+                      });
+
+                      if (filtered.length === 0) {
+                        return (
+                          <TableRow>
+                            <TableCell colSpan={3} className="p-12 text-center">
+                              <div className="flex flex-col items-center gap-2 opacity-40">
+                                <UserRound className="w-8 h-8" />
+                                <p className="font-bold uppercase text-xs">
+                                  {showOnlyCheckedIn ? "No live check-ins yet" : "No attendees found"}
+                                </p>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+
+                      return filtered.map(a => {
+                        const attendance = attendancesByAttendeeId[a.id]
+                        const present = ['present', 'late'].includes(String(attendance?.attendance_status || ''))
+                        return (
+                          <TableRow key={a.id} className={cn(present ? "bg-green-50/30 dark:bg-green-900/10" : "")}>
+                            <TableCell>
+                              <div className="font-bold text-sm">{a.guest?.name || a.name || `Guest #${a.id}`}</div>
+                              <div className="text-[10px] text-muted-foreground font-medium">{a.guest?.email || a.email}</div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-[9px] font-black uppercase">
+                                {a.guest_type?.name || a.guest_type_name || '—'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Switch checked={present} onCheckedChange={(v) => toggleAttendance(a, v)} />
+                                <span className={cn(
+                                  "text-[10px] font-black uppercase tracking-tight",
+                                  present ? "text-green-600" : "text-muted-foreground"
+                                )}>
+                                  {present ? 'Present' : 'Absent'}
+                                </span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      });
+                    })()}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
         </DialogContent>

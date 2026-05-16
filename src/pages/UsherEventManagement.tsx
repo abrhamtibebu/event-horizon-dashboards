@@ -17,7 +17,9 @@ import {
   Plus,
   FileText,
   QrCode,
+  MessageSquare,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -70,6 +72,7 @@ import { generateSingleBadgePDF, generateBatchBadgePDF, printPDFBlob, waitForEle
 import { BadgeAssignmentDialog } from '@/components/BadgeAssignmentDialog';
 import { QRScanner } from '@/components/checkin/QRScanner';
 import { checkInByQR } from '@/lib/api';
+import { UsherMobileLayout } from '@/components/UsherMobileLayout'
 
 
 export default function UsherEventManagement() {
@@ -929,1268 +932,162 @@ export default function UsherEventManagement() {
   if (!eventData) return <div className="p-8 text-center">Event not found.</div>
 
   return (
-    <div className="space-y-6 px-3 md:px-6 max-w-[1400px] mx-auto w-full">
-      <PrintBadgeTemplateDialog
-        open={printTemplateDialogOpen}
-        onOpenChange={setPrintTemplateDialogOpen}
-        attendeeForPreview={
-          pendingSingleAttendee ||
-          attendees.find((a) => selectedAttendees.has(a.id)) ||
-          null
-        }
-        assignedTemplate={badgeTemplate}
-        onChoose={(choice) => {
-          setPrintTemplateChoice(choice)
-          const kind = pendingPrintKind
-          const single = pendingSingleAttendee
-          setPendingPrintKind(null)
-          setPendingSingleAttendee(null)
-          setTimeout(() => {
-            if (kind === 'single' && single) void generateBadge(single)
-            if (kind === 'batch') void handleBatchPrintBadges()
-          }, 0)
-        }}
-      />
-      {/* Breadcrumbs */}
-      <Breadcrumbs 
-        items={[
-          { label: 'Events', href: '/dashboard/events' },
-          { label: eventData?.name || 'Event Management' }
-        ]}
-        className="mb-4"
-      />
-      
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{eventData.name}</h1>
-          <p className="text-gray-600 mt-1">Event Management for Ushers</p>
-        </div>
-        <Button variant="outline" onClick={() => navigate('/dashboard')}>
-          Back to Dashboard
-        </Button>
-      </div>
-
-      {/* Event Info Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Event Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <Label className="text-sm font-medium text-gray-500">Date</Label>
-              <p className="text-sm">
-                {new Date(eventData.start_date).toLocaleDateString()}
-              </p>
+    <UsherMobileLayout title={eventData.name}>
+      <div className="space-y-6 px-4 pb-12">
+        {/* Mobile Header with QR Quick Action */}
+        <div className="flex flex-col gap-4 pt-2">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Guest Management</h2>
+              <div className="flex items-center gap-2">
+                <span className="text-3xl font-black text-white">{attendees.length}</span>
+                <span className="text-gray-500 font-medium text-sm">Total Guests</span>
+              </div>
             </div>
-            <div>
-              <Label className="text-sm font-medium text-gray-500">
-                Location
-              </Label>
-              <p className="text-sm">{eventData.location}</p>
-            </div>
-            <div>
-              <Label className="text-sm font-medium text-gray-500">
-                Total Attendees
-              </Label>
-              <p className="text-sm">{attendees.length}</p>
-            </div>
-            <div>
-              <Label className="text-sm font-medium text-gray-500">
-                Status
-              </Label>
-              <Badge
-                variant={
-                  eventData.status === 'active' ? 'default' : 'secondary'
-                }
-              >
-                {eventData.status}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Main Content */}
-      <Tabs defaultValue="attendees" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="attendees">Attendees</TabsTrigger>
-          <TabsTrigger value="registration">Registration</TabsTrigger>
-          <TabsTrigger value="badges">Badge Printing</TabsTrigger>
-          <TabsTrigger value="onsite-checkin">
-            Onsite Check-In & Walk-In Handling
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Attendees Tab */}
-        <TabsContent value="attendees" className="space-y-4">
-          {/* Upload CSV button for attendees tab */}
-          <div className="flex flex-col items-start mb-2">
-            <Button
-              variant="default"
-              onClick={() => fileInputRef.current?.click()}
-              type="button"
-              className="mb-1"
+            <Button 
+              onClick={() => setQrScannerOpen(true)}
+              className="w-16 h-16 rounded-[2rem] bg-primary hover:bg-primary/90 text-white shadow-2xl shadow-primary/30 flex items-center justify-center p-0"
             >
-              Upload Attendees CSV
+              <QrCode className="w-8 h-8" />
             </Button>
-            <span className="text-xs text-gray-500">Upload a CSV file to add multiple attendees at once.</span>
           </div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  Attendees ({attendees.length})
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setQrScannerOpen(true)}
-                    className="flex items-center gap-2"
-                  >
-                    <QrCode className="w-4 h-4" />
-                    Scan QR Code
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={exportAttendeesToCSV}
-                    className="flex items-center gap-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export CSV
-                  </Button>
-                  <Button
-                    variant="outline"
+
+          {/* Mobile Search Bar */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-gray-500 group-focus-within:text-primary transition-colors" />
+            </div>
+            <Input
+              type="search"
+              placeholder="Search guest name or company..."
+              className="w-full h-14 pl-12 pr-4 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-gray-500 focus:border-primary focus:ring-primary/20 transition-all text-base"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Filter Chips - Horizontal Scrollable */}
+        <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 no-scrollbar">
+          <Badge 
+            onClick={() => setCheckedInFilter('all')}
+            className={cn(
+              "rounded-full px-5 py-2.5 text-[10px] font-black uppercase cursor-pointer border-none transition-all flex-shrink-0 whitespace-nowrap",
+              checkedInFilter === 'all' ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-white/5 text-gray-400"
+            )}
+          >
+            All Guests
+          </Badge>
+          <Badge 
+            onClick={() => setCheckedInFilter('checked-in')}
+            className={cn(
+              "rounded-full px-5 py-2.5 text-[10px] font-black uppercase cursor-pointer border-none transition-all flex-shrink-0 whitespace-nowrap",
+              checkedInFilter === 'checked-in' ? "bg-green-500 text-white shadow-lg shadow-green-500/20" : "bg-white/5 text-gray-400"
+            )}
+          >
+            Checked In
+          </Badge>
+          <Badge 
+            onClick={() => setCheckedInFilter('not-checked-in')}
+            className={cn(
+              "rounded-full px-5 py-2.5 text-[10px] font-black uppercase cursor-pointer border-none transition-all flex-shrink-0 whitespace-nowrap",
+              checkedInFilter === 'not-checked-in' ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "bg-white/5 text-gray-400"
+            )}
+          >
+            Pending
+          </Badge>
+        </div>
+
+        {/* Mobile Guest Cards */}
+        <div className="space-y-4">
+          {attendeesLoading ? (
+            <div className="py-24 text-center space-y-4">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+              <p className="text-gray-500 font-black uppercase tracking-widest text-[10px]">Syncing Guest Data...</p>
+            </div>
+          ) : (
+            filteredAttendees.map((attendee) => (
+              <div key={attendee.id} className="bg-white/5 border border-white/10 rounded-3xl p-5 backdrop-blur-md relative group overflow-hidden transition-all hover:bg-white/10 active:scale-[0.98]">
+                <div className="flex justify-between items-start">
+                  <div className="flex gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center text-xl font-black text-white border border-white/5 shadow-inner">
+                      {attendee.guest?.name?.charAt(0) || 'G'}
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-lg text-white leading-none pt-1">{attendee.guest?.name}</h4>
+                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                        {attendee.guest?.company || 'Individual Guest'}
+                      </p>
+                      <div className="pt-2">
+                        <Badge className={cn("text-[9px] font-black uppercase rounded-lg px-3 py-1 border-none", getGuestTypeBadgeClasses(attendee.guest_type?.name))}>
+                          {attendee.guest_type?.name}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    {attendee.checked_in ? (
+                      <div className="bg-green-500/10 text-green-400 p-3 rounded-[1.2rem] border border-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+                        <CheckCircle className="w-6 h-6" />
+                      </div>
+                    ) : (
+                      <Button 
+                        size="sm"
+                        onClick={() => handleQRScan(attendee.guest?.uuid)}
+                        className="bg-primary hover:bg-primary/90 text-white font-black text-[10px] uppercase rounded-[1.2rem] h-12 px-6 shadow-lg shadow-primary/20"
+                      >
+                        Check-in
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Secondary Actions for mobile (Touch friendly) */}
+                <div className="flex gap-3 mt-6 pt-5 border-t border-white/5">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
                     onClick={() => {
-                      setPendingPrintKind('batch')
+                      setPendingSingleAttendee(attendee)
                       setPrintTemplateDialogOpen(true)
                     }}
-                    disabled={selectedAttendees.size === 0}
-                    className="flex items-center gap-2"
+                    className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 font-black text-[10px] uppercase h-11 rounded-xl transition-all"
                   >
-                    <Printer className="w-4 h-4" />
-                    Print Selected Badges
+                    <Printer className="w-3.5 h-3.5 mr-2 text-primary" /> Print Badge
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => navigate(`/dashboard/messages?eventId=${eventId}`)}
+                    className="flex-1 border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 font-black text-[10px] uppercase h-11 rounded-xl transition-all"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 mr-2 text-primary" /> Message
                   </Button>
                 </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Search and Filters */}
-              <div className="mb-4 flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Search by name, email, company..."
-                    className="pl-8"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <Select
-                  value={guestTypeFilter}
-                  onValueChange={setGuestTypeFilter}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Guest Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    {guestTypes.map((type, idx) => (
-                      <SelectItem key={`${type.id}-${idx}`} value={type.id.toString()}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={checkedInFilter}
-                  onValueChange={setCheckedInFilter}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Check-in Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="checked-in">Checked In</SelectItem>
-                    <SelectItem value="not-checked-in">
-                      Not Checked In
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
-
-              {/* Attendees Table */}
-              <div className="rounded-md border min-w-0 overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">
-                        <Checkbox
-                          checked={
-                            selectedAttendees.size === attendees.length &&
-                            attendees.length > 0
-                          }
-                          onCheckedChange={handleSelectAll}
-                        />
-                      </TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Company</TableHead>
-                      <TableHead>Guest Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {attendeesLoading ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8">
-                          Loading attendees...
-                        </TableCell>
-                      </TableRow>
-                    ) : attendeesError ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={7}
-                          className="text-center py-8 text-red-500"
-                        >
-                          {attendeesError}
-                        </TableCell>
-                      </TableRow>
-                    ) : filteredAttendees.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={7}
-                          className="text-center py-8 text-gray-500"
-                        >
-                          No attendees found.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredAttendees.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                            No matching guests found for "{searchTerm}".
-                          </TableCell>
-                        </TableRow>
-                      ) : filteredAttendees.map((attendee) => (
-                        <TableRow key={attendee.id}>
-                          <TableCell>
-                            <Checkbox
-                              checked={selectedAttendees.has(attendee.id)}
-                              onCheckedChange={(checked) =>
-                                handleAttendeeSelection(
-                                  attendee.id,
-                                  checked as boolean
-                                )
-                              }
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {attendee.guest?.name || 'N/A'}
-                          </TableCell>
-                          <TableCell>
-                            {attendee.guest?.email || 'N/A'}
-                          </TableCell>
-                          <TableCell>
-                            {attendee.guest?.company || 'N/A'}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getGuestTypeBadgeClasses(attendee.guest_type?.name)}>
-                              {attendee.guest_type?.name || 'N/A'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getCheckInBadgeClasses(attendee.checked_in)}>
-                              {attendee.checked_in ? 'Checked In' : 'Registered'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  setPendingPrintKind('single')
-                                  setPendingSingleAttendee(attendee)
-                                  setPrintTemplateDialogOpen(true)
-                                }}
-                                title="Print Badge"
-                              >
-                                <Printer className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => testBadge(attendee)}
-                                disabled={false}
-                                title="Preview badge"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              {(user?.role === 'admin' || user?.role === 'superadmin' || 
-                                (['organizer', 'organizer_admin'].includes(user?.role) && eventData?.organizer_id === user?.organizer_id)) && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleRemoveAttendee(attendee)}
-                                  title="Remove Attendee"
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+            ))
+          )}
+          
+          {filteredAttendees.length === 0 && !attendeesLoading && (
+            <div className="py-24 text-center">
+              <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Users className="w-10 h-10 text-gray-700" />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Registration Tab */}
-        <TabsContent value="registration" className="space-y-4">
-          <div className="flex justify-end mb-4">
-            <Button
-              onClick={() => setAssignBadgeDialogOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <QrCode className="h-4 w-4 mr-2" />
-              Assign Pre-Generated Badge
-            </Button>
-          </div>
-          <Card className="mb-4">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Upload className="w-5 h-5" />
-                Bulk Upload Attendees (CSV)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col md:flex-row md:items-center gap-4 mb-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  onChange={handleCSVFile}
-                  className="hidden"
-                  disabled={csvLoading}
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  type="button"
-                  disabled={csvLoading}
-                >
-                  Upload CSV
-                </Button>
-                <Button variant="outline" onClick={handleDownloadSampleCSV} type="button">
-                  Download Sample CSV
-                </Button>
-                {csvFileName && <span className="text-sm text-gray-600">{csvFileName}</span>}
-              </div>
-              {csvErrors.length > 0 && (
-                <div className="mb-2 text-red-600 text-sm">
-                  {csvErrors.map((err, i) => (
-                    <div key={i}>Row {err.row}: {err.error}</div>
-                  ))}
-                </div>
-              )}
-              {csvRows.length > 0 && (
-                <div className="overflow-x-auto mb-2 space-y-2">
-                  <div className="text-sm text-gray-700">
-                    Previewing first {csvPreviewRows.length} of {csvRows.length} rows.
-                  </div>
-                  <table className="min-w-full text-xs border">
-                    <thead>
-                      <tr>
-                        {requiredHeaders.map((h) => (
-                          <th key={h} className="border px-2 py-1">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {csvPreviewRows.map((row, idx) => (
-                        <tr key={idx} className={csvErrors.some((err) => err.row === idx + 2) ? 'bg-red-50' : ''}>
-                          {requiredHeaders.map((h) => (
-                            <td key={h} className="border px-2 py-1">{row[h]}</td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {csvRows.length > 0 && (
-                <div className="flex items-center gap-3 mt-2">
-                  <Button
-                    onClick={handleUploadCSV}
-                    disabled={csvLoading || csvErrors.length > 0}
-                  >
-                    {csvLoading ? 'Uploading...' : 'Confirm Upload'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setCsvRows([]); setCsvErrors([]); setCsvFileName(null); setCsvPreviewRows([]); setCsvSuccess(null); setCsvFailure(null);
-                      if (fileInputRef.current) fileInputRef.current.value = '';
-                    }}
-                  >
-                    Clear
-                  </Button>
-                </div>
-              )}
-              {csvSuccess && <div className="text-green-600 mt-2 text-sm">{csvSuccess}</div>}
-              {csvFailure && <div className="text-red-600 mt-2 text-sm">{csvFailure}</div>}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5" />
-                Register New Attendee
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => setAddAttendeeDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add New Attendee
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Badge Printing Tab */}
-        <TabsContent value="badges" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Printer className="w-5 h-5" />
-                Badge Printing
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <Badge variant={badgeTemplate ? 'default' : 'secondary'}>
-                    {badgeTemplate ? 'Template Available' : 'No Template'}
-                  </Badge>
-                  <span className="text-sm text-gray-600">
-                    {badgeTemplate
-                      ? badgeTemplate.name
-                      : 'No badge template found for this event'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Single Badge</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Print individual badges for specific attendees
-                      </p>
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        disabled={false}
-                      >
-                        <Printer className="mr-2 h-4 w-4" />
-                        Print Single Badge
-                      </Button>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Batch Printing</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Print multiple badges for selected attendees
-                      </p>
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => {
-                          setPendingPrintKind('batch')
-                          setPrintTemplateDialogOpen(true)
-                        }}
-                        disabled={
-                          selectedAttendees.size === 0 || !badgeTemplate
-                        }
-                      >
-                        <Printer className="mr-2 h-4 w-4" />
-                        Print Selected ({selectedAttendees.size})
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Onsite Check-In Tab */}
-        <TabsContent value="onsite-checkin">
-          <DashboardCard title="Onsite Check-In & Walk-In Handling">
-            <div className="mb-6">
-              <h4 className="font-semibold mb-2">Manual Check-In</h4>
-              <p className="text-sm text-muted-foreground mb-4">
-                Use the search functionality above to find and check in attendees manually.
-              </p>
+              <p className="text-gray-500 font-black uppercase tracking-widest text-xs">No guests matching filters</p>
             </div>
+          )}
+        </div>
 
-            {/* Manual Check-In */}
-            <div className="mb-6">
-              <h4 className="font-semibold mb-2">Manual Check-In</h4>
-              <Input
-                type="search"
-                placeholder="Search by name, email, or company..."
-                className="mb-3 w-full"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <div className="max-h-72 overflow-y-auto border rounded bg-gray-50">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Company</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {attendees
-                      .filter((a) => !debouncedSearchTerm || a._search?.includes(debouncedSearchTerm))
-                      .map((a) => (
-                        <TableRow key={a.id}>
-                          <TableCell>{a.guest?.name}</TableCell>
-                          <TableCell>{a.guest?.email}</TableCell>
-                          <TableCell>{a.guest?.company}</TableCell>
-                          <TableCell>
-                            {a.checked_in ? (
-                              <Badge className="bg-green-100 text-green-700">
-                                Present
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-gray-100 text-gray-700">
-                                Absent
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {a.checked_in ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={async () => {
-                                  await api.post(
-                                    `/events/${eventId}/attendees/${a.id}/check-in`,
-                                    { checked_in: false }
-                                  )
-                                  setAttendees((prev) =>
-                                    prev.map((att) =>
-                                      att.id === a.id
-                                        ? { ...att, checked_in: false }
-                                        : att
-                                    )
-                                  )
-                                }}
-                              >
-                                Mark Absent
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={async () => {
-                                  await api.post(
-                                    `/events/${eventId}/attendees/${a.id}/check-in`,
-                                    { checked_in: true }
-                                  )
-                                  setAttendees((prev) =>
-                                    prev.map((att) =>
-                                      att.id === a.id
-                                        ? { ...att, checked_in: true }
-                                        : att
-                                    )
-                                  )
-                                }}
-                              >
-                                Mark Present
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-
-            {/* Walk-In Registration */}
-            <div className="mb-6">
-              <h4 className="font-semibold mb-2">Walk-In Registration</h4>
-              
-              {/* Existing Guest Info Banner */}
-              {existingGuestInfo && (
-                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4 rounded">
-                  <div className="flex">
-                    <div className="flex-shrink-0">
-                      <div className="w-5 h-5 bg-blue-400 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs">ℹ</span>
-                      </div>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm text-blue-800">
-                        <strong>Existing guest found!</strong> We found a guest with this email/phone number. 
-                        We'll update their information with the latest details you provide.
-                      </p>
-                      <div className="mt-2 text-xs text-blue-700">
-                        <p><strong>Previous info:</strong> {existingGuestInfo.name} • {existingGuestInfo.company} • {existingGuestInfo.jobtitle}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              <form
-                className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 p-4 rounded border"
-                onSubmit={async (e) => {
-                  e.preventDefault()
-                  setAddAttendeeLoading(true)
-                  try {
-                    const payload = {
-                      ...addAttendeeForm,
-                      name: `${addAttendeeForm.first_name} ${addAttendeeForm.last_name}`.trim(),
-                    }
-                    const response = await api.post(
-                      `/events/${eventId}/attendees`,
-                      payload
-                    )
-                    const newAttendee = response.data
-                    setAttendees((prev) => [...prev, newAttendee])
-                    setAddAttendeeForm({
-                      first_name: '',
-                      last_name: '',
-                      email: '',
-                      phone: '',
-                      company: '',
-                      jobtitle: '',
-                      gender: '',
-                      country: '',
-                      guest_type_id: '',
-                    })
-                    setAddAttendeeDialogOpen(false)
-                    setSinglePrintAttendee(newAttendee)
-                    setTimeout(() => {
-                      if (singlePrintRef.current) {
-                        singlePrintRef.current.style.visibility = 'visible'
-                        handleSinglePrint()
-                      }
-                    }, 500)
-                    showSuccess('Walk-in registered!', 'Badge is printing and attendee list updated.')
-                  } catch (err: any) {
-                    showError('Failed to register walk-in', err.response?.data?.error || 'Please try again.')
-                  } finally {
-                    setAddAttendeeLoading(false)
-                  }
-                }}
-              >
-                <Input
-                  placeholder="First Name"
-                  value={addAttendeeForm.first_name}
-                  onChange={(e) =>
-                    setAddAttendeeForm((f: any) => ({
-                      ...f,
-                      first_name: e.target.value,
-                    }))
-                  }
-                  required
-                />
-                <Input
-                  placeholder="Last Name"
-                  value={addAttendeeForm.last_name}
-                  onChange={(e) =>
-                    setAddAttendeeForm((f: any) => ({
-                      ...f,
-                      last_name: e.target.value,
-                    }))
-                  }
-                  required
-                />
-                <Input
-                  placeholder="Email"
-                  type="email"
-                  value={addAttendeeForm.email}
-                  onChange={(e) => {
-                    setAddAttendeeForm((f: any) => ({
-                      ...f,
-                      email: e.target.value,
-                    }));
-                    
-                    // Check for existing guest when email changes
-                    const email = e.target.value;
-                    const phone = addAttendeeForm.phone;
-                    
-                    // Debounce the validation
-                    const timeoutId = setTimeout(() => {
-                      if (email || phone) {
-                        checkExistingGuest(email, phone);
-                      }
-                    }, 500);
-                    
-                    return () => clearTimeout(timeoutId);
-                  }}
-                  required
-                  className={`${
-                    validationStatus.email === 'valid' ? 'border-green-500 focus:border-green-500 focus:ring-green-200' : ''
-                  } ${
-                    validationStatus.email === 'checking' ? 'border-blue-500 focus:border-blue-500 focus:ring-blue-200' : ''
-                  } ${
-                    validationStatus.email === 'duplicate' ? 'border-orange-500 focus:border-orange-500 focus:ring-orange-200' : ''
-                  }`}
-                />
-                {validationStatus.email === 'checking' && (
-                  <div className="col-span-2 flex items-center gap-2 text-blue-600 text-sm">
-                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    <span>Checking availability...</span>
-                  </div>
-                )}
-                <Input
-                  placeholder="Phone"
-                  value={addAttendeeForm.phone}
-                  onChange={(e) => {
-                    setAddAttendeeForm((f: any) => ({
-                      ...f,
-                      phone: e.target.value,
-                    }));
-                    
-                    // Check for existing guest when phone changes
-                    const email = addAttendeeForm.email;
-                    const phone = e.target.value;
-                    
-                    // Debounce the validation
-                    const timeoutId = setTimeout(() => {
-                      if (email || phone) {
-                        checkExistingGuest(email, phone);
-                      }
-                    }, 500);
-                    
-                    return () => clearTimeout(timeoutId);
-                  }}
-                  className={`${
-                    validationStatus.phone === 'valid' ? 'border-green-500 focus:border-green-500 focus:ring-green-200' : ''
-                  } ${
-                    validationStatus.phone === 'checking' ? 'border-blue-500 focus:border-blue-500 focus:ring-blue-200' : ''
-                  } ${
-                    validationStatus.phone === 'duplicate' ? 'border-orange-500 focus:border-orange-500 focus:ring-orange-200' : ''
-                  }`}
-                />
-                <Input
-                  placeholder="Company"
-                  value={addAttendeeForm.company}
-                  onChange={(e) =>
-                    setAddAttendeeForm((f: any) => ({
-                      ...f,
-                      company: e.target.value,
-                    }))
-                  }
-                />
-                <Input
-                  placeholder="Job Title"
-                  value={addAttendeeForm.jobtitle}
-                  onChange={(e) =>
-                    setAddAttendeeForm((f: any) => ({
-                      ...f,
-                      jobtitle: e.target.value,
-                    }))
-                  }
-                />
-                <Input
-                  placeholder="Gender"
-                  value={addAttendeeForm.gender}
-                  onChange={(e) =>
-                    setAddAttendeeForm((f: any) => ({
-                      ...f,
-                      gender: e.target.value,
-                    }))
-                  }
-                />
-                <Input
-                  placeholder="Country"
-                  value={addAttendeeForm.country}
-                  onChange={(e) =>
-                    setAddAttendeeForm((f: any) => ({
-                      ...f,
-                      country: e.target.value,
-                    }))
-                  }
-                />
-                <Select
-                  value={addAttendeeForm.guest_type_id}
-                  onValueChange={(value) =>
-                    setAddAttendeeForm((f: any) => ({
-                      ...f,
-                      guest_type_id: value,
-                    }))
-                  }
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Guest Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {guestTypes.map((type: any, idx: number) => (
-                      <SelectItem key={`${type.id}-${idx}`} value={String(type.id)}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="submit"
-                  className="col-span-1 md:col-span-2 mt-2"
-                  disabled={addAttendeeLoading}
-                >
-                  {addAttendeeLoading
-                    ? 'Registering...'
-                    : 'Register & Print Badge'}
-                </Button>
-              </form>
-            </div>
-          </DashboardCard>
-        </TabsContent>
-      </Tabs>
-
-      {/* Add Attendee Dialog */}
-      <Dialog
-        open={addAttendeeDialogOpen}
-        onOpenChange={setAddAttendeeDialogOpen}
-      >
-        <DialogContent className="w-[95vw] sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-          <DialogHeader>
-            <DialogTitle>Add New Attendee</DialogTitle>
-            <DialogDescription>
-              Enter the details of the new attendee for {eventData.name}.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAddAttendee} className="space-y-4 py-4">
-            {/* Badge Code Input */}
-            <div>
-              <Label htmlFor="badge_code" className="flex items-center gap-2">
-                <QrCode className="h-4 w-4" />
-                Badge QR Code (Optional)
-              </Label>
-              <Input
-                id="badge_code"
-                value={badgeCode}
-                onChange={(e) => setBadgeCode(e.target.value)}
-                placeholder="Scan or enter badge code to assign pre-generated badge"
-                className="font-mono"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Leave blank to register without a pre-generated badge
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="first_name">First Name</Label>
-                <Input
-                  id="first_name"
-                  value={addAttendeeForm.first_name}
-                  onChange={(e) =>
-                    handleAddAttendeeInput('first_name', e.target.value)
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="last_name">Last Name</Label>
-                <Input
-                  id="last_name"
-                  value={addAttendeeForm.last_name}
-                  onChange={(e) =>
-                    handleAddAttendeeInput('last_name', e.target.value)
-                  }
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={addAttendeeForm.email}
-                  onChange={(e) =>
-                    handleAddAttendeeInput('email', e.target.value)
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  value={addAttendeeForm.phone}
-                  onChange={(e) =>
-                    handleAddAttendeeInput('phone', e.target.value)
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="company">Company</Label>
-                <Input
-                  id="company"
-                  value={addAttendeeForm.company}
-                  onChange={(e) =>
-                    handleAddAttendeeInput('company', e.target.value)
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="jobtitle">Job Title</Label>
-                <Input
-                  id="jobtitle"
-                  value={addAttendeeForm.jobtitle}
-                  onChange={(e) =>
-                    handleAddAttendeeInput('jobtitle', e.target.value)
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="gender">Gender</Label>
-                <Select
-                  onValueChange={(value) =>
-                    handleAddAttendeeInput('gender', value)
-                  }
-                  value={addAttendeeForm.gender}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select gender" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Male">Male</SelectItem>
-                    <SelectItem value="Female">Female</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                    <SelectItem value="Prefer not to say">
-                      Prefer not to say
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="country">Country</Label>
-                <Select
-                  onValueChange={(value) =>
-                    handleAddAttendeeInput('country', value)
-                  }
-                  value={addAttendeeForm.country}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select country" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Afghanistan">Afghanistan</SelectItem>
-                    <SelectItem value="Albania">Albania</SelectItem>
-                    <SelectItem value="Algeria">Algeria</SelectItem>
-                    <SelectItem value="Andorra">Andorra</SelectItem>
-                    <SelectItem value="Angola">Angola</SelectItem>
-                    <SelectItem value="Antigua and Barbuda">
-                      Antigua and Barbuda
-                    </SelectItem>
-                    <SelectItem value="Argentina">Argentina</SelectItem>
-                    <SelectItem value="Armenia">Armenia</SelectItem>
-                    <SelectItem value="Australia">Australia</SelectItem>
-                    <SelectItem value="Austria">Austria</SelectItem>
-                    <SelectItem value="Azerbaijan">Azerbaijan</SelectItem>
-                    <SelectItem value="Bahamas">Bahamas</SelectItem>
-                    <SelectItem value="Bahrain">Bahrain</SelectItem>
-                    <SelectItem value="Bangladesh">Bangladesh</SelectItem>
-                    <SelectItem value="Barbados">Barbados</SelectItem>
-                    <SelectItem value="Belarus">Belarus</SelectItem>
-                    <SelectItem value="Belgium">Belgium</SelectItem>
-                    <SelectItem value="Belize">Belize</SelectItem>
-                    <SelectItem value="Benin">Benin</SelectItem>
-                    <SelectItem value="Bhutan">Bhutan</SelectItem>
-                    <SelectItem value="Bolivia">Bolivia</SelectItem>
-                    <SelectItem value="Bosnia and Herzegovina">
-                      Bosnia and Herzegovina
-                    </SelectItem>
-                    <SelectItem value="Botswana">Botswana</SelectItem>
-                    <SelectItem value="Brazil">Brazil</SelectItem>
-                    <SelectItem value="Brunei">Brunei</SelectItem>
-                    <SelectItem value="Bulgaria">Bulgaria</SelectItem>
-                    <SelectItem value="Burkina Faso">Burkina Faso</SelectItem>
-                    <SelectItem value="Burundi">Burundi</SelectItem>
-                    <SelectItem value="Cabo Verde">Cabo Verde</SelectItem>
-                    <SelectItem value="Cambodia">Cambodia</SelectItem>
-                    <SelectItem value="Cameroon">Cameroon</SelectItem>
-                    <SelectItem value="Canada">Canada</SelectItem>
-                    <SelectItem value="Central African Republic">
-                      Central African Republic
-                    </SelectItem>
-                    <SelectItem value="Chad">Chad</SelectItem>
-                    <SelectItem value="Chile">Chile</SelectItem>
-                    <SelectItem value="China">China</SelectItem>
-                    <SelectItem value="Colombia">Colombia</SelectItem>
-                    <SelectItem value="Comoros">Comoros</SelectItem>
-                    <SelectItem value="Congo">Congo</SelectItem>
-                    <SelectItem value="Costa Rica">Costa Rica</SelectItem>
-                    <SelectItem value="Croatia">Croatia</SelectItem>
-                    <SelectItem value="Cuba">Cuba</SelectItem>
-                    <SelectItem value="Cyprus">Cyprus</SelectItem>
-                    <SelectItem value="Czech Republic">
-                      Czech Republic
-                    </SelectItem>
-                    <SelectItem value="Democratic Republic of the Congo">
-                      Democratic Republic of the Congo
-                    </SelectItem>
-                    <SelectItem value="Denmark">Denmark</SelectItem>
-                    <SelectItem value="Djibouti">Djibouti</SelectItem>
-                    <SelectItem value="Dominica">Dominica</SelectItem>
-                    <SelectItem value="Dominican Republic">
-                      Dominican Republic
-                    </SelectItem>
-                    <SelectItem value="Ecuador">Ecuador</SelectItem>
-                    <SelectItem value="Egypt">Egypt</SelectItem>
-                    <SelectItem value="El Salvador">El Salvador</SelectItem>
-                    <SelectItem value="Equatorial Guinea">
-                      Equatorial Guinea
-                    </SelectItem>
-                    <SelectItem value="Eritrea">Eritrea</SelectItem>
-                    <SelectItem value="Estonia">Estonia</SelectItem>
-                    <SelectItem value="Eswatini">Eswatini</SelectItem>
-                    <SelectItem value="Ethiopia">Ethiopia</SelectItem>
-                    <SelectItem value="Fiji">Fiji</SelectItem>
-                    <SelectItem value="Finland">Finland</SelectItem>
-                    <SelectItem value="France">France</SelectItem>
-                    <SelectItem value="Gabon">Gabon</SelectItem>
-                    <SelectItem value="Gambia">Gambia</SelectItem>
-                    <SelectItem value="Georgia">Georgia</SelectItem>
-                    <SelectItem value="Germany">Germany</SelectItem>
-                    <SelectItem value="Ghana">Ghana</SelectItem>
-                    <SelectItem value="Greece">Greece</SelectItem>
-                    <SelectItem value="Grenada">Grenada</SelectItem>
-                    <SelectItem value="Guatemala">Guatemala</SelectItem>
-                    <SelectItem value="Guinea">Guinea</SelectItem>
-                    <SelectItem value="Guinea-Bissau">Guinea-Bissau</SelectItem>
-                    <SelectItem value="Guyana">Guyana</SelectItem>
-                    <SelectItem value="Haiti">Haiti</SelectItem>
-                    <SelectItem value="Honduras">Honduras</SelectItem>
-                    <SelectItem value="Hungary">Hungary</SelectItem>
-                    <SelectItem value="Iceland">Iceland</SelectItem>
-                    <SelectItem value="India">India</SelectItem>
-                    <SelectItem value="Indonesia">Indonesia</SelectItem>
-                    <SelectItem value="Iran">Iran</SelectItem>
-                    <SelectItem value="Iraq">Iraq</SelectItem>
-                    <SelectItem value="Ireland">Ireland</SelectItem>
-                    <SelectItem value="Israel">Israel</SelectItem>
-                    <SelectItem value="Italy">Italy</SelectItem>
-                    <SelectItem value="Jamaica">Jamaica</SelectItem>
-                    <SelectItem value="Japan">Japan</SelectItem>
-                    <SelectItem value="Jordan">Jordan</SelectItem>
-                    <SelectItem value="Kazakhstan">Kazakhstan</SelectItem>
-                    <SelectItem value="Kenya">Kenya</SelectItem>
-                    <SelectItem value="Kiribati">Kiribati</SelectItem>
-                    <SelectItem value="Kuwait">Kuwait</SelectItem>
-                    <SelectItem value="Kyrgyzstan">Kyrgyzstan</SelectItem>
-                    <SelectItem value="Laos">Laos</SelectItem>
-                    <SelectItem value="Latvia">Latvia</SelectItem>
-                    <SelectItem value="Lebanon">Lebanon</SelectItem>
-                    <SelectItem value="Lesotho">Lesotho</SelectItem>
-                    <SelectItem value="Liberia">Liberia</SelectItem>
-                    <SelectItem value="Libya">Libya</SelectItem>
-                    <SelectItem value="Liechtenstein">Liechtenstein</SelectItem>
-                    <SelectItem value="Lithuania">Lithuania</SelectItem>
-                    <SelectItem value="Luxembourg">Luxembourg</SelectItem>
-                    <SelectItem value="Madagascar">Madagascar</SelectItem>
-                    <SelectItem value="Malawi">Malawi</SelectItem>
-                    <SelectItem value="Malaysia">Malaysia</SelectItem>
-                    <SelectItem value="Maldives">Maldives</SelectItem>
-                    <SelectItem value="Mali">Mali</SelectItem>
-                    <SelectItem value="Malta">Malta</SelectItem>
-                    <SelectItem value="Marshall Islands">
-                      Marshall Islands
-                    </SelectItem>
-                    <SelectItem value="Mauritania">Mauritania</SelectItem>
-                    <SelectItem value="Mauritius">Mauritius</SelectItem>
-                    <SelectItem value="Mexico">Mexico</SelectItem>
-                    <SelectItem value="Micronesia">Micronesia</SelectItem>
-                    <SelectItem value="Moldova">Moldova</SelectItem>
-                    <SelectItem value="Monaco">Monaco</SelectItem>
-                    <SelectItem value="Mongolia">Mongolia</SelectItem>
-                    <SelectItem value="Montenegro">Montenegro</SelectItem>
-                    <SelectItem value="Morocco">Morocco</SelectItem>
-                    <SelectItem value="Mozambique">Mozambique</SelectItem>
-                    <SelectItem value="Myanmar">Myanmar</SelectItem>
-                    <SelectItem value="Namibia">Namibia</SelectItem>
-                    <SelectItem value="Nauru">Nauru</SelectItem>
-                    <SelectItem value="Nepal">Nepal</SelectItem>
-                    <SelectItem value="Netherlands">Netherlands</SelectItem>
-                    <SelectItem value="New Zealand">New Zealand</SelectItem>
-                    <SelectItem value="Nicaragua">Nicaragua</SelectItem>
-                    <SelectItem value="Niger">Niger</SelectItem>
-                    <SelectItem value="Nigeria">Nigeria</SelectItem>
-                    <SelectItem value="North Korea">North Korea</SelectItem>
-                    <SelectItem value="North Macedonia">
-                      North Macedonia
-                    </SelectItem>
-                    <SelectItem value="Norway">Norway</SelectItem>
-                    <SelectItem value="Oman">Oman</SelectItem>
-                    <SelectItem value="Pakistan">Pakistan</SelectItem>
-                    <SelectItem value="Palau">Palau</SelectItem>
-                    <SelectItem value="Panama">Panama</SelectItem>
-                    <SelectItem value="Papua New Guinea">
-                      Papua New Guinea
-                    </SelectItem>
-                    <SelectItem value="Paraguay">Paraguay</SelectItem>
-                    <SelectItem value="Peru">Peru</SelectItem>
-                    <SelectItem value="Philippines">Philippines</SelectItem>
-                    <SelectItem value="Poland">Poland</SelectItem>
-                    <SelectItem value="Portugal">Portugal</SelectItem>
-                    <SelectItem value="Qatar">Qatar</SelectItem>
-                    <SelectItem value="Romania">Romania</SelectItem>
-                    <SelectItem value="Russia">Russia</SelectItem>
-                    <SelectItem value="Rwanda">Rwanda</SelectItem>
-                    <SelectItem value="Saint Kitts and Nevis">
-                      Saint Kitts and Nevis
-                    </SelectItem>
-                    <SelectItem value="Saint Lucia">Saint Lucia</SelectItem>
-                    <SelectItem value="Saint Vincent and the Grenadines">
-                      Saint Vincent and the Grenadines
-                    </SelectItem>
-                    <SelectItem value="Samoa">Samoa</SelectItem>
-                    <SelectItem value="San Marino">San Marino</SelectItem>
-                    <SelectItem value="Sao Tome and Principe">
-                      Sao Tome and Principe
-                    </SelectItem>
-                    <SelectItem value="Saudi Arabia">Saudi Arabia</SelectItem>
-                    <SelectItem value="Senegal">Senegal</SelectItem>
-                    <SelectItem value="Serbia">Serbia</SelectItem>
-                    <SelectItem value="Seychelles">Seychelles</SelectItem>
-                    <SelectItem value="Sierra Leone">Sierra Leone</SelectItem>
-                    <SelectItem value="Singapore">Singapore</SelectItem>
-                    <SelectItem value="Slovakia">Slovakia</SelectItem>
-                    <SelectItem value="Slovenia">Slovenia</SelectItem>
-                    <SelectItem value="Solomon Islands">
-                      Solomon Islands
-                    </SelectItem>
-                    <SelectItem value="Somalia">Somalia</SelectItem>
-                    <SelectItem value="South Africa">South Africa</SelectItem>
-                    <SelectItem value="South Korea">South Korea</SelectItem>
-                    <SelectItem value="South Sudan">South Sudan</SelectItem>
-                    <SelectItem value="Spain">Spain</SelectItem>
-                    <SelectItem value="Sri Lanka">Sri Lanka</SelectItem>
-                    <SelectItem value="Sudan">Sudan</SelectItem>
-                    <SelectItem value="Suriname">Suriname</SelectItem>
-                    <SelectItem value="Sweden">Sweden</SelectItem>
-                    <SelectItem value="Switzerland">Switzerland</SelectItem>
-                    <SelectItem value="Syria">Syria</SelectItem>
-                    <SelectItem value="Taiwan">Taiwan</SelectItem>
-                    <SelectItem value="Tajikistan">Tajikistan</SelectItem>
-                    <SelectItem value="Tanzania">Tanzania</SelectItem>
-                    <SelectItem value="Thailand">Thailand</SelectItem>
-                    <SelectItem value="Timor-Leste">Timor-Leste</SelectItem>
-                    <SelectItem value="Togo">Togo</SelectItem>
-                    <SelectItem value="Tonga">Tonga</SelectItem>
-                    <SelectItem value="Trinidad and Tobago">
-                      Trinidad and Tobago
-                    </SelectItem>
-                    <SelectItem value="Tunisia">Tunisia</SelectItem>
-                    <SelectItem value="Turkey">Turkey</SelectItem>
-                    <SelectItem value="Turkmenistan">Turkmenistan</SelectItem>
-                    <SelectItem value="Tuvalu">Tuvalu</SelectItem>
-                    <SelectItem value="Uganda">Uganda</SelectItem>
-                    <SelectItem value="Ukraine">Ukraine</SelectItem>
-                    <SelectItem value="United Arab Emirates">
-                      United Arab Emirates
-                    </SelectItem>
-                    <SelectItem value="United Kingdom">
-                      United Kingdom
-                    </SelectItem>
-                    <SelectItem value="United States">United States</SelectItem>
-                    <SelectItem value="Uruguay">Uruguay</SelectItem>
-                    <SelectItem value="Uzbekistan">Uzbekistan</SelectItem>
-                    <SelectItem value="Vanuatu">Vanuatu</SelectItem>
-                    <SelectItem value="Vatican City">Vatican City</SelectItem>
-                    <SelectItem value="Venezuela">Venezuela</SelectItem>
-                    <SelectItem value="Vietnam">Vietnam</SelectItem>
-                    <SelectItem value="Yemen">Yemen</SelectItem>
-                    <SelectItem value="Zambia">Zambia</SelectItem>
-                    <SelectItem value="Zimbabwe">Zimbabwe</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="guest_type_id">Guest Type</Label>
-              <Select
-                onValueChange={(value) =>
-                  handleAddAttendeeInput('guest_type_id', value)
-                }
-                value={addAttendeeForm.guest_type_id}
-                required
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a guest type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {guestTypes
-                    .filter(
-                      (type) =>
-                        type.id !== undefined &&
-                        type.id !== null &&
-                        type.id !== ''
-                    )
-                    .map((type, idx) => (
-                      <SelectItem key={`${type.id}-${idx}`} value={String(type.id)}>
-                        {type.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setAddAttendeeDialogOpen(false)}
-                disabled={addAttendeeLoading}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={addAttendeeLoading}>
-                {addAttendeeLoading ? 'Adding...' : 'Add Attendee'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+        {/* Floating Action Button for adding walk-ins */}
+        <div className="fixed bottom-28 right-6 z-50">
+          <Button 
+            onClick={() => setAddAttendeeDialogOpen(true)}
+            className="w-16 h-16 rounded-[2rem] bg-gradient-to-tr from-primary to-blue-500 text-white shadow-[0_15px_30px_rgba(var(--primary-rgb),0.4)] hover:scale-110 active:scale-95 transition-all flex items-center justify-center p-0 border-4 border-[#0b1630]"
+          >
+            <Plus className="w-10 h-10" />
+          </Button>
+        </div>
+      </div>
 
       {/* Hidden single badge print area */}
       <div
@@ -2285,88 +1182,105 @@ export default function UsherEventManagement() {
         </div>
       </div>
 
-      {/* Test badge display */}
-      {showTestBadge && testAttendee && (
-        <Dialog open={showTestBadge} onOpenChange={setShowTestBadge}>
-          <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-            <DialogHeader>
-              <DialogTitle>Badge Preview</DialogTitle>
-              <DialogDescription>
-                This is a preview of how the badge will look when printed.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex justify-center">
-              <BadgeTest attendee={testAttendee} />
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowTestBadge(false)}>
-                Close
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowTestBadge(false)
-                  generateBadge(testAttendee)
-                }}
-              >
-                Print Badge
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Remove Attendee Confirmation Dialog */}
-      <Dialog open={removeAttendeeDialogOpen} onOpenChange={setRemoveAttendeeDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remove Attendee</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to remove {attendeeToRemove?.guest?.name || 'this attendee'} from the event? This action cannot be undone.
-            </DialogDescription>
+      {/* Mobile Optimized Dialogs */}
+      <Dialog open={addAttendeeDialogOpen} onOpenChange={setAddAttendeeDialogOpen}>
+        <DialogContent className="w-[95vw] max-w-lg bg-[#0b1630] border-white/10 rounded-[2.5rem] p-8 max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl">
+          <DialogHeader className="mb-6">
+            <DialogTitle className="text-2xl font-black text-white uppercase tracking-tight">Register Guest</DialogTitle>
+            <DialogDescription className="text-gray-500 font-medium">Add a walk-in attendee to this event</DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setRemoveAttendeeDialogOpen(false)}
-              disabled={removeAttendeeLoading}
-            >
-              Cancel
+          <form onSubmit={handleAddAttendee} className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-gray-500 tracking-widest ml-1">First Name</Label>
+                <Input className="bg-white/5 border-white/10 rounded-2xl h-14 text-white focus:border-primary transition-all" value={addAttendeeForm.first_name} onChange={e => handleAddAttendeeInput('first_name', e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-gray-500 tracking-widest ml-1">Last Name</Label>
+                <Input className="bg-white/5 border-white/10 rounded-2xl h-14 text-white focus:border-primary transition-all" value={addAttendeeForm.last_name} onChange={e => handleAddAttendeeInput('last_name', e.target.value)} required />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-gray-500 tracking-widest ml-1">Email Address</Label>
+              <Input className="bg-white/5 border-white/10 rounded-2xl h-14 text-white focus:border-primary transition-all" type="email" value={addAttendeeForm.email} onChange={e => handleAddAttendeeInput('email', e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-gray-500 tracking-widest ml-1">Guest Classification</Label>
+              <Select onValueChange={v => handleAddAttendeeInput('guest_type_id', v)} value={addAttendeeForm.guest_type_id}>
+                <SelectTrigger className="bg-white/5 border-white/10 rounded-2xl h-14 text-white">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0b1630] border-white/10 rounded-2xl">
+                  {guestTypes.map(gt => (
+                    <SelectItem key={gt.id} value={String(gt.id)} className="text-white hover:bg-white/10 focus:bg-white/10 py-3">{gt.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" disabled={addAttendeeLoading} className="w-full h-16 rounded-[1.5rem] bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest mt-6 shadow-xl shadow-primary/20">
+              {addAttendeeLoading ? 'Processing...' : 'Complete Registration'}
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleRemoveAttendeeConfirm}
-              disabled={removeAttendeeLoading}
-            >
-              {removeAttendeeLoading ? 'Removing...' : 'Remove Attendee'}
-            </Button>
-          </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
-      {/* Badge Assignment Dialog */}
-      {/* QR Scanner Dialog */}
+      {/* QR Scanner Dialog - Full Screen Vibe */}
       <Dialog open={qrScannerOpen} onOpenChange={setQrScannerOpen}>
-        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogContent className="w-[100vw] h-[100vh] sm:w-[95vw] sm:h-[90vh] max-w-md bg-black border-none rounded-none sm:rounded-[3rem] p-0 overflow-hidden">
+          <div className="relative h-full flex flex-col">
+            <Button 
+              variant="ghost" 
+              onClick={() => setQrScannerOpen(false)}
+              className="absolute top-6 right-6 z-50 text-white/50 hover:text-white bg-white/5 rounded-full p-2 h-12 w-12"
+            >
+              <X className="w-8 h-8" />
+            </Button>
+            
+            <div className="flex-1 relative flex flex-col items-center justify-center">
+              <div className="absolute top-16 text-center space-y-2 z-10 px-8">
+                <h2 className="text-2xl font-black text-white uppercase tracking-tighter drop-shadow-lg">Point & Scan</h2>
+                <p className="text-xs text-white/60 font-bold uppercase tracking-[0.2em]">Center QR code in frame</p>
+              </div>
+              
+              <div className="w-full h-full">
+                <QRScanner onScan={handleQRScan} isEnabled={!qrScanning} />
+              </div>
+
+              {qrScanning && (
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-40">
+                  <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+                  <p className="text-primary font-black uppercase tracking-widest text-xs animate-pulse">Checking In...</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Required Print Logic Components */}
+      <PrintBadgeTemplateDialog
+        open={printTemplateDialogOpen}
+        onOpenChange={setPrintTemplateDialogOpen}
+        attendeeForPreview={pendingSingleAttendee}
+        assignedTemplate={badgeTemplate}
+        onChoose={(choice) => {
+          setPrintTemplateChoice(choice)
+          setTimeout(() => generateBadge(pendingSingleAttendee), 100)
+        }}
+      />
+      
+      {/* Remove Attendee Confirmation Dialog */}
+      <Dialog open={removeAttendeeDialogOpen} onOpenChange={setRemoveAttendeeDialogOpen}>
+        <DialogContent className="bg-[#0b1630] border-white/10 rounded-[2rem]">
           <DialogHeader>
-            <DialogTitle>Scan QR Code for Check-in</DialogTitle>
-            <DialogDescription>
-              Scan the attendee's QR code to check them in for this event. The QR code contains the guest UUID which will be used to identify and check in the attendee.
+            <DialogTitle className="text-white">Confirm Removal</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Are you sure you want to remove {attendeeToRemove?.guest?.name || 'this attendee'}?
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <QRScanner
-              onScan={handleQRScan}
-              isEnabled={!qrScanning}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setQrScannerOpen(false)}
-              disabled={qrScanning}
-            >
-              Close
-            </Button>
+          <DialogFooter className="gap-3 mt-4">
+            <Button variant="outline" onClick={() => setRemoveAttendeeDialogOpen(false)} disabled={removeAttendeeLoading} className="border-white/10 text-white bg-white/5 rounded-xl">Cancel</Button>
+            <Button variant="destructive" onClick={handleRemoveAttendeeConfirm} disabled={removeAttendeeLoading} className="bg-red-500 hover:bg-red-600 rounded-xl font-bold">Remove</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2375,11 +1289,8 @@ export default function UsherEventManagement() {
         open={assignBadgeDialogOpen}
         onOpenChange={setAssignBadgeDialogOpen}
         eventId={Number(eventId)}
-        onSuccess={() => {
-          // Refresh attendees list after assignment
-          fetchAttendeesWithFilters()
-        }}
+        onSuccess={() => fetchAttendeesWithFilters()}
       />
-    </div>
+    </UsherMobileLayout>
   )
 }

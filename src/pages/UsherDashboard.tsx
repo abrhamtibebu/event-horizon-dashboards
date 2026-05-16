@@ -12,9 +12,11 @@ import {
   Search,
   Filter,
   RefreshCw,
-  MessageCircle,
+  ArrowUpRight,
   MessageSquare,
   DollarSign,
+  Mic,
+  MonitorPlay,
 } from 'lucide-react'
 import { MetricCard } from '@/components/MetricCard'
 import { DashboardCard } from '@/components/DashboardCard'
@@ -30,7 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import api from '@/lib/api'
-import { getGuestTypeBadgeClasses } from '@/lib/utils'
+import { getGuestTypeBadgeClasses, cn } from '@/lib/utils'
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -46,6 +48,7 @@ import {
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/use-toast'
+import { UsherMobileLayout } from '@/components/UsherMobileLayout'
 
 
 export default function UsherDashboard() {
@@ -252,411 +255,171 @@ export default function UsherDashboard() {
       : recentCheckIns
 
   return (
-    <div className="space-y-6 px-2 sm:px-4">
-      {/* Removed duplicate <Header onSearch={setSearchQuery} /> */}
-
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <MetricCard
-          title="Assigned Events"
-          value={keyMetrics?.assignedEvents || 'N/A'}
-          icon={<Calendar className="w-6 h-6 text-primary" />}
-        />
-        <MetricCard
-          title="Active Events"
-          value={keyMetrics?.activeEvents || 'N/A'}
-          icon={<Users className="w-6 h-6 text-primary" />}
-        />
-        {/* Additional Stats */}
-        <MetricCard
-          title="Total Earnings"
-          value={keyMetrics?.totalEarnings ? `${keyMetrics.totalEarnings} ETB` : '0.00'}
-          icon={<DollarSign className="w-6 h-6 text-yellow-500" />}
-        />
-        <MetricCard
-          title="Earnings per Event"
-          value={keyMetrics?.earningsPerEvent ? `${keyMetrics.earningsPerEvent} ETB` : '0.00'}
-          icon={<DollarSign className="w-6 h-6 text-yellow-500" />}
-        />
-        {/* More stats coming soon */}
-      </div>
-
-      {/* New prominent cards for Total Check-ins Today and Pending Issues */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-4">
-        {/* Total Check-ins Today Card */}
-        <div className="bg-gradient-to-r from-[hsl(var(--color-success))]/10 to-[hsl(var(--primary))]/10 dark:from-[hsl(var(--color-success))]/20 dark:to-[hsl(var(--primary))]/20 rounded-xl shadow p-6 flex flex-col items-center justify-center">
-          <div className="flex items-center gap-3 mb-2">
-            <UserCheck className="w-8 h-8 text-green-600 dark:text-green-400" />
-            <span className="text-2xl font-bold text-green-800 dark:text-green-300">{keyMetrics?.totalCheckInsToday?.value || 'N/A'}</span>
-          </div>
-          <div className="text-lg font-semibold text-green-800 dark:text-green-300">Total Check-ins Today</div>
-          {keyMetrics?.totalCheckInsToday?.trend && (
-            <div className="text-sm text-green-700 dark:text-green-400 mt-1">{keyMetrics.totalCheckInsToday.trend}</div>
-          )}
+    <UsherMobileLayout title="Usher Dashboard">
+      <div className="space-y-8 px-4 pb-12">
+        {/* Quick Scan Action - The most important button for an usher */}
+        <div className="relative group overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-blue-600 p-1 shadow-2xl shadow-primary/30">
+          <Button 
+            onClick={() => navigate('/dashboard/usher/redemption')}
+            className="w-full h-24 bg-[#0b1630] hover:bg-[#0b1630]/90 rounded-[22px] flex items-center justify-between px-6 transition-all"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                <QrCode className="w-8 h-8 text-primary" />
+              </div>
+              <div className="text-left">
+                <span className="block text-xl font-black tracking-tight text-white uppercase">Scan QR Code</span>
+                <span className="text-sm text-gray-400 font-medium">Instantly check-in guests</span>
+              </div>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+              <ArrowUpRight className="w-6 h-6 text-primary" />
+            </div>
+          </Button>
         </div>
-        {/* Pending Issues Card */}
-        <div className="bg-orange-500/10 dark:bg-orange-900/20 border-l-4 border-orange-400 dark:border-orange-600 rounded-xl shadow p-6 flex flex-col justify-center">
-          <div className="flex items-center gap-3 mb-2">
-            <AlertTriangle className="w-8 h-8 text-orange-500 dark:text-orange-400" />
-            <span className="text-2xl font-bold text-orange-800 dark:text-orange-300">{keyMetrics?.pendingIssues || 'N/A'}</span>
-          </div>
-          <div className="text-lg font-semibold text-orange-700 dark:text-orange-300">Pending Issues</div>
-          <div className="text-sm text-orange-600 dark:text-orange-400 mt-1">Please review and resolve outstanding issues.</div>
-        </div>
-      </div>
 
-      {/* Event Overview & Quick Check-in */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-        <DashboardCard title="My Assigned Events">
+        {/* Primary Metrics */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-2 text-green-400">
+              <UserCheck className="w-4 h-4" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Today</span>
+            </div>
+            <span className="text-2xl font-black text-white">{keyMetrics?.totalCheckInsToday?.value || '0'}</span>
+            <span className="block text-xs text-gray-500 font-medium mt-1">Check-ins</span>
+          </div>
+          <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-2 text-orange-400">
+              <AlertTriangle className="w-4 h-4" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Pending</span>
+            </div>
+            <span className="text-2xl font-black text-white">{keyMetrics?.pendingIssues || '0'}</span>
+            <span className="block text-xs text-gray-500 font-medium mt-1">Issues</span>
+          </div>
+        </div>
+
+        {/* Active Assignments Section */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-lg font-black uppercase tracking-tight text-white">Your Assignments</h2>
+            <Link to="/dashboard/usher/events" className="text-xs font-bold text-primary uppercase">See All</Link>
+          </div>
+          
           <div className="space-y-4">
-            {filteredAssignedEvents?.map((event: any) => {
-              const tasks = getTasks(event)
-              return (
-                <div key={event.id} className="p-4 bg-muted/50 rounded-lg flex flex-col gap-2 sm:gap-0">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-2">
-                    <div>
-                      <h4 className="font-semibold text-card-foreground text-lg sm:text-base">
-                        {event.name}
-                      </h4>
-                      <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mt-1">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          <span>{event.date}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          <span>{event.time}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <Badge className={getStatusColor(event.status)}>
-                      {event.status}
-                    </Badge>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-3">
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-4 h-4" />
+            {filteredAssignedEvents?.map((event: any) => (
+              <div key={event.id} className="relative group overflow-hidden rounded-2xl bg-white/5 border border-white/10 p-5 backdrop-blur-sm transition-all hover:bg-white/10">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-lg leading-tight text-white">{event.name}</h3>
+                    <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
+                      <MapPin className="w-3 h-3 text-primary" />
                       <span>{event.location}</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Users className="w-4 h-4" />
-                      <span>
-                        {event.checkedIn}/{event.totalAttendees}
-                      </span>
-                    </div>
                   </div>
+                  <Badge className={cn("rounded-full px-3 py-1 text-[10px] font-bold uppercase border-none", getStatusColor(event.status))}>
+                    {event.status}
+                  </Badge>
+                </div>
 
-                  <div className="space-y-2">
-                    <div className="flex flex-col sm:flex-row justify-between text-xs">
-                      <span>Check-in Progress</span>
-                      <span>
-                        {event.totalAttendees
-                          ? Math.round(
-                            (event.checkedIn / event.totalAttendees) * 100
-                          )
-                          : 0}
-                        %
-                      </span>
-                    </div>
-                    <Progress
-                      value={
-                        event.totalAttendees
-                          ? (event.checkedIn / event.totalAttendees) * 100
-                          : 0
-                      }
-                      className="h-2"
-                    />
-                    <div className="flex gap-2 mt-2">
-                      <Button
-                        onClick={() => handleEventMessage(event.id)}
-                        className="flex-1 bg-brand-gradient bg-brand-gradient-hover text-foreground text-sm py-2"
-                      >
-                        <MessageCircle className="w-4 h-4 mr-2" />
-                        Event Chat
-                      </Button>
-                      <Button
-                        onClick={() => handleMessageOrganizer(event)}
-                        variant="outline"
-                        className="flex-1 text-sm py-2 border-[hsl(var(--color-warning))] text-[hsl(var(--color-warning))]"
-                      >
-                        <MessageCircle className="w-4 h-4 mr-2" />
-                        Message Organizer
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <h5 className="font-semibold mb-2 text-base sm:text-sm">Assigned Tasks</h5>
-                    {tasks.length === 0 ? (
-                      <div className="text-muted-foreground text-sm">No tasks assigned.</div>
-                    ) : (
-                      <ul className="space-y-2">
-                        {tasks.map((task: string) => (
-                          <li key={task} className="flex items-center gap-2">
-                            <Checkbox
-                              checked={taskCompletion[event.id]?.[task] || false}
-                              onCheckedChange={async (checked) => {
-                                setTaskCompletion((prev) => ({
-                                  ...prev,
-                                  [event.id]: {
-                                    ...prev[event.id],
-                                    [task]: checked,
-                                  },
-                                }))
-                                if (checked) {
-                                  setCompletingTask((prev) => ({ ...prev, [event.id]: true }))
-                                  try {
-                                    await api.post(`/events/${event.id}/usher/tasks/complete`, {
-                                      completed_tasks: [task],
-                                    })
-                                    // Optionally show a toast or refresh data
-                                  } catch {
-                                    // Optionally handle error
-                                  } finally {
-                                    setCompletingTask((prev) => ({ ...prev, [event.id]: false }))
-                                  }
-                                }
-                              }}
-                              disabled={completingTask[event.id]}
-                            />
-                            <span className={taskCompletion[event.id]?.[task] ? 'line-through text-muted-foreground/50' : ''}>{task}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col md:flex-row gap-2 mt-2">
-                    <div className="flex-1">
-                      <span className="block text-sm font-medium text-foreground">Assigned Tasks:</span>
-                      <span className="block text-card-foreground">
-                        {Array.isArray(event.tasks) && event.tasks.length > 0
-                          ? event.tasks.join(', ')
-                          : 'No tasks assigned.'}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <span className="block text-sm font-medium text-foreground">Daily Rate:</span>
-                      <span className="block text-card-foreground">{event.daily_rate ? `${event.daily_rate} ETB` : '-'}</span>
-                    </div>
-                    <div className="flex-1">
-                      <span className="block text-sm font-medium text-foreground">Ushering Days:</span>
-                      <span className="block text-card-foreground">
-                        {event.from_date ? event.from_date : '-'}
-                        {event.from_date || event.to_date ? ' to ' : ''}
-                        {event.to_date ? event.to_date : '-'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col md:flex-row gap-2 mt-2 items-center">
-                    <div className="flex-1">
-                      <span className="block text-sm font-medium text-foreground">Status:</span>
-                      <span className="block text-card-foreground capitalize">{event.accepted}</span>
-                    </div>
-                    {event.accepted === 'pending' && (
-                      <div className="flex gap-2">
-                        <Button size="sm" className="bg-green-600 text-foreground" disabled={actionLoading} onClick={() => handleAcceptJob(event.id)}>
-                          Accept
-                        </Button>
-                        <Button size="sm" className="bg-red-600 text-foreground" disabled={actionLoading} onClick={() => setRejectDialogOpenId(event.id)}>
-                          Reject
-                        </Button>
-                      </div>
-                    )}
-                    {event.accepted === 'accepted' && (
-                      <div className="flex-1 text-green-700 font-semibold">
-                        Expected Earnings: {event.daily_rate && event.from_date && event.to_date ? `${calculateEarnings(event.daily_rate, event.from_date, event.to_date)} ETB` : '-'}
-                      </div>
-                    )}
-                    {event.accepted === 'rejected' && (
-                      <div className="flex-1 text-red-700 font-semibold">
-                        Rejected: {event.rejected_reason || 'No reason provided'}
-                      </div>
-                    )}
-                  </div>
-                  {/* Reject Reason Dialog */}
-                  <Dialog open={rejectDialogOpenId === event.id} onOpenChange={open => { if (!open) setRejectDialogOpenId(null); }}>
-                    <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-                      <DialogHeader>
-                        <DialogTitle>Reject Job</DialogTitle>
-                        <DialogDescription>Provide a reason for rejecting this job assignment.</DialogDescription>
-                      </DialogHeader>
-                      <textarea
-                        className="w-full border rounded px-2 py-1 mt-2"
-                        rows={3}
-                        placeholder="Reason for rejection"
-                        value={rejectReason}
-                        onChange={e => setRejectReason(e.target.value)}
-                      />
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setRejectDialogOpenId(null)} disabled={actionLoading}>Cancel</Button>
-                        <Button onClick={() => handleRejectJob(event.id)} disabled={actionLoading || !rejectReason.trim()} className="bg-red-600 text-foreground">
-                          {actionLoading ? 'Rejecting...' : 'Reject Job'}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between mt-3 gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      Zone: {event.zone}
+                {/* Mobile Progress Bar */}
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
+                    <span>Overall Attendance</span>
+                    <span className="text-white">
+                      {event.totalAttendees ? Math.round((event.checkedIn / event.totalAttendees) * 100) : 0}%
                     </span>
-                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                      <Link to={`/dashboard/usher/events?eventId=${event.id}`} className="w-full sm:w-auto">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full sm:w-auto bg-brand-gradient bg-brand-gradient-hover text-foreground text-sm py-2"
-                        >
-                          <Users className="w-4 h-4 mr-1" />
-                          Manage
-                        </Button>
-                      </Link>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-primary rounded-full shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)] transition-all duration-500" 
+                      style={{ width: `${event.totalAttendees ? (event.checkedIn / event.totalAttendees) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Assigned Sessions - Live Tracking */}
+                {event.sessions && event.sessions.length > 0 && (
+                  <div className="mb-6 space-y-3">
+                    <div className="flex items-center gap-2 px-1">
+                      <MonitorPlay className="w-3 h-3 text-primary animate-pulse" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-primary/80">Live Session Assignments</span>
+                    </div>
+                    <div className="space-y-2">
+                      {event.sessions.map((session: any) => (
+                        <div key={session.id} className="bg-white/5 border border-white/5 rounded-xl p-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                              <span className="text-[11px] font-bold text-white truncate max-w-[120px]">{session.name}</span>
+                            </div>
+                            <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                              {session.current_attendance || 0} / {session.max_capacity || '∞'}
+                            </span>
+                          </div>
+                          <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                            <div 
+                              className={cn(
+                                "h-full transition-all duration-700",
+                                (session.current_attendance / (session.max_capacity || 100)) > 0.9 ? "bg-red-500" : "bg-primary"
+                              )}
+                              style={{ width: `${Math.min(100, (session.current_attendance / (session.max_capacity || 100)) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
+                )}
 
-                </div>
-              )
-            })}
-          </div>
-        </DashboardCard>
-
-        <DashboardCard title="Quick Check-in">
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Input
-                placeholder="Search attendee name or ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="flex-1 min-w-0"
-              />
-              <Button variant="outline" className="w-full sm:w-auto">
-                <Search className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <Select value={selectedEvent} onValueChange={setSelectedEvent}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select event" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Events</SelectItem>
-                {assignedEvents?.map((event: any) => (
-                  <SelectItem key={event.id} value={event.id.toString()}>
-                    {event.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <div className="p-4 border-2 border-dashed border-border rounded-lg text-center">
-              <QrCode className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-              <p className="text-muted-foreground text-sm">
-                Scan QR code or search manually
-              </p>
-            </div>
-
-            <Button
-              onClick={() => navigate('/dashboard/usher/redemption')}
-              className="w-full bg-brand-gradient bg-brand-gradient-hover text-foreground text-sm py-2"
-            >
-              <UserCheck className="w-4 h-4 mr-2" />
-              Manual Check-in
-            </Button>
-          </div>
-        </DashboardCard>
-      </div>
-
-      {/* Quick Actions */}
-      <DashboardCard title="Quick Actions">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
-          <Link
-            to="/dashboard/messages"
-            className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg transition-colors"
-          >
-            <MessageSquare className="w-8 h-8 mx-auto mb-2 text-primary" />
-            <span className="font-medium">Messages</span>
-          </Link>
-          <Link
-            to="/dashboard/usher/redemption"
-            className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg transition-colors"
-          >
-            <QrCode className="w-8 h-8 mx-auto mb-2 text-primary" />
-            <span className="font-medium">Ticket Validator</span>
-          </Link>
-          <Link
-            to="/dashboard/usher/events"
-            className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg transition-colors"
-          >
-            <Users className="w-8 h-8 mx-auto mb-2 text-primary" />
-            <span className="font-medium">Guest List</span>
-          </Link>
-          <Link
-            to="/dashboard/locate-badges"
-            className="block p-4 text-center bg-muted/50 hover:bg-accent rounded-lg transition-colors"
-          >
-            <MapPin className="w-8 h-8 mx-auto mb-2 text-primary" />
-            <span className="font-medium">Locate Badges</span>
-          </Link>
-        </div>
-      </DashboardCard>
-
-      {/* Recent Activity & Support Issues */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DashboardCard title="Recent Check-ins">
-          <div className="space-y-3">
-            {filteredCheckIns?.map((checkIn: any) => (
-              <div key={checkIn.id} className="flex items-center gap-3">
-                <div className="p-2 bg-muted rounded-full">
-                  <UserCheck className="w-4 h-4 text-green-600 dark:text-green-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{checkIn.name}</p>
-                  <p className="text-xs text-muted-foreground/70">{checkIn.company}</p>
-                </div>
-                <div className="text-right">
-                  <Badge className={getTypeColor(checkIn.guest_type?.name)}>{checkIn.guest_type?.name || ''}</Badge>
-                  <p className="text-xs text-muted-foreground/70 mt-1">{checkIn.time}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button 
+                    onClick={() => navigate(`/dashboard/usher/events?eventId=${event.id}`)}
+                    className="bg-primary hover:bg-primary/90 text-white font-bold h-10 rounded-xl text-xs uppercase"
+                  >
+                    Manage Guests
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => handleEventMessage(event.id)}
+                    className="border-white/10 bg-white/5 hover:bg-white/10 text-white font-bold h-10 rounded-xl text-xs uppercase"
+                  >
+                    Event Chat
+                  </Button>
                 </div>
               </div>
             ))}
           </div>
-        </DashboardCard>
+        </section>
 
-        <DashboardCard title="Pending Issues">
-          <div className="space-y-3">
-            {pendingIssues?.map((issue: any) => (
-              <div
-                key={issue.id}
-                className={`p-3 rounded-lg border ${getPriorityColor(
-                  issue.priority
-                )}`}
-              >
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{issue.issue}</p>
-                    <p className="text-xs opacity-75 mt-1">
-                      {issue.location} • {issue.time}
-                    </p>
+        {/* Recent Activity Mini-List */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-lg font-black uppercase tracking-tight text-white">Recent Activity</h2>
+          </div>
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm divide-y divide-white/5">
+            {filteredCheckIns?.slice(0, 3).map((checkIn: any) => (
+              <div key={checkIn.id} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+                    <UserCheck className="w-5 h-5 text-green-400" />
+                  </div>
+                  <div>
+                    <span className="block text-sm font-bold text-white">{checkIn.name}</span>
+                    <span className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">{checkIn.time}</span>
                   </div>
                 </div>
+                <Badge variant="outline" className="text-[9px] font-bold border-white/10 text-gray-400">
+                  {checkIn.guest_type?.name}
+                </Badge>
               </div>
             ))}
+            {(!filteredCheckIns || filteredCheckIns.length === 0) && (
+              <div className="py-4 text-center text-sm text-gray-500 font-medium">No recent activity yet</div>
+            )}
           </div>
-          <Button variant="outline" size="sm" className="w-full mt-4">
-            Report New Issue
-          </Button>
-        </DashboardCard>
-
-        {/* Recent Activity */}
-        <div className="col-span-1 lg:col-span-2">
-          <RecentActivity limit={6} />
-        </div>
+        </section>
       </div>
-
-    </div>
+    </UsherMobileLayout>
   )
 }
 

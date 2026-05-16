@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { getSessionUshers, assignSessionUshers, removeSessionUsher, updateSessionUsher, getEventUshers } from '@/lib/api'
+import { getSessionUshers, assignSessionUshers, removeSessionUsher, updateSessionUsher, getEventUshers, getUshers } from '@/lib/api'
 import { toast } from 'sonner'
 
 interface Props {
@@ -20,9 +20,10 @@ export default function SessionUsherAssignmentDialog({ eventId, sessionId, open,
   const [tasks, setTasks] = useState<string>('')
   const load = async () => {
     try {
-      const [eventUshersRes, sessionUshersRes] = await Promise.all([
+      const [eventUshersRes, sessionUshersRes, allUshersRes] = await Promise.all([
         getEventUshers(eventId),
         getSessionUshers(sessionId),
+        getUshers(), // Fetch all ushers just in case
       ])
       const sessionPayload = sessionUshersRes.data as { data?: unknown[] } | unknown[]
       const assignedArr = Array.isArray(sessionPayload)
@@ -30,9 +31,18 @@ export default function SessionUsherAssignmentDialog({ eventId, sessionId, open,
         : (sessionPayload?.data ?? [])
       setAssigned(assignedArr as any[])
       const assignedIds = new Set((assignedArr as any[]).map((u: any) => u.id))
+      
       const eventPayload = eventUshersRes.data as { data?: unknown[] } | unknown[]
       const eventUshers = Array.isArray(eventPayload) ? eventPayload : (eventPayload?.data ?? [])
-      setAvailable((eventUshers as any[]).filter((u: any) => !assignedIds.has(u.id)))
+      
+      // If event has ushers, use them. Otherwise, allow picking from all available ushers for this organizer
+      let pool = (eventUshers as any[])
+      if (pool.length === 0) {
+        const allPayload = allUshersRes.data as { data?: unknown[] } | unknown[]
+        pool = Array.isArray(allPayload) ? allPayload : (allPayload?.data ?? [])
+      }
+
+      setAvailable(pool.filter((u: any) => !assignedIds.has(u.id)))
     } catch (e) {
       console.error(e)
       toast.error('Could not load ushers for this session')

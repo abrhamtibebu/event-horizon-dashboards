@@ -33,6 +33,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import api from '@/lib/api';
 import { useRegistrationShareMeta } from '@/lib/registrationShareMeta';
+import { useTheme } from 'next-themes';
 
 interface EventData {
   id: number;
@@ -68,6 +69,11 @@ const TelebirrRegistration: React.FC = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { setTheme } = useTheme();
+
+  useEffect(() => {
+    setTheme('light');
+  }, [setTheme]);
 
   const [eventData, setEventData] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -273,30 +279,46 @@ const TelebirrRegistration: React.FC = () => {
         <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"></div>
         
         <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
-          <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md rounded-full px-6 py-2 mb-8 border border-white/30">
-            <Award className="w-5 h-5 text-yellow-300" />
-            <span className="font-bold tracking-wide uppercase text-sm">Celebrating 5 Years of Innovation</span>
+          <div className="inline-flex justify-center mb-8">
+            <img src="/telebirr5th year logo.png" alt="Telebirr 5th Year Anniversary" className="h-16 md:h-24 w-auto object-contain drop-shadow-md" />
           </div>
           
           <h2 className="text-4xl md:text-6xl font-extrabold mb-6 leading-tight drop-shadow-lg">
-            {eventData?.name || 'Tele birr 5th Year Anniversary Exhibition'}
+            {eventData?.title || eventData?.name || 'Loading...'}
           </h2>
           
           <div className="flex flex-wrap justify-center gap-6 text-lg font-medium">
             <div className="flex items-center gap-2">
               <Calendar className="w-6 h-6" />
-              <span>May 29 - 31, 2026</span>
+              <span>
+                {eventData?.start_date && eventData?.end_date 
+                  ? `${new Date(eventData.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(eventData.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` 
+                  : (eventData?.start_date 
+                      ? new Date(eventData.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                      : 'Loading...')}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <MapPin className="w-6 h-6" />
-              <span>Addis International Convention Center</span>
+              <span>{eventData?.venue_name || eventData?.location || 'Loading...'}</span>
             </div>
           </div>
         </div>
       </section>
 
       {/* Main Registration Form */}
-      <main className="max-w-4xl mx-auto px-4 py-16 -mt-10 relative z-20">
+      <main className="max-w-4xl mx-auto px-4 py-16 -mt-10 relative z-20 space-y-8">
+        {eventData?.description && (
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden p-8 md:p-12">
+            <h3 className="text-3xl font-bold text-gray-900 mb-2">About the Event</h3>
+            <div className="h-1 w-20 mt-4 mb-6 rounded-full" style={{ backgroundColor: colors.deepGreen }}></div>
+            <div 
+              className="prose max-w-none text-gray-600 prose-a:text-[#8DC63F] prose-headings:text-gray-800"
+              dangerouslySetInnerHTML={{ __html: eventData.description }}
+            />
+          </div>
+        )}
+
         <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden">
           <div className="p-8 md:p-12">
             <div className="mb-12">

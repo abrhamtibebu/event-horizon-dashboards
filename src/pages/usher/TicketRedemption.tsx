@@ -21,6 +21,7 @@ export default function TicketRedemption() {
     const [lastResult, setLastResult] = useState<ValidationResult | null>(null);
     const [history, setHistory] = useState<ValidationResult[]>([]);
     const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+    const [selectedSessionId, setSelectedSessionId] = useState<string>('default');
     const [isScanning, setIsScanning] = useState(false);
     const [activeTab, setActiveTab] = useState('scanner');
 
@@ -37,8 +38,9 @@ export default function TicketRedemption() {
 
     const validateMutation = useMutation({
         mutationFn: (id: string) => validateTicket({
-            ticket_number: id,
-            event_id: selectedEventId || undefined
+            ticket_identifier: id,
+            event_id: selectedEventId || undefined,
+            session_id: selectedSessionId !== 'default' ? Number(selectedSessionId) : undefined
         }),
         onSuccess: (data) => {
             setLastResult(data);
@@ -122,30 +124,66 @@ export default function TicketRedemption() {
                         {assignedEvents && assignedEvents.length > 0 ? (
                             <div className="grid grid-cols-1 gap-2">
                                 {assignedEvents.map((event: any) => (
-                                    <Button
-                                        key={event.id}
-                                        variant={selectedEventId === event.id ? "default" : "outline"}
-                                        className={cn(
-                                            "h-14 justify-start px-4 text-left border-2 transition-all",
-                                            selectedEventId === event.id ? "ring-2 ring-primary ring-offset-2 scale-[1.02]" : "hover:border-primary/50"
+                                    <div key={event.id} className="space-y-2">
+                                        <Button
+                                            variant={selectedEventId === event.id ? "default" : "outline"}
+                                            className={cn(
+                                                "h-14 w-full justify-start px-4 text-left border-2 transition-all",
+                                                selectedEventId === event.id ? "ring-2 ring-primary ring-offset-2 scale-[1.01]" : "hover:border-primary/50"
+                                            )}
+                                            onClick={() => {
+                                                setSelectedEventId(event.id);
+                                                setSelectedSessionId('default');
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-3 w-full">
+                                                <div className={cn(
+                                                    "w-8 h-8 rounded-full flex items-center justify-center font-black",
+                                                    selectedEventId === event.id ? "bg-white text-primary" : "bg-primary/10 text-primary"
+                                                )}>
+                                                    {event.name.charAt(0)}
+                                                </div>
+                                                <div className="flex-1 truncate">
+                                                    <p className="font-black text-sm leading-tight">{event.name}</p>
+                                                    <p className="text-[10px] font-bold opacity-70 uppercase truncate">
+                                                        {event.location} • {event.date}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </Button>
+
+                                        {selectedEventId === event.id && event.sessions && event.sessions.length > 0 && (
+                                            <div className="pl-4 pr-1 py-2 space-y-2 bg-white/5 rounded-xl border border-white/5 animate-in slide-in-from-top-2">
+                                                <p className="text-[9px] font-black uppercase text-muted-foreground px-2">Monitor Session Attendance</p>
+                                                <div className="grid grid-cols-1 gap-2">
+                                                    <Button
+                                                        variant={selectedSessionId === 'default' ? "secondary" : "ghost"}
+                                                        size="sm"
+                                                        className="h-8 justify-between text-[10px] font-bold uppercase"
+                                                        onClick={() => setSelectedSessionId('default')}
+                                                    >
+                                                        Main Event Entry
+                                                        {selectedSessionId === 'default' && <CheckCircle className="w-3 h-3 text-primary" />}
+                                                    </Button>
+                                                    {event.sessions.map((session: any) => (
+                                                        <Button
+                                                            key={session.id}
+                                                            variant={selectedSessionId === String(session.id) ? "secondary" : "ghost"}
+                                                            size="sm"
+                                                            className="h-10 justify-between text-[10px] font-bold uppercase"
+                                                            onClick={() => setSelectedSessionId(String(session.id))}
+                                                        >
+                                                            <div className="flex flex-col items-start">
+                                                                <span>{session.name}</span>
+                                                                <span className="text-[8px] opacity-60">Live: {session.current_attendance || 0} checked-in</span>
+                                                            </div>
+                                                            {selectedSessionId === String(session.id) && <CheckCircle className="w-3 h-3 text-primary" />}
+                                                        </Button>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         )}
-                                        onClick={() => setSelectedEventId(event.id)}
-                                    >
-                                        <div className="flex items-center gap-3 w-full">
-                                            <div className={cn(
-                                                "w-8 h-8 rounded-full flex items-center justify-center font-black",
-                                                selectedEventId === event.id ? "bg-white text-primary" : "bg-primary/10 text-primary"
-                                            )}>
-                                                {event.name.charAt(0)}
-                                            </div>
-                                            <div className="flex-1 truncate">
-                                                <p className="font-black text-sm leading-tight">{event.name}</p>
-                                                <p className="text-[10px] font-bold opacity-70 uppercase truncate">
-                                                    {event.location} • {event.date}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </Button>
+                                    </div>
                                 ))}
                             </div>
                         ) : (

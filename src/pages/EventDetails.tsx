@@ -140,7 +140,8 @@ import { UsherAssignmentDialog } from '@/components/UsherAssignmentDialog'
 import { EventAccessCodesDialog } from '@/components/EventAccessCodesDialog'
 import React from 'react'
 import QRCode from 'react-qr-code'
-import QRCodeLib from 'qrcode'
+import { QRCodeSVG } from 'qrcode.react'
+import GoogleVenueAutocompleteInput from '@/components/GoogleVenueAutocompleteInput'
 import BadgePrint from '@/components/Badge'
 import BadgeTest from '@/components/BadgeTest'
 import { getOfficialBadgeTemplate, getBadgeTemplates } from '@/lib/badgeTemplates'
@@ -1246,10 +1247,10 @@ export default function EventDetails() {
     setEditEventRange([{ startDate, endDate, key: 'selection' }])
     setEditRegRange([{ startDate: regStartDate, endDate: regEndDate, key: 'selection' }])
 
-    // Handle guest_types properly - extract names from objects if they are objects
     let guestTypes: string[] = []
-    if (Array.isArray(eventData.guest_types)) {
-      guestTypes = eventData.guest_types.map((gt: any) => {
+    const eventGuestTypes = eventData.guest_types || eventData.guestTypes || [];
+    if (Array.isArray(eventGuestTypes)) {
+      guestTypes = eventGuestTypes.map((gt: any) => {
         // If it's an object with a name property, extract the name
         if (typeof gt === 'object' && gt !== null && gt.name) {
           return gt.name
@@ -1261,9 +1262,9 @@ export default function EventDetails() {
         // Fallback to string conversion
         return String(gt)
       }).filter(Boolean)
-    } else if (typeof eventData.guest_types === 'string') {
+    } else if (typeof eventGuestTypes === 'string') {
       // Handle comma-separated string
-      guestTypes = eventData.guest_types.split(',').map((s: string) => s.trim()).filter(Boolean)
+      guestTypes = eventGuestTypes.split(',').map((s: string) => s.trim()).filter(Boolean)
     }
 
     setEditForm({
@@ -4590,11 +4591,10 @@ export default function EventDetails() {
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="edit_location">Location</Label>
-                            <Input
-                              id="edit_location"
-                              value={editForm.location}
-                              onChange={(e) => handleEditInput('location', e.target.value)}
-                              placeholder="e.g. Grand Convention Center"
+                            <GoogleVenueAutocompleteInput
+                              value={editForm.location || ''}
+                              onChange={(value) => handleEditInput('location', value)}
+                              placeholder="Search for a venue or location"
                               className="rounded-xl shadow-sm border-muted-foreground/20"
                             />
                           </div>

@@ -253,6 +253,10 @@ const AppWithRealtime = () => {
             }
           />
           <Route
+            path="/event/telebirr-register"
+            element={<Navigate to="/event/telebirr-register/56" replace />}
+          />
+          <Route
             path="/event/telebirr-register/:eventId"
             element={
               <PublicRoute>
