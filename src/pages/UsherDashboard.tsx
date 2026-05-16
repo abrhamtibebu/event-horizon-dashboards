@@ -409,7 +409,7 @@ export default function UsherDashboard() {
                   </div>
                 </div>
                 <Badge variant="outline" className="text-[9px] font-bold border-white/10 text-gray-400">
-                  {checkIn.guest_type?.name}
+                  {checkIn.guest_type?.name || checkIn.guest_type_name || checkIn.guest?.guest_type?.name || 'Standard'}
                 </Badge>
               </div>
             ))}
