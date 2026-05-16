@@ -302,6 +302,12 @@
 
 /* Custom animations for the sign-in page and registration forms */
 @layer utilities {
+  .pb-safe-area {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe-area {
+    padding-top: env(safe-area-inset-top);
+  }
 
   /* Brand gradient utilities */
   .bg-brand-gradient {

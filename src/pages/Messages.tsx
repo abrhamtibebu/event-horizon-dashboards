@@ -21,6 +21,7 @@ import { useSingleUserOnlineStatus, useRealtimeOnlineStatus } from '../hooks/use
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+import { UsherMobileLayout } from '@/components/UsherMobileLayout'
 import type { Conversation, Message, User, Event } from '../types/message'
 
 export default function Messages() {
@@ -271,8 +272,11 @@ export default function Messages() {
     )
   }
 
-  return (
-    <div className="flex h-[calc(100vh-64px)] bg-background overflow-hidden">
+  const content = (
+    <div className={cn(
+      "flex bg-background overflow-hidden",
+      user?.role === 'usher' ? "h-[calc(100vh-130px)] md:h-[calc(100vh-64px)]" : "h-[calc(100vh-64px)]"
+    )}>
       {/* Sidebar Overlay */}
       <AnimatePresence>
         {showSidebar && window.innerWidth < 1024 && (
@@ -497,4 +501,10 @@ export default function Messages() {
       />
     </div>
   )
+
+  if (user?.role === 'usher') {
+    return <UsherMobileLayout title="Event Chat">{content}</UsherMobileLayout>
+  }
+
+  return content
 }

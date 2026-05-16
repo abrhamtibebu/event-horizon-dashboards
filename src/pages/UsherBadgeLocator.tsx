@@ -28,6 +28,7 @@ import { toast } from 'sonner'
 import { useAuth } from '@/hooks/use-auth'
 import api from '@/lib/api'
 import { getGuestTypeBadgeClasses } from '@/lib/utils'
+import { UsherMobileLayout } from '@/components/UsherMobileLayout'
 
 // --- Data Model ---
 interface BadgeData {
@@ -519,124 +520,126 @@ export default function UsherBadgeLocator() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Development Mode Notice */}
-      {localStorage.getItem('mock_auth') === 'true' && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-blue-600" />
-            <span className="text-sm text-blue-800 font-medium">Development Mode</span>
+    <UsherMobileLayout title="Badge Locator">
+      <div className="space-y-6 p-4">
+        {/* Development Mode Notice */}
+        {localStorage.getItem('mock_auth') === 'true' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-blue-600" />
+              <span className="text-sm text-blue-800 font-medium">Development Mode</span>
+            </div>
+            <p className="text-sm text-blue-700 mt-1">
+              You're currently using mock data for development. In production, this will connect to the live API.
+            </p>
           </div>
-          <p className="text-sm text-blue-700 mt-1">
-            You're currently using mock data for development. In production, this will connect to the live API.
-          </p>
-        </div>
-      )}
-      
-      {/* --- Event Selector --- */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-foreground">Select Assigned Event</label>
-          {selectedEventId && (
-            <Badge variant="outline" className="text-xs">
-              {data.length} badges loaded
-            </Badge>
+        )}
+        
+        {/* --- Event Selector --- */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-foreground">Select Assigned Event</label>
+            {selectedEventId && (
+              <Badge variant="outline" className="text-xs">
+                {data.length} badges loaded
+              </Badge>
+            )}
+          </div>
+          <Select 
+            value={selectedEventId} 
+            onValueChange={(value) => {
+              setSelectedEventId(value);
+              setSelectedGuest(null);
+            }}
+            disabled={loadingEvents}
+          >
+            <SelectTrigger className="w-full max-w-md">
+              <SelectValue placeholder={loadingEvents ? 'Loading events...' : 'Choose an assigned event'} />
+            </SelectTrigger>
+            <SelectContent>
+              {events.map((event: any, index: number) => (
+                <SelectItem key={`usher-event-${event.id}-${index}`} value={event.id.toString()}>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{event.name}</span>
+                    <span className="text-xs text-muted-foreground/70">
+                      {new Date(event.start_date).toLocaleDateString()}
+                    </span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {eventError && (
+            <div className="text-red-600 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />
+              {eventError}
+            </div>
+          )}
+          {!selectedEventId && !loadingEvents && (
+            <div className="text-amber-600 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" />
+              Please select an assigned event to view badge locations
+            </div>
           )}
         </div>
-        <Select 
-          value={selectedEventId} 
-          onValueChange={(value) => {
-            setSelectedEventId(value);
-            setSelectedGuest(null);
-          }}
-          disabled={loadingEvents}
-        >
-          <SelectTrigger className="w-full max-w-md">
-            <SelectValue placeholder={loadingEvents ? 'Loading events...' : 'Choose an assigned event'} />
-          </SelectTrigger>
-          <SelectContent>
-            {events.map((event: any, index: number) => (
-              <SelectItem key={`usher-event-${event.id}-${index}`} value={event.id.toString()}>
-                <div className="flex flex-col">
-                  <span className="font-medium">{event.name}</span>
-                  <span className="text-xs text-muted-foreground/70">
-                    {new Date(event.start_date).toLocaleDateString()}
-                  </span>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {eventError && (
-          <div className="text-red-600 text-xs mt-1 flex items-center gap-1">
-            <AlertCircle className="w-3 h-3" />
-            {eventError}
+
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="hidden md:block">
+            <h1 className="text-3xl font-bold text-foreground">Badge Locator</h1>
+            <p className="text-muted-foreground mt-1">Search and manage guest badges for your assigned events.</p>
+          </div>
+          <div className="w-full md:w-1/2 lg:w-1/3 flex flex-col gap-2">
+            <SearchBarWithAutocomplete badges={filteredData} onSelect={setSelectedGuest} isSearching={isSearching} />
+          </div>
+        </div>
+
+        {/* Statistics Summary */}
+        {data.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-card rounded-lg p-4 border border-border">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-600" />
+                <span className="text-sm text-muted-foreground">Total Badges</span>
+              </div>
+              <div className="text-2xl font-bold text-card-foreground mt-1">{data.length}</div>
+            </div>
+            <div className="bg-card rounded-lg p-4 border border-border">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <span className="text-sm text-muted-foreground">Collected</span>
+              </div>
+              <div className="text-2xl font-bold text-green-600 mt-1">
+                {data.filter(b => b.collected).length}
+              </div>
+            </div>
+            <div className="bg-card rounded-lg p-4 border border-border">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+                <span className="text-sm text-muted-foreground">Missing</span>
+              </div>
+              <div className="text-2xl font-bold text-red-600 mt-1">
+                {data.filter(b => b.status === 'missing').length}
+              </div>
+            </div>
+            <div className="bg-card rounded-lg p-4 border border-border">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-yellow-600" />
+                <span className="text-sm text-muted-foreground">Reprint Needed</span>
+              </div>
+              <div className="text-2xl font-bold text-yellow-600 mt-1">
+                {data.filter(b => b.status === 'reprint requested').length}
+              </div>
+            </div>
           </div>
         )}
-        {!selectedEventId && !loadingEvents && (
-          <div className="text-amber-600 text-xs mt-1 flex items-center gap-1">
-            <AlertCircle className="w-3 h-3" />
-            Please select an assigned event to view badge locations
-          </div>
+
+        {selectedGuest && (
+          <>
+            <BadgeResultPanel badge={selectedGuest} user={user} onAction={handleBadgeAction} />
+            <HistoryLog history={selectedGuest.printHistory} />
+          </>
         )}
       </div>
-
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Badge Locator</h1>
-          <p className="text-muted-foreground mt-1">Search and manage guest badges for your assigned events.</p>
-        </div>
-        <div className="w-full md:w-1/2 lg:w-1/3 flex flex-col gap-2">
-          <SearchBarWithAutocomplete badges={filteredData} onSelect={setSelectedGuest} isSearching={isSearching} />
-        </div>
-      </div>
-
-      {/* Statistics Summary */}
-      {data.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-card rounded-lg p-4 border border-border">
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-blue-600" />
-              <span className="text-sm text-muted-foreground">Total Badges</span>
-            </div>
-            <div className="text-2xl font-bold text-card-foreground mt-1">{data.length}</div>
-          </div>
-          <div className="bg-card rounded-lg p-4 border border-border">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <span className="text-sm text-muted-foreground">Collected</span>
-            </div>
-            <div className="text-2xl font-bold text-green-600 mt-1">
-              {data.filter(b => b.collected).length}
-            </div>
-          </div>
-          <div className="bg-card rounded-lg p-4 border border-border">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600" />
-              <span className="text-sm text-muted-foreground">Missing</span>
-            </div>
-            <div className="text-2xl font-bold text-red-600 mt-1">
-              {data.filter(b => b.status === 'missing').length}
-            </div>
-          </div>
-          <div className="bg-card rounded-lg p-4 border border-border">
-            <div className="flex items-center gap-2">
-              <RefreshCw className="w-5 h-5 text-yellow-600" />
-              <span className="text-sm text-muted-foreground">Reprint Needed</span>
-            </div>
-            <div className="text-2xl font-bold text-yellow-600 mt-1">
-              {data.filter(b => b.status === 'reprint requested').length}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedGuest && (
-        <>
-          <BadgeResultPanel badge={selectedGuest} user={user} onAction={handleBadgeAction} />
-          <HistoryLog history={selectedGuest.printHistory} />
-        </>
-      )}
-    </div>
+    </UsherMobileLayout>
   )
 }

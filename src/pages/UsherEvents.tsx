@@ -12,6 +12,7 @@ import { getGuestTypeBadgeClasses, getCheckInBadgeClasses } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Printer, Search, QrCode } from 'lucide-react'
 import { Spinner, SpinnerInline } from '@/components/ui/spinner'
+import { UsherMobileLayout } from '@/components/UsherMobileLayout'
 import BadgePrint from '@/components/Badge'
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -144,9 +145,16 @@ export default function UsherEvents() {
       setBadgeTemplate(null)
       return
     }
+    
+    // Some staff roles might not have permission to fetch templates
+    // We catch and handle silently to avoid console noise
     getOfficialBadgeTemplate(Number(selectedEventId))
       .then((res) => setBadgeTemplate(res.data))
-      .catch(() => {
+      .catch((err) => {
+        if (err.response?.status === 403) {
+            console.warn('Unauthorized to fetch official badge template');
+            return;
+        }
         getBadgeTemplates(Number(selectedEventId))
           .then((res) => setBadgeTemplate(res.data?.[0] ?? null))
           .catch(() => setBadgeTemplate(null))
@@ -519,46 +527,45 @@ export default function UsherEvents() {
   const filteredAttendees = searchPerformed ? attendees : [];
 
   return (
-    <div className="min-h-screen bg-background">
-      <PrintBadgeTemplateDialog
-        open={printTemplateDialogOpen}
-        onOpenChange={setPrintTemplateDialogOpen}
-        attendeeForPreview={pendingPrintAttendee}
-        assignedTemplate={badgeTemplate}
-        onChoose={(choice) => {
-          setPrintTemplateChoice(choice)
-          const attendee = pendingPrintAttendee
-          setPendingPrintAttendee(null)
-          setTimeout(() => {
-            if (attendee) void runPrintBadge(attendee)
-          }, 0)
-        }}
-      />
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
-        {/* Breadcrumbs */}
-        <div className="mb-6">
-          <Breadcrumbs 
-            items={[
-              { label: 'Usher Events', href: '/dashboard/usher-events' }
-            ]}
-          />
+    <UsherMobileLayout title="Guest Management">
+      <div className="container mx-auto px-4 py-4 md:py-6 max-w-7xl pb-20">
+        <PrintBadgeTemplateDialog
+          open={printTemplateDialogOpen}
+          onOpenChange={setPrintTemplateDialogOpen}
+          attendeeForPreview={pendingPrintAttendee}
+          assignedTemplate={badgeTemplate}
+          onChoose={(choice) => {
+            setPrintTemplateChoice(choice)
+            const attendee = pendingPrintAttendee
+            setPendingPrintAttendee(null)
+            setTimeout(() => {
+              if (attendee) void runPrintBadge(attendee)
+            }, 0)
+          }}
+        />
+        <div className="hidden md:block mb-6">
+            <Breadcrumbs
+                items={[
+                    { label: 'Usher Events', href: '/dashboard/usher-events' }
+                ]}
+            />
         </div>
         
-        {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-              <Search className="w-6 h-6 text-primary-foreground" />
+        {/* Header Section - Desktop Only */}
+        <div className="mb-8 hidden md:block">
+            <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+                    <Search className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <div>
+                    <h1 className="text-3xl font-bold text-foreground">
+                        Guest Management
+                    </h1>
+                    <p className="text-muted-foreground">
+                        Search for guests by name, email, phone, or company. Add and edit attendees for your assigned event.
+                    </p>
+                </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">
-                Guest Management
-              </h1>
-              <p className="text-muted-foreground">
-                Search for guests by name, email, phone, or company. Add and edit attendees for your assigned event.
-              </p>
-            </div>
-          </div>
         </div>
         
         {/* Main Content Card */}
@@ -1124,6 +1131,6 @@ export default function UsherEvents() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </UsherMobileLayout>
   )
-} 
+}

@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import api, { getEventSessions, createEventSession, updateSession, deleteSession, createSessionAttendance, updateSessionAttendance, getSessionById, cancelSession } from '@/lib/api'
 import { Switch } from '@/components/ui/switch'
-import { Mic, Plus, Calendar, MapPin, Trash2, UserRound, XCircle } from 'lucide-react'
+import { Mic, Plus, Calendar, MapPin, Trash2, UserRound, XCircle, CheckCircle2 } from 'lucide-react'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Calendar as UiCalendar } from '@/components/ui/calendar'
 import { toast } from 'sonner'
@@ -199,17 +199,15 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
   }
 
-  const [showOnlyCheckedIn, setShowOnlyCheckedIn] = useState(true)
 
   const openAttendance = async (session: any) => {
     setAttendanceOpen(true)
     setAttendanceSession(session)
     setAttendanceLoading(true)
-    setShowOnlyCheckedIn(true) // Reset to live check-ins only by default
     try {
-      // Load event attendees
+      // Load event attendees with guest_type relation included
       const attendeesRes = await api.get(`/events/${Number(eventId)}/attendees`, {
-        params: { per_page: 500 },
+        params: { per_page: 500, include: 'guest,guest_type' },
       })
       const raw = attendeesRes.data as { data?: unknown[] } | unknown[]
       const list = Array.isArray(raw) ? raw : raw?.data ?? []
@@ -764,16 +762,8 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
             <div className="space-y-4">
               <div className="flex items-center justify-between py-2">
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center space-x-2">
-                    <Switch 
-                      id="show-checked-in" 
-                      checked={showOnlyCheckedIn} 
-                      onCheckedChange={setShowOnlyCheckedIn} 
-                    />
-                    <Label htmlFor="show-checked-in" className="text-sm font-bold uppercase cursor-pointer">
-                      Live Check-ins Only
-                    </Label>
-                  </div>
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-primary">Live Attendance Data</span>
                 </div>
                 <div className="text-xs font-bold text-muted-foreground uppercase">
                   Total: {Object.values(attendancesByAttendeeId).filter(a => ['present', 'late'].includes(a.attendance_status)).length} present
@@ -792,7 +782,6 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                   <TableBody>
                     {(() => {
                       const filtered = attendees.filter(a => {
-                        if (!showOnlyCheckedIn) return true;
                         const attendance = attendancesByAttendeeId[a.id];
                         return ['present', 'late'].includes(String(attendance?.attendance_status || ''));
                       });
@@ -803,9 +792,7 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                             <TableCell colSpan={3} className="p-12 text-center">
                               <div className="flex flex-col items-center gap-2 opacity-40">
                                 <UserRound className="w-8 h-8" />
-                                <p className="font-bold uppercase text-xs">
-                                  {showOnlyCheckedIn ? "No live check-ins yet" : "No attendees found"}
-                                </p>
+                                <p className="font-bold uppercase text-xs">No live check-ins yet</p>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -823,17 +810,18 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-[9px] font-black uppercase">
-                                {a.guest_type?.name || a.guest_type_name || '—'}
+                                {a.guest_type?.name || 
+                                 a.guest_type_name || 
+                                 a.guest?.guest_type?.name || 
+                                 a.guest?.guest_type_name || 
+                                 'Standard'}
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Switch checked={present} onCheckedChange={(v) => toggleAttendance(a, v)} />
-                                <span className={cn(
-                                  "text-[10px] font-black uppercase tracking-tight",
-                                  present ? "text-green-600" : "text-muted-foreground"
-                                )}>
-                                  {present ? 'Present' : 'Absent'}
+                              <div className="flex items-center gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                <span className="text-[10px] font-black uppercase tracking-tight text-green-600">
+                                  Attended
                                 </span>
                               </div>
                             </TableCell>

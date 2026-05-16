@@ -20,38 +20,40 @@ export default function AuthPage() {
   const isSignUp = mode === 'signup'
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted p-4">
-      <div className="relative flex h-[580px] w-full max-w-[860px] overflow-hidden rounded-[32px] bg-card shadow-2xl">
+    <div className="flex min-h-screen items-center justify-center bg-muted p-0 sm:p-4">
+      <div className="relative flex min-h-screen w-full flex-col overflow-hidden bg-card shadow-2xl sm:h-[620px] sm:min-h-0 sm:max-w-[860px] sm:flex-row sm:rounded-[32px]">
         {/* ── Forms layer ── */}
-        <div className="relative z-0 flex h-full w-full">
-          {/* Sign-in form (left half) */}
+        <div className="relative z-0 flex flex-1 flex-col sm:flex-row">
+          {/* Sign-in form */}
           <div
-            className={`absolute inset-y-0 left-0 flex w-1/2 flex-col items-center justify-center px-8 transition-all duration-700 ease-in-out sm:px-12 ${
-              isSignUp ? '-translate-x-[20%] scale-90 opacity-0' : 'translate-x-0 scale-100 opacity-100'
+            className={`flex flex-1 flex-col items-center justify-center px-8 transition-all duration-700 ease-in-out sm:px-12 ${
+              isSignUp 
+                ? 'max-sm:hidden sm:absolute sm:inset-y-0 sm:left-0 sm:w-1/2 sm:-translate-x-[20%] sm:scale-90 sm:opacity-0' 
+                : 'sm:absolute sm:inset-y-0 sm:left-0 sm:w-1/2 sm:translate-x-0 sm:scale-100 sm:opacity-100'
             }`}
           >
             <SignInForm />
           </div>
 
-          {/* Sign-up form (right half) */}
+          {/* Sign-up form */}
           <div
-            className={`absolute inset-y-0 right-0 flex w-1/2 flex-col items-center justify-center overflow-y-auto px-8 transition-all duration-700 ease-in-out sm:px-12 ${
-              isSignUp ? 'translate-x-0 scale-100 opacity-100' : 'translate-x-[20%] scale-90 opacity-0'
+            className={`flex flex-1 flex-col items-center justify-center overflow-y-auto px-8 transition-all duration-700 ease-in-out sm:px-12 ${
+              isSignUp 
+                ? 'sm:absolute sm:inset-y-0 sm:right-0 sm:w-1/2 sm:translate-x-0 sm:scale-100 sm:opacity-100' 
+                : 'max-sm:hidden sm:absolute sm:inset-y-0 sm:right-0 sm:w-1/2 sm:translate-x-[20%] sm:scale-90 sm:opacity-0'
             }`}
           >
             <SignUpForm />
           </div>
         </div>
 
-        {/* ── Sliding overlay panel ── */}
+        {/* ── Sliding overlay panel (Desktop Only) ── */}
         <div
-          className={`pointer-events-none absolute inset-y-0 z-10 w-1/2 transition-transform duration-700 ease-in-out ${
+          className={`pointer-events-none absolute inset-y-0 z-10 hidden w-1/2 transition-transform duration-700 ease-in-out sm:block ${
             isSignUp ? 'translate-x-0' : 'translate-x-full'
           }`}
         >
-          <div className="pointer-events-auto flex h-full flex-col items-center justify-center bg-primary px-10 text-center text-primary-foreground"
-            style={{ borderRadius: isSignUp ? '0 0 0 0' : '0 0 0 0' }}
-          >
+          <div className="pointer-events-auto flex h-full flex-col items-center justify-center bg-primary px-10 text-center text-primary-foreground">
             <h2 className="text-[30px] font-bold leading-tight">
               {isSignUp ? 'Welcome Back!' : 'Hello, Friend!'}
             </h2>
@@ -68,8 +70,6 @@ export default function AuthPage() {
             </button>
           </div>
         </div>
-
-        {/* Mobile-only: the overlay is hidden; show inline link instead via each form */}
       </div>
     </div>
   )

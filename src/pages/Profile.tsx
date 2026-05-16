@@ -12,7 +12,9 @@ import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/hooks/use-auth'
 import { useModernAlerts } from '@/hooks/useModernAlerts'
 import api from '@/lib/api'
+import { cn } from '@/lib/utils'
 import { ModernConfirmationDialog } from '@/components/ui/ModernConfirmationDialog'
+import { UsherMobileLayout } from '@/components/UsherMobileLayout'
 
 export default function Profile() {
   const { user, setUser, logout } = useAuth()
@@ -191,18 +193,20 @@ export default function Profile() {
     setIsEditing(false)
   }
 
-  return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      {/* Breadcrumbs */}
-      <Breadcrumbs 
-        items={[
-          { label: 'Profile', href: '/dashboard/profile' }
-        ]}
-        className="mb-4"
-      />
+  const content = (
+    <div className="container mx-auto p-4 md:p-6 max-w-4xl pb-20">
+      {/* Breadcrumbs - Hidden on mobile for ushers */}
+      <div className={cn(user?.role === 'usher' && "hidden md:block")}>
+        <Breadcrumbs 
+          items={[
+            { label: 'Profile', href: '/dashboard/profile' }
+          ]}
+          className="mb-4"
+        />
+      </div>
       
-      {/* Header */}
-      <div className="mb-8">
+      {/* Header - Hidden on mobile for ushers as Layout provides it */}
+      <div className={cn("mb-8", user?.role === 'usher' && "hidden md:block")}>
         <h1 className="text-3xl font-bold text-foreground mb-2">My Profile</h1>
         <p className="text-muted-foreground">Manage your personal information and preferences</p>
       </div>
@@ -670,6 +674,12 @@ export default function Profile() {
       />
     </div>
   )
+
+  if (user?.role === 'usher') {
+    return <UsherMobileLayout title="My Profile">{content}</UsherMobileLayout>
+  }
+
+  return content
 }
 
 
