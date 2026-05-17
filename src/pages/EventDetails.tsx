@@ -4501,7 +4501,11 @@ export default function EventDetails() {
                 </TabsContent>
                 <TabsContent value="sessions">
                   <div className="min-h-[200px]">
-                    <EventSessions eventId={Number(eventId)} />
+                    <EventSessions 
+                      eventId={Number(eventId)} 
+                      eventStart={eventData?.start_date} 
+                      eventEnd={eventData?.end_date} 
+                    />
                   </div>
                 </TabsContent>
                   <TabsContent value="invitations">

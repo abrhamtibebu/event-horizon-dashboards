@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import api, { getEventSessions, createEventSession, updateSession, deleteSession, createSessionAttendance, updateSessionAttendance, getSessionById, cancelSession } from '@/lib/api'
 import { Switch } from '@/components/ui/switch'
-import { Mic, Plus, Calendar, MapPin, Trash2, UserRound, XCircle, CheckCircle2 } from 'lucide-react'
+import { Mic, Plus, Calendar, MapPin, Trash2, UserRound, XCircle, CheckCircle2, Lock, Globe, Upload, UserCheck, Users, Pencil } from 'lucide-react'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Calendar as UiCalendar } from '@/components/ui/calendar'
 import { toast } from 'sonner'
@@ -20,6 +20,8 @@ import SessionUsherAssignmentDialog from '@/components/SessionUsherAssignmentDia
 
 interface EventSessionsProps {
   eventId: number | string
+  eventStart?: string
+  eventEnd?: string
 }
 
 type SpeakerDraft = {
@@ -70,7 +72,7 @@ function mapApiSpeaker(sp: Record<string, unknown>): SpeakerDraft {
   }
 }
 
-export default function EventSessions({ eventId }: EventSessionsProps) {
+export default function EventSessions({ eventId, eventStart, eventEnd }: EventSessionsProps) {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({
@@ -81,9 +83,14 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
     location: '',
     max_capacity: '',
     status: 'scheduled',
+    access_type: 'public',
     speakers: [emptySpeaker()] as SpeakerDraft[],
   })
   const [editingId, setEditingId] = useState<number | null>(null)
+
+  // CSV Import State
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+  const [importingSessionId, setImportingSessionId] = useState<number | null>(null)
 
   const [authError, setAuthError] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
@@ -120,6 +127,7 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
         location: '',
         max_capacity: '',
         status: 'scheduled',
+        access_type: 'public',
         speakers: [emptySpeaker()],
       })
       setEditingId(null)
@@ -150,6 +158,7 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
         location: '',
         max_capacity: '',
         status: 'scheduled',
+        access_type: 'public',
         speakers: [emptySpeaker()],
       })
       setEditingId(null)
@@ -266,6 +275,99 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
     }
   }
 
+  const formatConciseDateTime = (iso?: string) => {
+    if (!iso) return '';
+    const date = new Date(iso);
+    return date.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
+
+  // Modern time picker helpers
+  const getHourValue = (isoString?: string) => {
+    if (!isoString) return '12';
+    const date = new Date(isoString);
+    let h = date.getHours();
+    if (h === 0) return '12';
+    if (h > 12) h -= 12;
+    return String(h);
+  }
+
+  const getMinuteValue = (isoString?: string) => {
+    if (!isoString) return '00';
+    const date = new Date(isoString);
+    const m = Math.round(date.getMinutes() / 5) * 5;
+    return String(m === 60 ? 55 : m).padStart(2, '0');
+  }
+
+  const getAmpmValue = (isoString?: string) => {
+    if (!isoString) return 'AM';
+    const date = new Date(isoString);
+    return date.getHours() >= 12 ? 'PM' : 'AM';
+  }
+
+  const updateTimeValue = (type: 'start' | 'end', hour: string, minute: string, ampm: string) => {
+    const currentISO = type === 'start' ? form.start_time : form.end_time;
+    const baseDate = currentISO ? new Date(currentISO) : new Date();
+    
+    let h = parseInt(hour, 10);
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    
+    const m = parseInt(minute, 10);
+    baseDate.setHours(h, m, 0, 0);
+
+    if (type === 'start') {
+      const nextISO = baseDate.toISOString();
+      let endISO = form.end_time;
+      if (!endISO || new Date(endISO) <= baseDate) {
+        endISO = addHours(baseDate, 1).toISOString();
+      }
+      setForm(prev => ({ ...prev, start_time: nextISO, end_time: endISO }));
+    } else {
+      const nextISO = baseDate.toISOString();
+      const start = form.start_time ? new Date(form.start_time) : undefined;
+      if (start && baseDate <= start) {
+        toast.warning('End time must be after start time');
+        const fixed = addHours(start, 1);
+        setForm(prev => ({ ...prev, end_time: fixed.toISOString() }));
+      } else {
+        setForm(prev => ({ ...prev, end_time: nextISO }));
+      }
+    }
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !importingSessionId) return
+    
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    toast.promise(
+      api.post(`/sessions/${importingSessionId}/guests/import`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      }),
+      {
+        loading: 'Importing guests and sending emails...',
+        success: (res) => {
+          setImportingSessionId(null)
+          e.target.value = '' // Reset
+          queryClient.invalidateQueries({ queryKey: ['event-sessions', eventId] })
+          return res.data?.message || 'Guests imported successfully!'
+        },
+        error: (err) => {
+          setImportingSessionId(null)
+          e.target.value = ''
+          return err.response?.data?.error || 'Failed to import guests'
+        }
+      }
+    )
+  }
+
   const sessionNeedsSpeakers = (t: string) => t === 'seminar' || t === 'panel_discussion'
 
   return (
@@ -286,6 +388,7 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
               location: '',
               max_capacity: '',
               status: 'scheduled',
+              access_type: 'public',
               speakers: [emptySpeaker()],
             })
             setFormErrors({})
@@ -304,6 +407,13 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
           <CardDescription>All sessions for this event</CardDescription>
         </CardHeader>
         <CardContent>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept=".csv,.txt"
+            onChange={handleFileChange} 
+          />
           {authError && (
             <div className="mb-4">
               <Badge variant="secondary" className="text-red-700 bg-red-50 border border-red-200">Authentication required</Badge>
@@ -331,7 +441,10 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                   {sessions.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">
-                        <div>{s.name}</div>
+                        <div className="flex items-center gap-2">
+                          {s.access_type === 'private' ? <Lock className="w-3.5 h-3.5 text-muted-foreground" /> : <Globe className="w-3.5 h-3.5 text-muted-foreground" />}
+                          {s.name}
+                        </div>
                         {Array.isArray(s.speakers) && s.speakers.length > 0 ? (
                           <div className="text-xs text-muted-foreground mt-0.5">
                             {s.speakers.length} speaker{s.speakers.length !== 1 ? 's' : ''}
@@ -353,24 +466,44 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                       </TableCell>
                       <TableCell>{s.max_capacity ?? '—'}</TableCell>
                       <TableCell>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          {s.access_type === 'private' && (
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              title="Import Guests"
+                              className="h-8 w-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800"
+                              onClick={() => {
+                                setImportingSessionId(s.id);
+                                fileInputRef.current?.click();
+                              }}
+                            >
+                              <Upload className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
+                            title="Attendance"
+                            className="h-8 w-8"
                             onClick={() => openAttendance(s)}
                           >
-                            Attendance
+                            <UserCheck className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
+                            title="Assign Ushers"
+                            className="h-8 w-8"
                             onClick={() => { setUsherSessionId(s.id); setUsherDialogOpen(true) }}
                           >
-                            Ushers
+                            <Users className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
+                            title="Edit Session"
+                            className="h-8 w-8"
                             onClick={() => {
                               setEditingId(s.id)
                               const st = s.session_type || 'seminar'
@@ -387,17 +520,30 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                                 location: s.location || '',
                                 max_capacity: s.max_capacity?.toString?.() || '',
                                 status: s.status || 'scheduled',
+                                access_type: s.access_type || 'public',
                                 speakers: spk,
                               })
                               setOpen(true)
                             }}
                           >
-                            Edit
+                            <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button variant="outline" size="sm" onClick={async () => { await cancelSession(s.id); queryClient.invalidateQueries({ queryKey: ['event-sessions', eventId] }) }}>
-                            <XCircle className="h-4 w-4 mr-1" /> Cancel
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            title="Cancel Session"
+                            className="h-8 w-8"
+                            onClick={async () => { await cancelSession(s.id); queryClient.invalidateQueries({ queryKey: ['event-sessions', eventId] }) }}
+                          >
+                            <XCircle className="h-4 w-4" />
                           </Button>
-                          <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate(s.id)}>
+                          <Button 
+                            variant="destructive" 
+                            size="icon"
+                            title="Delete Session"
+                            className="h-8 w-8"
+                            onClick={() => deleteMutation.mutate(s.id)}
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -445,19 +591,36 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
+            <div className="flex items-center gap-4 py-2 border rounded-md px-3 bg-muted/20">
+              <div className="flex-1">
+                <Label className="text-sm font-semibold">Private Session</Label>
+                <p className="text-xs text-muted-foreground">Require attendees to be on a guest list. You can import CSV guests after creating.</p>
+              </div>
+              <Switch 
+                checked={form.access_type === 'private'} 
+                onCheckedChange={(checked) => setForm(prev => ({ ...prev, access_type: checked ? 'private' : 'public' }))} 
+              />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="justify-start w-full">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    {form.start_time ? new Date(form.start_time).toLocaleString() : 'Select start'}
+                  <Button variant="outline" className="justify-start w-full text-left font-normal truncate">
+                    <Calendar className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="truncate">{form.start_time ? formatConciseDateTime(form.start_time) : 'Select start'}</span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
+                <PopoverContent className="w-auto max-w-[95vw] p-0" align="start" side="bottom" sideOffset={4} avoidCollisions>
                   <div className="p-3 space-y-3">
                     <UiCalendar
                       mode="single"
                       selected={form.start_time ? new Date(form.start_time) : undefined}
+                      disabled={(date) => {
+                        const start = eventStart ? new Date(new Date(eventStart).setHours(0,0,0,0)) : null;
+                        const end = eventEnd ? new Date(new Date(eventEnd).setHours(23,59,59,999)) : null;
+                        if (start && date < start) return true;
+                        if (end && date > end) return true;
+                        return false;
+                      }}
                       onSelect={(d: any) => {
                         if (!d) return
                         const prev = form.start_time ? new Date(form.start_time) : new Date()
@@ -472,33 +635,71 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                         setForm({ ...form, start_time: nextISO, end_time: endISO })
                       }}
                     />
-                    <div className="flex items-center gap-2">
-                      <Input type="time" value={getHHMM(form.start_time)} onChange={e => {
-                        const v = e.target.value
-                        const base = form.start_time ? new Date(form.start_time) : new Date()
-                        const next = setTimeOnDate(base, v)
-                        let endISO = form.end_time
-                        if (!endISO || new Date(endISO) <= next) {
-                          endISO = addHours(next, 1).toISOString()
-                        }
-                        setForm({ ...form, start_time: next.toISOString(), end_time: endISO })
-                      }} />
+                    <div className="flex items-center gap-1.5 border-t pt-2 justify-center bg-muted/10">
+                      <Label className="text-xs font-medium text-muted-foreground mr-1">Time</Label>
+                      <Select 
+                        value={getHourValue(form.start_time)} 
+                        onValueChange={(h) => updateTimeValue('start', h, getMinuteValue(form.start_time), getAmpmValue(form.start_time))}
+                      >
+                        <SelectTrigger className="w-[58px] h-7 text-xs px-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }).map((_, i) => (
+                            <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-muted-foreground text-xs">:</span>
+                      <Select 
+                        value={getMinuteValue(form.start_time)} 
+                        onValueChange={(m) => updateTimeValue('start', getHourValue(form.start_time), m, getAmpmValue(form.start_time))}
+                      >
+                        <SelectTrigger className="w-[58px] h-7 text-xs px-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }).map((_, i) => {
+                            const val = String(i * 5).padStart(2, '0');
+                            return <SelectItem key={val} value={val}>{val}</SelectItem>;
+                          })}
+                        </SelectContent>
+                      </Select>
+                      <Select 
+                        value={getAmpmValue(form.start_time)} 
+                        onValueChange={(ampm) => updateTimeValue('start', getHourValue(form.start_time), getMinuteValue(form.start_time), ampm)}
+                      >
+                        <SelectTrigger className="w-[58px] h-7 text-xs px-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AM">AM</SelectItem>
+                          <SelectItem value="PM">PM</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </PopoverContent>
               </Popover>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="justify-start w-full">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    {form.end_time ? new Date(form.end_time).toLocaleString() : 'Select end'}
+                  <Button variant="outline" className="justify-start w-full text-left font-normal truncate">
+                    <Calendar className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="truncate">{form.end_time ? formatConciseDateTime(form.end_time) : 'Select end'}</span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
+                <PopoverContent className="w-auto max-w-[95vw] p-0" align="start" side="bottom" sideOffset={4} avoidCollisions>
                   <div className="p-3 space-y-3">
                     <UiCalendar
                       mode="single"
                       selected={form.end_time ? new Date(form.end_time) : undefined}
+                      disabled={(date) => {
+                        const start = eventStart ? new Date(new Date(eventStart).setHours(0,0,0,0)) : null;
+                        const end = eventEnd ? new Date(new Date(eventEnd).setHours(23,59,59,999)) : null;
+                        if (start && date < start) return true;
+                        if (end && date > end) return true;
+                        return false;
+                      }}
                       onSelect={(d: any) => {
                         if (!d) return
                         const prev = form.end_time ? new Date(form.end_time) : (form.start_time ? new Date(form.start_time) : new Date())
@@ -513,29 +714,48 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                         setForm({ ...form, end_time: nextISO })
                       }}
                     />
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="time"
-                        min={(() => {
-                          const s = form.start_time ? new Date(form.start_time) : undefined
-                          const e = form.end_time ? new Date(form.end_time) : undefined
-                          return s && e && sameYMD(s, e) ? getHHMM(form.start_time) : undefined
-                        })()}
-                        value={getHHMM(form.end_time)}
-                        onChange={e => {
-                          const v = e.target.value
-                          const base = form.end_time ? new Date(form.end_time) : (form.start_time ? new Date(form.start_time) : new Date())
-                          const next = setTimeOnDate(base, v)
-                          const start = form.start_time ? new Date(form.start_time) : undefined
-                          if (start && next <= start) {
-                            toast.warning('End time must be after start time')
-                            const fixed = addHours(start, 1)
-                            setForm({ ...form, end_time: fixed.toISOString() })
-                          } else {
-                            setForm({ ...form, end_time: next.toISOString() })
-                          }
-                        }}
-                      />
+                    <div className="flex items-center gap-1.5 border-t pt-2 justify-center bg-muted/10">
+                      <Label className="text-xs font-medium text-muted-foreground mr-1">Time</Label>
+                      <Select 
+                        value={getHourValue(form.end_time)} 
+                        onValueChange={(h) => updateTimeValue('end', h, getMinuteValue(form.end_time), getAmpmValue(form.end_time))}
+                      >
+                        <SelectTrigger className="w-[58px] h-7 text-xs px-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }).map((_, i) => (
+                            <SelectItem key={i+1} value={String(i+1)}>{i+1}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-muted-foreground text-xs">:</span>
+                      <Select 
+                        value={getMinuteValue(form.end_time)} 
+                        onValueChange={(m) => updateTimeValue('end', getHourValue(form.end_time), m, getAmpmValue(form.end_time))}
+                      >
+                        <SelectTrigger className="w-[58px] h-7 text-xs px-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }).map((_, i) => {
+                            const val = String(i * 5).padStart(2, '0');
+                            return <SelectItem key={val} value={val}>{val}</SelectItem>;
+                          })}
+                        </SelectContent>
+                      </Select>
+                      <Select 
+                        value={getAmpmValue(form.end_time)} 
+                        onValueChange={(ampm) => updateTimeValue('end', getHourValue(form.end_time), getMinuteValue(form.end_time), ampm)}
+                      >
+                        <SelectTrigger className="w-[58px] h-7 text-xs px-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AM">AM</SelectItem>
+                          <SelectItem value="PM">PM</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="flex gap-2 pt-1">
                       <Button size="sm" variant="outline" onClick={() => {
@@ -709,6 +929,7 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                       end_time: form.end_time,
                       location: form.location || null,
                       max_capacity: form.max_capacity ? Number(form.max_capacity) : null,
+                      access_type: form.access_type,
                     }
                     const payload =
                       sessionNeedsSpeakers(form.session_type)
@@ -730,6 +951,7 @@ export default function EventSessions({ eventId }: EventSessionsProps) {
                       end_time: form.end_time,
                       location: form.location || null,
                       max_capacity: form.max_capacity ? Number(form.max_capacity) : null,
+                      access_type: form.access_type,
                     }
                     const payload =
                       sessionNeedsSpeakers(form.session_type)
