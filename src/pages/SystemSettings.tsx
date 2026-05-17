@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { DashboardCard } from '@/components/DashboardCard'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
@@ -35,6 +35,7 @@ import api from '@/lib/api'
 import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
 
 interface SystemSettings {
   general: {
@@ -190,112 +191,122 @@ export default function SystemSettings() {
   if (!settings) return null
 
   return (
-    <div className="min-h-screen bg-transparent p-1 sm:p-6 space-y-6">
+    <div className="container mx-auto p-4 md:p-6 pb-24 space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
         >
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs font-bold uppercase tracking-widest text-primary/80">
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-primary">
               System Configuration
             </span>
           </div>
-          <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
             System Settings
           </h1>
-          <p className="text-muted-foreground mt-1">Configure system-wide settings and preferences.</p>
+          <p className="text-sm text-muted-foreground mt-1">Configure system-wide assets, SMTP details, and parameters.</p>
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex items-center gap-3"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+          className="flex items-center gap-3 shrink-0"
         >
-          <Button variant="outline" onClick={fetchSettings} className="gap-2">
+          <Button variant="outline" onClick={fetchSettings} className="rounded-2xl h-12 px-5 font-semibold gap-2 border-muted-foreground/20">
             <RefreshCw className="w-4 h-4" />
-            Reset
+            Reset Defaults
           </Button>
-          <Button onClick={handleSave} disabled={!hasChanges || saving} className="gap-2">
+          <Button onClick={handleSave} disabled={!hasChanges || saving} className="rounded-2xl h-12 px-6 font-semibold gap-2 shadow-lg shadow-primary/20">
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : 'Save Changes'}
           </Button>
         </motion.div>
       </div>
 
-      {/* Settings Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="general" className="gap-2">
+      {/* Settings Navigation Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 h-auto p-1.5 bg-muted rounded-2xl border border-border gap-1.5">
+          <TabsTrigger value="general" className="gap-2 rounded-2xl py-3 text-xs font-bold uppercase tracking-wider transition-all duration-300">
             <Globe className="w-4 h-4" />
             General
           </TabsTrigger>
-          <TabsTrigger value="email" className="gap-2">
+          <TabsTrigger value="email" className="gap-2 rounded-2xl py-3 text-xs font-bold uppercase tracking-wider transition-all duration-300">
             <Mail className="w-4 h-4" />
             Email
           </TabsTrigger>
-          <TabsTrigger value="security" className="gap-2">
+          <TabsTrigger value="security" className="gap-2 rounded-2xl py-3 text-xs font-bold uppercase tracking-wider transition-all duration-300">
             <Shield className="w-4 h-4" />
             Security
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2">
+          <TabsTrigger value="notifications" className="gap-2 rounded-2xl py-3 text-xs font-bold uppercase tracking-wider transition-all duration-300">
             <Bell className="w-4 h-4" />
-            Notifications
+            Alerts
           </TabsTrigger>
-          <TabsTrigger value="storage" className="gap-2">
+          <TabsTrigger value="storage" className="gap-2 rounded-2xl py-3 text-xs font-bold uppercase tracking-wider transition-all duration-300 col-span-2 sm:col-span-1">
             <Database className="w-4 h-4" />
             Storage
           </TabsTrigger>
         </TabsList>
 
         {/* General Settings */}
-        <TabsContent value="general" className="space-y-6">
-          <DashboardCard title="General Settings">
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="site_name">Site Name</Label>
+        <TabsContent value="general" className="focus-visible:outline-none">
+          <Card className="border border-border rounded-2xl shadow-sm overflow-hidden bg-card">
+            <CardHeader className="pb-4 pt-6 px-6">
+              <CardTitle className="text-xl font-bold flex items-center gap-2">
+                <Globe className="w-5 h-5 text-primary" />
+                General System Profile
+              </CardTitle>
+              <CardDescription>Setup metadata details and site status options</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 p-6 pt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="site_name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Site Name</Label>
                   <Input
                     id="site_name"
                     value={settings.general.site_name}
                     onChange={(e) => handleSettingChange('general', 'site_name', e.target.value)}
+                    className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="site_url">Site URL</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="site_url" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Site URL</Label>
                   <Input
                     id="site_url"
                     value={settings.general.site_url}
                     onChange={(e) => handleSettingChange('general', 'site_url', e.target.value)}
+                    className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="site_description">Site Description</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="site_description" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Site Description</Label>
                 <Textarea
                   id="site_description"
                   value={settings.general.site_description}
                   onChange={(e) => handleSettingChange('general', 'site_description', e.target.value)}
-                  rows={3}
+                  rows={4}
+                  className="rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25 resize-none p-4"
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="timezone">Timezone</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="timezone" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Timezone</Label>
                   <Select
                     value={settings.general.timezone}
                     onValueChange={(value) => handleSettingChange('general', 'timezone', value)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-12 rounded-2xl border-muted-foreground/20 focus:ring-primary/25 px-4">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="rounded-2xl border-black/5">
                       <SelectItem value="Africa/Addis_Ababa">Africa/Addis_Ababa (EAT)</SelectItem>
                       <SelectItem value="UTC">UTC</SelectItem>
                       <SelectItem value="America/New_York">America/New_York (EST)</SelectItem>
@@ -303,16 +314,16 @@ export default function SystemSettings() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="language">Language</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="language" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Language</Label>
                   <Select
                     value={settings.general.language}
                     onValueChange={(value) => handleSettingChange('general', 'language', value)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-12 rounded-2xl border-muted-foreground/20 focus:ring-primary/25 px-4">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="rounded-2xl border-black/5">
                       <SelectItem value="en">English</SelectItem>
                       <SelectItem value="am">አማርኛ</SelectItem>
                       <SelectItem value="fr">Français</SelectItem>
@@ -321,13 +332,15 @@ export default function SystemSettings() {
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="bg-border/40" />
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="maintenance_mode">Maintenance Mode</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Enable to put the site in maintenance mode
+              <div className="flex items-center justify-between p-4 rounded-2xl border border-border bg-muted/30">
+                <div className="space-y-1">
+                  <Label htmlFor="maintenance_mode" className="text-sm font-bold flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                    Maintenance Mode
+                  </Label>
+                  <p className="text-xs text-muted-foreground max-w-md">
+                    Restricts site registration and ticketing flows to admin-only accesses when enabled.
                   </p>
                 </div>
                 <Switch
@@ -336,109 +349,132 @@ export default function SystemSettings() {
                   onCheckedChange={(checked) =>
                     handleSettingChange('general', 'maintenance_mode', checked)
                   }
+                  className="data-[state=checked]:bg-amber-500"
                 />
               </div>
-            </div>
-          </DashboardCard>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Email Settings */}
-        <TabsContent value="email" className="space-y-6">
-          <DashboardCard title="Email Configuration">
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="smtp_host">SMTP Host</Label>
+        <TabsContent value="email" className="focus-visible:outline-none">
+          <Card className="border border-border rounded-2xl shadow-sm overflow-hidden bg-card">
+            <CardHeader className="pb-4 pt-6 px-6">
+              <CardTitle className="text-xl font-bold flex items-center gap-2">
+                <Mail className="w-5 h-5 text-primary" />
+                SMTP Mail Server Configuration
+              </CardTitle>
+              <CardDescription>Setup servers for system notifications and order confirmations</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 p-6 pt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="smtp_host" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">SMTP Host</Label>
                   <Input
                     id="smtp_host"
                     value={settings.email.smtp_host}
                     onChange={(e) => handleSettingChange('email', 'smtp_host', e.target.value)}
+                    className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="smtp_port">SMTP Port</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="smtp_port" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">SMTP Port</Label>
                   <Input
                     id="smtp_port"
                     type="number"
                     value={settings.email.smtp_port}
                     onChange={(e) => handleSettingChange('email', 'smtp_port', parseInt(e.target.value))}
+                    className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="smtp_username">SMTP Username</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="smtp_username" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">SMTP Username</Label>
                   <Input
                     id="smtp_username"
                     value={settings.email.smtp_username}
                     onChange={(e) => handleSettingChange('email', 'smtp_username', e.target.value)}
+                    className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="smtp_password">SMTP Password</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="smtp_password" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">SMTP Password</Label>
                   <Input
                     id="smtp_password"
                     type="password"
                     value={settings.email.smtp_password}
                     onChange={(e) => handleSettingChange('email', 'smtp_password', e.target.value)}
+                    className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="smtp_encryption">SMTP Encryption</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="smtp_encryption" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">SMTP Encryption</Label>
                   <Select
                     value={settings.email.smtp_encryption}
                     onValueChange={(value: any) => handleSettingChange('email', 'smtp_encryption', value)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-12 rounded-2xl border-muted-foreground/20 focus:ring-primary/25 px-4">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="rounded-2xl border-black/5">
                       <SelectItem value="tls">TLS</SelectItem>
                       <SelectItem value="ssl">SSL</SelectItem>
                       <SelectItem value="none">None</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="from_email">From Email</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="from_email" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">From Email Address</Label>
                   <Input
                     id="from_email"
                     type="email"
                     value={settings.email.from_email}
                     onChange={(e) => handleSettingChange('email', 'from_email', e.target.value)}
+                    className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="from_name">From Name</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="from_name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">From Name</Label>
                 <Input
                   id="from_name"
                   value={settings.email.from_name}
                   onChange={(e) => handleSettingChange('email', 'from_name', e.target.value)}
+                  className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                 />
               </div>
 
-              <Separator />
+              <Separator className="bg-border/40" />
 
-              <Button variant="outline" onClick={handleTestEmail} className="gap-2">
-                <Mail className="w-4 h-4" />
-                Send Test Email
-              </Button>
-            </div>
-          </DashboardCard>
+              <div className="flex justify-start">
+                <Button variant="outline" onClick={handleTestEmail} className="rounded-2xl h-11 px-5 font-semibold gap-2 border-muted-foreground/20">
+                  <Mail className="w-4 h-4 text-primary" />
+                  Send Test Connection Email
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Security Settings */}
-        <TabsContent value="security" className="space-y-6">
-          <DashboardCard title="Security Settings">
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="password_min_length">Minimum Password Length</Label>
+        <TabsContent value="security" className="focus-visible:outline-none">
+          <Card className="border border-border rounded-2xl shadow-sm overflow-hidden bg-card">
+            <CardHeader className="pb-4 pt-6 px-6">
+              <CardTitle className="text-xl font-bold flex items-center gap-2">
+                <Shield className="w-5 h-5 text-primary" />
+                Security & Authentication Parameters
+              </CardTitle>
+              <CardDescription>Setup minimum passwords lengths, 2FA, and login protections</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 p-6 pt-0">
+              <div className="space-y-1.5">
+                <Label htmlFor="password_min_length" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Minimum Password Length</Label>
                 <Input
                   id="password_min_length"
                   type="number"
@@ -446,14 +482,17 @@ export default function SystemSettings() {
                   onChange={(e) =>
                     handleSettingChange('security', 'password_min_length', parseInt(e.target.value))
                   }
+                  className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                 />
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
+              <div className="space-y-4 rounded-2xl border p-4 bg-muted/10 border-border/40">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Password Criteria</span>
+                
+                <div className="flex items-center justify-between py-1 border-b border-border/20">
                   <div className="space-y-0.5">
-                    <Label htmlFor="password_require_uppercase">Require Uppercase</Label>
-                    <p className="text-sm text-muted-foreground">Password must contain uppercase letters</p>
+                    <Label htmlFor="password_require_uppercase" className="text-sm font-semibold">Require Uppercase</Label>
+                    <p className="text-xs text-muted-foreground">Passwords must contain capital letters</p>
                   </div>
                   <Switch
                     id="password_require_uppercase"
@@ -464,10 +503,10 @@ export default function SystemSettings() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between py-1 border-b border-border/20">
                   <div className="space-y-0.5">
-                    <Label htmlFor="password_require_lowercase">Require Lowercase</Label>
-                    <p className="text-sm text-muted-foreground">Password must contain lowercase letters</p>
+                    <Label htmlFor="password_require_lowercase" className="text-sm font-semibold">Require Lowercase</Label>
+                    <p className="text-xs text-muted-foreground">Passwords must contain small letters</p>
                   </div>
                   <Switch
                     id="password_require_lowercase"
@@ -478,10 +517,10 @@ export default function SystemSettings() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between py-1 border-b border-border/20">
                   <div className="space-y-0.5">
-                    <Label htmlFor="password_require_numbers">Require Numbers</Label>
-                    <p className="text-sm text-muted-foreground">Password must contain numbers</p>
+                    <Label htmlFor="password_require_numbers" className="text-sm font-semibold">Require Numbers</Label>
+                    <p className="text-xs text-muted-foreground">Passwords must contain integers</p>
                   </div>
                   <Switch
                     id="password_require_numbers"
@@ -492,10 +531,10 @@ export default function SystemSettings() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between py-1">
                   <div className="space-y-0.5">
-                    <Label htmlFor="password_require_symbols">Require Symbols</Label>
-                    <p className="text-sm text-muted-foreground">Password must contain special characters</p>
+                    <Label htmlFor="password_require_symbols" className="text-sm font-semibold">Require Symbols</Label>
+                    <p className="text-xs text-muted-foreground">Passwords must contain special symbols (@, #, etc)</p>
                   </div>
                   <Switch
                     id="password_require_symbols"
@@ -507,11 +546,9 @@ export default function SystemSettings() {
                 </div>
               </div>
 
-              <Separator />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="session_timeout">Session Timeout (minutes)</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="session_timeout" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Session Timeout (minutes)</Label>
                   <Input
                     id="session_timeout"
                     type="number"
@@ -519,10 +556,11 @@ export default function SystemSettings() {
                     onChange={(e) =>
                       handleSettingChange('security', 'session_timeout', parseInt(e.target.value))
                     }
+                    className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="max_login_attempts">Max Login Attempts</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="max_login_attempts" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Max Login Attempts</Label>
                   <Input
                     id="max_login_attempts"
                     type="number"
@@ -530,16 +568,21 @@ export default function SystemSettings() {
                     onChange={(e) =>
                       handleSettingChange('security', 'max_login_attempts', parseInt(e.target.value))
                     }
+                    className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                   />
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="bg-border/40" />
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="two_factor_enabled">Two-Factor Authentication</Label>
-                  <p className="text-sm text-muted-foreground">Enable 2FA for all users</p>
+              <div className="flex items-center justify-between p-4 rounded-2xl border border-border bg-muted/30">
+                <div className="space-y-1">
+                  <Label htmlFor="two_factor_enabled" className="text-sm font-bold flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                    Two-Factor Authentication (2FA)
+                  </Label>
+                  <p className="text-xs text-muted-foreground max-w-md">
+                    Require absolute verification via email or mobile codes on login.
+                  </p>
                 </div>
                 <Switch
                   id="two_factor_enabled"
@@ -549,19 +592,28 @@ export default function SystemSettings() {
                   }
                 />
               </div>
-            </div>
-          </DashboardCard>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Notification Settings */}
-        <TabsContent value="notifications" className="space-y-6">
-          <DashboardCard title="Notification Settings">
-            <div className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
+        <TabsContent value="notifications" className="focus-visible:outline-none">
+          <Card className="border border-border rounded-2xl shadow-sm overflow-hidden bg-card">
+            <CardHeader className="pb-4 pt-6 px-6">
+              <CardTitle className="text-xl font-bold flex items-center gap-2">
+                <Bell className="w-5 h-5 text-primary" />
+                System Alerts & Notices
+              </CardTitle>
+              <CardDescription>Setup direct alert methods and primary email receivers</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 p-6 pt-0">
+              <div className="space-y-4 rounded-2xl border p-4 bg-muted/10 border-border/40">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest ml-1">Dispatch Channels</span>
+                
+                <div className="flex items-center justify-between py-1 border-b border-border/20">
                   <div className="space-y-0.5">
-                    <Label htmlFor="email_notifications">Email Notifications</Label>
-                    <p className="text-sm text-muted-foreground">Enable email notifications</p>
+                    <Label htmlFor="email_notifications" className="text-sm font-semibold">Email Alerts</Label>
+                    <p className="text-xs text-muted-foreground">Send system updates through outgoing emails</p>
                   </div>
                   <Switch
                     id="email_notifications"
@@ -572,10 +624,10 @@ export default function SystemSettings() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between py-1 border-b border-border/20">
                   <div className="space-y-0.5">
-                    <Label htmlFor="sms_notifications">SMS Notifications</Label>
-                    <p className="text-sm text-muted-foreground">Enable SMS notifications</p>
+                    <Label htmlFor="sms_notifications" className="text-sm font-semibold">SMS Alerts</Label>
+                    <p className="text-xs text-muted-foreground">Send verification messages through SMS gateways</p>
                   </div>
                   <Switch
                     id="sms_notifications"
@@ -586,10 +638,10 @@ export default function SystemSettings() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between py-1">
                   <div className="space-y-0.5">
-                    <Label htmlFor="push_notifications">Push Notifications</Label>
-                    <p className="text-sm text-muted-foreground">Enable push notifications</p>
+                    <Label htmlFor="push_notifications" className="text-sm font-semibold">Web Push Alerts</Label>
+                    <p className="text-xs text-muted-foreground">Deliver browser notification card popups</p>
                   </div>
                   <Switch
                     id="push_notifications"
@@ -601,30 +653,38 @@ export default function SystemSettings() {
                 </div>
               </div>
 
-              <Separator />
+              <Separator className="bg-border/40" />
 
-              <div className="space-y-2">
-                <Label htmlFor="admin_email">Admin Email</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="admin_email" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">System Master Admin Email</Label>
                 <Input
                   id="admin_email"
                   type="email"
                   value={settings.notifications.admin_email}
                   onChange={(e) => handleSettingChange('notifications', 'admin_email', e.target.value)}
+                  className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                 />
-                <p className="text-sm text-muted-foreground">
-                  Email address for system notifications and alerts
+                <p className="text-[10.5px] text-muted-foreground ml-1">
+                  Receives high-level application critical logs, ticket failures, and payouts requests warnings.
                 </p>
               </div>
-            </div>
-          </DashboardCard>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Storage Settings */}
-        <TabsContent value="storage" className="space-y-6">
-          <DashboardCard title="Storage Settings">
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="max_file_size">Max File Size (bytes)</Label>
+        <TabsContent value="storage" className="focus-visible:outline-none">
+          <Card className="border border-border rounded-2xl shadow-sm overflow-hidden bg-card">
+            <CardHeader className="pb-4 pt-6 px-6">
+              <CardTitle className="text-xl font-bold flex items-center gap-2">
+                <Database className="w-5 h-5 text-primary" />
+                Asset & Media Storage Limits
+              </CardTitle>
+              <CardDescription>Setup size bounds, file types, and hosting cloud locations</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 p-6 pt-0">
+              <div className="space-y-1.5">
+                <Label htmlFor="max_file_size" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Max File Upload Size (bytes)</Label>
                 <Input
                   id="max_file_size"
                   type="number"
@@ -632,31 +692,32 @@ export default function SystemSettings() {
                   onChange={(e) =>
                     handleSettingChange('storage', 'max_file_size', parseInt(e.target.value))
                   }
+                  className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                 />
-                <p className="text-sm text-muted-foreground">
-                  Current: {(settings.storage.max_file_size / 1024 / 1024).toFixed(2)} MB
+                <p className="text-[11px] text-muted-foreground ml-1">
+                  Current size: <strong className="text-foreground font-semibold">{(settings.storage.max_file_size / 1024 / 1024).toFixed(2)} MB</strong> limit per upload.
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="storage_driver">Storage Driver</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="storage_driver" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Storage Driver Location</Label>
                 <Select
                   value={settings.storage.storage_driver}
                   onValueChange={(value: any) => handleSettingChange('storage', 'storage_driver', value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-12 rounded-2xl border-muted-foreground/20 focus:ring-primary/25 px-4">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="local">Local Storage</SelectItem>
-                    <SelectItem value="s3">Amazon S3</SelectItem>
-                    <SelectItem value="azure">Azure Blob Storage</SelectItem>
+                  <SelectContent className="rounded-2xl border-black/5">
+                    <SelectItem value="local">Local Storage Disk</SelectItem>
+                    <SelectItem value="s3">Amazon Web Services S3</SelectItem>
+                    <SelectItem value="azure">Microsoft Azure Cloud Containers</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="allowed_file_types">Allowed File Types</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="allowed_file_types" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Allowed File Extensions</Label>
                 <Input
                   id="allowed_file_types"
                   value={settings.storage.allowed_file_types.join(', ')}
@@ -667,13 +728,14 @@ export default function SystemSettings() {
                       e.target.value.split(',').map((t) => t.trim())
                     )
                   }
+                  className="h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/25"
                 />
-                <p className="text-sm text-muted-foreground">
-                  Comma-separated list of allowed file extensions
+                <p className="text-[10.5px] text-muted-foreground ml-1">
+                  Provide extensions as a simple comma-separated list (e.g. png, jpg, pdf, doc).
                 </p>
               </div>
-            </div>
-          </DashboardCard>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

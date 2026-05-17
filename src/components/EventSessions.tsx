@@ -4,13 +4,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import api, { getEventSessions, createEventSession, updateSession, deleteSession, createSessionAttendance, updateSessionAttendance, getSessionById, cancelSession } from '@/lib/api'
 import { Switch } from '@/components/ui/switch'
-import { Mic, Plus, Calendar, MapPin, Trash2, UserRound, XCircle, CheckCircle2, Lock, Globe, Upload, UserCheck, Users, Pencil } from 'lucide-react'
+import { Mic, Plus, Calendar, MapPin, Trash2, UserRound, XCircle, CheckCircle2, Lock, Globe, Upload, UserCheck, Users, Pencil, Download } from 'lucide-react'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { Calendar as UiCalendar } from '@/components/ui/calendar'
 import { toast } from 'sonner'
@@ -89,8 +89,10 @@ export default function EventSessions({ eventId, eventStart, eventEnd }: EventSe
   const [editingId, setEditingId] = useState<number | null>(null)
 
   // CSV Import State
-  const fileInputRef = React.useRef<HTMLInputElement>(null)
   const [importingSessionId, setImportingSessionId] = useState<number | null>(null)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
 
   const [authError, setAuthError] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
@@ -340,33 +342,24 @@ export default function EventSessions({ eventId, eventStart, eventEnd }: EventSe
     }
   }
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !importingSessionId) return
-    
-    const formData = new FormData()
-    formData.append('file', file)
-    
-    toast.promise(
-      api.post(`/sessions/${importingSessionId}/guests/import`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      }),
-      {
-        loading: 'Importing guests and sending emails...',
-        success: (res) => {
-          setImportingSessionId(null)
-          e.target.value = '' // Reset
-          queryClient.invalidateQueries({ queryKey: ['event-sessions', eventId] })
-          return res.data?.message || 'Guests imported successfully!'
-        },
-        error: (err) => {
-          setImportingSessionId(null)
-          e.target.value = ''
-          return err.response?.data?.error || 'Failed to import guests'
-        }
-      }
-    )
-  }
+  const handleDownloadSampleCSV = () => {
+    const csvContent = "name,email,phone\n" +
+      "Almaz Yosef,almaz.yosef@example.com,+251911123456\n" +
+      "Bekele Abebe,bekele.abebe@example.com,+251912234567\n" +
+      "Tadesse Lemesa,tadesse.lemesa@example.com,+251913345678\n" +
+      "Marta Gidey,marta.gidey@example.com,+251914456789\n" +
+      "Yonas Kassa,yonas.kassa@example.com,+251915567890\n";
+      
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'session-guests-sample.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const sessionNeedsSpeakers = (t: string) => t === 'seminar' || t === 'panel_discussion'
 
@@ -407,13 +400,82 @@ export default function EventSessions({ eventId, eventStart, eventEnd }: EventSe
           <CardDescription>All sessions for this event</CardDescription>
         </CardHeader>
         <CardContent>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
-            accept=".csv,.txt"
-            onChange={handleFileChange} 
-          />
+          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+            <DialogContent className="sm:max-w-md w-[95vw]">
+              <DialogHeader>
+                <DialogTitle>Import Session Guests</DialogTitle>
+                <DialogDescription>
+                  Upload a CSV file to import guests and register them for this private session.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                  <div className="space-y-0.5">
+                    <span className="text-sm font-semibold">Need a template?</span>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={handleDownloadSampleCSV} className="shrink-0">
+                    <Download className="h-4 w-4 mr-1.5" />
+                    Sample CSV
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Select CSV File</Label>
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1">
+                      <Input 
+                        type="file" 
+                        accept=".csv,.txt"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          setSelectedFile(file);
+                        }}
+                        className="cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Your CSV must include an <strong className="text-foreground">email</strong> column. Columns for <strong className="text-foreground">name</strong> and <strong className="text-foreground">phone</strong> are optional.
+                  </p>
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0 mt-2">
+                <Button variant="outline" onClick={() => { setImportDialogOpen(false); setSelectedFile(null); }}>
+                  Cancel
+                </Button>
+                <Button 
+                  disabled={!selectedFile || uploading} 
+                  onClick={async () => {
+                    if (!selectedFile || !importingSessionId) return;
+                    setUploading(true);
+                    const formData = new FormData();
+                    formData.append('file', selectedFile);
+                    
+                    toast.promise(
+                      api.post(`/sessions/${importingSessionId}/guests/import`, formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                      }),
+                      {
+                        loading: 'Importing guests and sending emails...',
+                        success: (res) => {
+                          setImportDialogOpen(false);
+                          setSelectedFile(null);
+                          queryClient.invalidateQueries({ queryKey: ['event-sessions', eventId] });
+                          return res.data?.message || 'Guests imported successfully!';
+                        },
+                        error: (err) => {
+                          return err.response?.data?.error || 'Failed to import guests';
+                        }
+                      }
+                    );
+                    setUploading(false);
+                  }}
+                >
+                  {uploading ? 'Uploading...' : 'Import Guests'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           {authError && (
             <div className="mb-4">
               <Badge variant="secondary" className="text-red-700 bg-red-50 border border-red-200">Authentication required</Badge>
@@ -475,7 +537,7 @@ export default function EventSessions({ eventId, eventStart, eventEnd }: EventSe
                               className="h-8 w-8 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800"
                               onClick={() => {
                                 setImportingSessionId(s.id);
-                                fileInputRef.current?.click();
+                                setImportDialogOpen(true);
                               }}
                             >
                               <Upload className="h-4 w-4" />

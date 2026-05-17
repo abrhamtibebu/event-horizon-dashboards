@@ -15,6 +15,7 @@ import type { PublicSurveyPayload, SurveyQuestion } from '@/types/survey'
 import { toast } from 'sonner'
 import { Slider } from '@/components/ui/slider'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 
 export default function PublicEventSurveyPage() {
   const { eventId } = useParams<{ eventId: string }>()
@@ -186,13 +187,13 @@ export default function PublicEventSurveyPage() {
       if (typeof m === 'string') msg = m
     }
     return (
-      <div className="min-h-[100dvh] flex flex-col bg-muted/40">
-        <div className="flex-1 flex items-center justify-center p-6 text-center max-w-md mx-auto">
-          <Card className="w-full border-destructive/30">
-            <CardHeader>
-              <CardTitle className="text-lg">Survey unavailable</CardTitle>
+      <div className="min-h-[100dvh] flex flex-col bg-gradient-to-b from-background via-muted/30 to-background justify-center">
+        <div className="flex-1 flex items-center justify-center p-6 text-center max-w-md mx-auto w-full">
+          <Card className="w-full border-destructive/20 shadow-2xl rounded-3xl backdrop-blur-md bg-card/60">
+            <CardHeader className="pt-8">
+              <CardTitle className="text-xl font-extrabold text-foreground">Survey Unavailable</CardTitle>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
+            <CardContent className="text-sm text-muted-foreground pb-8">
               {(typeof msg === 'string' && msg) ||
                 'There is no active survey for this event, or it is not available yet.'}
             </CardContent>
@@ -205,25 +206,22 @@ export default function PublicEventSurveyPage() {
 
   if (needsLottoDetails) {
     return (
-      <div className="min-h-[100dvh] bg-muted/40 flex flex-col items-center px-4 py-8">
-        <div className="w-full max-w-lg space-y-4 flex-1">
-          <div className="text-center space-y-1 px-2">
-            <div className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-2">
-              Lotto Enabled
-            </div>
-            <h1 className="text-xl font-bold leading-tight">{survey.title}</h1>
-            <p className="text-sm text-muted-foreground">
-              Please provide your contact details to receive your Lotto number after completing the survey.
+      <div className="min-h-[100dvh] bg-gradient-to-b from-background via-muted/20 to-background flex flex-col items-center px-4 py-12 justify-center">
+        <div className="w-full max-w-lg space-y-6 flex-1 flex flex-col justify-center">
+          <div className="text-center space-y-2 px-2">
+            <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent leading-tight">{survey.title}</h1>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Please provide your contact details to complete the survey and register for the lucky draw.
             </p>
           </div>
           
-          <Card className="shadow-md border-border">
-            <CardHeader>
-              <CardTitle className="text-lg">Contact Information</CardTitle>
+          <Card className="border border-black/5 dark:border-white/5 shadow-2xl rounded-3xl bg-card/60 backdrop-blur-md overflow-hidden">
+            <CardHeader className="pb-4 pt-6 px-6">
+              <CardTitle className="text-xl font-bold">Registration</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5 px-6 pb-6">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Full Name</Label>
                 <Input
                   id="name"
                   placeholder="Enter your name"
@@ -232,7 +230,10 @@ export default function PublicEventSurveyPage() {
                     setRespondentName(e.target.value)
                     if (contactErrors.name) setContactErrors(prev => ({ ...prev, name: undefined }))
                   }}
-                  className={contactErrors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
+                  className={cn(
+                    "h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/20 transition-all",
+                    contactErrors.name ? 'border-destructive focus-visible:ring-destructive' : ''
+                  )}
                 />
                 {contactErrors.name && (
                   <p className="text-[11px] font-medium text-destructive mt-1 animate-in fade-in slide-in-from-top-1">
@@ -241,7 +242,7 @@ export default function PublicEventSurveyPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="phone" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Phone Number</Label>
                 <Input
                   id="phone"
                   placeholder="e.g. 0912345678"
@@ -250,21 +251,24 @@ export default function PublicEventSurveyPage() {
                     setRespondentPhone(e.target.value)
                     if (contactErrors.phone) setContactErrors(prev => ({ ...prev, phone: undefined }))
                   }}
-                  className={contactErrors.phone ? 'border-destructive focus-visible:ring-destructive' : ''}
+                  className={cn(
+                    "h-12 px-4 rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/20 transition-all",
+                    contactErrors.phone ? 'border-destructive focus-visible:ring-destructive' : ''
+                  )}
                 />
                 {contactErrors.phone ? (
                   <p className="text-[11px] font-medium text-destructive mt-1 animate-in fade-in slide-in-from-top-1">
                     {contactErrors.phone}
                   </p>
                 ) : (
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-[10px] text-muted-foreground ml-1">
                     Format: 09... or 07... (one entry per phone number)
                   </p>
                 )}
               </div>
             </CardContent>
-            <CardFooter className="flex justify-end pt-4 border-t bg-muted/20">
-              <Button type="button" onClick={next}>
+            <CardFooter className="flex justify-end p-6 border-t border-border/40 bg-muted/10">
+              <Button type="button" size="lg" className="rounded-2xl px-6 font-semibold" onClick={next}>
                 Start Survey
               </Button>
             </CardFooter>
@@ -277,24 +281,27 @@ export default function PublicEventSurveyPage() {
 
   if (step >= questions.length) {
     return (
-      <div className="min-h-[100dvh] flex flex-col bg-muted/40 items-center px-4 py-8">
-        <div className="flex-1 flex items-center justify-center w-full">
-          <Card className="max-w-md w-full text-center shadow-lg">
-            <CardHeader>
-              <CardTitle>Submitted</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <p className="text-muted-foreground text-sm">Thank you for your feedback.</p>
-              {lottoNumber && (
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6 space-y-2">
-                  <p className="text-xs uppercase tracking-widest font-bold text-amber-600">Your Lotto Number</p>
-                  <div className="text-4xl font-mono tracking-[0.25em] font-bold text-foreground">
-                    {lottoNumber}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Please keep this number for the draw.</p>
+      <div className="min-h-[100dvh] bg-gradient-to-b from-background via-muted/20 to-background flex flex-col items-center px-4 py-12 justify-center">
+        <div className="flex-1 flex flex-col items-center justify-center w-full max-w-lg">
+          <Card className="w-full text-center border border-black/5 dark:border-white/5 shadow-2xl rounded-[2.5rem] bg-card/60 backdrop-blur-md overflow-hidden p-8 space-y-6">
+            <div className="w-16 h-16 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <svg className="w-8 h-8 stroke-current stroke-2 animate-bounce" fill="none" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div className="space-y-2">
+              <CardTitle className="text-2xl font-extrabold tracking-tight">Responses Submitted</CardTitle>
+              <p className="text-muted-foreground text-sm">Thank you so much for your valuable feedback.</p>
+            </div>
+            {lottoNumber && (
+              <div className="bg-gradient-to-br from-amber-500/5 to-amber-600/[0.02] border border-amber-500/10 rounded-2xl p-6 space-y-3 shadow-sm">
+                <p className="text-[10px] uppercase tracking-[0.2em] font-extrabold text-amber-600">Your Lotto Draw Ticket</p>
+                <div className="text-4xl font-mono tracking-[0.3em] font-black text-foreground py-2 select-all">
+                  {lottoNumber}
                 </div>
-              )}
-            </CardContent>
+                <p className="text-[11px] text-muted-foreground">Keep this ticket number safe for the upcoming event draw!</p>
+              </div>
+            )}
           </Card>
         </div>
         <SurveyBrandedFooter />
@@ -303,36 +310,56 @@ export default function PublicEventSurveyPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-muted/40 flex flex-col items-center px-4 py-8">
-      <div className="w-full max-w-lg space-y-4 flex-1">
-        <div className="text-center space-y-1 px-2">
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Feedback</p>
-          <h1 className="text-xl font-bold leading-tight">{survey.title}</h1>
+    <div className="min-h-[100dvh] bg-gradient-to-b from-background via-muted/20 to-background flex flex-col items-center px-4 py-12 justify-center">
+      <div className="w-full max-w-lg space-y-6 flex-1 flex flex-col justify-center">
+        <div className="text-center space-y-2 px-2">
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Feedback Survey</p>
+          <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent leading-tight">{survey.title}</h1>
           {survey.description ? (
             <p className="text-sm text-muted-foreground">{survey.description}</p>
           ) : null}
         </div>
-        <Progress value={progress} className="h-2" />
-        <Card className="shadow-md border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold leading-snug">
+        
+        {/* Progress Bar with modern labeling */}
+        <div className="space-y-2 px-1">
+          <div className="flex justify-between items-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <span>Question {step + 1} of {questions.length}</span>
+            <span>{Math.round(progress)}% Complete</span>
+          </div>
+          <Progress value={progress} className="h-1.5 bg-muted/60 transition-all duration-300" />
+        </div>
+
+        <Card className="border border-black/5 dark:border-white/5 shadow-2xl rounded-3xl bg-card/60 backdrop-blur-md overflow-hidden">
+          <CardHeader className="pb-4 pt-6 px-6">
+            <CardTitle className="text-lg font-bold leading-snug">
               {current?.question_text}
             </CardTitle>
             {current?.is_required ? (
-              <p className="text-xs text-muted-foreground">Required</p>
+              <p className="text-[10px] uppercase font-bold tracking-wider text-primary mt-1">Required Question</p>
             ) : null}
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 px-6 pb-6">
             {current && (
               <QuestionStep question={current} value={values[current.id]} onChange={(v) => setVal(current.id, v)} />
             )}
           </CardContent>
-          <CardFooter className="flex justify-between gap-2 flex-wrap pt-4 border-t bg-muted/20">
-            <Button type="button" variant="outline" disabled={step === 0 || submitMut.isPending} onClick={back}>
+          <CardFooter className="flex justify-between gap-2 p-6 border-t border-border/40 bg-muted/10">
+            <Button 
+              type="button" 
+              variant="outline" 
+              disabled={step === 0 || submitMut.isPending} 
+              onClick={back}
+              className="rounded-xl font-semibold"
+            >
               Back
             </Button>
-            <Button type="button" onClick={next} disabled={submitMut.isPending}>
-              {submitMut.isPending ? 'Submitting…' : step >= questions.length - 1 ? 'Submit' : 'Next'}
+            <Button 
+              type="button" 
+              onClick={next} 
+              disabled={submitMut.isPending}
+              className="rounded-xl px-5 font-semibold"
+            >
+              {submitMut.isPending ? 'Submitting…' : step >= questions.length - 1 ? 'Submit Responses' : 'Next Question'}
             </Button>
           </CardFooter>
         </Card>
@@ -387,7 +414,7 @@ function QuestionStep({
           value={typeof value === 'string' ? value : ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder="Your answer…"
-          className="resize-none"
+          className="resize-none rounded-2xl border-muted-foreground/20 focus-visible:ring-primary/20 transition-all p-4"
           maxLength={opts?.max_length ?? 5000}
         />
       )
@@ -395,18 +422,23 @@ function QuestionStep({
     case 'rating': {
       const min = opts?.min ?? 1
       const max = opts?.max ?? 5
-      const numeric = typeof value === 'number' ? value : min
+      const numeric = typeof value === 'number' ? value : null
       const range = Array.from({ length: max - min + 1 }, (_, i) => min + i)
       return (
         <div className="space-y-3">
-          <div className="flex flex-wrap gap-2 justify-center py-2">
+          <div className="flex flex-wrap gap-3 justify-center py-2">
             {range.map((n) => (
               <Button
                 key={n}
                 type="button"
                 size="lg"
                 variant={numeric === n ? 'default' : 'outline'}
-                className="min-w-12 rounded-xl font-bold"
+                className={cn(
+                  "w-14 h-14 rounded-2xl font-bold flex items-center justify-center transition-all duration-200 border text-base",
+                  numeric === n 
+                    ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/25 scale-105" 
+                    : "bg-background hover:bg-muted/50 border-border text-muted-foreground hover:text-foreground"
+                )}
                 onClick={() => onChange(n)}
               >
                 {n}
@@ -420,17 +452,18 @@ function QuestionStep({
     case 'nps': {
       const v = typeof value === 'number' ? value : 5
       return (
-        <div className="space-y-4 px-2">
+        <div className="space-y-6 px-2 py-2">
           <Slider
             value={[v]}
             min={0}
             max={10}
             step={1}
             onValueChange={(vals) => onChange(vals[0] ?? 0)}
+            className="py-1"
           />
-          <div className="flex justify-between text-xs text-muted-foreground">
+          <div className="flex justify-between text-xs text-muted-foreground items-center">
             <span>Not likely · 0</span>
-            <span className="text-lg font-bold text-foreground tabular-nums">{v}</span>
+            <span className="text-xl font-black text-foreground bg-primary/5 border border-primary/10 rounded-2xl px-4 py-1.5 tabular-nums">{v}</span>
             <span>10 · Very likely</span>
           </div>
         </div>
@@ -441,15 +474,36 @@ function QuestionStep({
       const choices = opts?.choices ?? []
       const current = typeof value === 'string' ? value : ''
       return (
-        <RadioGroup value={current} onValueChange={(v) => onChange(v)} className="space-y-2">
-          {choices.map((c) => (
-            <div key={c.value} className="flex items-center space-x-2 rounded-lg border border-border p-3">
-              <RadioGroupItem value={c.value} id={`${question.id}-${c.value}`} />
-              <Label htmlFor={`${question.id}-${c.value}`} className="flex-1 cursor-pointer leading-snug font-normal">
-                {c.label}
-              </Label>
-            </div>
-          ))}
+        <RadioGroup value={current} onValueChange={(v) => onChange(v)} className="space-y-2.5">
+          {choices.map((c) => {
+            const isSelected = current === c.value;
+            return (
+              <div 
+                key={c.value} 
+                onClick={() => onChange(c.value)}
+                className={cn(
+                  "flex items-center space-x-3 rounded-2xl border p-4 cursor-pointer transition-all duration-200 hover:bg-muted/30",
+                  isSelected 
+                    ? "border-primary bg-primary/5 shadow-sm" 
+                    : "border-border bg-background"
+                )}
+              >
+                <RadioGroupItem value={c.value} id={`${question.id}-${c.value}`} className="sr-only" />
+                <div className={cn(
+                  "w-5 h-5 rounded-full border flex items-center justify-center transition-all flex-shrink-0",
+                  isSelected ? "border-primary bg-primary" : "border-muted-foreground/30"
+                )}>
+                  {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />}
+                </div>
+                <span className={cn(
+                  "flex-1 text-sm font-medium leading-snug transition-colors",
+                  isSelected ? "text-foreground font-semibold" : "text-muted-foreground"
+                )}>
+                  {c.label}
+                </span>
+              </div>
+            )
+          })}
         </RadioGroup>
       )
     }
@@ -465,22 +519,39 @@ function QuestionStep({
         }
       }
       return (
-        <div className="space-y-2">
-          {choices.map((c) => (
-            <div key={c.value} className="flex items-start space-x-3 rounded-lg border border-border p-3">
-              <Checkbox
-                id={`${question.id}-${c.value}`}
-                checked={selected.includes(c.value)}
-                onCheckedChange={() => toggle(c.value)}
-              />
-              <Label
-                htmlFor={`${question.id}-${c.value}`}
-                className="flex-1 cursor-pointer leading-snug font-normal"
+        <div className="space-y-2.5">
+          {choices.map((c) => {
+            const isSelected = selected.includes(c.value);
+            return (
+              <div 
+                key={c.value} 
+                onClick={() => toggle(c.value)}
+                className={cn(
+                  "flex items-start space-x-3 rounded-2xl border p-4 cursor-pointer transition-all duration-200 hover:bg-muted/30",
+                  isSelected 
+                    ? "border-primary bg-primary/5 shadow-sm" 
+                    : "border-border bg-background"
+                )}
               >
-                {c.label}
-              </Label>
-            </div>
-          ))}
+                <div className={cn(
+                  "w-5 h-5 rounded-md border flex items-center justify-center mt-0.5 transition-all flex-shrink-0",
+                  isSelected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/30"
+                )}>
+                  {isSelected && (
+                    <svg className="w-3.5 h-3.5 stroke-current stroke-2" fill="none" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span className={cn(
+                  "flex-1 text-sm font-medium leading-snug transition-colors",
+                  isSelected ? "text-foreground font-semibold" : "text-muted-foreground"
+                )}>
+                  {c.label}
+                </span>
+              </div>
+            )
+          })}
         </div>
       )
     }
