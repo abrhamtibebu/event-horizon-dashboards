@@ -306,9 +306,9 @@ export default function PublicEventRegister() {
         const eventData = res.data?.data || res.data;
         console.log('[PublicEventRegister] Event data received:', eventData);
         
-        // Custom redirect for Telebirr 5th Anniversary (Event ID 56)
-        if (eventData?.id === 56 || eventData?.id === '56' || eventUuid === '094a5f9c-879c-468c-afd5-932521c50076') {
-          navigate(`/event/telebirr-register/56${window.location.search}`, { replace: true });
+        // Custom redirect for Telebirr 5th Anniversary (Event ID 4)
+        if (eventData?.id === 4 || eventData?.id === '4') {
+          navigate(`/event/telebirr-register/4${window.location.search}`, { replace: true });
           return;
         }
 

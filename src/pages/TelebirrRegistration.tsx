@@ -274,7 +274,7 @@ const TelebirrRegistration: React.FC = () => {
       </nav>
 
       {/* Hero Section with Banner */}
-      <section className="relative py-20 overflow-hidden text-white" style={{ background: eventId === '56' ? `url('/tele birr event banner.png')` : (eventData?.image ? `url(${eventData.image})` : `linear-gradient(135deg, ${colors.deepGreen} 0%, ${colors.lightGreen} 100%)`), backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      <section className="relative py-20 overflow-hidden text-white" style={{ background: eventId === '4' ? `url('/tele birr event banner.png')` : (eventData?.image ? `url(${eventData.image})` : `linear-gradient(135deg, ${colors.deepGreen} 0%, ${colors.lightGreen} 100%)`), backgroundSize: 'cover', backgroundPosition: 'center' }}>
         {/* Overlay for readability */}
         <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"></div>
         

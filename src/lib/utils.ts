@@ -203,8 +203,8 @@ export function getStatusColor(status: string): string {
  * @returns The full URL to the image
  */
 export const getImageUrl = (imagePath: string | null | undefined | any, eventId?: number | string | null): string => {
-  // Hardwire for Telebirr 5th Anniversary (Event 56)
-  if (eventId === 56 || eventId === '56' || (typeof imagePath === 'string' && imagePath.includes('telebirr'))) {
+  // Hardwire for Telebirr 5th Anniversary (Event 4)
+  if (eventId === 4 || eventId === '4' || (typeof imagePath === 'string' && imagePath.includes('telebirr'))) {
     return '/tele birr event banner.png'
   }
 

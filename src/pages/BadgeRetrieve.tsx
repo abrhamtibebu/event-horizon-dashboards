@@ -85,7 +85,7 @@ export default function BadgeRetrieve() {
     }
   }
 
-  const isTelebirr = eventUuid === '56'
+  const isTelebirr = eventUuid === '4'
   const telebirrColors = {
     deepGreen: '#8DC63F',
     lightGreen: '#8DC63F',

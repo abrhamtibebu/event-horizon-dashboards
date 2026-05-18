@@ -34,7 +34,7 @@ const TelebirrRegistrationSuccess: React.FC = () => {
 
   const guestUuid = registrationData?.guest_uuid || '';
   const qrValue = guestUuid; // Use full UUID for reliable check-in
-  const eventUuid = eventData?.uuid || '094a5f9c-879c-468c-afd5-932521c50076';
+  const eventUuid = eventData?.uuid || '';
   const eventName = eventData?.title || eventData?.name || 'Event';
 
   const [showShareSection, setShowShareSection] = React.useState(false);

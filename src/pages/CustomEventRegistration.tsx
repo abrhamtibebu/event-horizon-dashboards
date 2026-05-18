@@ -101,9 +101,9 @@ const CustomEventRegistration: React.FC = () => {
 
   // Fetch event data
   useEffect(() => {
-    // Redirect for Telebirr 5th Anniversary (Event ID 56)
-    if (eventId === '56' || eventId === '094a5f9c-879c-468c-afd5-932521c50076') {
-      navigate(`/event/telebirr-register/56${window.location.search}`, { replace: true });
+    // Redirect for Telebirr 5th Anniversary (Event ID 4)
+    if (eventId === '4') {
+      navigate(`/event/telebirr-register/4${window.location.search}`, { replace: true });
       return;
     }
 

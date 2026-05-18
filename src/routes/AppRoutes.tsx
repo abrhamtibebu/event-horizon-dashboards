@@ -254,7 +254,7 @@ const AppWithRealtime = () => {
           />
           <Route
             path="/event/telebirr-register"
-            element={<Navigate to="/event/telebirr-register/56" replace />}
+            element={<Navigate to="/event/telebirr-register/4" replace />}
           />
           <Route
             path="/event/telebirr-register/:eventId"
