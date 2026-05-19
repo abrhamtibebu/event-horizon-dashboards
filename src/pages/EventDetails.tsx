@@ -245,6 +245,13 @@ export default function EventDetails() {
   const [editLoading, setEditLoading] = useState(false)
   const editImageInputRef = useRef<HTMLInputElement>(null)
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null)
+  const [editLocationMeta, setEditLocationMeta] = useState({
+    venue_name: '' as string,
+    formatted_address: '' as string,
+    latitude: null as number | null,
+    longitude: null as number | null,
+    city: '' as string,
+  })
 
   // Add state for edit form date ranges
   const [showEditEventRange, setShowEditEventRange] = useState(false)
@@ -838,7 +845,11 @@ export default function EventDetails() {
         'Country': attendee.guest?.country || 'N/A',
         'City': attendee.guest?.city || 'N/A',
         'Guest Type': guestTypeName,
-        'Reg Type': attendee.registration_type === 'onsite' ? 'Onsite' : 'Pre-Reg',
+        'Reg Type': attendee.registration_type === 'onsite'
+          ? 'Onsite'
+          : attendee.registration_type === 'evella'
+            ? 'Evella'
+            : 'Pre-Reg',
         'Registration Date': attendee.created_at
           ? format(parseISO(attendee.created_at), 'MMM d, yyyy, h:mm a')
           : 'N/A',
@@ -1270,6 +1281,14 @@ export default function EventDetails() {
       ...eventDataForEdit,
       guest_types: guestTypes,
     })
+    setEditLocationMeta({
+      venue_name: eventData.venue_name || eventData.geolocation?.venue_name || '',
+      formatted_address:
+        eventData.formatted_address || eventData.geolocation?.formatted_address || '',
+      latitude: eventData.latitude ?? eventData.geolocation?.latitude ?? null,
+      longitude: eventData.longitude ?? eventData.geolocation?.longitude ?? null,
+      city: eventData.city || '',
+    })
     setEditImagePreview(
       eventData.event_image ? getImageUrl(eventData.event_image) : null
     )
@@ -1381,6 +1400,11 @@ export default function EventDetails() {
     try {
       let payload;
       let headers = {};
+      const isPlatformAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+      const featuredRank =
+        isPlatformAdmin && editForm && 'featured_rank' in editForm
+          ? (editForm.featured_rank as number | null)
+          : undefined;
       // Convert date objects to ISO strings for API
       const processedEditForm = {
         ...editForm,
@@ -1392,26 +1416,42 @@ export default function EventDetails() {
         guest_types: Array.isArray(editForm.guest_types)
           ? editForm.guest_types
           : (editForm.guest_types || '').split(',').map((s) => s.trim()).filter(Boolean),
+        venue_name: editLocationMeta.venue_name || null,
+        formatted_address: editLocationMeta.formatted_address || null,
+        latitude: editLocationMeta.latitude,
+        longitude: editLocationMeta.longitude,
+        city: editLocationMeta.city || null,
       };
+      const { featured_rank: _fr, event_image: _ei, ...formWithoutFeatured } = processedEditForm;
       if (processedEditForm.event_image && processedEditForm.event_image instanceof File) {
         payload = new FormData();
         payload.append('_method', 'PUT');
-        Object.entries(processedEditForm).forEach(([key, value]) => {
-          if (key === 'event_image' && value) {
-            payload.append('event_image', value);
+        Object.entries(formWithoutFeatured).forEach(([key, value]) => {
+          if (key === 'event_image' && processedEditForm.event_image) {
+            payload.append('event_image', processedEditForm.event_image);
           } else if (key === 'guest_types') {
             (Array.isArray(value) ? value : [value]).forEach((type: string) =>
               payload.append('guest_types[]', type)
             );
-          } else {
+          } else if (value !== undefined && value !== null) {
             payload.append(key, value as any);
           }
         });
+        if (isPlatformAdmin && featuredRank !== undefined) {
+          payload.append(
+            'featured_rank',
+            featuredRank === null ? '' : String(featuredRank),
+          );
+        }
         headers = { 'Content-Type': 'multipart/form-data' };
         await api.post(`/events/${Number(eventId)}`, payload, { headers });
       } else {
-        const { event_image, ...payloadWithoutImage } = processedEditForm;
-        payload = payloadWithoutImage;
+        payload = {
+          ...formWithoutFeatured,
+          ...(isPlatformAdmin && featuredRank !== undefined
+            ? { featured_rank: featuredRank }
+            : {}),
+        };
         await api.put(`/events/${Number(eventId)}`, payload, { headers });
       }
       // Refresh event details before closing dialog
@@ -3420,6 +3460,10 @@ export default function EventDetails() {
                                       <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/30 text-[10px] px-1.5 py-0 rounded-full border whitespace-nowrap">
                                         Onsite
                                       </Badge>
+                                    ) : attendee.registration_type === 'evella' ? (
+                                      <Badge className="bg-violet-500/10 text-violet-600 border-violet-500/30 text-[10px] px-1.5 py-0 rounded-full border whitespace-nowrap">
+                                        Evella
+                                      </Badge>
                                     ) : (
                                       <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-[10px] px-1.5 py-0 rounded-full border whitespace-nowrap">
                                         Pre-Reg
@@ -4617,8 +4661,26 @@ export default function EventDetails() {
                           <div className="space-y-2">
                             <Label htmlFor="edit_location">Location</Label>
                             <GoogleVenueAutocompleteInput
-                              value={editForm.location || ''}
+                              value={
+                                editForm.location ||
+                                editLocationMeta.formatted_address ||
+                                editLocationMeta.venue_name ||
+                                ''
+                              }
                               onChange={(value) => handleEditInput('location', value)}
+                              onPlaceSelected={(selection) => {
+                                handleEditInput(
+                                  'location',
+                                  selection.formattedAddress || selection.venueName,
+                                )
+                                setEditLocationMeta({
+                                  venue_name: selection.venueName,
+                                  formatted_address: selection.formattedAddress,
+                                  latitude: selection.latitude,
+                                  longitude: selection.longitude,
+                                  city: selection.city,
+                                })
+                              }}
                               placeholder="Search for a venue or location"
                               className="rounded-xl shadow-sm border-muted-foreground/20"
                             />
@@ -4712,6 +4774,44 @@ export default function EventDetails() {
                               </SelectContent>
                             </Select>
                           </div>
+                          {(user?.role === 'admin' || user?.role === 'superadmin') && (
+                            <div className="space-y-2 sm:col-span-2">
+                              <Label htmlFor="edit_featured_rank">Evella featured slot</Label>
+                              <Select
+                                value={
+                                  editForm.featured_rank != null
+                                    ? String(editForm.featured_rank)
+                                    : 'none'
+                                }
+                                onValueChange={(value) =>
+                                  handleEditInput(
+                                    'featured_rank',
+                                    value === 'none' ? null : Number(value),
+                                  )
+                                }
+                              >
+                                <SelectTrigger
+                                  id="edit_featured_rank"
+                                  className="rounded-xl border-muted-foreground/20 shadow-sm"
+                                >
+                                  <SelectValue placeholder="Not featured on Evella" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl">
+                                  <SelectItem value="none">Not featured</SelectItem>
+                                  {[1, 2, 3, 4, 5].map((slot) => (
+                                    <SelectItem key={slot} value={String(slot)}>
+                                      Slot {slot}
+                                      {slot === 1 ? ' (hero — largest on home)' : ''}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground">
+                                Slots 1–5 control placement on evella.et home (slot 1 = hero).
+                                Event must be public to appear on Evella.
+                              </p>
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="edit_event_image">Event Banner Image</Label>

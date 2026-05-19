@@ -2,9 +2,12 @@ import { useNavigate } from 'react-router-dom'
 import { Ticket, Gift, ArrowRight, Users, DollarSign, Calendar, Star, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Breadcrumbs from '@/components/Breadcrumbs'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function EventTypeSelection() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const isPlatformAdmin = user?.role === 'admin' || user?.role === 'superadmin'
 
   return (
     <div className="min-h-screen bg-background">
@@ -133,7 +136,8 @@ export default function EventTypeSelection() {
             </div>
           </div>
 
-          {/* External Event Option */}
+          {/* External Event Option — platform admins only */}
+          {isPlatformAdmin && (
           <div className="bg-card rounded-2xl shadow-sm border border-border p-8 hover:shadow-lg transition-all duration-300 lg:col-span-2 max-w-2xl mx-auto w-full">
             <div className="text-center mb-8">
               <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -180,6 +184,7 @@ export default function EventTypeSelection() {
               </Button>
             </div>
           </div>
+          )}
         </div>
 
         {/* Comparison Table */}

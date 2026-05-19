@@ -45,7 +45,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import Pagination from '@/components/Pagination'
 import { Spinner } from '@/components/ui/spinner'
 import { usePagination } from '@/hooks/usePagination'
-import { Star, StarOff } from 'lucide-react'
+import { showSuccessToast, showErrorToast } from '@/components/ui/ModernToast'
+import axios from 'axios'
 
 export default function Events() {
   const [events, setEvents] = useState<any[]>([])
@@ -54,7 +55,7 @@ export default function Events() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [pricingFilter, setPricingFilter] = useState('all')
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [featuredSavingId, setFeaturedSavingId] = useState<number | null>(null)
   const [eventCounts, setEventCounts] = useState({
     ticketed: 0,
     free: 0,
@@ -63,17 +64,48 @@ export default function Events() {
 
   const { user } = useAuth()
   const { hasPermission, hasRole, checkPermission } = usePermissionCheck()
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const isPlatformAdmin = user?.role === 'admin' || user?.role === 'superadmin'
 
-  // Toggle featured status for admin
-  const toggleFeatured = async (eventId: number, currentStatus: boolean) => {
+  const setFeaturedSlot = async (eventId: number, slot: number | null, eventName?: string) => {
+    setFeaturedSavingId(eventId)
     try {
-      await api.put(`/events/${eventId}/toggle-featured`)
-      // Refresh events list
-      window.location.reload()
-    } catch (error: any) {
-      console.error('Failed to toggle featured status:', error)
-      // Show error toast if available
+      const { data } = await api.put(`/events/${eventId}/featured-slot`, { slot })
+      const updated = data?.event
+      setEvents((prev) =>
+        prev.map((e) => {
+          if (e.id === eventId) {
+            return {
+              ...e,
+              featured_rank: updated?.featured_rank ?? slot,
+              is_featured: updated?.is_featured ?? slot !== null,
+            }
+          }
+          if (slot !== null && e.featured_rank === slot) {
+            return { ...e, featured_rank: null, is_featured: false }
+          }
+          return e
+        }),
+      )
+      if (slot === null) {
+        showSuccessToast(
+          eventName ? `"${eventName}" removed from Evella featured` : 'Removed from Evella featured',
+        )
+      } else {
+        const base = eventName
+          ? `"${eventName}" assigned to Evella slot ${slot}${slot === 1 ? ' (hero)' : ''}`
+          : `Assigned to Evella featured slot ${slot}`
+        showSuccessToast(base)
+      }
+    } catch (error: unknown) {
+      const message = axios.isAxiosError(error)
+        ? (error.response?.data?.error as string) ||
+          (error.response?.data?.message as string) ||
+          'Failed to update featured placement'
+        : 'Failed to update featured placement'
+      showErrorToast(message)
+    } finally {
+      setFeaturedSavingId(null)
     }
   }
 
@@ -441,11 +473,11 @@ export default function Events() {
             </div>
           )}
 
-          {/* Events Grid or List */}
+          {/* Admin: table list · Organizers: card grid */}
           {!loading && !error && (
             <div className="mt-6">
-              {/* Admin Table View */}
-              {(user?.role === 'admin' || user?.role === 'superadmin') && (
+              {isPlatformAdmin && (
+                <>
                 <div className="bg-card rounded-2xl shadow-sm border border-border min-w-0 overflow-x-auto overflow-hidden">
                   <Table>
                     <TableHeader>
@@ -456,8 +488,8 @@ export default function Events() {
                         <TableHead className="font-semibold text-foreground">Visibility</TableHead>
                         <TableHead className="font-semibold text-foreground">Status</TableHead>
                         <TableHead className="font-semibold text-foreground">Attendees</TableHead>
-                        <TableHead className="font-semibold text-foreground">Featured</TableHead>
-                        <TableHead className="font-semibold text-foreground">Actions</TableHead>
+                        <TableHead className="font-semibold text-foreground">Evella</TableHead>
+                        <TableHead className="font-semibold text-foreground text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -473,8 +505,20 @@ export default function Events() {
                             {event.organizer?.name || 'Unknown'}
                           </TableCell>
                           <TableCell>
-                            <Badge className={`${event.event_type === 'ticketed' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'} text-xs font-medium`}>
-                              {event.event_type === 'ticketed' ? '🎫 Ticketed' : '🎉 Free'}
+                            <Badge
+                              className={`${
+                                event.event_type === 'ticketed'
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : event.event_type === 'external'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-green-100 text-green-800'
+                              } text-xs font-medium`}
+                            >
+                              {event.event_type === 'ticketed'
+                                ? '🎫 Ticketed'
+                                : event.event_type === 'external'
+                                  ? '🔗 External'
+                                  : '🎉 Free'}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -491,46 +535,72 @@ export default function Events() {
                             {event.attendee_count || 0}/{event.max_guests || 500}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => toggleFeatured(event.id, event.is_featured)}
-                              disabled={event.visibility !== 'public' || event.advertisement_status !== 'approved'}
-                              className={`p-2 ${event.is_featured ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-500'}`}
-                              title={
-                                event.visibility !== 'public' || event.advertisement_status !== 'approved'
-                                  ? 'Event must be public and approved to be featured'
-                                  : event.is_featured
-                                    ? 'Remove from featured'
-                                    : 'Mark as featured'
+                            <Select
+                              value={
+                                event.featured_rank
+                                  ? String(event.featured_rank)
+                                  : 'none'
                               }
+                              onValueChange={(value) => {
+                                const slot =
+                                  value === 'none' ? null : Number(value)
+                                if (slot === event.featured_rank) return
+                                setFeaturedSlot(event.id, slot, event.name)
+                              }}
+                              disabled={featuredSavingId === event.id}
                             >
-                              {event.is_featured ? (
-                                <Star className="w-5 h-5 fill-current" />
-                              ) : (
-                                <StarOff className="w-5 h-5" />
-                              )}
-                            </Button>
+                              <SelectTrigger
+                                className="h-8 w-[140px] text-xs"
+                                title="Evella home featured slot (1 = hero)"
+                              >
+                                <SelectValue placeholder="Not featured" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Not featured</SelectItem>
+                                {[1, 2, 3, 4, 5].map((slot) => (
+                                  <SelectItem key={slot} value={String(slot)}>
+                                    Slot {slot}
+                                    {slot === 1 ? ' (hero)' : ''}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {event.visibility !== 'public' && event.featured_rank ? (
+                              <p className="text-[10px] text-muted-foreground mt-1 max-w-[140px]">
+                                Set visibility to public to show on evella.et
+                              </p>
+                            ) : null}
                           </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Link to={`/dashboard/events/${event.id}`}>
-                                <Button variant="outline" size="sm">
-                                  <Eye className="w-4 h-4 mr-1" />
-                                  View
-                                </Button>
-                              </Link>
-                            </div>
+                          <TableCell className="text-right">
+                            <Link to={`/dashboard/events/${event.id}`}>
+                              <Button variant="outline" size="sm">
+                                <Eye className="w-4 h-4 mr-1" />
+                                View
+                              </Button>
+                            </Link>
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
+                {totalRecords > 0 && (
+                  <div className="mt-4">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      totalRecords={totalRecords}
+                      perPage={perPage}
+                      onPageChange={handlePageChange}
+                      onPerPageChange={handlePerPageChange}
+                    />
+                  </div>
+                )}
+                </>
               )}
 
-              {/* Organizer/Usher/Event Manager Grid View */}
-              {(hasRole(['organizer', 'organizer_admin', 'usher', 'event_manager'])) ? (
+              {!isPlatformAdmin &&
+              hasRole(['organizer', 'organizer_admin', 'usher', 'event_manager']) ? (
                 <>
                   {filteredEvents.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 bg-card rounded-2xl border border-border">

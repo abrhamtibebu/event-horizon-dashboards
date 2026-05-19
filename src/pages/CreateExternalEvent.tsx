@@ -34,6 +34,7 @@ import { Progress } from '@/components/ui/progress'
 import { showSuccessToast, showErrorToast } from '@/components/ui/ModernToast'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/hooks/use-auth'
 
 // Ethiopian major cities
 const ETHIOPIAN_CITIES = [
@@ -43,7 +44,16 @@ const ETHIOPIAN_CITIES = [
 
 export default function CreateExternalEvent() {
   const navigate = useNavigate()
+  const { user, isLoading: authLoading } = useAuth()
   const [activeStep, setActiveStep] = useState(1)
+
+  useEffect(() => {
+    if (authLoading) return
+    if (user?.role !== 'admin' && user?.role !== 'superadmin') {
+      showErrorToast('Only administrators can create external events')
+      navigate('/dashboard/events', { replace: true })
+    }
+  }, [authLoading, user, navigate])
   const totalSteps = 3
   const [isSubmitting, setIsSubmitting] = useState(false)
 

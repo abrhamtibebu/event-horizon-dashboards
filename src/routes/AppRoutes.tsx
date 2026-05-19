@@ -501,15 +501,7 @@ const AppWithRealtime = () => {
             <Route
               path="events/create/external"
               element={
-                <RoleProtectedRoute
-                  allowedRoles={[
-                    'superadmin',
-                    'admin',
-                    'organizer',
-                    'organizer_admin',
-                    'event_manager',
-                  ]}
-                >
+                <RoleProtectedRoute allowedRoles={['superadmin', 'admin']}>
                   <Lazy>
                     <P.CreateExternalEventPage />
                   </Lazy>
