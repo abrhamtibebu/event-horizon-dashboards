@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import api from '@/lib/api';
+import { downloadPublicAttendeeBadgeWithToast } from '@/lib/publicBadgeDownload';
 import {
   CheckCircle,
   Download,
@@ -50,21 +50,13 @@ const TelebirrRegistrationSuccess: React.FC = () => {
     }
     
     try {
-      const response = await api.get(`/public/events/${eventData.id}/attendees/${registrationData.id}/badge`, {
-        params: { guestUuid: guestUuid || undefined },
-        responseType: 'blob',
-      });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `telebirr-badge-${registrationData.registration_code || 'ticket'}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      toast.success('Badge downloaded successfully!');
-    } catch (error) {
+      await downloadPublicAttendeeBadgeWithToast({
+        eventId: eventData.id,
+        attendeeId: registrationData.id,
+        guestUuid,
+        downloadFilename: `telebirr-badge-${registrationData.registration_code || 'ticket'}.pdf`,
+      }, 'Badge downloaded successfully!');
+    } catch {
       toast.error('Failed to download badge');
     }
   };

@@ -133,7 +133,7 @@ const navigationCategories = [
         title: 'Ticket Sales',
         url: '/dashboard/ticket-management',
         icon: Ticket,
-        roles: ['organizer', 'organizer_admin'],
+        roles: ['organizer', 'organizer_admin', 'event_manager'],
         permission: 'tickets.manage',
       },
       {
@@ -171,14 +171,14 @@ const navigationCategories = [
         title: 'Guests',
         url: '/dashboard/guests',
         icon: Users2,
-        roles: ['organizer', 'organizer_admin'],
+        roles: ['organizer', 'organizer_admin', 'event_manager'],
         permission: 'guests.manage',
       },
       {
         title: 'Ushers',
         url: '/dashboard/usher-management',
         icon: UserPlus2,
-        roles: ['organizer', 'organizer_admin', 'user'],
+        roles: ['organizer', 'organizer_admin', 'event_manager', 'user'],
         permission: 'ushers.manage',
       },
       {
@@ -272,7 +272,7 @@ const navigationCategories = [
         title: 'Locate Badges',
         url: '/dashboard/locate-badges',
         icon: MapPin,
-        roles: ['admin', 'organizer', 'organizer_admin', 'usher'],
+        roles: ['admin', 'organizer', 'organizer_admin', 'event_manager', 'usher'],
         permission: 'badges.locate',
       },
     ],
@@ -284,7 +284,7 @@ const navigationCategories = [
         title: 'Analytics',
         url: '/dashboard/reports',
         icon: BarChart3,
-        roles: ['organizer', 'organizer_admin'],
+        roles: ['organizer', 'organizer_admin', 'event_manager'],
         permission: 'reports.view',
       },
     ],
@@ -360,7 +360,7 @@ export function AppSidebar() {
   const { state, toggleSidebar } = useSidebar()
   const { user, logout } = useAuth()
   const { hasPermission, isOrganizerAdmin } = useOrganizerPermissions()
-  const { hasRole } = usePermissionCheck()
+  const { hasRole, hasPermission: hasRolePermission } = usePermissionCheck()
   const isCollapsed = state === 'collapsed'
   const [trashCount, setTrashCount] = useState(0)
   const location = useLocation()
@@ -412,9 +412,10 @@ export function AppSidebar() {
           return false
         }
 
-        // For organizer and organizer_admin users, check permissions
-        if ((user.role === 'organizer' || user.role === 'organizer_admin') && item.permission) {
+        // For organizer-side users, check granular permissions
+        if ((user.role === 'organizer' || user.role === 'organizer_admin' || user.role === 'event_manager') && item.permission) {
           if (isOrganizerAdmin || user.role === 'organizer_admin') return true
+          if (user.role === 'event_manager') return hasRolePermission(item.permission)
 
           if (item.permission === 'vendors.any') {
             const vendorPermissions = [

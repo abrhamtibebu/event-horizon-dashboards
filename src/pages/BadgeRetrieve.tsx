@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle, Download, Mail, Search, ShieldCheck } from 'l
 import { toast } from 'sonner'
 
 import api, { lookupPublicBadge, type PublicBadgeLookupResponse } from '@/lib/api'
+import { downloadPublicAttendeeBadgeWithToast } from '@/lib/publicBadgeDownload'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -60,24 +61,18 @@ export default function BadgeRetrieve() {
     setDownloading(true)
 
     try {
-      const response = await api.get(
-        `/public/events/${lookupResult.eventId}/attendees/${lookupResult.attendeeId}/badge`,
+      const ok = await downloadPublicAttendeeBadgeWithToast(
         {
-          params: { guestUuid: lookupResult.guestUuid },
-          responseType: 'blob',
+          eventId: lookupResult.eventId,
+          attendeeId: lookupResult.attendeeId,
+          guestUuid: lookupResult.guestUuid,
+          downloadFilename: `${lookupResult.guestName?.replace(/\s+/g, '-') || 'badge'}.pdf`,
         },
+        'E-badge downloaded successfully.',
       )
-
-      const blob = new Blob([response.data], { type: 'application/pdf' })
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `${lookupResult.guestName?.replace(/\s+/g, '-') || 'badge'}.pdf`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
-      toast.success('E-badge downloaded successfully.')
+      if (!ok) {
+        return
+      }
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to download badge. Please try again.')
     } finally {

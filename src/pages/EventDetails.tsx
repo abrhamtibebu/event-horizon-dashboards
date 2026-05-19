@@ -4514,10 +4514,10 @@ export default function EventDetails() {
                       eventUuid={eventData?.uuid || ''}
                       eventName={eventData?.name || ''}
                       eventType={eventData?.event_type as 'free' | 'ticketed' || 'free'}
-                      isOrganizer={user?.role === 'organizer' || user?.role === 'organizer_admin' || user?.role === 'admin' || user?.role === 'superadmin'}
+                      isOrganizer={user?.role === 'organizer' || user?.role === 'organizer_admin' || user?.role === 'event_manager' || user?.role === 'admin' || user?.role === 'superadmin'}
                     />
                   </TabsContent>
-                {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin') && eventData?.event_type !== 'ticketed' ? (
+                {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin' || user?.role === 'event_manager') && eventData?.event_type !== 'ticketed' ? (
                   <TabsContent value="bulk-badges">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between bg-card rounded-xl p-4 border border-border shadow-sm">

@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { showSuccessToast, showErrorToast } from '@/components/ui/ModernToast'
 import api from '@/lib/api'
+import { isOrganizerEventRole } from '@/lib/roles'
 import { useAuth } from '@/hooks/use-auth'
 import { useFeatureAccess } from '@/hooks/useFeatureAccess'
 import { UpgradePrompt } from '@/components/subscription/UpgradePrompt'
@@ -162,11 +163,11 @@ export default function CreateTicketedEvent() {
     fetchData('/event-categories', setEventCategories, 'eventCategories')
 
     // Pre-select organizer for organizers and organizer_admins
-    if (user && (user.role === 'organizer' || user.role === 'organizer_admin') && user.organizer_id) {
+    if (user && isOrganizerEventRole(user.role) && user.organizer_id) {
       setFormData(prev => ({ ...prev, organizer_id: String(user.organizer_id) }))
     }
 
-    if (user?.role !== 'organizer' && user?.role !== 'organizer_admin') {
+    if (!isOrganizerEventRole(user?.role)) {
       fetchData('/organizers', setOrganizers, 'organizers')
     } else {
       setLoading(prev => ({ ...prev, organizers: false }))
@@ -309,7 +310,7 @@ export default function CreateTicketedEvent() {
           : {}),
         max_guests: parseInt(formData.max_guests, 10),
         // Only include organizer_id if not an organizer or organizer_admin (backend sets it for them)
-        ...(user?.role !== 'organizer' && user?.role !== 'organizer_admin' && { organizer_id: formData.organizer_id }),
+        ...(!isOrganizerEventRole(user?.role) && { organizer_id: formData.organizer_id }),
       }
       const headers = {}
 
@@ -771,7 +772,7 @@ export default function CreateTicketedEvent() {
                 <Label htmlFor="organizer_id" className="flex items-center gap-2 text-foreground font-medium">
                   <Tag className="w-4 h-4 text-green-500" /> Organizer
                 </Label>
-                {(user?.role === 'organizer' || user?.role === 'organizer_admin') ? (
+                {isOrganizerEventRole(user?.role) ? (
                   <Input
                     value={decodeHtmlEntities(user.organizer?.name || 'Loading organizer...')}
                     disabled

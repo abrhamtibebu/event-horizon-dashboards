@@ -11,6 +11,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import api from '@/lib/api';
+import { downloadPublicAttendeeBadgeWithToast } from '@/lib/publicBadgeDownload';
 import { SpinnerInline } from '@/components/ui/spinner';
 import { GuestShareBannerPanel } from '@/components/share/GuestShareBannerPanel'
 
@@ -83,22 +84,12 @@ export default function RegistrationSuccess() {
     if (!attendeeId || !eventIdParam) return;
     setDownloading(true);
     try {
-      const response = await api.get(`/public/events/${eventIdParam}/attendees/${attendeeId}/badge`, {
-        params: { guestUuid: guestUuid || undefined },
-        responseType: 'blob',
+      await downloadPublicAttendeeBadgeWithToast({
+        eventId: eventIdParam,
+        attendeeId,
+        guestUuid,
+        downloadFilename: qrValue.length > 0 ? `e-badge-${qrValue}.pdf` : 'e-badge.pdf',
       });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = qrValue.length > 0 ? `e-badge-${qrValue}.pdf` : 'e-badge.pdf';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      toast.success('E-badge downloaded successfully!');
-    } catch (_error: unknown) {
-      toast.error('Failed to download badge. Please try again.');
     } finally {
       setDownloading(false);
     }

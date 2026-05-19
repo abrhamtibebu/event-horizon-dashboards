@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { showSuccessToast, showErrorToast } from '@/components/ui/ModernToast'
 import api from '@/lib/api'
+import { isOrganizerEventRole } from '@/lib/roles'
 import { useAuth } from '@/hooks/use-auth'
 import {
   Select,
@@ -160,11 +161,11 @@ export default function CreateFreeEvent() {
     fetchData('/event-categories', setEventCategories, 'eventCategories')
 
     // Pre-select organizer for organizers and organizer_admins
-    if (user && (user.role === 'organizer' || user.role === 'organizer_admin') && user.organizer_id) {
+    if (user && isOrganizerEventRole(user.role) && user.organizer_id) {
       setFormData(prev => ({ ...prev, organizer_id: String(user.organizer_id) }))
     }
 
-    if (user?.role !== 'organizer' && user?.role !== 'organizer_admin') {
+    if (!isOrganizerEventRole(user?.role)) {
       fetchData('/organizers', setOrganizers, 'organizers')
     } else {
       setLoading(prev => ({ ...prev, organizers: false }))
@@ -296,7 +297,7 @@ export default function CreateFreeEvent() {
       return
     }
 
-    if (user?.role !== 'organizer' && user?.role !== 'organizer_admin' && !formData.organizer_id) {
+    if (!isOrganizerEventRole(user?.role) && !formData.organizer_id) {
       showErrorToast('Please select an organizer.')
       return
     }
@@ -365,7 +366,7 @@ export default function CreateFreeEvent() {
           : {}),
         max_guests: maxGuests,
         // Only include organizer_id if not an organizer or organizer_admin (backend sets it for them)
-        ...(user?.role !== 'organizer' && user?.role !== 'organizer_admin' && { organizer_id: formData.organizer_id }),
+        ...(!isOrganizerEventRole(user?.role) && { organizer_id: formData.organizer_id }),
         guest_types: allGuestTypes,
       }
 
@@ -381,7 +382,7 @@ export default function CreateFreeEvent() {
               payload.append('guest_types', JSON.stringify(value))
             }
           } else if (value !== null && value !== undefined && value !== '') {
-            if (key === 'organizer_id' && (user?.role === 'organizer' || user?.role === 'organizer_admin')) {
+            if (key === 'organizer_id' && isOrganizerEventRole(user?.role)) {
               // Skip organizer_id for organizers
             } else {
               payload.append(key, value as any)
@@ -398,7 +399,7 @@ export default function CreateFreeEvent() {
       } else {
         payload = Object.fromEntries(
           Object.entries(processedFormData).filter(([key, value]) => {
-            if (key === 'organizer_id' && (user?.role === 'organizer' || user?.role === 'organizer_admin')) {
+            if (key === 'organizer_id' && isOrganizerEventRole(user?.role)) {
               return false
             }
             return value !== null && value !== undefined && value !== ''
@@ -814,7 +815,7 @@ export default function CreateFreeEvent() {
                   <Label htmlFor="organizer_id" className="text-sm font-semibold">
                     Organizer <span className="text-destructive">*</span>
                   </Label>
-                  {(user?.role === 'organizer' || user?.role === 'organizer_admin') ? (
+                  {isOrganizerEventRole(user?.role) ? (
                     <Input
                       value={decodeHtmlEntities(user.organizer?.name || 'Loading organizer...')}
                       disabled

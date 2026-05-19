@@ -507,6 +507,7 @@ const AppWithRealtime = () => {
                     'admin',
                     'organizer',
                     'organizer_admin',
+                    'event_manager',
                   ]}
                 >
                   <Lazy>
@@ -542,6 +543,7 @@ const AppWithRealtime = () => {
                   allowedRoles={[
                     'organizer',
                     'organizer_admin',
+                    'event_manager',
                     'admin',
                     'superadmin',
                   ]}
@@ -584,7 +586,7 @@ const AppWithRealtime = () => {
               path="ticket-analytics/:eventId"
               element={
                 <RoleProtectedRoute
-                  allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin']}
+                  allowedRoles={['superadmin', 'admin', 'organizer', 'organizer_admin', 'event_manager']}
                 >
                   <Lazy>
                     <P.AnalyticsDashboardPage />
@@ -683,7 +685,9 @@ const AppWithRealtime = () => {
             <Route
               path="guests"
               element={
-                <RoleProtectedRoute allowedRoles={['organizer', 'organizer_admin']}>
+                <RoleProtectedRoute
+                  allowedRoles={['organizer', 'organizer_admin', 'event_manager']}
+                >
                   <Lazy>
                     <P.GuestsPage />
                   </Lazy>
@@ -700,6 +704,7 @@ const AppWithRealtime = () => {
                     'admin',
                     'organizer',
                     'organizer_admin',
+                    'event_manager',
                     'user',
                   ]}
                 >
@@ -718,6 +723,7 @@ const AppWithRealtime = () => {
                     'admin',
                     'organizer',
                     'organizer_admin',
+                    'event_manager',
                     'user',
                   ]}
                 >
@@ -736,6 +742,7 @@ const AppWithRealtime = () => {
                     'admin',
                     'organizer',
                     'organizer_admin',
+                    'event_manager',
                     'user',
                   ]}
                 >
@@ -1143,7 +1150,9 @@ const AppWithRealtime = () => {
             <Route
               path="reports"
               element={
-                <RoleProtectedRoute allowedRoles={['superadmin', 'organizer', 'organizer_admin']}>
+                <RoleProtectedRoute
+                  allowedRoles={['superadmin', 'organizer', 'organizer_admin', 'event_manager']}
+                >
                   <Lazy>
                     <P.ReportsPage />
                   </Lazy>
