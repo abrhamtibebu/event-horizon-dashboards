@@ -196,9 +196,19 @@ export function getStatusColor(status: string): string {
   }
 }
 
+/** Storage directory prefixes returned by the Laravel backend (without leading slash). */
+const STORAGE_PATH_PREFIXES = [
+  'event_images/',
+  'organizer_logos/',
+  'organizer_banners/',
+  'guest_profiles/',
+  'user_profiles/',
+  'badge_templates/',
+] as const
+
 /**
  * Constructs a proper image URL from a storage path
- * @param imagePath - The image path from the backend (e.g., "/storage/image.png")
+ * @param imagePath - The image path from the backend (e.g. "organizer_logos/file.png")
  * @param eventId - Optional event ID for hardwiring specific event banners
  * @returns The full URL to the image
  */
@@ -209,27 +219,47 @@ export const getImageUrl = (imagePath: string | null | undefined | any, eventId?
   }
 
   if (!imagePath || typeof imagePath !== 'string') {
-    return '/placeholder.svg' // Default placeholder
+    return '/placeholder.svg'
   }
 
-  // If it's already a full URL, return as is
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath
+  const trimmed = imagePath.trim()
+  if (!trimmed) {
+    return '/placeholder.svg'
   }
 
-  // Check if it's a storage path (with or without leading slash)
-  if (imagePath.includes('storage/')) {
-    const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
-    return `${getApiBaseURLForStorage()}${cleanPath}`
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed
   }
 
-  // Handle raw storage paths (e.g. "event_images/filename.jpg")
-  if (imagePath.startsWith('event_images/') || imagePath.startsWith('organizer_logos/')) {
-    return `${getApiBaseURLForStorage()}/storage/${imagePath}`
+  if (trimmed.startsWith('blob:') || trimmed.startsWith('data:')) {
+    return trimmed
   }
 
-  return imagePath
+  const base = getApiBaseURLForStorage()
+
+  if (trimmed.includes('storage/')) {
+    const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+    return `${base}${cleanPath}`
+  }
+
+  const normalized = trimmed.replace(/^\/+/, '')
+
+  const isStoragePath =
+    STORAGE_PATH_PREFIXES.some((prefix) => normalized.startsWith(prefix)) ||
+    (normalized.includes('/') && /\.(jpe?g|png|gif|webp|svg)$/i.test(normalized))
+
+  if (isStoragePath) {
+    return `${base}/storage/${normalized}`
+  }
+
+  return trimmed
 }
+
+/** Resolve organizer logo path to a full storage URL. */
+export const getOrganizerLogoUrl = (logo?: string | null) => getImageUrl(logo)
+
+/** Resolve organizer banner path to a full storage URL. */
+export const getOrganizerBannerUrl = (banner?: string | null) => getImageUrl(banner)
 
 /**
  * Compresses a base64 image string to a target width/height and quality.

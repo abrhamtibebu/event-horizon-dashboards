@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/hooks/use-auth'
 import { useModernAlerts } from '@/hooks/useModernAlerts'
 import api from '@/lib/api'
-import { cn, getImageUrl } from '@/lib/utils'
+import { cn, getOrganizerBannerUrl, getOrganizerLogoUrl } from '@/lib/utils'
 import { ModernConfirmationDialog } from '@/components/ui/ModernConfirmationDialog'
 import { UsherMobileLayout } from '@/components/UsherMobileLayout'
 
@@ -247,7 +247,7 @@ export default function Profile() {
       setBannerPreview('')
       setIsEditingOrg(false)
     } catch (error: any) {
-      showError(error.response?.data?.message || 'Failed to update organization details')
+      showError(error.response?.data?.error || error.response?.data?.message || 'Failed to update organization details')
     } finally {
       setIsSavingOrg(false)
     }
@@ -843,7 +843,7 @@ export default function Profile() {
                 {bannerPreview ? (
                   <img src={bannerPreview} alt="Organization Banner Preview" className="w-full h-full object-cover" />
                 ) : organizer?.banner ? (
-                  <img src={getImageUrl(organizer.banner)} alt="Organization Banner" className="w-full h-full object-cover" />
+                  <img src={getOrganizerBannerUrl(organizer.banner)} alt="Organization Banner" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-muted-foreground/40 font-medium text-sm">
                     No organization banner uploaded
@@ -875,7 +875,7 @@ export default function Profile() {
                   {logoPreview ? (
                     <img src={logoPreview} alt="Organization Logo Preview" className="w-full h-full object-cover" />
                   ) : organizer?.logo ? (
-                    <img src={getImageUrl(organizer.logo)} alt="Organization Logo" className="w-full h-full object-cover" />
+                    <img src={getOrganizerLogoUrl(organizer.logo)} alt="Organization Logo" className="w-full h-full object-cover" />
                   ) : (
                     <Building2 className="w-10 h-10 md:w-14 md:h-14 text-muted-foreground/60" />
                   )}

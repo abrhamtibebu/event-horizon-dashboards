@@ -419,10 +419,10 @@ const CustomEventRegistration: React.FC = () => {
           <div className="max-w-7xl mx-auto px-4 py-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                {eventData?.organizer?.logo && (
+                {(eventData?.organizer?.logo || eventData?.organizer_logo) && (
                   <div className="w-16 h-16 bg-white rounded-lg border-2 border-slate-300 flex items-center justify-center p-2 shadow-sm">
                     <img
-                      src={getImageUrl(eventData.organizer.logo)}
+                      src={getImageUrl(eventData.organizer?.logo || eventData.organizer_logo)}
                       alt={eventData.organizer.name}
                       className="w-full h-full object-contain"
                     />
@@ -535,11 +535,11 @@ const CustomEventRegistration: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              {eventData?.organizer?.logo && (
+              {(eventData?.organizer?.logo || eventData?.organizer_logo) && (
                 <div className="w-16 h-16 bg-white rounded-lg border-2 border-slate-300 flex items-center justify-center p-2 shadow-sm">
                   <img
-                    src={getImageUrl(eventData.organizer.logo)}
-                    alt={eventData.organizer.name}
+                    src={getImageUrl(eventData.organizer?.logo || eventData.organizer_logo)}
+                    alt={eventData.organizer?.name || eventData.organizer_name || 'Organizer'}
                     className="w-full h-full object-contain"
                   />
                 </div>

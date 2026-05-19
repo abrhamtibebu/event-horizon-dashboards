@@ -8,6 +8,43 @@ export interface FileValidationResult {
   message: string
 }
 
+/** Registration profile picture: PNG and JPEG only */
+export const PROFILE_PICTURE_ACCEPT = 'image/jpeg,image/jpg,image/png,.jpg,.jpeg,.png'
+
+const PROFILE_PICTURE_EXTENSIONS = ['jpg', 'jpeg', 'png']
+const PROFILE_PICTURE_MIMES = ['image/jpeg', 'image/png']
+
+/**
+ * Validate registration profile picture (PNG or JPEG only)
+ */
+export function validateProfilePictureFile(file: File, maxSizeKB = 4096): FileValidationResult {
+  const fileSizeKB = file.size / 1024
+
+  if (fileSizeKB > maxSizeKB) {
+    return {
+      valid: false,
+      message: `File size exceeds maximum allowed size of ${maxSizeKB}KB`,
+    }
+  }
+
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  if (!extension || !PROFILE_PICTURE_EXTENSIONS.includes(extension)) {
+    return {
+      valid: false,
+      message: 'Only PNG and JPEG images are allowed.',
+    }
+  }
+
+  if (!PROFILE_PICTURE_MIMES.includes(file.type)) {
+    return {
+      valid: false,
+      message: 'Only PNG and JPEG images are allowed.',
+    }
+  }
+
+  return { valid: true, message: 'File is valid' }
+}
+
 /**
  * Validate image file on frontend
  */

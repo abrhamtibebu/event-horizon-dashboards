@@ -31,6 +31,7 @@ import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
 import api from '@/lib/api'
+import { getOrganizerBannerUrl, getOrganizerLogoUrl } from '@/lib/utils'
 import { Spinner } from '@/components/ui/spinner'
 
 interface OrganizerFormDialogProps {
@@ -122,6 +123,8 @@ export function OrganizerFormDialog({
           logo: null,
           banner: null,
         })
+        setLogoPreview(org.logo ? getOrganizerLogoUrl(org.logo) : null)
+        setBannerPreview(org.banner ? getOrganizerBannerUrl(org.banner) : null)
       } catch (err: any) {
         toast.error(err.response?.data?.message ?? 'Failed to load organizer.')
         onOpenChange(false)

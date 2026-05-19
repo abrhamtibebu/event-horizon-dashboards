@@ -7,8 +7,9 @@ const getStorageBaseUrl = () => getApiBaseURLForStorage()
 
 const buildStorageUrl = (path?: string) => {
   if (!path) return ''
-  if (path.startsWith('http')) return path
-  return `${getStorageBaseUrl()}/storage/${path.replace(/^\/?storage\//, '')}`
+  if (path.startsWith('http') || path.startsWith('blob:') || path.startsWith('data:')) return path
+  const normalized = path.replace(/^\/?storage\//, '').replace(/^\/+/, '')
+  return `${getStorageBaseUrl()}/storage/${normalized}`
 }
 
 const resolveFileUrl = (path?: string, explicitUrl?: string) => {

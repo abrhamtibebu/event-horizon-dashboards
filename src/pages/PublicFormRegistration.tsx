@@ -260,7 +260,8 @@ export default function PublicFormRegistration() {
   const startDate = event?.start_date ? new Date(event.start_date) : null;
   const endDate = event?.end_date ? new Date(event.end_date) : null;
   const organizerName = event?.organizer?.name || 'Event Organizer';
-  const organizerLogo = event?.organizer?.logo ? getImageUrl(event.organizer.logo) : null;
+  const organizerLogoPath = event?.organizer?.logo || event?.organizer_logo;
+  const organizerLogo = organizerLogoPath ? getImageUrl(organizerLogoPath) : null;
   const eventImage = (event?.event_image || event?.image_url) ? getImageUrl(event.event_image || event.image_url, event.id) : null;
 
   if (form.status !== 'active') {

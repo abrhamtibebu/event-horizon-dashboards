@@ -18,7 +18,7 @@ export function useOrganizerStatus() {
 
   useEffect(() => {
     const checkOrganizerStatus = async () => {
-      if (!user || user.role !== 'organizer') {
+      if (!user || !user.organizer_id || !['organizer', 'organizer_admin', 'event_manager'].includes(user.role)) {
         setIsLoading(false)
         return
       }

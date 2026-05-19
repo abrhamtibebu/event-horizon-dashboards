@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import api from '@/lib/api';
+import { PROFILE_PICTURE_ACCEPT, validateProfilePictureFile } from '@/lib/fileValidation';
 import { useRegistrationShareMeta } from '@/lib/registrationShareMeta';
 import { useTheme } from 'next-themes';
 
@@ -203,9 +204,22 @@ const TelebirrRegistration: React.FC = () => {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleInputChange('profilePicture', e.target.files[0]);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = validateProfilePictureFile(file);
+    if (!validation.valid) {
+      setErrors(prev => ({ ...prev, profilePicture: validation.message }));
+      e.target.value = '';
+      return;
     }
+
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next.profilePicture;
+      return next;
+    });
+    handleInputChange('profilePicture', file);
   };
 
   const validateForm = () => {
@@ -524,7 +538,7 @@ const TelebirrRegistration: React.FC = () => {
                       <p className="text-sm font-bold text-gray-700 mb-1">
                         {formData.profilePicture ? 'Change your photo' : 'Upload your profile photo'}
                       </p>
-                      <p className="text-xs text-gray-500 mb-4">PNG, JPG or JPEG. Max 4MB.</p>
+                      <p className="text-xs text-gray-500 mb-4">PNG or JPEG only. Max 4MB.</p>
                       <Label 
                         htmlFor="profilePicture" 
                         className="inline-flex items-center gap-2 px-6 py-2 rounded-xl bg-white border-2 border-gray-200 text-sm font-bold text-gray-700 cursor-pointer hover:border-[#8DC63F] hover:text-[#8DC63F] transition-all shadow-sm active:scale-95"
@@ -535,13 +549,16 @@ const TelebirrRegistration: React.FC = () => {
                       <input
                         id="profilePicture"
                         type="file"
-                        accept="image/*"
+                        accept={PROFILE_PICTURE_ACCEPT}
                         onChange={handleFileChange}
                         className="hidden"
                       />
                     </div>
                   </div>
                 </div>
+                {errors.profilePicture && (
+                  <p className="text-sm text-red-500 font-medium pl-1">{errors.profilePicture}</p>
+                )}
 
               </div>
 

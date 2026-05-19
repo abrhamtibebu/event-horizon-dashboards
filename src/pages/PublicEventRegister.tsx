@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle, Building, UserCog, Mail, Phone as PhoneIcon, X, Mic2, ArrowRight } from 'lucide-react';
 import { useRegistrationShareMeta } from '@/lib/registrationShareMeta';
 import { getImageUrl } from '@/lib/utils';
+import { PROFILE_PICTURE_ACCEPT, validateProfilePictureFile } from '@/lib/fileValidation';
 import { PublicTicketSelector } from '@/components/public/PublicTicketSelector';
 import { PublicPaymentSelector } from '@/components/public/PublicPaymentSelector';
 import { PublicTicketDisplay } from '@/components/public/PublicTicketDisplay';
@@ -460,6 +461,12 @@ export default function PublicEventRegister() {
       if (!file) {
         setProfileImage(null);
         setProfileImagePreview(null);
+        return;
+      }
+
+      const validation = validateProfilePictureFile(file);
+      if (!validation.valid) {
+        toast.error(validation.message);
         return;
       }
 
@@ -1041,9 +1048,9 @@ export default function PublicEventRegister() {
           {organizerName && (
             <div className="border-b border-slate-50 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-800/50 px-4 py-5 sm:px-8 sm:py-6">
               <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-4 max-w-2xl mx-auto sm:mx-0 sm:max-w-none text-center sm:text-left">
-                {event.organizer?.logo ? (
+                {(event.organizer?.logo || event.organizer_logo) ? (
                   <img
-                    src={getImageUrl(event.organizer.logo)}
+                    src={getImageUrl(event.organizer?.logo || event.organizer_logo)}
                     alt=""
                     className="h-14 w-14 sm:h-16 sm:w-16 shrink-0 object-contain rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1"
                   />
@@ -1312,14 +1319,14 @@ export default function PublicEventRegister() {
                                 {profileImage ? profileImage.name : 'Tap to upload'}
                               </p>
                               <p className="text-[10px] font-bold text-slate-400 truncate">
-                                Used on your share banner
-                                {isSpeakerOrPanelist ? ' • Required for speaker badges' : ''}
+                                PNG or JPEG only
+                                {isSpeakerOrPanelist ? ' • Required for speaker badges' : ' • Used on your share banner'}
                               </p>
                             </div>
                           </div>
                           <Input
                             type="file"
-                            accept="image/*"
+                            accept={PROFILE_PICTURE_ACCEPT}
                             className="hidden"
                             onChange={(e) => handleFieldChange('profile_picture', e.target.files?.[0])}
                           />

@@ -49,7 +49,6 @@ import {
   Code,
   RefreshCw,
   TrendingUp,
-  Building,
   Globe,
   Palette,
   RotateCcw,
@@ -4042,15 +4041,31 @@ export default function EventDetails() {
                           <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
                             <div className="flex items-center justify-between mb-6">
                               <div>
-                                <h3 className="text-lg font-semibold text-foreground">Top Companies</h3>
-                                <p className="text-sm text-muted-foreground">Most represented organizations</p>
+                                <h3 className="text-lg font-semibold text-foreground">Top Performing Sessions</h3>
+                                <p className="text-sm text-muted-foreground">Sessions ranked by total attendance</p>
                               </div>
                               <div className="w-8 h-8 bg-warning/20 rounded-lg flex items-center justify-center">
-                                <Building className="w-4 h-4 text-warning" />
+                                <Calendar className="w-4 h-4 text-warning" />
                               </div>
                             </div>
+                            {sessionCheckInLoading ? (
+                              <div className="flex items-center justify-center h-[280px]">
+                                <Spinner size="lg" variant="primary" text="Loading session data..." />
+                              </div>
+                            ) : sessionCheckInData.length === 0 ? (
+                              <div className="flex flex-col items-center justify-center h-[280px] text-muted-foreground">
+                                <Calendar className="w-12 h-12 mb-4 opacity-50" />
+                                <p className="text-lg font-medium">No Session Data</p>
+                                <p className="text-sm text-center px-4">Session attendance will appear once sessions are created and attendees check in</p>
+                              </div>
+                            ) : (
                             <ResponsiveContainer width="100%" height={280}>
-                              <BarChart data={analytics.top_companies || []}>
+                              <BarChart
+                                data={[...sessionCheckInData]
+                                  .sort((a, b) => b.total_attendances - a.total_attendances)
+                                  .slice(0, 10)}
+                                margin={{ top: 10, right: 10, left: 0, bottom: 50 }}
+                              >
                                 {(() => {
                                   const styles = getChartStyles();
                                   const chartColors = getChartColors();
@@ -4058,18 +4073,21 @@ export default function EventDetails() {
                                   return (
                                     <>
                                       <defs>
-                                        <linearGradient id="companyGradient" x1="0" y1="0" x2="0" y2="1">
+                                        <linearGradient id="sessionAttendanceGradient" x1="0" y1="0" x2="0" y2="1">
                                           <stop offset="5%" stopColor={chartColors.warning} stopOpacity={0.8} />
                                           <stop offset="95%" stopColor={chartColors.warning} stopOpacity={0.3} />
                                         </linearGradient>
                                       </defs>
                                       <CartesianGrid strokeDasharray="3 3" stroke={styles.gridStroke} />
                                       <XAxis
-                                        dataKey="company"
+                                        dataKey="session_name"
                                         stroke={styles.axisStroke}
                                         fontSize={12}
                                         tickLine={false}
                                         axisLine={false}
+                                        angle={-45}
+                                        textAnchor="end"
+                                        height={70}
                                       />
                                       <YAxis
                                         allowDecimals={false}
@@ -4086,17 +4104,20 @@ export default function EventDetails() {
                                           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                                           color: styles.tooltipText,
                                         }}
+                                        formatter={(value: number) => [value, 'Total Attendance']}
                                       />
                                       <Bar
-                                        dataKey="count"
-                                        fill="url(#companyGradient)"
+                                        dataKey="total_attendances"
+                                        fill="url(#sessionAttendanceGradient)"
                                         radius={[4, 4, 0, 0]}
+                                        name="Total Attendance"
                                       />
                                     </>
                                   );
                                 })()}
                               </BarChart>
                             </ResponsiveContainer>
+                            )}
                           </div>
 
                           <div className="bg-card rounded-2xl shadow-sm border border-border p-6">

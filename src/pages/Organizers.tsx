@@ -19,7 +19,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { MetricCard } from '@/components/MetricCard'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { getOrganizerLogoUrl } from '@/lib/utils'
 import {
   Table,
   TableBody,
@@ -312,6 +313,13 @@ export default function Organizers() {
                   <TableCell className="border-border">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-10 w-10 rounded-lg bg-primary/15 border border-border">
+                        {org.logo ? (
+                          <AvatarImage
+                            src={getOrganizerLogoUrl(org.logo)}
+                            alt={`${org.name} logo`}
+                            className="object-cover"
+                          />
+                        ) : null}
                         <AvatarFallback className="rounded-lg bg-primary/15 text-primary font-semibold text-sm">
                           {org.name?.[0]?.toUpperCase() ?? 'O'}
                         </AvatarFallback>
