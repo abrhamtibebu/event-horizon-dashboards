@@ -12,7 +12,6 @@ import {
   Plus,
   Trash2,
   UserCheck,
-  Sparkles,
   CheckCircle2,
   ArrowRight,
   Info,
@@ -39,8 +38,10 @@ import { decodeHtmlEntities } from '@/lib/utils/string'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Progress } from '@/components/ui/progress'
 import GoogleVenueAutocompleteInput from '@/components/GoogleVenueAutocompleteInput'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar as DateCalendar } from '@/components/ui/calendar'
+import type { DateRange } from 'react-day-picker'
 
 // Ethiopian major cities
 const ETHIOPIAN_CITIES = [
@@ -726,74 +727,36 @@ export default function CreateFreeEvent() {
   `
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <style>{modernDatePickerStyles}</style>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        {/* Header Section */}
-        <div className="mb-8">
-          <Breadcrumbs
-            items={[
-              { label: 'Events', href: '/dashboard/events' },
-              { label: 'Create Free Event' }
-            ]}
-            className="mb-6"
-          />
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <Breadcrumbs
+          items={[
+            { label: 'Events', href: '/dashboard/events' },
+            { label: 'Create Free Event' },
+          ]}
+          className="mb-4"
+        />
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                  <Sparkles className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    Create Free Event
-                  </h1>
-                  <p className="text-muted-foreground text-sm sm:text-base mt-1">
-                    Set up your event and start welcoming guests
-                  </p>
-                </div>
-              </div>
-            </div>
-            <Button
-              onClick={() => navigate('/dashboard/events')}
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-4 h-4 mr-2" />
-              Cancel
-            </Button>
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              Create free event
+            </h1>
+            <p className="max-w-2xl text-muted-foreground">
+              Set up your event details, schedule, and guest types.
+            </p>
           </div>
-
-          {/* Progress Indicator */}
-          <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-foreground">Form Completion</span>
-                <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{progress}%</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-              <p className="text-xs text-muted-foreground mt-2">
-                Complete all required fields to create your event
-              </p>
-            </CardContent>
-          </Card>
+          <Button onClick={() => navigate('/dashboard/events')} variant="outline">
+            Cancel
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information Card */}
-          <Card className="border-border/50 shadow-lg shadow-black/5 bg-card/80 backdrop-blur-sm">
+          <Card>
             <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-md">
-                  <FileText className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Basic Information</CardTitle>
-                  <CardDescription>Tell us about your event</CardDescription>
-                </div>
-              </div>
+              <CardTitle className="text-xl">Event details</CardTitle>
+              <CardDescription>Basic info and classification.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -963,17 +926,10 @@ export default function CreateFreeEvent() {
           </Card>
 
           {/* Event Visibility */}
-          <Card className="border-border/50 shadow-lg shadow-black/5 bg-card/80 backdrop-blur-sm">
+          <Card>
             <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Eye className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl text-foreground">Event Visibility</CardTitle>
-                  <CardDescription>Control who can discover and register for your event</CardDescription>
-                </div>
-              </div>
+              <CardTitle className="text-xl">Visibility</CardTitle>
+              <CardDescription>Control who can discover and register.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1073,17 +1029,10 @@ export default function CreateFreeEvent() {
           </Card>
 
           {/* Location & Capacity Card */}
-          <Card className="border-border/50 shadow-lg shadow-black/5 bg-card/80 backdrop-blur-sm">
+          <Card>
             <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-md">
-                  <MapPin className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Location & Capacity</CardTitle>
-                  <CardDescription>Where and how many guests</CardDescription>
-                </div>
-              </div>
+              <CardTitle className="text-xl">Location & capacity</CardTitle>
+              <CardDescription>Where the event takes place and maximum guests.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1170,17 +1119,10 @@ export default function CreateFreeEvent() {
 
 
           {/* Date & Time Card */}
-          <Card className="border-border/50 shadow-lg shadow-black/5 bg-card/80 backdrop-blur-sm">
+          <Card>
             <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center shadow-md">
-                  <Calendar className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Date & Time</CardTitle>
-                  <CardDescription>Event schedule and registration period</CardDescription>
-                </div>
-              </div>
+              <CardTitle className="text-xl">Schedule</CardTitle>
+              <CardDescription>Event and registration date/time.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1214,166 +1156,62 @@ export default function CreateFreeEvent() {
                     </label>
                   </div>
 
-                  <div className="modern-date-picker border border-border rounded-2xl overflow-hidden shadow-lg bg-card">
-                    <div className="date-picker-header">
-                      <div className="date-picker-title">
-                        <Calendar className="w-5 h-5" />
-                        Select Event Dates
-                      </div>
-                      <div className="date-picker-nav">
-                        <button type="button" className="nav-btn" onClick={() => {
-                          const newDate = new Date(eventRange[0].startDate);
-                          newDate.setMonth(newDate.getMonth() - 1);
-                          setEventRange([{
-                            ...eventRange[0],
-                            startDate: newDate
-                          }]);
-                        }}>
-                          ←
-                        </button>
-                        <button type="button" className="nav-btn" onClick={() => {
-                          const newDate = new Date(eventRange[0].startDate);
-                          newDate.setMonth(newDate.getMonth() + 1);
-                          setEventRange([{
-                            ...eventRange[0],
-                            startDate: newDate
-                          }]);
-                        }}>
-                          →
-                        </button>
-                      </div>
-                    </div>
-                    <div className="month-year-selector">
-                      <select
-                        className="month-selector"
-                        value={eventRange[0].startDate.getMonth()}
-                        onChange={(e) => {
-                          const newDate = new Date(eventRange[0].startDate);
-                          newDate.setMonth(parseInt(e.target.value));
-                          setEventRange([{
-                            ...eventRange[0],
-                            startDate: newDate
-                          }]);
-                        }}
-                      >
-                        {[
-                          'January', 'February', 'March', 'April', 'May', 'June',
-                          'July', 'August', 'September', 'October', 'November', 'December'
-                        ].map((month, index) => (
-                          <option key={month} value={index}>{month}</option>
-                        ))}
-                      </select>
-                      <select
-                        className="year-selector"
-                        value={eventRange[0].startDate.getFullYear()}
-                        onChange={(e) => {
-                          const newDate = new Date(eventRange[0].startDate);
-                          newDate.setFullYear(parseInt(e.target.value));
-                          setEventRange([{
-                            ...eventRange[0],
-                            startDate: newDate
-                          }]);
-                        }}
-                      >
-                        {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
-                          <option key={year} value={year}>{year}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="weekdays-grid">
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} className="weekday">{day}</div>
-                      ))}
-                    </div>
-                    <div className="days-grid">
-                      {Array.from({ length: 42 }, (_, index) => {
-                        const monthStart = new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth(), 1);
-                        const firstDay = monthStart.getDay();
-                        const day = index - firstDay + 1;
-                        const currentDate = new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth(), day);
-
-                        // Normalize dates to midnight for comparison
-                        const normalizeDate = (date: Date) => {
-                          const normalized = new Date(date);
-                          normalized.setHours(0, 0, 0, 0);
-                          return normalized;
-                        };
-
-                        const normalizedCurrent = normalizeDate(currentDate);
-                        const normalizedStart = eventRange[0].startDate ? normalizeDate(eventRange[0].startDate) : null;
-                        const normalizedEnd = eventRange[0].endDate ? normalizeDate(eventRange[0].endDate) : null;
-                        const normalizedToday = normalizeDate(new Date());
-
-                        const isCurrentMonth = currentDate.getMonth() === eventRange[0].startDate.getMonth();
-                        const isToday = normalizedCurrent.getTime() === normalizedToday.getTime();
-                        const isSelected = (normalizedStart && normalizedStart.getTime() === normalizedCurrent.getTime()) ||
-                          (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
-                        const isInRange = normalizedStart && normalizedEnd &&
-                          normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
-                        const isDisabled = normalizedCurrent < normalizedToday;
-
-                        return (
-                          <div
-                            key={index}
-                            className={`day-cell ${!isCurrentMonth ? 'other-month' :
-                              isDisabled ? 'disabled' :
-                                isSelected ? 'selected' :
-                                  isInRange ? 'in-range' :
-                                    isToday ? 'today' : ''
-                              }`}
-                            onClick={() => {
-                              if (isDisabled) return;
-                              const newRange = { ...eventRange[0] };
-                              // If both dates are set or neither is set, start a new selection
-                              if ((newRange.startDate && newRange.endDate) || (!newRange.startDate && !newRange.endDate)) {
-                                newRange.startDate = normalizeDate(currentDate);
-                                newRange.endDate = undefined;
-                              } else if (newRange.startDate && normalizedCurrent < normalizeDate(newRange.startDate)) {
-                                // If clicking before start date, make it the new start
-                                newRange.startDate = normalizeDate(currentDate);
-                                newRange.endDate = undefined;
-                              } else if (newRange.startDate) {
-                                // Set end date
-                                newRange.endDate = normalizeDate(currentDate);
-                              }
-                              setEventRange([newRange]);
-                            }}
-                          >
-                            {isCurrentMonth && day > 0 && day <= new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth() + 1, 0).getDate() ? day : ''}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="date-picker-actions">
-                      <button
-                        type="button"
-                        className="action-btn today"
-                        onClick={() => {
-                          const today = new Date();
-                          setEventRange([{
-                            startDate: today,
-                            endDate: today,
-                            key: 'selection'
-                          }]);
-                        }}
-                      >
-                        Today
-                      </button>
-                      <button
-                        type="button"
-                        className="action-btn"
-                        onClick={() => {
-                          setEventRange([{
-                            startDate: new Date(),
-                            endDate: undefined,
-                            key: 'selection'
-                          }]);
-                        }}
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="w-full justify-start">
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {eventRange[0].startDate
+                          ? (isSingleDayEvent
+                              ? eventRange[0].startDate.toLocaleDateString()
+                              : `${eventRange[0].startDate.toLocaleDateString()} – ${eventRange[0].endDate?.toLocaleDateString?.() ?? '…'}`)
+                          : 'Select dates'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      {isSingleDayEvent ? (
+                        <DateCalendar
+                          mode="single"
+                          selected={eventRange[0].startDate}
+                          onSelect={(date) => {
+                            if (!date) return
+                            setSelectedEventDate(date)
+                            setEventRange([
+                              {
+                                ...eventRange[0],
+                                startDate: date,
+                                endDate: date,
+                                key: 'selection',
+                              },
+                            ])
+                          }}
+                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                          initialFocus
+                        />
+                      ) : (
+                        <DateCalendar
+                          mode="range"
+                          numberOfMonths={2}
+                          selected={{
+                            from: eventRange[0].startDate,
+                            to: eventRange[0].endDate,
+                          } satisfies DateRange}
+                          onSelect={(range) => {
+                            if (!range?.from) return
+                            setEventRange([
+                              {
+                                ...eventRange[0],
+                                startDate: range.from,
+                                endDate: range.to ?? range.from,
+                                key: 'selection',
+                              },
+                            ])
+                          }}
+                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                          initialFocus
+                        />
+                      )}
+                    </PopoverContent>
+                  </Popover>
 
                   {/* Event Time Selectors */}
                   <div className="grid grid-cols-2 gap-4 mt-4">
@@ -1410,166 +1248,49 @@ export default function CreateFreeEvent() {
                     <span className="text-sm">Alignment Spacer</span>
                   </div>
 
-                  <div className="modern-date-picker border border-border rounded-2xl overflow-hidden shadow-lg bg-card">
-                    <div className="date-picker-header">
-                      <div className="date-picker-title">
-                        <Calendar className="w-5 h-5" />
-                        Select Registration Dates
-                      </div>
-                      <div className="date-picker-nav">
-                        <button type="button" className="nav-btn" onClick={() => {
-                          const newDate = new Date(regRange[0].startDate);
-                          newDate.setMonth(newDate.getMonth() - 1);
-                          setRegRange([{
-                            ...regRange[0],
-                            startDate: newDate
-                          }]);
-                        }}>
-                          ←
-                        </button>
-                        <button type="button" className="nav-btn" onClick={() => {
-                          const newDate = new Date(regRange[0].startDate);
-                          newDate.setMonth(newDate.getMonth() + 1);
-                          setRegRange([{
-                            ...regRange[0],
-                            startDate: newDate
-                          }]);
-                        }}>
-                          →
-                        </button>
-                      </div>
-                    </div>
-                    <div className="month-year-selector">
-                      <select
-                        className="month-selector"
-                        value={regRange[0].startDate.getMonth()}
-                        onChange={(e) => {
-                          const newDate = new Date(regRange[0].startDate);
-                          newDate.setMonth(parseInt(e.target.value));
-                          setRegRange([{
-                            ...regRange[0],
-                            startDate: newDate
-                          }]);
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="w-full justify-start">
+                        <Calendar className="mr-2 h-4 w-4" />
+                        {regRange[0].startDate
+                          ? `${regRange[0].startDate.toLocaleDateString()} – ${regRange[0].endDate?.toLocaleDateString?.() ?? '…'}`
+                          : 'Select dates'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <DateCalendar
+                        mode="range"
+                        numberOfMonths={2}
+                        selected={{
+                          from: regRange[0].startDate,
+                          to: regRange[0].endDate,
+                        } satisfies DateRange}
+                        onSelect={(range) => {
+                          if (!range?.from) return
+                          const nextStart = range.from
+                          const nextEnd = range.to ?? range.from
+                          setRegRange([
+                            {
+                              ...regRange[0],
+                              startDate: nextStart,
+                              endDate: nextEnd,
+                              key: 'selection',
+                            },
+                          ])
                         }}
-                      >
-                        {[
-                          'January', 'February', 'March', 'April', 'May', 'June',
-                          'July', 'August', 'September', 'October', 'November', 'December'
-                        ].map((month, index) => (
-                          <option key={month} value={index}>{month}</option>
-                        ))}
-                      </select>
-                      <select
-                        className="year-selector"
-                        value={regRange[0].startDate.getFullYear()}
-                        onChange={(e) => {
-                          const newDate = new Date(regRange[0].startDate);
-                          newDate.setFullYear(parseInt(e.target.value));
-                          setRegRange([{
-                            ...regRange[0],
-                            startDate: newDate
-                          }]);
+                        disabled={(date) => {
+                          const today = new Date()
+                          today.setHours(0, 0, 0, 0)
+                          const eventEnd = eventRange[0].endDate ? new Date(eventRange[0].endDate) : null
+                          if (eventEnd) eventEnd.setHours(0, 0, 0, 0)
+                          if (date < today) return true
+                          if (eventEnd && date > eventEnd) return true
+                          return false
                         }}
-                      >
-                        {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
-                          <option key={year} value={year}>{year}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="weekdays-grid">
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} className="weekday">{day}</div>
-                      ))}
-                    </div>
-                    <div className="days-grid">
-                      {Array.from({ length: 42 }, (_, index) => {
-                        const monthStart = new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth(), 1);
-                        const firstDay = monthStart.getDay();
-                        const day = index - firstDay + 1;
-                        const currentDate = new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth(), day);
-
-                        // Normalize dates to midnight for comparison
-                        const normalizeDate = (date: Date) => {
-                          const normalized = new Date(date);
-                          normalized.setHours(0, 0, 0, 0);
-                          return normalized;
-                        };
-
-                        const normalizedCurrent = normalizeDate(currentDate);
-                        const normalizedStart = regRange[0].startDate ? normalizeDate(regRange[0].startDate) : null;
-                        const normalizedEnd = regRange[0].endDate ? normalizeDate(regRange[0].endDate) : null;
-                        const normalizedToday = normalizeDate(new Date());
-
-                        const isCurrentMonth = currentDate.getMonth() === regRange[0].startDate.getMonth();
-                        const isToday = normalizedCurrent.getTime() === normalizedToday.getTime();
-                        const isSelected = (normalizedStart && normalizedStart.getTime() === normalizedCurrent.getTime()) ||
-                          (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
-                        const isInRange = normalizedStart && normalizedEnd &&
-                          normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
-                        const isDisabled = normalizedCurrent < normalizedToday;
-
-                        return (
-                          <div
-                            key={index}
-                            className={`day-cell ${!isCurrentMonth ? 'other-month' :
-                              isDisabled ? 'disabled' :
-                                isSelected ? 'selected' :
-                                  isInRange ? 'in-range' :
-                                    isToday ? 'today' : ''
-                              }`}
-                            onClick={() => {
-                              if (isDisabled) return;
-                              const newRange = { ...regRange[0] };
-                              // If both dates are set or neither is set, start a new selection
-                              if ((newRange.startDate && newRange.endDate) || (!newRange.startDate && !newRange.endDate)) {
-                                newRange.startDate = normalizeDate(currentDate);
-                                newRange.endDate = undefined;
-                              } else if (newRange.startDate && normalizedCurrent < normalizeDate(newRange.startDate)) {
-                                // If clicking before start date, make it the new start
-                                newRange.startDate = normalizeDate(currentDate);
-                                newRange.endDate = undefined;
-                              } else if (newRange.startDate) {
-                                // Set end date
-                                newRange.endDate = normalizeDate(currentDate);
-                              }
-                              setRegRange([newRange]);
-                            }}
-                          >
-                            {isCurrentMonth && day > 0 && day <= new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth() + 1, 0).getDate() ? day : ''}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="date-picker-actions">
-                      <button
-                        type="button"
-                        className="action-btn today"
-                        onClick={() => {
-                          const today = new Date();
-                          setRegRange([{
-                            startDate: today,
-                            endDate: today,
-                            key: 'selection'
-                          }]);
-                        }}
-                      >
-                        Today
-                      </button>
-                      <button
-                        type="button"
-                        className="action-btn"
-                        onClick={() => {
-                          setRegRange([{
-                            startDate: new Date(),
-                            endDate: undefined,
-                            key: 'selection'
-                          }]);
-                        }}
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
 
                   {/* Registration Time Selectors */}
                   <div className="grid grid-cols-2 gap-4 mt-4">
@@ -1598,13 +1319,10 @@ export default function CreateFreeEvent() {
           </Card>
 
           {/* Guest Types Card */}
-          <Card className="border-border/50 shadow-lg shadow-black/5 bg-card/80 backdrop-blur-sm">
+          <Card>
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-md">
-                    <UserCheck className="w-5 h-5 text-white" />
-                  </div>
                   <div>
                     <CardTitle className="text-xl">Guest Types</CardTitle>
                     <CardDescription>
@@ -1620,7 +1338,6 @@ export default function CreateFreeEvent() {
                   onClick={addCustomGuestType}
                   variant="outline"
                   size="sm"
-                  className="border-emerald-500/50 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Custom Type
@@ -1639,10 +1356,7 @@ export default function CreateFreeEvent() {
                         type="button"
                         variant={isSelected ? 'default' : 'outline'}
                         size="sm"
-                        className={`h-auto py-2.5 px-3 transition-all ${isSelected
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/30'
-                          : 'hover:border-emerald-500/50 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/10'
-                          }`}
+                        className="h-auto py-2.5 px-3 transition-all"
                         onClick={() => toggleGuestType(guestType.name)}
                       >
                         {isSelected && <CheckCircle2 className="w-4 h-4 mr-1.5" />}
@@ -1750,7 +1464,7 @@ export default function CreateFreeEvent() {
             <Button
               type="submit"
               disabled={isSubmitting || totalSelectedGuestTypes === 0}
-              className="h-11 px-8 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-11 px-8"
             >
               {isSubmitting ? (
                 <span className="flex items-center">

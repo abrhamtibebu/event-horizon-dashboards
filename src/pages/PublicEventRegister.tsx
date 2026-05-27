@@ -10,6 +10,7 @@ import api from '@/lib/api';
 import { toast } from 'sonner';
 import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle, Building, UserCog, Mail, Phone as PhoneIcon, X, Mic2, ArrowRight } from 'lucide-react';
 import { useRegistrationShareMeta } from '@/lib/registrationShareMeta';
+import { telebirrRegisterPathWithSearch } from '@/pages/telebirr-reg/routes';
 import { getImageUrl } from '@/lib/utils';
 import { PROFILE_PICTURE_ACCEPT, validateProfilePictureFile } from '@/lib/fileValidation';
 import { PublicTicketSelector } from '@/components/public/PublicTicketSelector';
@@ -309,7 +310,7 @@ export default function PublicEventRegister() {
         
         // Custom redirect for Telebirr 5th Anniversary (Event ID 4)
         if (eventData?.id === 4 || eventData?.id === '4') {
-          navigate(`/event/telebirr-register/4${window.location.search}`, { replace: true });
+          navigate(telebirrRegisterPathWithSearch('4', window.location.search), { replace: true });
           return;
         }
 

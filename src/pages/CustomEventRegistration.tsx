@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { telebirrRegisterPathWithSearch } from '@/pages/telebirr-reg/routes';
 import { useMutation } from '@tanstack/react-query';
 import {
   Calendar,
@@ -103,7 +104,7 @@ const CustomEventRegistration: React.FC = () => {
   useEffect(() => {
     // Redirect for Telebirr 5th Anniversary (Event ID 4)
     if (eventId === '4') {
-      navigate(`/event/telebirr-register/4${window.location.search}`, { replace: true });
+      navigate(telebirrRegisterPathWithSearch('4', window.location.search), { replace: true });
       return;
     }
 

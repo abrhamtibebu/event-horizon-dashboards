@@ -4,6 +4,28 @@ import { Button } from '@/components/ui/button'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { useAuth } from '@/hooks/use-auth'
 
+function FeatureRow({
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  subtitle: string
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-foreground">
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-foreground">{title}</div>
+        <div className="text-sm text-muted-foreground">{subtitle}</div>
+      </div>
+    </div>
+  )
+}
+
 export default function EventTypeSelection() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -11,221 +33,117 @@ export default function EventTypeSelection() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Breadcrumbs */}
-        <Breadcrumbs 
+        <Breadcrumbs
           items={[
             { label: 'Events', href: '/dashboard/events' },
-            { label: 'Create Event' }
+            { label: 'Create Event' },
           ]}
           className="mb-4"
         />
-        
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Create New Event</h1>
-              <p className="text-muted-foreground mt-2">
-                Choose the type of event you want to create
-              </p>
-            </div>
-            <Button
-              onClick={() => navigate('/dashboard/events')}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              Back to Events
+
+        {/* Header */}
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              Create event
+            </h1>
+            <p className="max-w-2xl text-muted-foreground">
+              Choose a type to start. You can edit all details later.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => navigate('/dashboard/events')} variant="outline">
+              Back
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Free Event Option */}
-          <div className="bg-card rounded-2xl shadow-sm border border-border p-8 hover:shadow-lg transition-all duration-300">
-            <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Gift className="w-10 h-10 text-white" />
-              </div>
-              <h2 className="text-2xl font-bold text-card-foreground mb-2">Free Event</h2>
-              <p className="text-muted-foreground">Perfect for corporate events, meetups, and free gatherings</p>
-            </div>
-
-            <div className="space-y-4 mb-8">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-green-500/10 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                  <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Free */}
+          <div className="group rounded-2xl border border-border bg-card p-6 shadow-sm transition-colors hover:border-foreground/15">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                    <Gift className="h-5 w-5" />
+                  </span>
+                  Free event
                 </div>
-                <span className="text-card-foreground">Guest type management</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-green-500/10 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                  <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
-                </div>
-                <span className="text-card-foreground">Simple registration process</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-green-500/10 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                  <Star className="w-4 h-4 text-green-600 dark:text-green-400" />
-                </div>
-                <span className="text-card-foreground">Basic attendee tracking</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-green-500/10 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                  <Gift className="w-4 h-4 text-green-600 dark:text-green-400" />
-                </div>
-                <span className="text-card-foreground">No payment processing</span>
+                <p className="text-sm text-muted-foreground">
+                  Best for meetups, community gatherings, and corporate events.
+                </p>
               </div>
             </div>
 
-            <div className="text-center">
-              <Button
-                onClick={() => navigate('/dashboard/events/create/free')}
-                className="bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 w-full"
-              >
-                Create Free Event
-                <ArrowRight className="w-4 h-4 ml-2" />
+            <div className="mt-6 space-y-4">
+              <FeatureRow icon={Users} title="Guest types" subtitle="VIP, speakers, staff, and custom types." />
+              <FeatureRow icon={Calendar} title="Registration" subtitle="Simple registration flow for attendees." />
+              <FeatureRow icon={Star} title="Tracking" subtitle="Basic attendee tracking and check-in." />
+            </div>
+
+            <div className="mt-6">
+              <Button onClick={() => navigate('/dashboard/events/create/free')} className="w-full">
+                Create free event
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          {/* Ticketed Event Option */}
-          <div className="bg-card rounded-2xl shadow-sm border border-border p-8 hover:shadow-lg transition-all duration-300">
-            <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Ticket className="w-10 h-10 text-white" />
-              </div>
-              <h2 className="text-2xl font-bold text-card-foreground mb-2">Ticketed Event</h2>
-              <p className="text-muted-foreground">Ideal for paid events, conferences, and revenue-generating activities</p>
-            </div>
-
-            <div className="space-y-4 mb-8">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-purple-500/10 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                  <Ticket className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+          {/* Ticketed */}
+          <div className="group rounded-2xl border border-border bg-card p-6 shadow-sm transition-colors hover:border-foreground/15">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-700 dark:text-violet-300">
+                    <Ticket className="h-5 w-5" />
+                  </span>
+                  Ticketed event
                 </div>
-                <span className="text-card-foreground">Multiple ticket types</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-purple-500/10 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                  <DollarSign className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                </div>
-                <span className="text-card-foreground">Revenue tracking</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-purple-500/10 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                  <Calendar className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                </div>
-                <span className="text-card-foreground">Advanced analytics</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-purple-500/10 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                  <Star className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                </div>
-                <span className="text-card-foreground">Payment processing</span>
+                <p className="text-sm text-muted-foreground">
+                  Best for conferences, workshops, and paid experiences.
+                </p>
               </div>
             </div>
 
-            <div className="text-center">
-              <Button
-                onClick={() => navigate('/dashboard/events/create/ticketed')}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 w-full"
-              >
-                Create Ticketed Event
-                <ArrowRight className="w-4 h-4 ml-2" />
+            <div className="mt-6 space-y-4">
+              <FeatureRow icon={Ticket} title="Ticket tiers" subtitle="Multiple ticket types and pricing." />
+              <FeatureRow icon={DollarSign} title="Payments" subtitle="Sell tickets and track revenue." />
+              <FeatureRow icon={Calendar} title="Analytics" subtitle="Ticketing analytics and reporting." />
+            </div>
+
+            <div className="mt-6">
+              <Button onClick={() => navigate('/dashboard/events/create/ticketed')} className="w-full">
+                Create ticketed event
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
-            </div>
-          </div>
-
-          {/* External Event Option — platform admins only */}
-          {isPlatformAdmin && (
-          <div className="bg-card rounded-2xl shadow-sm border border-border p-8 hover:shadow-lg transition-all duration-300 lg:col-span-2 max-w-2xl mx-auto w-full">
-            <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <ExternalLink className="w-10 h-10 text-white" />
-              </div>
-              <h2 className="text-2xl font-bold text-card-foreground mb-2">External Event</h2>
-              <p className="text-muted-foreground">For events managed outside Evella. Mention where users can register.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                  <ExternalLink className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                <span className="text-card-foreground">Custom registration links</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                  <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                <span className="text-card-foreground">External organizer profiles</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                  <Star className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                <span className="text-card-foreground">Global discovery exposure</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-500/10 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                  <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                <span className="text-card-foreground">Simple publishing flow</span>
-              </div>
-            </div>
-
-            <div className="text-center">
-              <Button
-                onClick={() => navigate('/dashboard/events/create/external')}
-                className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 w-full"
-              >
-                Create External Event
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-          </div>
-          )}
-        </div>
-
-        {/* Comparison Table */}
-        <div className="mt-12 bg-card rounded-2xl shadow-sm border border-border p-8">
-          <h3 className="text-xl font-bold text-card-foreground mb-6 text-center">Feature Comparison</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <h4 className="font-semibold text-card-foreground mb-4">Free Events</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>✓ Guest type management</li>
-                <li>✓ Simple registration</li>
-                <li>✓ Basic attendee tracking</li>
-                <li>✓ No payment processing</li>
-                <li>✓ Corporate event friendly</li>
-                <li>✓ Meetup and community events</li>
-              </ul>
-            </div>
-            <div className="text-center border-l border-r border-border px-6">
-              <h4 className="font-semibold text-card-foreground mb-4">Ticketed Events</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>✓ Multiple ticket types</li>
-                <li>✓ Revenue tracking</li>
-                <li>✓ Advanced analytics</li>
-                <li>✓ Payment processing</li>
-                <li>✓ Conference and workshops</li>
-                <li>✓ Revenue-generating activities</li>
-              </ul>
-            </div>
-            <div className="text-center">
-              <h4 className="font-semibold text-card-foreground mb-4">Both Include</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>✓ Event management</li>
-                <li>✓ Attendee registration</li>
-                <li>✓ Badge generation</li>
-                <li>✓ Email notifications</li>
-                <li>✓ Event analytics</li>
-                <li>✓ Mobile check-in</li>
-              </ul>
             </div>
           </div>
         </div>
+
+        {/* External (admin only) */}
+        {isPlatformAdmin && (
+          <div className="mt-6 rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/10 text-sky-700 dark:text-sky-300">
+                    <ExternalLink className="h-5 w-5" />
+                  </span>
+                  External event (admins)
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Publish an event managed outside Evella and link users to an external registration.
+                </p>
+              </div>
+              <Button onClick={() => navigate('/dashboard/events/create/external')}>
+                Create external event
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -35,6 +35,8 @@ import {
 } from '@/components/ui/select'
 import { decodeHtmlEntities } from '@/lib/utils/string'
 import GoogleVenueAutocompleteInput from '@/components/GoogleVenueAutocompleteInput'
+import { Calendar as DateCalendar } from '@/components/ui/calendar'
+import type { DateRange } from 'react-day-picker'
 
 // Ethiopian major cities
 const ETHIOPIAN_CITIES = [
@@ -709,48 +711,35 @@ export default function CreateTicketedEvent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <style>{modernDatePickerStyles}</style>
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Breadcrumbs */}
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <Breadcrumbs
           items={[
             { label: 'Events', href: '/dashboard/events' },
-            { label: 'Create Ticketed Event' }
+            { label: 'Create Ticketed Event' },
           ]}
           className="mb-4"
         />
 
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Create Ticketed Event</h1>
-              <p className="text-muted-foreground mt-2">
-                Set up a paid event with multiple ticket tiers and revenue tracking
-              </p>
-            </div>
-            <Button
-              onClick={() => navigate('/dashboard/events')}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <X className="w-4 h-4" />
-              Cancel
-            </Button>
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              Create ticketed event
+            </h1>
+            <p className="max-w-2xl text-muted-foreground">
+              Set up event details and schedule. Ticket types can be added after creation.
+            </p>
           </div>
+          <Button onClick={() => navigate('/dashboard/events')} variant="outline">
+            Cancel
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Event Information */}
-          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-            <style>{modernDatePickerStyles}</style>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                <Ticket className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-card-foreground">Ticketed Event</h3>
-                <p className="text-muted-foreground text-sm">Paid tickets with multiple tiers</p>
-              </div>
+          <div className="bg-card rounded-lg border border-border p-6 shadow-sm">
+            <div className="mb-6">
+              <h3 className="text-xl font-semibold text-foreground">Event details</h3>
+              <p className="text-sm text-muted-foreground">Basic info and classification.</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -993,7 +982,7 @@ export default function CreateTicketedEvent() {
           </div>
 
           {/* Event Visibility */}
-          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+          <div className="bg-card rounded-lg shadow-sm border border-border p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
                 <Eye className="w-5 h-5 text-white" />
@@ -1104,7 +1093,7 @@ export default function CreateTicketedEvent() {
           </div>
 
           {/* Date & Time */}
-          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+          <div className="bg-card rounded-lg shadow-sm border border-border p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-brand-gradient rounded-xl flex items-center justify-center">
                 <Calendar className="w-5 h-5 text-primary-foreground" />
@@ -1145,166 +1134,62 @@ export default function CreateTicketedEvent() {
                   </label>
                 </div>
 
-                <div className="modern-date-picker border border-border rounded-2xl overflow-hidden shadow-lg bg-card">
-                  <div className="date-picker-header">
-                    <div className="date-picker-title">
-                      <Calendar className="w-5 h-5" />
-                      Select Event Dates
-                    </div>
-                    <div className="date-picker-nav">
-                      <button type="button" className="nav-btn" onClick={() => {
-                        const newDate = new Date(eventRange[0].startDate);
-                        newDate.setMonth(newDate.getMonth() - 1);
-                        setEventRange([{
-                          ...eventRange[0],
-                          startDate: newDate
-                        }]);
-                      }}>
-                        ←
-                      </button>
-                      <button type="button" className="nav-btn" onClick={() => {
-                        const newDate = new Date(eventRange[0].startDate);
-                        newDate.setMonth(newDate.getMonth() + 1);
-                        setEventRange([{
-                          ...eventRange[0],
-                          startDate: newDate
-                        }]);
-                      }}>
-                        →
-                      </button>
-                    </div>
-                  </div>
-                  <div className="month-year-selector">
-                    <select
-                      className="month-selector"
-                      value={eventRange[0].startDate.getMonth()}
-                      onChange={(e) => {
-                        const newDate = new Date(eventRange[0].startDate);
-                        newDate.setMonth(parseInt(e.target.value));
-                        setEventRange([{
-                          ...eventRange[0],
-                          startDate: newDate
-                        }]);
-                      }}
-                    >
-                      {[
-                        'January', 'February', 'March', 'April', 'May', 'June',
-                        'July', 'August', 'September', 'October', 'November', 'December'
-                      ].map((month, index) => (
-                        <option key={month} value={index}>{month}</option>
-                      ))}
-                    </select>
-                    <select
-                      className="year-selector"
-                      value={eventRange[0].startDate.getFullYear()}
-                      onChange={(e) => {
-                        const newDate = new Date(eventRange[0].startDate);
-                        newDate.setFullYear(parseInt(e.target.value));
-                        setEventRange([{
-                          ...eventRange[0],
-                          startDate: newDate
-                        }]);
-                      }}
-                    >
-                      {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
-                        <option key={year} value={year}>{year}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="weekdays-grid">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                      <div key={day} className="weekday">{day}</div>
-                    ))}
-                  </div>
-                  <div className="days-grid">
-                    {Array.from({ length: 42 }, (_, index) => {
-                      const monthStart = new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth(), 1);
-                      const firstDay = monthStart.getDay();
-                      const day = index - firstDay + 1;
-                      const currentDate = new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth(), day);
-
-                      // Normalize dates to midnight for comparison
-                      const normalizeDate = (date: Date) => {
-                        const normalized = new Date(date);
-                        normalized.setHours(0, 0, 0, 0);
-                        return normalized;
-                      };
-
-                      const normalizedCurrent = normalizeDate(currentDate);
-                      const normalizedStart = eventRange[0].startDate ? normalizeDate(eventRange[0].startDate) : null;
-                      const normalizedEnd = eventRange[0].endDate ? normalizeDate(eventRange[0].endDate) : null;
-                      const normalizedToday = normalizeDate(new Date());
-
-                      const isCurrentMonth = currentDate.getMonth() === eventRange[0].startDate.getMonth();
-                      const isToday = normalizedCurrent.getTime() === normalizedToday.getTime();
-                      const isSelected = (normalizedStart && normalizedStart.getTime() === normalizedCurrent.getTime()) ||
-                        (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
-                      const isInRange = normalizedStart && normalizedEnd &&
-                        normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
-                      const isDisabled = normalizedCurrent < normalizedToday;
-
-                      return (
-                        <div
-                          key={index}
-                          className={`day-cell ${!isCurrentMonth ? 'other-month' :
-                            isDisabled ? 'disabled' :
-                              isSelected ? 'selected' :
-                                isInRange ? 'in-range' :
-                                  isToday ? 'today' : ''
-                            }`}
-                          onClick={() => {
-                            if (isDisabled) return;
-                            const newRange = { ...eventRange[0] };
-                            // If both dates are set or neither is set, start a new selection
-                            if ((newRange.startDate && newRange.endDate) || (!newRange.startDate && !newRange.endDate)) {
-                              newRange.startDate = normalizeDate(currentDate);
-                              newRange.endDate = undefined;
-                            } else if (newRange.startDate && normalizedCurrent < normalizeDate(newRange.startDate)) {
-                              // If clicking before start date, make it the new start
-                              newRange.startDate = normalizeDate(currentDate);
-                              newRange.endDate = undefined;
-                            } else if (newRange.startDate) {
-                              // Set end date
-                              newRange.endDate = normalizeDate(currentDate);
-                            }
-                            setEventRange([newRange]);
-                          }}
-                        >
-                          {isCurrentMonth && day > 0 && day <= new Date(eventRange[0].startDate.getFullYear(), eventRange[0].startDate.getMonth() + 1, 0).getDate() ? day : ''}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="date-picker-actions">
-                    <button
-                      type="button"
-                      className="action-btn today"
-                      onClick={() => {
-                        const today = new Date();
-                        setEventRange([{
-                          startDate: today,
-                          endDate: today,
-                          key: 'selection'
-                        }]);
-                      }}
-                    >
-                      Today
-                    </button>
-                    <button
-                      type="button"
-                      className="action-btn"
-                      onClick={() => {
-                        setEventRange([{
-                          startDate: new Date(),
-                          endDate: undefined,
-                          key: 'selection'
-                        }]);
-                      }}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" className="w-full justify-start">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {eventRange[0].startDate
+                        ? (isSingleDayEvent
+                            ? eventRange[0].startDate.toLocaleDateString()
+                            : `${eventRange[0].startDate.toLocaleDateString()} – ${eventRange[0].endDate?.toLocaleDateString?.() ?? '…'}`)
+                        : 'Select dates'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    {isSingleDayEvent ? (
+                      <DateCalendar
+                        mode="single"
+                        selected={eventRange[0].startDate}
+                        onSelect={(date) => {
+                          if (!date) return
+                          setSelectedEventDate(date)
+                          setEventRange([
+                            {
+                              ...eventRange[0],
+                              startDate: date,
+                              endDate: date,
+                              key: 'selection',
+                            },
+                          ])
+                        }}
+                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                        initialFocus
+                      />
+                    ) : (
+                      <DateCalendar
+                        mode="range"
+                        numberOfMonths={2}
+                        selected={{
+                          from: eventRange[0].startDate,
+                          to: eventRange[0].endDate,
+                        } satisfies DateRange}
+                        onSelect={(range) => {
+                          if (!range?.from) return
+                          setEventRange([
+                            {
+                              ...eventRange[0],
+                              startDate: range.from,
+                              endDate: range.to ?? range.from,
+                              key: 'selection',
+                            },
+                          ])
+                        }}
+                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                        initialFocus
+                      />
+                    )}
+                  </PopoverContent>
+                </Popover>
 
                 {/* Event Time Selectors */}
                 <div className="grid grid-cols-2 gap-4 mt-4">
@@ -1340,166 +1225,49 @@ export default function CreateTicketedEvent() {
                   <span className="text-sm">Alignment Spacer</span>
                 </div>
 
-                <div className="modern-date-picker border border-border rounded-2xl overflow-hidden shadow-lg bg-card">
-                  <div className="date-picker-header">
-                    <div className="date-picker-title">
-                      <Calendar className="w-5 h-5" />
-                      Select Registration Dates
-                    </div>
-                    <div className="date-picker-nav">
-                      <button type="button" className="nav-btn" onClick={() => {
-                        const newDate = new Date(regRange[0].startDate);
-                        newDate.setMonth(newDate.getMonth() - 1);
-                        setRegRange([{
-                          ...regRange[0],
-                          startDate: newDate
-                        }]);
-                      }}>
-                        ←
-                      </button>
-                      <button type="button" className="nav-btn" onClick={() => {
-                        const newDate = new Date(regRange[0].startDate);
-                        newDate.setMonth(newDate.getMonth() + 1);
-                        setRegRange([{
-                          ...regRange[0],
-                          startDate: newDate
-                        }]);
-                      }}>
-                        →
-                      </button>
-                    </div>
-                  </div>
-                  <div className="month-year-selector">
-                    <select
-                      className="month-selector"
-                      value={regRange[0].startDate.getMonth()}
-                      onChange={(e) => {
-                        const newDate = new Date(regRange[0].startDate);
-                        newDate.setMonth(parseInt(e.target.value));
-                        setRegRange([{
-                          ...regRange[0],
-                          startDate: newDate
-                        }]);
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" className="w-full justify-start">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {regRange[0].startDate
+                        ? `${regRange[0].startDate.toLocaleDateString()} – ${regRange[0].endDate?.toLocaleDateString?.() ?? '…'}`
+                        : 'Select dates'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <DateCalendar
+                      mode="range"
+                      numberOfMonths={2}
+                      selected={{
+                        from: regRange[0].startDate,
+                        to: regRange[0].endDate,
+                      } satisfies DateRange}
+                      onSelect={(range) => {
+                        if (!range?.from) return
+                        const nextStart = range.from
+                        const nextEnd = range.to ?? range.from
+                        setRegRange([
+                          {
+                            ...regRange[0],
+                            startDate: nextStart,
+                            endDate: nextEnd,
+                            key: 'selection',
+                          },
+                        ])
                       }}
-                    >
-                      {[
-                        'January', 'February', 'March', 'April', 'May', 'June',
-                        'July', 'August', 'September', 'October', 'November', 'December'
-                      ].map((month, index) => (
-                        <option key={month} value={index}>{month}</option>
-                      ))}
-                    </select>
-                    <select
-                      className="year-selector"
-                      value={regRange[0].startDate.getFullYear()}
-                      onChange={(e) => {
-                        const newDate = new Date(regRange[0].startDate);
-                        newDate.setFullYear(parseInt(e.target.value));
-                        setRegRange([{
-                          ...regRange[0],
-                          startDate: newDate
-                        }]);
+                      disabled={(date) => {
+                        const today = new Date()
+                        today.setHours(0, 0, 0, 0)
+                        const eventEnd = eventRange[0].endDate ? new Date(eventRange[0].endDate) : null
+                        if (eventEnd) eventEnd.setHours(0, 0, 0, 0)
+                        if (date < today) return true
+                        if (eventEnd && date > eventEnd) return true
+                        return false
                       }}
-                    >
-                      {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
-                        <option key={year} value={year}>{year}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="weekdays-grid">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                      <div key={day} className="weekday">{day}</div>
-                    ))}
-                  </div>
-                  <div className="days-grid">
-                    {Array.from({ length: 42 }, (_, index) => {
-                      const monthStart = new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth(), 1);
-                      const firstDay = monthStart.getDay();
-                      const day = index - firstDay + 1;
-                      const currentDate = new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth(), day);
-
-                      // Normalize dates to midnight for comparison
-                      const normalizeDate = (date: Date) => {
-                        const normalized = new Date(date);
-                        normalized.setHours(0, 0, 0, 0);
-                        return normalized;
-                      };
-
-                      const normalizedCurrent = normalizeDate(currentDate);
-                      const normalizedStart = regRange[0].startDate ? normalizeDate(regRange[0].startDate) : null;
-                      const normalizedEnd = regRange[0].endDate ? normalizeDate(regRange[0].endDate) : null;
-                      const normalizedToday = normalizeDate(new Date());
-
-                      const isCurrentMonth = currentDate.getMonth() === regRange[0].startDate.getMonth();
-                      const isToday = normalizedCurrent.getTime() === normalizedToday.getTime();
-                      const isSelected = (normalizedStart && normalizedStart.getTime() === normalizedCurrent.getTime()) ||
-                        (normalizedEnd && normalizedEnd.getTime() === normalizedCurrent.getTime());
-                      const isInRange = normalizedStart && normalizedEnd &&
-                        normalizedCurrent >= normalizedStart && normalizedCurrent <= normalizedEnd;
-                      const isDisabled = normalizedCurrent < normalizedToday;
-
-                      return (
-                        <div
-                          key={index}
-                          className={`day-cell ${!isCurrentMonth ? 'other-month' :
-                            isDisabled ? 'disabled' :
-                              isSelected ? 'selected' :
-                                isInRange ? 'in-range' :
-                                  isToday ? 'today' : ''
-                            }`}
-                          onClick={() => {
-                            if (isDisabled) return;
-                            const newRange = { ...regRange[0] };
-                            // If both dates are set or neither is set, start a new selection
-                            if ((newRange.startDate && newRange.endDate) || (!newRange.startDate && !newRange.endDate)) {
-                              newRange.startDate = normalizeDate(currentDate);
-                              newRange.endDate = undefined;
-                            } else if (newRange.startDate && normalizedCurrent < normalizeDate(newRange.startDate)) {
-                              // If clicking before start date, make it the new start
-                              newRange.startDate = normalizeDate(currentDate);
-                              newRange.endDate = undefined;
-                            } else if (newRange.startDate) {
-                              // Set end date
-                              newRange.endDate = normalizeDate(currentDate);
-                            }
-                            setRegRange([newRange]);
-                          }}
-                        >
-                          {isCurrentMonth && day > 0 && day <= new Date(regRange[0].startDate.getFullYear(), regRange[0].startDate.getMonth() + 1, 0).getDate() ? day : ''}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="date-picker-actions">
-                    <button
-                      type="button"
-                      className="action-btn today"
-                      onClick={() => {
-                        const today = new Date();
-                        setRegRange([{
-                          startDate: today,
-                          endDate: today,
-                          key: 'selection'
-                        }]);
-                      }}
-                    >
-                      Today
-                    </button>
-                    <button
-                      type="button"
-                      className="action-btn"
-                      onClick={() => {
-                        setRegRange([{
-                          startDate: new Date(),
-                          endDate: undefined,
-                          key: 'selection'
-                        }]);
-                      }}
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
 
                 {/* Registration Time Selectors */}
                 <div className="grid grid-cols-2 gap-4 mt-4">
@@ -1527,7 +1295,7 @@ export default function CreateTicketedEvent() {
           </div>
 
           {/* Info Message */}
-          <div className="bg-info/10 border border-info/30 rounded-2xl p-6">
+          <div className="bg-muted/30 border border-border rounded-lg p-6">
             <div className="flex items-start gap-3">
               <div className="text-info text-2xl dark:text-info">ℹ️</div>
               <div>
@@ -1555,11 +1323,7 @@ export default function CreateTicketedEvent() {
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
-            >
+            <Button type="submit" disabled={isSubmitting} className="px-6 py-2">
               {isSubmitting ? (
                 <span className="flex items-center">
                   <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>

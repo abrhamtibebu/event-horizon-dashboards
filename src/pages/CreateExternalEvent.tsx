@@ -1,28 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Globe,
   MapPin,
-  Calendar,
   Image as ImageIcon,
   Building2,
   ExternalLink,
-  ChevronRight,
-  ArrowLeft,
-  Sparkles,
   Info,
   X,
   Upload,
-  CheckCircle2
+  Calendar as CalendarIcon,
 } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import GoogleVenueAutocompleteInput from '@/components/GoogleVenueAutocompleteInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -30,11 +25,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Progress } from '@/components/ui/progress'
 import { showSuccessToast, showErrorToast } from '@/components/ui/ModernToast'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
 
 // Ethiopian major cities
 const ETHIOPIAN_CITIES = [
@@ -42,19 +38,34 @@ const ETHIOPIAN_CITIES = [
   'Hawassa', 'Bahir Dar', 'Jimma', 'Dessie', 'Jijiga'
 ]
 
+function toLocalInputValue(d: Date | null) {
+  if (!d) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  const mm = pad(d.getMonth() + 1)
+  const dd = pad(d.getDate())
+  const hh = pad(d.getHours())
+  const mi = pad(d.getMinutes())
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`
+}
+
+function parseLocalInputValue(v: string): Date | null {
+  if (!v) return null
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
 export default function CreateExternalEvent() {
   const navigate = useNavigate()
   const { user, isLoading: authLoading } = useAuth()
-  const [activeStep, setActiveStep] = useState(1)
 
   useEffect(() => {
     if (authLoading) return
     if (user?.role !== 'admin' && user?.role !== 'superadmin') {
-      showErrorToast('Only administrators can create external events')
+      showErrorToast('Only admins and superadmins can create external events')
       navigate('/dashboard/events', { replace: true })
     }
   }, [authLoading, user, navigate])
-  const totalSteps = 3
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -64,10 +75,11 @@ export default function CreateExternalEvent() {
     event_category_id: '',
     city: '',
     venue_name: '',
-    start_date: '',
-    end_date: '',
     organizer_name: '',
   })
+
+  const [scheduleStart, setScheduleStart] = useState<Date | null>(null)
+  const [scheduleEnd, setScheduleEnd] = useState<Date | null>(null)
 
   const [locationMeta, setLocationMeta] = useState<{
     latitude: number | null
@@ -109,6 +121,16 @@ export default function CreateExternalEvent() {
     setFormData(prev => ({ ...prev, [id]: value }))
   }
 
+  const isValidUrl = useMemo(() => {
+    if (!formData.external_registration_url) return true
+    try {
+      const u = new URL(formData.external_registration_url)
+      return u.protocol === 'https:' || u.protocol === 'http:'
+    } catch {
+      return false
+    }
+  }, [formData.external_registration_url])
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'event' | 'logo' | 'banner') => {
     const file = e.target.files?.[0]
     if (file) {
@@ -130,11 +152,44 @@ export default function CreateExternalEvent() {
       showErrorToast('Event name and registration URL are required')
       return
     }
+    if (!isValidUrl) {
+      showErrorToast('Please enter a valid URL (including https://)')
+      return
+    }
+    if (!formData.event_category_id) {
+      showErrorToast('Please select a category')
+      return
+    }
+    if (!formData.city || !formData.venue_name) {
+      showErrorToast('Please fill in both city and venue')
+      return
+    }
+    if (!scheduleStart || !scheduleEnd) {
+      showErrorToast('Please select both start and end date/time')
+      return
+    }
+    if (scheduleEnd <= scheduleStart) {
+      showErrorToast('End date/time must be after start date/time')
+      return
+    }
 
     setIsSubmitting(true)
     try {
       const data = new FormData()
-      Object.entries(formData).forEach(([key, value]) => data.append(key, value))
+      // NOTE: backend does not have a `city` column on `events`.
+      // We keep `city` in UI state, but send it via `location` instead.
+      data.append('name', formData.name)
+      data.append('description', formData.description)
+      data.append('external_registration_url', formData.external_registration_url)
+      data.append('event_category_id', formData.event_category_id)
+      data.append('venue_name', formData.venue_name)
+      data.append('organizer_name', formData.organizer_name)
+      data.append(
+        'location',
+        [formData.venue_name, formData.city].filter(Boolean).join(', '),
+      )
+      data.append('start_date', scheduleStart.toISOString())
+      data.append('end_date', scheduleEnd.toISOString())
       
       if (locationMeta.latitude !== null) data.append('latitude', String(locationMeta.latitude))
       if (locationMeta.longitude !== null) data.append('longitude', String(locationMeta.longitude))
@@ -160,330 +215,378 @@ export default function CreateExternalEvent() {
     }
   }
 
-  const nextStep = () => setActiveStep(prev => Math.min(prev + 1, totalSteps))
-  const prevStep = () => setActiveStep(prev => Math.max(prev - 1, 1))
-
   return (
-    <div className="min-h-screen bg-transparent p-4 sm:p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <Breadcrumbs
           items={[
             { label: 'Events', href: '/dashboard/events' },
-            { label: 'External Event' }
+            { label: 'External Event' },
           ]}
-          className="mb-8"
+          className="mb-4"
         />
 
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-xs font-bold uppercase tracking-widest text-blue-500/80">
-                Premium Publishing
-              </span>
-            </div>
-            <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-              Publish External Event
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              Publish external event
             </h1>
-            <p className="text-muted-foreground mt-1">Showcase experiences hosted outside Evella.</p>
+            <p className="max-w-2xl text-muted-foreground">
+              Create a listing for an event hosted outside Evella and link users to an external registration page.
+            </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate('/dashboard/events')}>
-            <X className="w-4 h-4 mr-2" />
+          <Button variant="outline" onClick={() => navigate('/dashboard/events')}>
             Cancel
           </Button>
         </div>
 
-        {/* custom Progress Tracker */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-4">
-            {['Basic Info', 'Media & Organizer', 'Link & Finalize'].map((label, idx) => (
-              <div key={label} className="flex flex-col items-center flex-1">
-                <div className={cn(
-                  "w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-lg",
-                  activeStep > idx + 1 ? "bg-green-500 text-white" :
-                  activeStep === idx + 1 ? "bg-blue-600 text-white scale-110 shadow-blue-500/20" :
-                  "bg-muted text-muted-foreground"
-                )}>
-                  {activeStep > idx + 1 ? <CheckCircle2 className="w-6 h-6" /> : (idx + 1)}
-                </div>
-                <span className={cn(
-                  "text-[10px] font-black uppercase tracking-widest mt-3 transition-colors duration-300",
-                  activeStep === idx + 1 ? "text-blue-500" : "text-muted-foreground/60"
-                )}>{label}</span>
-              </div>
-            ))}
-          </div>
-          <Progress value={(activeStep / totalSteps) * 100} className="h-1 bg-muted/30" />
-        </div>
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeStep}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Card className="border-none shadow-2xl shadow-black/5 bg-card/40 backdrop-blur-xl rounded-[2rem] overflow-hidden">
-              <CardContent className="p-8 sm:p-12">
-                {activeStep === 1 && (
-                  <div className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="space-y-3">
-                        <Label htmlFor="name" className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Event Name</Label>
-                        <Input
-                          id="name"
-                          placeholder="e.g. World Marathon 2024"
-                          value={formData.name}
-                          onChange={handleInputChange}
-                          className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-2 focus:ring-blue-500/50 text-lg transition-all"
-                        />
-                      </div>
-                      <div className="space-y-3">
-                        <Label htmlFor="event_category_id" className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Category</Label>
-                        <Select
-                          value={formData.event_category_id}
-                          onValueChange={(val) => setFormData(prev => ({ ...prev, event_category_id: val }))}
-                        >
-                          <SelectTrigger className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-2 focus:ring-blue-500/50 text-lg">
-                            <SelectValue placeholder="Select Category" />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-2xl">
-                            {categories.map((cat) => (
-                              <SelectItem key={cat.id} value={String(cat.id)} className="rounded-xl">
-                                {cat.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <Label htmlFor="description" className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Description</Label>
-                      <Textarea
-                        id="description"
-                        placeholder="Deep dive into the experience..."
-                        rows={5}
-                        value={formData.description}
-                        onChange={handleInputChange}
-                        className="rounded-3xl bg-muted/30 border-none focus:ring-2 focus:ring-blue-500/50 text-lg transition-all p-6"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="space-y-3">
-                        <Label htmlFor="city" className="text-sm font-bold uppercase tracking-widest text-muted-foreground">City</Label>
-                        <Select
-                          value={formData.city}
-                          onValueChange={(val) => setFormData(prev => ({ ...prev, city: val }))}
-                        >
-                          <SelectTrigger className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-2 focus:ring-blue-500/50 text-lg">
-                            <SelectValue placeholder="Addis Ababa" />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-2xl">
-                            {ETHIOPIAN_CITIES.map((city) => (
-                              <SelectItem key={city} value={city} className="rounded-xl">
-                                {city}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-3">
-                        <Label htmlFor="venue_name" className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Venue</Label>
-                        <GoogleVenueAutocompleteInput
-                          value={formData.venue_name}
-                          onChange={(val) => setFormData(prev => ({ ...prev, venue_name: val }))}
-                          onPlaceSelected={(selection) => {
-                            setFormData(prev => ({ ...prev, venue_name: selection.venueName }))
-                            if (selection.city && ETHIOPIAN_CITIES.includes(selection.city)) {
-                              setFormData(prev => ({ ...prev, city: selection.city }))
-                            }
-                            setLocationMeta({
-                              latitude: selection.latitude,
-                              longitude: selection.longitude,
-                              formattedAddress: selection.formattedAddress,
-                            })
-                          }}
-                          placeholder="Millennium Hall"
-                          className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-2 focus:ring-blue-500/50 text-lg"
-                        />
-                      </div>
-                    </div>
+        <form
+          className="grid grid-cols-1 gap-6 lg:grid-cols-3"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void handleSubmit()
+          }}
+        >
+          <div className="space-y-6 lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Event details</CardTitle>
+                <CardDescription>Name, category, and description.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Event name</Label>
+                    <Input
+                      id="name"
+                      placeholder="e.g. World Marathon 2024"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                    />
                   </div>
-                )}
+                  <div className="space-y-2">
+                    <Label htmlFor="event_category_id">Category</Label>
+                    <Select
+                      value={formData.event_category_id}
+                      onValueChange={(val) => setFormData((prev) => ({ ...prev, event_category_id: val }))}
+                    >
+                      <SelectTrigger id="event_category_id">
+                        <SelectValue placeholder={loadingCategories ? 'Loading categories…' : 'Select category'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={String(cat.id)}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-                {activeStep === 2 && (
-                  <div className="space-y-10">
-                    <div className="space-y-4">
-                      <Label className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                        <ImageIcon className="w-4 h-4" /> Header Imagery
-                      </Label>
-                      <div
-                        className="relative h-64 rounded-[2rem] bg-muted/30 border-2 border-dashed border-muted-foreground/20 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/40 hover:border-blue-500/50 transition-all overflow-hidden"
-                        onClick={() => document.getElementById('event_file')?.click()}
-                      >
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="What is this event about? Who is it for? What should attendees expect?"
+                    rows={5}
+                    value={formData.description}
+                    onChange={handleInputChange}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Location</CardTitle>
+                <CardDescription>Where the event takes place.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="city">City</Label>
+                  <Select
+                    value={formData.city}
+                    onValueChange={(val) => setFormData((prev) => ({ ...prev, city: val }))}
+                  >
+                    <SelectTrigger id="city">
+                      <SelectValue placeholder="Select a city" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ETHIOPIAN_CITIES.map((city) => (
+                        <SelectItem key={city} value={city}>
+                          {city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="venue_name">Venue</Label>
+                  <GoogleVenueAutocompleteInput
+                    value={formData.venue_name}
+                    onChange={(val) => setFormData((prev) => ({ ...prev, venue_name: val }))}
+                    onPlaceSelected={(selection) => {
+                      setFormData((prev) => ({ ...prev, venue_name: selection.venueName }))
+                      if (selection.city && ETHIOPIAN_CITIES.includes(selection.city)) {
+                        setFormData((prev) => ({ ...prev, city: selection.city }))
+                      }
+                      setLocationMeta({
+                        latitude: selection.latitude,
+                        longitude: selection.longitude,
+                        formattedAddress: selection.formattedAddress,
+                      })
+                    }}
+                    placeholder="Search venue"
+                    className="h-10"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Schedule</CardTitle>
+                <CardDescription>Set start and end date/time.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Start</Label>
+                  <div className="flex gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button type="button" variant="outline" className="w-full justify-start">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {scheduleStart ? scheduleStart.toLocaleDateString() : 'Pick a date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={scheduleStart ?? undefined}
+                          onSelect={(d) => {
+                            if (!d) return
+                            const prev = scheduleStart ?? new Date()
+                            const next = new Date(d)
+                            next.setHours(prev.getHours(), prev.getMinutes(), 0, 0)
+                            setScheduleStart(next)
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <Input
+                      type="time"
+                      value={scheduleStart ? toLocalInputValue(scheduleStart).slice(11) : ''}
+                      onChange={(e) => {
+                        const base = scheduleStart ?? new Date()
+                        const [hh, mm] = e.target.value.split(':').map(Number)
+                        if (!Number.isFinite(hh) || !Number.isFinite(mm)) return
+                        const next = new Date(base)
+                        next.setHours(hh, mm, 0, 0)
+                        setScheduleStart(next)
+                      }}
+                      className="w-32"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>End</Label>
+                  <div className="flex gap-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button type="button" variant="outline" className="w-full justify-start">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {scheduleEnd ? scheduleEnd.toLocaleDateString() : 'Pick a date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={scheduleEnd ?? undefined}
+                          onSelect={(d) => {
+                            if (!d) return
+                            const prev = scheduleEnd ?? new Date()
+                            const next = new Date(d)
+                            next.setHours(prev.getHours(), prev.getMinutes(), 0, 0)
+                            setScheduleEnd(next)
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <Input
+                      type="time"
+                      value={scheduleEnd ? toLocalInputValue(scheduleEnd).slice(11) : ''}
+                      onChange={(e) => {
+                        const base = scheduleEnd ?? new Date()
+                        const [hh, mm] = e.target.value.split(':').map(Number)
+                        if (!Number.isFinite(hh) || !Number.isFinite(mm)) return
+                        const next = new Date(base)
+                        next.setHours(hh, mm, 0, 0)
+                        setScheduleEnd(next)
+                      }}
+                      className="w-32"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>External registration</CardTitle>
+                <CardDescription>Where users will register.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Label htmlFor="external_registration_url">Registration URL</Label>
+                <div className="relative">
+                  <ExternalLink className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="external_registration_url"
+                    placeholder="https://example.com/register"
+                    value={formData.external_registration_url}
+                    onChange={handleInputChange}
+                    className={cn('pl-9', !isValidUrl && 'border-destructive focus-visible:ring-destructive/20')}
+                  />
+                </div>
+                {!isValidUrl && (
+                  <p className="text-sm text-destructive">
+                    Please enter a valid URL (including `https://`).
+                  </p>
+                )}
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  Use a direct link to the external registration page.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Media</CardTitle>
+                <CardDescription>Optional images for the listing.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label>Event banner</Label>
+                  <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="h-14 w-20 overflow-hidden rounded-md bg-muted">
                         {eventImagePreview ? (
-                          <img src={eventImagePreview} className="w-full h-full object-cover" alt="Preview" />
+                          <img src={eventImagePreview} className="h-full w-full object-cover" alt="Event banner preview" />
                         ) : (
-                          <div className="text-center">
-                            <Upload className="w-10 h-10 mx-auto mb-2 text-muted-foreground/50" />
-                            <p className="text-sm font-bold text-muted-foreground">Click to upload Event Banner</p>
+                          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                            <ImageIcon className="h-5 w-5" />
                           </div>
                         )}
-                        <input id="event_file" type="file" className="hidden" onChange={(e) => handleFileChange(e, 'event')} />
                       </div>
-                    </div>
-
-                    <div className="space-y-6 pt-6 border-t border-muted/50">
-                      <h3 className="text-xl font-bold flex items-center gap-2">
-                        <Building2 className="w-5 h-5 text-blue-500" /> External Organizer
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-3">
-                          <Label htmlFor="organizer_name" className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Name</Label>
-                          <Input
-                            id="organizer_name"
-                            placeholder="Org Name"
-                            value={formData.organizer_name}
-                            onChange={handleInputChange}
-                            className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-2 focus:ring-blue-500/50"
-                          />
-                        </div>
-                        <div className="flex gap-4">
-                          <div
-                            className="w-24 h-24 rounded-2xl bg-muted/30 border-2 border-dashed border-muted-foreground/20 flex items-center justify-center cursor-pointer hover:border-blue-500/50 overflow-hidden shrink-0"
-                            onClick={() => document.getElementById('logo_file')?.click()}
-                          >
-                            {orgLogoPreview ? (
-                              <img src={orgLogoPreview} className="w-full h-full object-cover" alt="Logo" />
-                            ) : (
-                              <p className="text-[10px] font-black uppercase text-muted-foreground/50">Logo</p>
-                            )}
-                            <input id="logo_file" type="file" className="hidden" onChange={(e) => handleFileChange(e, 'logo')} />
-                          </div>
-                          <div
-                             className="flex-1 h-24 rounded-2xl bg-muted/30 border-2 border-dashed border-muted-foreground/20 flex items-center justify-center cursor-pointer hover:border-blue-500/50 overflow-hidden"
-                             onClick={() => document.getElementById('banner_file')?.click()}
-                          >
-                            {orgBannerPreview ? (
-                              <img src={orgBannerPreview} className="w-full h-full object-cover" alt="Banner" />
-                            ) : (
-                              <p className="text-[10px] font-black uppercase text-muted-foreground/50">Org Banner</p>
-                            )}
-                            <input id="banner_file" type="file" className="hidden" onChange={(e) => handleFileChange(e, 'banner')} />
-                          </div>
-                        </div>
+                      <div className="flex-1">
+                        <input
+                          id="event_file"
+                          type="file"
+                          className="hidden"
+                          onChange={(e) => handleFileChange(e, 'event')}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => document.getElementById('event_file')?.click()}
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Upload
+                        </Button>
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
 
-                {activeStep === 3 && (
-                  <div className="space-y-8">
-                    <div className="p-8 rounded-[2rem] bg-blue-500/5 border border-blue-500/20">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg">
-                          <Globe className="w-6 h-6 text-white" />
+                <div className="space-y-2">
+                  <Label>Organizer</Label>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="organizer_name">Organizer name</Label>
+                      <Input
+                        id="organizer_name"
+                        placeholder="Organizer name"
+                        value={formData.organizer_name}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Organizer logo</Label>
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 overflow-hidden rounded-md bg-muted">
+                          {orgLogoPreview ? (
+                            <img src={orgLogoPreview} className="h-full w-full object-cover" alt="Logo preview" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                              <Building2 className="h-4 w-4" />
+                            </div>
+                          )}
                         </div>
-                        <div>
-                          <h4 className="text-xl font-bold">External Registration</h4>
-                          <p className="text-sm text-muted-foreground">Where will users secure their spots?</p>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <Label htmlFor="external_registration_url" className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Registration Link (URL)</Label>
-                        <div className="relative">
-                          <ExternalLink className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                          <Input
-                            id="external_registration_url"
-                            placeholder="https://example.com/register"
-                            value={formData.external_registration_url}
-                            onChange={handleInputChange}
-                            className="h-16 pl-12 rounded-2xl bg-background border-none shadow-inner text-lg text-blue-500 font-bold"
-                          />
-                        </div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-2 mt-2 px-2">
-                          <Info className="w-3 h-3 italic" />
-                          Make sure the link starts with https://
-                        </p>
+                        <input
+                          id="logo_file"
+                          type="file"
+                          className="hidden"
+                          onChange={(e) => handleFileChange(e, 'logo')}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => document.getElementById('logo_file')?.click()}
+                        >
+                          Upload
+                        </Button>
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="space-y-3">
-                        <Label htmlFor="start_date" className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Event Schedule</Label>
-                        <Input
-                          id="start_date"
-                          type="datetime-local"
-                          value={formData.start_date}
-                          onChange={handleInputChange}
-                          className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-2 focus:ring-blue-500/50"
-                        />
-                      </div>
-                      <div className="space-y-3">
-                         <Label htmlFor="end_date" className="text-sm font-bold uppercase tracking-widest text-muted-foreground opacity-0 invisible">End Date</Label>
-                         <Input
-                          id="end_date"
-                          type="datetime-local"
-                          value={formData.end_date}
-                          onChange={handleInputChange}
-                          className="h-14 rounded-2xl bg-muted/30 border-none focus:ring-2 focus:ring-blue-500/50"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="bg-muted/30 p-8 rounded-[2rem] border border-muted/50">
-                      <h4 className="font-bold mb-4 flex items-center gap-2 uppercase tracking-widest text-xs text-muted-foreground">
-                        <Sparkles className="w-3 h-3 text-blue-500" /> Summary Preview
-                      </h4>
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-                           <Globe className="w-8 h-8 text-blue-500" />
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label>Organizer banner</Label>
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-16 overflow-hidden rounded-md bg-muted">
+                          {orgBannerPreview ? (
+                            <img src={orgBannerPreview} className="h-full w-full object-cover" alt="Banner preview" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                              <MapPin className="h-4 w-4" />
+                            </div>
+                          )}
                         </div>
-                        <div>
-                          <p className="font-black text-xl truncate max-w-sm">{formData.name || 'Untitled Event'}</p>
-                          <p className="text-sm text-muted-foreground flex items-center gap-2">
-                             {formData.organizer_name || 'Individual Organizer'} • <span className="text-blue-500 font-bold">External</span>
-                          </p>
-                        </div>
+                        <input
+                          id="banner_file"
+                          type="file"
+                          className="hidden"
+                          onChange={(e) => handleFileChange(e, 'banner')}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => document.getElementById('banner_file')?.click()}
+                        >
+                          Upload
+                        </Button>
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
               </CardContent>
-
-              <div className="p-8 sm:p-12 pt-0 bg-muted/10 border-t border-muted/30 flex items-center justify-between">
-                <Button
-                  variant="ghost"
-                  onClick={prevStep}
-                  disabled={activeStep === 1}
-                  className="rounded-2xl h-14 px-8 text-lg font-bold disabled:opacity-30"
-                >
-                  <ArrowLeft className="w-5 h-5 mr-3" /> Previous
+              <CardFooter className="justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => navigate('/dashboard/events')}>
+                  Cancel
                 </Button>
-
-                {activeStep < totalSteps ? (
-                  <Button
-                    onClick={nextStep}
-                    className="rounded-2xl h-14 px-10 text-lg font-black bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-500/20"
-                  >
-                    Continue <ChevronRight className="w-5 h-5 ml-3" />
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handleSubmit}
-                    isLoading={isSubmitting}
-                    className="rounded-2xl h-14 px-12 text-lg font-black bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-105 transition-all shadow-2xl shadow-blue-500/30"
-                  >
-                    Publish Experience <Sparkles className="w-5 h-5 ml-3" />
-                  </Button>
-                )}
-              </div>
+                <Button type="submit" disabled={isSubmitting} className="min-w-40">
+                  {isSubmitting ? 'Publishing…' : 'Publish external event'}
+                </Button>
+              </CardFooter>
             </Card>
-          </motion.div>
-        </AnimatePresence>
+          </div>
+        </form>
       </div>
     </div>
   )
