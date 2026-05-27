@@ -42,7 +42,6 @@ import {
   Clock,
   History,
   Megaphone,
-  Palette,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -189,21 +188,9 @@ const navigationCategories = [
         permission: 'vendors.any',
       },
       {
-        title: 'Sales Team',
-        url: '/dashboard/salesperson-management',
-        icon: Users2,
-        roles: ['superadmin', 'admin'],
-      },
-      {
         title: 'Financials',
         url: '/dashboard/admin/financials',
         icon: DollarSign,
-        roles: ['superadmin', 'admin'],
-      },
-      {
-        title: 'Advanced Analytics',
-        url: '/dashboard/admin/analytics',
-        icon: BarChart3,
         roles: ['superadmin', 'admin'],
       },
       {
@@ -216,12 +203,6 @@ const navigationCategories = [
         title: 'API Management',
         url: '/dashboard/admin/api',
         icon: Key,
-        roles: ['superadmin', 'admin'],
-      },
-      {
-        title: 'System Logs',
-        url: '/dashboard/admin/logs',
-        icon: FileText,
         roles: ['superadmin', 'admin'],
       },
       {
@@ -242,13 +223,6 @@ const navigationCategories = [
         icon: Users2,
         roles: ['organizer', 'organizer_admin'],
         permission: 'team.manage',
-      },
-      {
-        title: 'Badge Designer',
-        url: '/dashboard/badge-designer',
-        icon: Palette,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'event_manager'],
-        permission: 'badges.manage',
       },
     ],
   },

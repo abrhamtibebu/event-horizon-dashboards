@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Calendar,
@@ -12,9 +11,6 @@ import {
   Activity,
   Shield,
   FileText,
-  BarChart3,
-  PieChart as PieChartIcon,
-  LineChart,
   Clock,
   CheckCircle2,
   XCircle,
@@ -23,12 +19,22 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MetricCard } from '@/components/MetricCard'
-import { DashboardCard } from '@/components/DashboardCard'
-import api from '@/lib/api'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { Spinner } from '@/components/ui/spinner'
 import {
-  LineChart as RechartsLineChart,
-  Line,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { toast } from 'sonner'
+import { format } from 'date-fns'
+import { exportDashboardToCSV, exportDashboardToPDF } from '@/utils/dashboardExport'
+import api from '@/lib/api'
+import {
   AreaChart,
   Area,
   XAxis,
@@ -43,155 +49,170 @@ import {
   BarChart,
   Bar,
 } from 'recharts'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { toast } from 'sonner'
-import { format } from 'date-fns'
-import { exportDashboardToCSV, exportDashboardToPDF } from '@/utils/dashboardExport'
 
-// Color palette for charts
+type DateRange = '7d' | '30d' | '90d' | 'all'
+
+type Trend = { value: number; isPositive: boolean } | string
+
+type KeyMetric = { value?: string | number; trend?: Trend }
+
+type GrowthPoint = { month: string; events?: number; users?: number }
+
+type StatusDistributionItem = { name: string; value: number; color?: string }
+
+type UserRoleDistributionItem = { role: string; count: number; growth?: number }
+
+type AlertItem = {
+  id: string | number
+  title: string
+  description?: string
+  severity?: string
+  timestamp: string
+}
+
+type ActivityItem = {
+  id: string | number
+  type?: string
+  description: string
+  timestamp: string
+}
+
+type DashboardStats = {
+  keyMetrics?: {
+    totalEvents?: KeyMetric
+    totalUsers?: KeyMetric
+    activeOrganizers?: KeyMetric
+    monthlyRevenue?: KeyMetric
+  }
+  eventGrowth?: GrowthPoint[]
+  eventStatusDistribution?: StatusDistributionItem[]
+  userRoleDistribution?: UserRoleDistributionItem[]
+  systemAlerts?: AlertItem[]
+  recentActivities?: ActivityItem[]
+}
+
 const CHART_COLORS = {
-  primary: ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444'],
+  primary: ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'],
   status: {
-    draft: '#3b82f6',
-    active: '#16a34a',
-    completed: '#6b7280',
-    cancelled: '#ef4444',
+    draft: 'hsl(var(--chart-1))',
+    active: 'hsl(var(--chart-2))',
+    completed: 'hsl(var(--muted-foreground))',
+    cancelled: 'hsl(var(--destructive))',
   },
 }
 
-// Quick Actions Component
 function QuickActionsPanel({ navigate }: { navigate: (path: string) => void }) {
   const actions = [
-    {
-      title: 'View Organizers',
-      description: 'Manage organizer accounts',
-      icon: Building2,
-      path: '/dashboard/organizers',
-      color: 'bg-blue-500',
-    },
-    {
-      title: 'View Users',
-      description: 'Manage user accounts',
-      icon: Users,
-      path: '/dashboard/users',
-      color: 'bg-purple-500',
-    },
-    {
-      title: 'Audit Logs',
-      description: 'View system activity',
-      icon: FileText,
-      path: '/dashboard/audit-logs',
-      color: 'bg-green-500',
-    },
-    {
-      title: 'Subscriptions',
-      description: 'Manage subscriptions',
-      icon: Shield,
-      path: '/dashboard/admin/subscriptions',
-      color: 'bg-orange-500',
-    },
+    { title: 'View Organizers', description: 'Manage organizer accounts', icon: Building2, path: '/dashboard/organizers' },
+    { title: 'View Users', description: 'Manage user accounts', icon: Users, path: '/dashboard/users' },
+    { title: 'Audit Logs', description: 'View system activity', icon: FileText, path: '/dashboard/audit-logs' },
+    { title: 'Subscriptions', description: 'Manage subscriptions', icon: Shield, path: '/dashboard/admin/subscriptions' },
   ]
 
   return (
-    <DashboardCard title="Quick Actions">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {actions.map((action) => {
-          const Icon = action.icon
-          return (
-            <button
-              key={action.title}
-              onClick={() => navigate(action.path)}
-              className="flex items-center gap-3 p-4 rounded-lg border border-border hover:bg-accent transition-colors text-left group"
-            >
-              <div className={`p-2 rounded-lg ${action.color} text-white group-hover:scale-110 transition-transform`}>
-                <Icon className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-sm">{action.title}</p>
-                <p className="text-xs text-muted-foreground">{action.description}</p>
-              </div>
-            </button>
-          )
-        })}
-      </div>
-    </DashboardCard>
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Quick Actions</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {actions.map((action) => {
+            const Icon = action.icon
+            return (
+              <button
+                key={action.title}
+                type="button"
+                onClick={() => navigate(action.path)}
+                className="flex items-start gap-3 rounded-lg border border-border p-4 text-left hover:bg-muted/50 transition-colors w-full"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{action.title}</p>
+                  <p className="text-xs text-muted-foreground">{action.description}</p>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
-// Recent Activity Feed Component
-function RecentActivityFeed({ activities }: { activities: any[] }) {
+function RecentActivityFeed({ activities }: { activities: ActivityItem[] }) {
   const getActivityIcon = (type: string) => {
-    switch (type.toLowerCase()) {
+    switch (type?.toLowerCase()) {
       case 'event':
-        return <Calendar className="w-4 h-4" />
+        return <Calendar className="h-4 w-4" />
       case 'user':
-        return <Users className="w-4 h-4" />
+        return <Users className="h-4 w-4" />;
       case 'organizer':
-        return <Building2 className="w-4 h-4" />
+        return <Building2 className="h-4 w-4" />;
       default:
-        return <Activity className="w-4 h-4" />
+        return <Activity className="h-4 w-4" />;
     }
   }
 
-  if (!activities || activities.length === 0) {
+  if (!activities?.length) {
     return (
-      <DashboardCard title="Recent Activity">
-        <div className="text-center py-8 text-muted-foreground">
-          <Activity className="w-12 h-12 mx-auto mb-2 opacity-50" />
-          <p className="text-sm">No recent activity</p>
-        </div>
-      </DashboardCard>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Recent Activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+            <Activity className="h-10 w-10 opacity-50 mb-2" />
+            <p className="text-sm">No recent activity</p>
+          </div>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
-    <DashboardCard title="Recent Activity">
-      <div className="space-y-3">
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Recent Activity</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3 max-h-[320px] overflow-y-auto">
         {activities.map((activity) => (
-          <div
-            key={activity.id}
-            className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
-          >
-            <div className="p-2 rounded-lg bg-primary/10 text-primary mt-0.5">
-              {getActivityIcon(activity.type)}
+            <div
+              key={activity.id}
+              className="flex items-start gap-3 rounded-lg border border-border p-3 hover:bg-muted/50 transition-colors"
+            >
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                {getActivityIcon(activity.type || 'activity')}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-foreground line-clamp-2">{activity.description}</p>
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <Clock className="h-3 w-3 shrink-0" />
+                  {activity.timestamp}
+                </p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground line-clamp-2">
-                {activity.description}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                {activity.timestamp}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </DashboardCard>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
-// System Alerts Component
-function SystemAlertsPanel({ alerts }: { alerts: any[] }) {
+function SystemAlertsPanel({ alerts }: { alerts: AlertItem[] }) {
   const getSeverityIcon = (severity: string) => {
     switch (severity?.toLowerCase()) {
       case 'critical':
       case 'error':
-        return <XCircle className="w-4 h-4 text-destructive" />
+        return <XCircle className="h-4 w-4 text-destructive" />;
       case 'warning':
-        return <AlertTriangle className="w-4 h-4 text-yellow-500" />
+        return <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500" />;
       case 'info':
-        return <Info className="w-4 h-4 text-blue-500" />
+        return <Info className="h-4 w-4 text-primary" />;
       default:
-        return <CheckCircle2 className="w-4 h-4 text-green-500" />
+        return <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
     }
   }
 
@@ -199,77 +220,87 @@ function SystemAlertsPanel({ alerts }: { alerts: any[] }) {
     switch (severity?.toLowerCase()) {
       case 'critical':
       case 'error':
-        return <Badge variant="destructive">Critical</Badge>
+        return <Badge variant="destructive">Critical</Badge>;
       case 'warning':
-        return <Badge className="bg-yellow-500">Warning</Badge>
+        return <Badge variant="secondary" className="border-amber-500/50 text-amber-700 dark:text-amber-400">Warning</Badge>;
       case 'info':
-        return <Badge variant="secondary">Info</Badge>
+        return <Badge variant="secondary">Info</Badge>;
       default:
-        return <Badge className="bg-green-500">Normal</Badge>
+        return <Badge variant="outline">Normal</Badge>;
     }
   }
 
-  if (!alerts || alerts.length === 0) {
+  if (!alerts?.length) {
     return (
-      <DashboardCard title="System Alerts">
-        <div className="text-center py-8 text-muted-foreground">
-          <CheckCircle2 className="w-12 h-12 mx-auto mb-2 text-green-500 opacity-50" />
-          <p className="text-sm">All systems operational</p>
-        </div>
-      </DashboardCard>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">System Alerts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+            <CheckCircle2 className="h-10 w-10 text-emerald-600 dark:text-emerald-400 mb-2 opacity-80" />
+            <p className="text-sm">All systems operational</p>
+          </div>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
-    <DashboardCard title="System Alerts">
-      <div className="space-y-3">
-        {alerts.map((alert) => (
-          <div
-            key={alert.id}
-            className="flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
-          >
-            <div className="mt-0.5">{getSeverityIcon(alert.severity)}</div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <p className="text-sm font-semibold text-foreground">{alert.title}</p>
-                {getSeverityBadge(alert.severity)}
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">System Alerts</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3 max-h-[320px] overflow-y-auto">
+          {alerts.map((alert) => (
+            <div
+              key={alert.id}
+              className="flex items-start gap-3 rounded-lg border border-border p-3 hover:bg-muted/50 transition-colors"
+            >
+              <div className="mt-0.5 shrink-0">{getSeverityIcon(alert.severity)}</div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className="text-sm font-medium">{alert.title}</p>
+                  {getSeverityBadge(alert.severity)}
+                </div>
+                {alert.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-2">{alert.description}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <Clock className="h-3 w-3 shrink-0" />
+                  {alert.timestamp}
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground line-clamp-2">{alert.description}</p>
-              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                {alert.timestamp}
-              </p>
             </div>
-          </div>
-        ))}
-      </div>
-    </DashboardCard>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
 export default function AdminDashboard() {
   const navigate = useNavigate()
-  const [stats, setStats] = useState<any>(null)
+  const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d')
+  const [dateRange, setDateRange] = useState<DateRange>('30d')
   const [refreshing, setRefreshing] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true)
       setRefreshing(true)
       const response = await api.get('/dashboard/admin', {
-        params: {
-          date_range: dateRange,
-        },
+        params: { date_range: dateRange },
       })
-      setStats(response.data)
+      setStats(response.data as DashboardStats)
       setError(null)
       setLastRefresh(new Date())
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError('Failed to load Command Center data.')
       console.error(err)
       toast.error('Failed to load dashboard data')
@@ -277,41 +308,19 @@ export default function AdminDashboard() {
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [dateRange])
 
   useEffect(() => {
     fetchDashboardData()
-  }, [dateRange])
+  }, [fetchDashboardData])
 
-  // Auto-refresh functionality
   useEffect(() => {
     if (!autoRefresh) return
-
     const interval = setInterval(() => {
       fetchDashboardData()
-    }, 60000) // Refresh every 60 seconds
-
+    }, 60000)
     return () => clearInterval(interval)
-  }, [autoRefresh, dateRange])
-
-  // Auto-refresh functionality
-  useEffect(() => {
-    if (!autoRefresh) return
-
-    const interval = setInterval(() => {
-      fetchDashboardData()
-      setLastRefresh(new Date())
-    }, 60000) // Refresh every 60 seconds
-
-    return () => clearInterval(interval)
-  }, [autoRefresh, dateRange])
-
-  // Update last refresh time when data is fetched
-  useEffect(() => {
-    if (stats && !lastRefresh) {
-      setLastRefresh(new Date())
-    }
-  }, [stats])
+  }, [autoRefresh, fetchDashboardData])
 
   const handleExport = async (exportFormat: 'csv' | 'pdf') => {
     try {
@@ -319,42 +328,38 @@ export default function AdminDashboard() {
         toast.error('No data available to export')
         return
       }
-
       toast.loading(`Exporting dashboard data as ${exportFormat.toUpperCase()}...`)
-
-      // Small delay to show loading state
       await new Promise((resolve) => setTimeout(resolve, 300))
-
       if (exportFormat === 'csv') {
         exportDashboardToCSV(stats, dateRange)
         toast.success('Dashboard data exported as CSV')
-      } else if (exportFormat === 'pdf') {
+      } else {
         exportDashboardToPDF(stats, dateRange)
         toast.success('Dashboard data exported as PDF')
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Export error:', err)
-      toast.error(`Failed to export data: ${err.message || 'Unknown error'}`)
+      toast.error('Failed to export data')
     }
   }
 
   if (loading && !stats) {
     return (
-      <div className="flex h-[80vh] items-center justify-center">
-        <Spinner size="lg" variant="primary" text="Initializing Command Center..." />
+      <div className="flex h-[60vh] items-center justify-center">
+        <Spinner size="lg" variant="primary" text="Loading dashboard..." />
       </div>
     )
   }
 
   if (error && !stats) {
     return (
-      <div className="flex flex-col items-center justify-center h-[80vh] text-center p-6">
-        <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
-          <AlertCircle className="w-8 h-8 text-destructive" />
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center p-6 space-y-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+          <AlertCircle className="h-6 w-6 text-destructive" />
         </div>
-        <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
-        <p className="text-muted-foreground mb-6">{error}</p>
-        <Button onClick={() => window.location.reload()}>Retry Connection</Button>
+        <h2 className="text-xl font-semibold">Unable to load dashboard</h2>
+        <p className="text-sm text-muted-foreground max-w-md">{error}</p>
+        <Button onClick={() => window.location.reload()}>Retry</Button>
       </div>
     )
   }
@@ -364,47 +369,66 @@ export default function AdminDashboard() {
   const userRoleData = stats?.userRoleDistribution || []
   const systemAlerts = stats?.systemAlerts || []
   const recentActivities = stats?.recentActivities || []
+  const km = stats?.keyMetrics
+
+  const metricCards = [
+    {
+      title: 'Total Events',
+      value: km?.totalEvents?.value ?? '0',
+      trend: km?.totalEvents?.trend,
+      icon: Calendar,
+      link: '/dashboard/events',
+    },
+    {
+      title: 'Platform Users',
+      value: km?.totalUsers?.value ?? '0',
+      trend: km?.totalUsers?.trend,
+      icon: Users,
+      link: '/dashboard/users',
+    },
+    {
+      title: 'Active Organizers',
+      value: km?.activeOrganizers?.value ?? '0',
+      trend: km?.activeOrganizers?.trend,
+      icon: Building2,
+      link: '/dashboard/organizers',
+    },
+    {
+      title: 'Monthly Revenue',
+      value: km?.monthlyRevenue?.value ?? '—',
+      trend: km?.monthlyRevenue?.trend,
+      icon: TrendingUp,
+    },
+  ]
 
   return (
-    <div className="min-h-screen bg-transparent p-1 sm:p-6 space-y-6">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-        >
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs font-bold uppercase tracking-widest text-primary/80">
-              Platform Status: Optimal
-            </span>
+            <Badge variant={systemAlerts.length > 0 ? 'destructive' : 'secondary'}>
+              {systemAlerts.length > 0 ? `${systemAlerts.length} alert(s)` : 'All systems operational'}
+            </Badge>
           </div>
-          <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-            Command Center
-          </h1>
-          <p className="text-muted-foreground mt-1">Real-time oversight and administrative control.</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Command Center</h1>
+          <p className="text-muted-foreground mt-1">
+            Platform overview and administrative controls.
+          </p>
           {lastRefresh && (
-            <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              Last updated: {format(lastRefresh, 'MMM d, yyyy HH:mm:ss')}
+            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              Last updated {format(lastRefresh, 'MMM d, yyyy HH:mm:ss')}
               {autoRefresh && (
-                <span className="ml-2 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block shrink-0" />
-                  Auto-refresh enabled
+                <span className="inline-flex items-center gap-1.5 text-primary">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                  Auto-refresh on
                 </span>
               )}
-            </div>
+            </p>
           )}
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex items-center gap-3 flex-wrap"
-        >
-          <Select value={dateRange} onValueChange={(value: any) => setDateRange(value)}>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={dateRange} onValueChange={(v) => setDateRange(v as typeof dateRange)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue />
             </SelectTrigger>
@@ -415,302 +439,262 @@ export default function AdminDashboard() {
               <SelectItem value="all">All time</SelectItem>
             </SelectContent>
           </Select>
-
           <Button
             variant="outline"
+            size="sm"
             onClick={() => {
               fetchDashboardData()
               setLastRefresh(new Date())
             }}
             disabled={refreshing}
             className="gap-2"
-            title={lastRefresh ? `Last refreshed: ${format(lastRefresh, 'HH:mm:ss')}` : ''}
           >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
             Refresh
           </Button>
-          
           <Button
             variant={autoRefresh ? 'default' : 'outline'}
+            size="sm"
             onClick={() => setAutoRefresh(!autoRefresh)}
             className="gap-2"
-            title={autoRefresh ? 'Auto-refresh enabled (every 60s)' : 'Enable auto-refresh'}
           >
-            <Activity className={`w-4 h-4 ${autoRefresh ? 'animate-pulse' : ''}`} />
-            {autoRefresh ? 'Auto' : 'Manual'}
+            <Activity className="h-4 w-4" />
+            {autoRefresh ? 'Auto on' : 'Auto off'}
           </Button>
-
-          <Button variant="outline" onClick={() => handleExport('csv')} className="gap-2">
-            <Download className="w-4 h-4" />
-            Export CSV
+          <Button variant="outline" size="sm" onClick={() => handleExport('csv')}>
+            <Download className="h-4 w-4" />
+            CSV
           </Button>
-          <Button variant="outline" onClick={() => handleExport('pdf')} className="gap-2">
-            <Download className="w-4 h-4" />
-            Export PDF
+          <Button variant="outline" size="sm" onClick={() => handleExport('pdf')}>
+            <Download className="h-4 w-4" />
+            PDF
           </Button>
-        </motion.div>
+        </div>
       </div>
 
-      {/* Primary Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          {
-            title: 'Total Events',
-            ...stats?.keyMetrics?.totalEvents,
-            icon: <Calendar />,
-            link: '/dashboard/events',
-          },
-          {
-            title: 'Platform Users',
-            ...stats?.keyMetrics?.totalUsers,
-            icon: <Users />,
-            link: '/dashboard/users',
-          },
-          {
-            title: 'Active Organizers',
-            ...stats?.keyMetrics?.activeOrganizers,
-            icon: <Building2 />,
-            link: '/dashboard/organizers',
-          },
-          {
-            title: 'Monthly Revenue',
-            ...stats?.keyMetrics?.monthlyRevenue,
-            icon: <TrendingUp />,
-          },
-        ].map((metric, idx) => (
-          <motion.div
-            key={metric.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-          >
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {metricCards.map((metric) => {
+          const Icon = metric.icon
+          return (
             <MetricCard
+              key={metric.title}
               title={metric.title}
-              value={metric.value || '0'}
+              value={metric.value}
               trend={metric.trend}
-              icon={metric.icon}
-              className="bg-card/40 backdrop-blur-xl border-white/10 shadow-2xl"
+              icon={<Icon className="h-5 w-5" />}
               link={metric.link}
             />
-          </motion.div>
-        ))}
+          )
+        })}
       </div>
 
-      {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Event & User Growth Chart */}
-        <DashboardCard title="Event & User Growth">
-          {eventGrowthData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={eventGrowthData}>
-                <defs>
-                  <linearGradient id="colorEvents" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis dataKey="month" className="text-xs" />
-                <YAxis className="text-xs" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Legend />
-                <Area
-                  type="monotone"
-                  dataKey="events"
-                  stroke="#3b82f6"
-                  fillOpacity={1}
-                  fill="url(#colorEvents)"
-                  name="Events"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="users"
-                  stroke="#8b5cf6"
-                  fillOpacity={1}
-                  fill="url(#colorUsers)"
-                  name="Users"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>No growth data available</p>
-              </div>
-            </div>
-          )}
-        </DashboardCard>
-
-        {/* Event Status Distribution */}
-        <DashboardCard title="Event Status Distribution">
-          {eventStatusData.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={eventStatusData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {eventStatusData.map((entry: any, index: number) => (
-                      <Cell key={`cell-${index}`} fill={entry.color || CHART_COLORS.primary[index]} />
-                    ))}
-                  </Pie>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Event & user growth</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {eventGrowthData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={eventGrowthData}>
+                  <defs>
+                    <linearGradient id="colorEvents" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
+                      backgroundColor: 'hsl(var(--popover))',
                       border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
+                      borderRadius: 'var(--radius)',
                     }}
                   />
-                </PieChart>
+                  <Legend />
+                  <Area type="monotone" dataKey="events" stroke="hsl(var(--primary))" fill="url(#colorEvents)" name="Events" />
+                  <Area type="monotone" dataKey="users" stroke="hsl(var(--chart-2))" fill="url(#colorUsers)" name="Users" />
+                </AreaChart>
               </ResponsiveContainer>
-              <div className="grid grid-cols-2 gap-2 mt-4">
-                {eventStatusData.map((item: any, index: number) => (
-                  <div
-                    key={item.name}
-                    className="flex items-center justify-between p-2 bg-muted/50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: item.color || CHART_COLORS.primary[index] }}
-                      />
-                      <span className="text-sm text-foreground">{item.name}</span>
+            ) : (
+              <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">
+                No growth data for this period
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Event status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {eventStatusData.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={eventStatusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={70}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {eventStatusData.map((entry, index) => (
+                        <Cell
+                          key={entry.name}
+                          fill={
+                            entry.color ||
+                            CHART_COLORS.status[entry.name as keyof typeof CHART_COLORS.status] ||
+                            CHART_COLORS.primary[index % CHART_COLORS.primary.length]
+                          }
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--popover))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: 'var(--radius)',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {eventStatusData.map((item) => (
+                    <div
+                      key={item.name}
+                      className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm"
+                    >
+                      <span className="text-muted-foreground">{item.name}</span>
+                      <span className="font-medium tabular-nums">{item.value}</span>
                     </div>
-                    <span className="text-sm font-medium text-foreground">{item.value}</span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground py-8 text-center">No status breakdown</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">User roles</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {userRoleData.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={userRoleData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="role" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--popover))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: 'var(--radius)',
+                    }}
+                  />
+                  <Bar dataKey="count" fill="hsl(var(--primary))" name="Total" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="growth" fill="hsl(var(--chart-3))" name="New (30d)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {userRoleData.map((role) => (
+                  <div key={role.role} className="rounded-lg border border-border bg-card/50 p-3">
+                    <p className="text-xs text-muted-foreground">{role.role}</p>
+                    <p className="text-lg font-semibold tabular-nums">{role.count}</p>
+                    {role.growth > 0 && (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400">+{role.growth} (30d)</p>
+                    )}
                   </div>
                 ))}
               </div>
             </>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <PieChartIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>No status data available</p>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground py-6 text-center">No role data</p>
           )}
-        </DashboardCard>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* User Role Distribution */}
-      <DashboardCard title="User Role Distribution">
-        {userRoleData.length > 0 ? (
-          <div className="space-y-4">
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={userRoleData}>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis dataKey="role" className="text-xs" />
-                <YAxis className="text-xs" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Legend />
-                <Bar dataKey="count" fill="#3b82f6" name="Total Users" />
-                <Bar dataKey="growth" fill="#8b5cf6" name="New (30d)" />
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {userRoleData.map((role: any) => (
-                <div
-                  key={role.role}
-                  className="p-3 rounded-lg border border-border bg-card/50"
-                >
-                  <p className="text-xs text-muted-foreground mb-1">{role.role}</p>
-                  <p className="text-2xl font-bold">{role.count}</p>
-                  {role.growth > 0 && (
-                    <p className="text-xs text-green-500 mt-1">+{role.growth} this month</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-            <div className="text-center">
-              <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
-              <p>No user role data available</p>
-            </div>
-          </div>
-        )}
-      </DashboardCard>
-
-      {/* Insights Summary Card */}
       {stats && (
-        <DashboardCard title="Platform Insights">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-lg border border-border bg-card/50">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-4 h-4 text-primary" />
-                <p className="text-sm font-semibold">Growth Rate</p>
-              </div>
-              <p className="text-2xl font-bold">
-                {eventGrowthData.length > 1
-                  ? `${Math.round(
-                      ((eventGrowthData[eventGrowthData.length - 1]?.events || 0) -
-                        (eventGrowthData[0]?.events || 0)) /
-                        Math.max(1, eventGrowthData[0]?.events || 1) *
-                        100
-                    )}%`
-                  : 'N/A'}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Event growth trend</p>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Platform insights</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <InsightBlock
+                title="Growth rate"
+                value={
+                  eventGrowthData.length > 1
+                    ? `${Math.round(
+                        ((eventGrowthData[eventGrowthData.length - 1]?.events || 0) -
+                          (eventGrowthData[0]?.events || 0)) /
+                          Math.max(1, eventGrowthData[0]?.events || 1) *
+                          100
+                      )}%`
+                    : 'N/A'
+                }
+                hint="Event growth vs prior period"
+              />
+              <InsightBlock
+                title="New users (30d)"
+                value={userRoleData.reduce((s, r) => s + (r.growth || 0), 0).toString()}
+                hint="Users added in last 30 days"
+              />
+              <InsightBlock
+                title="System health"
+                value={
+                  systemAlerts.length === 0
+                    ? '100%'
+                    : `${Math.max(0, 100 - systemAlerts.length * 10)}%`
+                }
+                hint={
+                  systemAlerts.length === 0
+                    ? 'All systems operational'
+                    : `${systemAlerts.length} active alert(s)`
+                }
+              />
             </div>
-
-            <div className="p-4 rounded-lg border border-border bg-card/50">
-              <div className="flex items-center gap-2 mb-2">
-                <Users className="w-4 h-4 text-primary" />
-                <p className="text-sm font-semibold">Active Users</p>
-              </div>
-              <p className="text-2xl font-bold">
-                {userRoleData.reduce((sum: number, role: any) => sum + (role.growth || 0), 0)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">New users (30 days)</p>
-            </div>
-
-            <div className="p-4 rounded-lg border border-border bg-card/50">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertCircle className="w-4 h-4 text-primary" />
-                <p className="text-sm font-semibold">System Health</p>
-              </div>
-              <p className="text-2xl font-bold">
-                {systemAlerts.length === 0 ? '100%' : `${Math.max(0, 100 - systemAlerts.length * 10)}%`}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {systemAlerts.length === 0 ? 'All systems operational' : `${systemAlerts.length} active alerts`}
-              </p>
-            </div>
-          </div>
-        </DashboardCard>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Bottom Section: Quick Actions, Alerts, and Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <QuickActionsPanel navigate={navigate} />
         <SystemAlertsPanel alerts={systemAlerts} />
         <RecentActivityFeed activities={recentActivities} />
       </div>
+    </div>
+  )
+}
+
+function InsightBlock({
+  title,
+  value,
+  hint,
+}: {
+  title: string
+  value: string
+  hint?: string
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/30 p-4">
+      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <p className="text-2xl font-semibold tabular-nums text-foreground">{value}</p>
+      {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
     </div>
   )
 }

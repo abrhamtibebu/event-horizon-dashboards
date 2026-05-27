@@ -22,41 +22,39 @@ export function MetricCard({
   link,
 }: MetricCardProps) {
   const cardContent = (
-    <Card
-      className={cn(
-        'bg-card/40 backdrop-blur-xl border border-white/5 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-[1.5rem] hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)] hover:bg-card/60 transition-all duration-300 group',
-        className
-      )}
-    >
+    <Card className={cn('border border-border bg-card shadow-sm', className)}>
       <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-2 leading-none">
-              {title}
-            </p>
-            <p className="text-3xl font-black text-foreground mb-1 tabular-nums tracking-tight">
-              {value}
-            </p>
-            {/* Show trend as string if provided */}
-            {typeof trend === 'string' && (
-              <p className={cn('text-[13px] mt-2 font-bold flex items-center gap-1', trend.startsWith('+') ? 'text-emerald-500' : 'text-rose-500')}>
-                <span className="p-0.5 rounded-full bg-current/10">
-                  {trend.startsWith('+') ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-                </span>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <p className="text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
+            {typeof trend === 'string' && trend && (
+              <p
+                className={cn(
+                  'text-sm mt-1 flex items-center gap-1',
+                  trend.startsWith('+') ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                )}
+              >
+                {trend.startsWith('+') ? (
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                ) : (
+                  <ArrowDownRight className="h-3.5 w-3.5" />
+                )}
                 {trend.replace(/^\+|^-/, '')}
               </p>
             )}
-            {/* Show trend as object if provided */}
             {typeof trend === 'object' && trend && (
-              <p className={cn('text-[13px] mt-2 font-bold flex items-center gap-1', trend.isPositive ? 'text-emerald-500' : 'text-rose-500')}>
-                <span className="p-0.5 rounded-full bg-current/10">
-                  {trend.isPositive ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-                </span>
+              <p
+                className={cn(
+                  'text-sm mt-1 flex items-center gap-1',
+                  trend.isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                )}
+              >
                 {Math.abs(trend.value)}%
               </p>
             )}
           </div>
-          <div className="p-4 bg-gradient-to-br from-primary/20 to-primary/5 rounded-2xl group-hover:scale-110 transition-transform duration-300 shadow-inner flex items-center justify-center text-primary">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
             {icon}
           </div>
         </div>
