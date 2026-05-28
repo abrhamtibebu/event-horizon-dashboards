@@ -252,6 +252,7 @@ export default function EventDetails() {
     longitude: null as number | null,
     city: '' as string,
   })
+  const editSnapshotRef = useRef<Record<string, unknown> | null>(null)
 
   // Add state for edit form date ranges
   const [showEditEventRange, setShowEditEventRange] = useState(false)
@@ -1281,14 +1282,24 @@ export default function EventDetails() {
       ...eventDataForEdit,
       guest_types: guestTypes,
     })
-    setEditLocationMeta({
+    const locationMeta = {
       venue_name: eventData.venue_name || eventData.geolocation?.venue_name || '',
       formatted_address:
         eventData.formatted_address || eventData.geolocation?.formatted_address || '',
       latitude: eventData.latitude ?? eventData.geolocation?.latitude ?? null,
       longitude: eventData.longitude ?? eventData.geolocation?.longitude ?? null,
       city: eventData.city || '',
-    })
+    }
+    setEditLocationMeta(locationMeta)
+    editSnapshotRef.current = buildEditableEventPayload(
+      { ...eventDataForEdit, guest_types: guestTypes },
+      [{ startDate, endDate, key: 'selection' }],
+      [{ startDate: regStartDate, endDate: regEndDate, key: 'selection' }],
+      locationMeta,
+      user?.role === 'admin' || user?.role === 'superadmin'
+        ? (eventData.featured_rank ?? null)
+        : undefined,
+    )
     setEditImagePreview(
       eventData.event_image ? getImageUrl(eventData.event_image) : null
     )
@@ -1297,6 +1308,61 @@ export default function EventDetails() {
 
   const handleEditInput = (field: string, value: any) => {
     setEditForm((prev: any) => ({ ...prev, [field]: value }))
+  }
+
+  const buildEditableEventPayload = (
+    form: any,
+    eventRange: { startDate: Date; endDate: Date; key: string }[],
+    regRange: { startDate: Date; endDate: Date; key: string }[],
+    locationMeta: typeof editLocationMeta,
+    featuredRank?: number | null,
+  ): Record<string, unknown> => {
+    const payload: Record<string, unknown> = {
+      name: form.name,
+      description: form.description ?? '',
+      start_date: eventRange[0].startDate.toISOString(),
+      end_date: eventRange[0].endDate.toISOString(),
+      location: form.location,
+      max_guests: Number(form.max_guests),
+      registration_start_date: regRange[0].startDate.toISOString(),
+      registration_end_date: regRange[0].endDate.toISOString(),
+      event_type_id: form.event_type_id,
+      event_category_id: form.event_category_id,
+      visibility: form.visibility,
+      guest_types: Array.isArray(form.guest_types)
+        ? form.guest_types
+        : (form.guest_types || '').split(',').map((s: string) => s.trim()).filter(Boolean),
+      agenda: form.agenda || '',
+      requirements: form.requirements || '',
+      venue_name: locationMeta.venue_name || null,
+      formatted_address: locationMeta.formatted_address || null,
+      latitude: locationMeta.latitude,
+      longitude: locationMeta.longitude,
+    }
+    if (featuredRank !== undefined) {
+      payload.featured_rank = featuredRank
+    }
+    return payload
+  }
+
+  const editValuesEqual = (a: unknown, b: unknown): boolean => {
+    if (Array.isArray(a) && Array.isArray(b)) {
+      return a.length === b.length && a.every((v, i) => v === b[i])
+    }
+    return a === b
+  }
+
+  const diffEditPayload = (
+    current: Record<string, unknown>,
+    snapshot: Record<string, unknown>,
+  ): Record<string, unknown> => {
+    const changed: Record<string, unknown> = {}
+    for (const key of Object.keys(current)) {
+      if (!editValuesEqual(current[key], snapshot[key])) {
+        changed[key] = current[key]
+      }
+    }
+    return changed
   }
 
   // Handle session click to show checked-in guests
@@ -1398,60 +1464,47 @@ export default function EventDetails() {
     e.preventDefault();
     setEditLoading(true);
     try {
-      let payload;
+      let payload: Record<string, unknown> | FormData;
       let headers = {};
       const isPlatformAdmin = user?.role === 'admin' || user?.role === 'superadmin';
       const featuredRank =
         isPlatformAdmin && editForm && 'featured_rank' in editForm
           ? (editForm.featured_rank as number | null)
           : undefined;
-      // Convert date objects to ISO strings for API
-      const processedEditForm = {
-        ...editForm,
-        start_date: editEventRange[0].startDate.toISOString(),
-        end_date: editEventRange[0].endDate.toISOString(),
-        registration_start_date: editRegRange[0].startDate.toISOString(),
-        registration_end_date: editRegRange[0].endDate.toISOString(),
-        max_guests: Number(editForm.max_guests),
-        guest_types: Array.isArray(editForm.guest_types)
-          ? editForm.guest_types
-          : (editForm.guest_types || '').split(',').map((s) => s.trim()).filter(Boolean),
-        venue_name: editLocationMeta.venue_name || null,
-        formatted_address: editLocationMeta.formatted_address || null,
-        latitude: editLocationMeta.latitude,
-        longitude: editLocationMeta.longitude,
-        city: editLocationMeta.city || null,
-      };
-      const { featured_rank: _fr, event_image: _ei, ...formWithoutFeatured } = processedEditForm;
-      if (processedEditForm.event_image && processedEditForm.event_image instanceof File) {
-        payload = new FormData();
-        payload.append('_method', 'PUT');
-        Object.entries(formWithoutFeatured).forEach(([key, value]) => {
-          if (key === 'event_image' && processedEditForm.event_image) {
-            payload.append('event_image', processedEditForm.event_image);
-          } else if (key === 'guest_types') {
+      const snapshot = editSnapshotRef.current;
+      if (!snapshot) {
+        throw new Error('Edit snapshot missing');
+      }
+      const current = buildEditableEventPayload(
+        editForm,
+        editEventRange,
+        editRegRange,
+        editLocationMeta,
+        isPlatformAdmin ? featuredRank : undefined,
+      );
+      payload = diffEditPayload(current, snapshot);
+      if (Object.keys(payload).length === 0 && !(editForm.event_image instanceof File)) {
+        toast.info('No changes to save');
+        setEditLoading(false);
+        return;
+      }
+      if (editForm.event_image && editForm.event_image instanceof File) {
+        const formData = new FormData();
+        formData.append('_method', 'PUT');
+        formData.append('event_image', editForm.event_image);
+        Object.entries(payload).forEach(([key, value]) => {
+          if (key === 'guest_types') {
             (Array.isArray(value) ? value : [value]).forEach((type: string) =>
-              payload.append('guest_types[]', type)
+              formData.append('guest_types[]', type)
             );
           } else if (value !== undefined && value !== null) {
-            payload.append(key, value as any);
+            formData.append(key, value as string | Blob);
           }
         });
-        if (isPlatformAdmin && featuredRank !== undefined) {
-          payload.append(
-            'featured_rank',
-            featuredRank === null ? '' : String(featuredRank),
-          );
-        }
+        payload = formData;
         headers = { 'Content-Type': 'multipart/form-data' };
         await api.post(`/events/${Number(eventId)}`, payload, { headers });
       } else {
-        payload = {
-          ...formWithoutFeatured,
-          ...(isPlatformAdmin && featuredRank !== undefined
-            ? { featured_rank: featuredRank }
-            : {}),
-        };
         await api.put(`/events/${Number(eventId)}`, payload, { headers });
       }
       // Refresh event details before closing dialog
