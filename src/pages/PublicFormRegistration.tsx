@@ -24,6 +24,7 @@ import { formApi, formSubmissionApi } from '@/lib/api/forms';
 import type { Form, FormSubmissionRequest } from '@/types/forms';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { EventDescription } from '@/components/ui/event-description';
 import { getImageUrl } from '@/lib/utils';
 
 export default function PublicFormRegistration() {
@@ -363,9 +364,11 @@ export default function PublicFormRegistration() {
 
                 {/* Event Description with Better Typography */}
                 {event.description && (
-                  <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-medium px-2 sm:px-0">
-                    {event.description}
-                  </p>
+                  <EventDescription
+                    description={event.description}
+                    className="max-w-3xl mx-auto px-2 sm:px-0"
+                    textClassName="text-lg sm:text-xl text-muted-foreground leading-relaxed font-medium text-center"
+                  />
                 )}
               </div>
 

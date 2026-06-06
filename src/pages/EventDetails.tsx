@@ -91,6 +91,8 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
+import { EventDescription } from '@/components/ui/event-description'
 import { toast } from 'sonner'
 import api, {
   getUshers,
@@ -2903,9 +2905,14 @@ export default function EventDetails() {
                             <h3 className="text-lg sm:text-xl font-bold text-foreground">Event Description</h3>
                           </div>
                           <div className="prose prose-gray max-w-none">
-                            <p className="text-foreground leading-relaxed whitespace-pre-line">
-                              {eventData?.description || 'No description provided for this event.'}
-                            </p>
+                            {eventData?.description ? (
+                              <EventDescription
+                                description={eventData.description}
+                                textClassName="text-foreground leading-relaxed"
+                              />
+                            ) : (
+                              <p className="text-foreground leading-relaxed">No description provided for this event.</p>
+                            )}
                           </div>
                         </div>
 
@@ -4740,13 +4747,12 @@ export default function EventDetails() {
                           </div>
                           <div className="space-y-2 sm:col-span-2">
                             <Label htmlFor="edit_description">Description</Label>
-                            <Textarea
+                            <RichTextEditor
                               id="edit_description"
-                              value={editForm.description}
-                              onChange={(e) => handleEditInput('description', e.target.value)}
+                              value={editForm.description || ''}
+                              onChange={(html) => handleEditInput('description', html)}
                               placeholder="Describe your event..."
-                              rows={3}
-                              className="resize-none rounded-xl shadow-sm border-muted-foreground/20"
+                              minHeight={110}
                             />
                           </div>
                           <div className="space-y-2 sm:col-span-2">

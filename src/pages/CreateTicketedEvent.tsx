@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
@@ -793,13 +794,14 @@ export default function CreateTicketedEvent() {
                 <Label htmlFor="description" className="flex items-center gap-2 text-foreground font-medium">
                   <FileText className="w-4 h-4 text-purple-500" /> Description
                 </Label>
-                <Textarea
+                <RichTextEditor
                   id="description"
                   value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  onChange={(html) => handleInputChange('description', html)}
                   placeholder="Describe your ticketed event..."
-                  rows={4}
-                  className="mt-2 border-border focus:border-purple-500 focus:ring-purple-500 rounded-xl resize-none"
+                  className="mt-2"
+                  minHeight={130}
+                  accentColor="purple"
                 />
               </div>
 

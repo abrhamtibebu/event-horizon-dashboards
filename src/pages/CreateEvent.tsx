@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { toast } from 'sonner'
 import api from '@/lib/api'
 import { DateRange } from 'react-date-range'
@@ -834,15 +835,14 @@ export default function CreateEvent() {
                   <Label htmlFor="description" className="flex items-center gap-2 text-foreground font-medium">
                     <FileText className="w-4 h-4 text-primary" /> Description
                   </Label>
-                  <Textarea
+                  <RichTextEditor
                     id="description"
                     value={formData.description}
-                    onChange={(e) =>
-                      handleInputChange('description', e.target.value)
-                    }
+                    onChange={(html) => handleInputChange('description', html)}
                     placeholder="Describe your event..."
-                    rows={3}
-                    className="mt-2 border-border focus:border-primary focus:ring-primary/20 rounded-xl resize-none"
+                    className="mt-2"
+                    minHeight={110}
+                    accentColor="primary"
                   />
                 </div>
                 <div>

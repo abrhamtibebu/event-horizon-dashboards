@@ -35,6 +35,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import api from '@/lib/api';
 import { getImageUrl } from '@/lib/utils';
+import { EventDescription } from '@/components/ui/event-description';
 
 interface EventData {
   id: number;
@@ -651,7 +652,10 @@ const CustomEventRegistration: React.FC = () => {
                   {eventData?.description && (
                     <div className="pt-4 border-t border-slate-300">
                       <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-2">About</p>
-                      <p className="text-xs text-slate-600 leading-relaxed">{eventData.description}</p>
+                      <EventDescription
+                        description={eventData.description}
+                        textClassName="text-xs text-slate-600 leading-relaxed"
+                      />
                     </div>
                   )}
                 </div>

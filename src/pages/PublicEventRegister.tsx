@@ -25,6 +25,8 @@ import { useAuth } from '@/hooks/use-auth';
 import type { PaymentMethod, PaymentStatus } from '@/types/tickets';
 import type { PublicTicketType } from '@/types/publicTickets';
 import { SpinnerInline } from '@/components/ui/spinner';
+import { EventDescription } from '@/components/ui/event-description';
+import { richTextToPlain } from '@/lib/rich-text';
 
 export default function PublicEventRegister() {
   const { eventUuid } = useParams();
@@ -106,7 +108,7 @@ export default function PublicEventRegister() {
   useRegistrationShareMeta({
     enabled: Boolean(event && !loading && !error && event.name),
     title: event?.name,
-    description: typeof event?.description === 'string' ? event.description : undefined,
+    description: typeof event?.description === 'string' ? richTextToPlain(event.description) : undefined,
     imageRaw: event?.image ?? event?.image_url ?? event?.event_image,
     eventId: event?.id,
   });
@@ -1072,9 +1074,10 @@ export default function PublicEventRegister() {
             {/* Description & RSVP Area */}
             {event.description && (
               <div className="mb-8 sm:mb-12 text-center max-w-2xl mx-auto px-4">
-                <p className="text-base sm:text-xl text-slate-600 dark:text-slate-400 font-medium italic leading-relaxed">
-                  &ldquo;{event.description}&rdquo;
-                </p>
+                <EventDescription
+                  description={event.description}
+                  textClassName="text-base sm:text-xl text-slate-600 dark:text-slate-400 font-medium leading-relaxed"
+                />
               </div>
             )}
 

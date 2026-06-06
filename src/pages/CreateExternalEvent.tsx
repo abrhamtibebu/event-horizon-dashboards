@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
@@ -286,12 +287,12 @@ export default function CreateExternalEvent() {
 
                 <div className="space-y-2">
                   <Label htmlFor="description">Description</Label>
-                  <Textarea
+                  <RichTextEditor
                     id="description"
                     placeholder="What is this event about? Who is it for? What should attendees expect?"
-                    rows={5}
                     value={formData.description}
-                    onChange={handleInputChange}
+                    onChange={(html) => setFormData(prev => ({ ...prev, description: html }))}
+                    minHeight={150}
                   />
                 </div>
               </CardContent>

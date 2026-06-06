@@ -89,6 +89,40 @@ type DashboardStats = {
   userRoleDistribution?: UserRoleDistributionItem[]
   systemAlerts?: AlertItem[]
   recentActivities?: ActivityItem[]
+  externalMetrics?: {
+    evella?: {
+      trafficLive?: {
+        window_seconds: number
+        active_sessions: number
+        active_known_users: number
+        top_pages_now: { path: string; sessions: number }[]
+        active_sessions_by_app: { source_app: string; sessions: number }[]
+      } | null
+      trafficOverview?: {
+        range_days: number
+        source_app: string
+        unique_visitors: number
+        sessions_started: number
+        page_views: number
+        heartbeats: number
+        events_total: number
+        top_pages: { path: string; views: number }[]
+      } | null
+      recentActivity?: {
+        since_minutes: number
+        items: {
+          id: number
+          source_app: string
+          event: string
+          path: string | null
+          distinct_id: string | null
+          user_id: number | null
+          description: string
+          occurred_at: string | null
+        }[]
+      } | null
+    } | null
+  }
 }
 
 const CHART_COLORS = {
@@ -289,6 +323,9 @@ export default function AdminDashboard() {
   const [refreshing, setRefreshing] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+  const [evellaUsers, setEvellaUsers] = useState<
+    { data: { id: number; name: string; email: string; phone?: string | null }[] } | null
+  >(null)
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -310,9 +347,19 @@ export default function AdminDashboard() {
     }
   }, [dateRange])
 
+  const fetchEvellaUsers = useCallback(async () => {
+    try {
+      const resp = await api.get('/admin/external/evella/users', { params: { per_page: 10 } })
+      setEvellaUsers(resp.data as { data: { id: number; name: string; email: string; phone?: string | null }[] })
+    } catch {
+      setEvellaUsers(null)
+    }
+  }, [])
+
   useEffect(() => {
     fetchDashboardData()
-  }, [fetchDashboardData])
+    fetchEvellaUsers()
+  }, [fetchDashboardData, fetchEvellaUsers])
 
   useEffect(() => {
     if (!autoRefresh) return
@@ -369,6 +416,10 @@ export default function AdminDashboard() {
   const userRoleData = stats?.userRoleDistribution || []
   const systemAlerts = stats?.systemAlerts || []
   const recentActivities = stats?.recentActivities || []
+  const evella = stats?.externalMetrics?.evella
+  const evellaTrafficLive = evella?.trafficLive
+  const evellaTrafficOverview = evella?.trafficOverview
+  const evellaRecent = evella?.recentActivity?.items || []
   const km = stats?.keyMetrics
 
   const metricCards = [
@@ -676,6 +727,93 @@ export default function AdminDashboard() {
         <QuickActionsPanel navigate={navigate} />
         <SystemAlertsPanel alerts={systemAlerts} />
         <RecentActivityFeed activities={recentActivities} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Traffic (Evella Public + Dashboard)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-border p-3">
+                <p className="text-xs text-muted-foreground">Live sessions</p>
+                <p className="text-lg font-semibold">{evellaTrafficLive?.active_sessions ?? '—'}</p>
+              </div>
+              <div className="rounded-lg border border-border p-3">
+                <p className="text-xs text-muted-foreground">
+                  Unique visitors ({evellaTrafficOverview?.range_days ?? 30}d)
+                </p>
+                <p className="text-lg font-semibold">{evellaTrafficOverview?.unique_visitors ?? '—'}</p>
+              </div>
+              <div className="rounded-lg border border-border p-3">
+                <p className="text-xs text-muted-foreground">Page views ({evellaTrafficOverview?.range_days ?? 30}d)</p>
+                <p className="text-lg font-semibold">{evellaTrafficOverview?.page_views ?? '—'}</p>
+              </div>
+              <div className="rounded-lg border border-border p-3">
+                <p className="text-xs text-muted-foreground">
+                  Sessions started ({evellaTrafficOverview?.range_days ?? 30}d)
+                </p>
+                <p className="text-lg font-semibold">{evellaTrafficOverview?.sessions_started ?? '—'}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Top pages now</p>
+              <div className="space-y-2">
+                {(evellaTrafficLive?.top_pages_now || []).slice(0, 5).map((p) => (
+                  <div key={p.path} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="truncate">{p.path}</span>
+                    <span className="text-muted-foreground">{p.sessions}</span>
+                  </div>
+                ))}
+                {!evellaTrafficLive?.top_pages_now?.length && (
+                  <p className="text-xs text-muted-foreground">No live traffic data.</p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Evella Public Users (latest)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {(evellaUsers?.data || []).map((u) => (
+                <div key={u.id} className="flex items-center justify-between gap-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{u.name || '—'}</p>
+                    <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground">#{u.id}</span>
+                </div>
+              ))}
+              {!evellaUsers?.data?.length && <p className="text-xs text-muted-foreground">No evella users data.</p>}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Evella Activity (recent)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {evellaRecent.slice(0, 10).map((a) => (
+                <div key={a.id} className="text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate">{a.description}</span>
+                    <span className="text-xs text-muted-foreground">{a.source_app}</span>
+                  </div>
+                  {a.path && <p className="text-xs text-muted-foreground truncate">{a.path}</p>}
+                </div>
+              ))}
+              {!evellaRecent.length && <p className="text-xs text-muted-foreground">No recent evella activity.</p>}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

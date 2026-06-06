@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { showSuccessToast, showErrorToast } from '@/components/ui/ModernToast'
 import api from '@/lib/api'
 import { isOrganizerEventRole } from '@/lib/roles'
@@ -811,13 +812,13 @@ export default function CreateFreeEvent() {
                 <Label htmlFor="description" className="text-sm font-semibold">
                   Description
                 </Label>
-                <Textarea
+                <RichTextEditor
                   id="description"
                   value={formData.description}
-                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  onChange={(html) => handleInputChange('description', html)}
                   placeholder="Describe your event, what attendees can expect, and any important details..."
-                  rows={4}
-                  className="border-border focus:border-blue-500 focus:ring-blue-500/20 resize-none"
+                  minHeight={130}
+                  accentColor="blue"
                 />
               </div>
 

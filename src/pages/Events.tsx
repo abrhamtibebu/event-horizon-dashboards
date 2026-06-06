@@ -27,6 +27,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import api from '@/lib/api'
 import { getImageUrl } from '@/lib/utils'
+import { richTextToPlain } from '@/lib/rich-text'
 import EventCategoryManager from './EventCategoryManager'
 import EventTypeManager from './EventTypeManager'
 import { useAuth } from '@/hooks/use-auth'
@@ -498,7 +499,7 @@ export default function Events() {
                           <TableCell className="font-medium text-foreground">
                             <div>
                               <div className="font-semibold">{event.name}</div>
-                              <div className="text-sm text-muted-foreground line-clamp-1">{event.description}</div>
+                              <div className="text-sm text-muted-foreground line-clamp-1">{richTextToPlain(event.description)}</div>
                             </div>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
@@ -665,7 +666,7 @@ export default function Events() {
 
                                 {/* Description */}
                                 <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
-                                  {event.description}
+                                  {richTextToPlain(event.description)}
                                 </p>
 
                                 {/* Event Details */}

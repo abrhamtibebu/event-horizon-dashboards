@@ -30,6 +30,7 @@ import {
 import { Link, useOutletContext } from 'react-router-dom'
 import api from '@/lib/api'
 import { getImageUrl } from '@/lib/utils'
+import { richTextToPlain } from '@/lib/rich-text'
 
 export default function AttendeeDashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null)
@@ -225,7 +226,7 @@ export default function AttendeeDashboard() {
 
                 <h3 className="font-semibold text-card-foreground">{event.name}</h3>
                 <p className="text-sm text-muted-foreground line-clamp-2">
-                  {event.description}
+                  {richTextToPlain(event.description)}
                 </p>
 
                 <div className="space-y-2">
