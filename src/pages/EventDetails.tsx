@@ -58,6 +58,7 @@ import {
   CheckCircle2,
   FileEdit,
   Layers,
+  EyeOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -2805,6 +2806,32 @@ export default function EventDetails() {
 
                 <TabsContent value="details" className="mt-0 outline-none">
                   <div className="space-y-4 sm:space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                    {/* Visibility warning — shown only when event is active but not publicly visible on evella.et */}
+                    {eventData?.status === 'active' && eventData?.visibility === 'private' && (
+                      <div className="flex items-start gap-3 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm">
+                        <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-amber-800 dark:text-amber-300">
+                            Event is active but hidden from evella.et
+                          </p>
+                          <p className="mt-0.5 text-amber-700 dark:text-amber-400/90">
+                            Visibility is set to <strong>Private</strong>, so this event does not appear on the public evella.et browse or featured pages.
+                            To make it discoverable, open <strong>Edit Event</strong> and change Visibility to <strong>Public</strong>.
+                          </p>
+                        </div>
+                        {canManageEvent && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="shrink-0 border-amber-300 dark:border-amber-700 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60 h-8 text-xs rounded-lg"
+                            onClick={openEditDialog}
+                          >
+                            <Pencil className="w-3 h-3 mr-1.5" />
+                            Fix now
+                          </Button>
+                        )}
+                      </div>
+                    )}
                     {/* Simple Overview Cards - Responsive Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                       {/* Event Type Card */}

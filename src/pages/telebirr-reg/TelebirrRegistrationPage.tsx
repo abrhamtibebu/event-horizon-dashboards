@@ -16,6 +16,7 @@ import {
   Upload,
   X,
 } from 'lucide-react'
+import { validateOptionalText, validatePersonName, validatePublicEmail } from '@/lib/inputQuality'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,6 +37,7 @@ import { TelebirrRegLayout, TelebirrRegFooter } from './TelebirrRegLayout'
 import { telebirrSuccessPath } from './routes'
 import { saveRegistrationSuccess } from './sessionStorage'
 import type { TelebirrEventData, TelebirrFormData } from './types'
+import { RegistrationUnavailable, type RegistrationUnavailableVariant } from '@/components/public/RegistrationUnavailable'
 
 const TelebirrRegistrationPage: React.FC = () => {
   const { eventId = DEFAULT_TELEBIRR_EVENT_ID } = useParams<{ eventId: string }>()
@@ -198,18 +200,54 @@ const TelebirrRegistrationPage: React.FC = () => {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
-    if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required'
-    if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Valid email is required'
+
+    const nameResult = validatePersonName(formData.fullName)
+    if (!nameResult.valid) newErrors.fullName = nameResult.message
+
+    if (formData.email.trim()) {
+      const emailResult = validatePublicEmail(formData.email)
+      if (!emailResult.valid) newErrors.email = emailResult.message
     }
-    if (!formData.phoneNumber.trim()) newErrors.phoneNumber = 'Phone number is required'
-    if (!formData.country.trim()) newErrors.country = 'Country is required'
-    if (formData.country === 'Other' && !formData.otherCountry?.trim()) {
-      newErrors.country = 'Please specify your country'
+
+    if (!formData.phoneNumber.trim()) {
+      newErrors.phoneNumber = 'Phone number is required'
+    } else if (!/^[+]?[\d\s\-()]{10,}$/.test(formData.phoneNumber.trim())) {
+      newErrors.phoneNumber = 'Please enter a valid phone number'
     }
-    if (!formData.city.trim()) newErrors.city = 'City is required'
-    if (formData.city === 'Other' && !formData.otherCity?.trim()) {
-      newErrors.city = 'Please specify your city'
+
+    if (!formData.country.trim()) {
+      newErrors.country = 'Country is required'
+    } else if (formData.country === 'Other') {
+      if (!formData.otherCountry?.trim()) {
+        newErrors.country = 'Please specify your country'
+      } else {
+        const otherCountryResult = validateOptionalText(formData.otherCountry)
+        if (!otherCountryResult.valid) newErrors.country = otherCountryResult.message
+      }
+    }
+
+    if (!formData.city.trim()) {
+      newErrors.city = 'City is required'
+    } else if (formData.city === 'Other') {
+      if (!formData.otherCity?.trim()) {
+        newErrors.city = 'Please specify your city'
+      } else {
+        const otherCityResult = validateOptionalText(formData.otherCity)
+        if (!otherCityResult.valid) newErrors.city = otherCityResult.message
+      }
+    } else {
+      const cityResult = validateOptionalText(formData.city)
+      if (!cityResult.valid) newErrors.city = cityResult.message
+    }
+
+    if (formData.organization?.trim()) {
+      const orgResult = validateOptionalText(formData.organization)
+      if (!orgResult.valid) newErrors.organization = orgResult.message
+    }
+
+    if (formData.jobTitle?.trim()) {
+      const jobResult = validateOptionalText(formData.jobTitle)
+      if (!jobResult.valid) newErrors.jobTitle = jobResult.message
     }
 
     setErrors(newErrors)
@@ -242,6 +280,43 @@ const TelebirrRegistrationPage: React.FC = () => {
         </div>
       </div>
     )
+  }
+
+  if (errors.submit && !eventData) {
+    return <RegistrationUnavailable variant="not-found" />
+  }
+
+  // Registration window / lifecycle gating
+  if (eventData) {
+    const now = new Date()
+    const regEnd = eventData.registration_end_date ? new Date(eventData.registration_end_date) : null
+    const regStart = eventData.registration_start_date ? new Date(eventData.registration_start_date) : null
+    const eventEnd = eventData.end_date ? new Date(eventData.end_date) : null
+
+    let gateVariant: RegistrationUnavailableVariant | null = null
+    if (eventEnd && !Number.isNaN(eventEnd.getTime()) && eventEnd < now) {
+      gateVariant = 'event-passed'
+    } else if (regEnd && !Number.isNaN(regEnd.getTime()) && regEnd < now) {
+      gateVariant = 'registration-ended'
+    } else if (regStart && !Number.isNaN(regStart.getTime()) && regStart > now) {
+      gateVariant = 'registration-not-started'
+    } else if (eventData.status && eventData.status !== 'active') {
+      gateVariant = 'inactive'
+    } else if (eventData.is_registration_open === false) {
+      gateVariant = 'registration-ended'
+    }
+
+    if (gateVariant) {
+      return (
+        <RegistrationUnavailable
+          variant={gateVariant}
+          eventName={eventData.name}
+          registrationEndDate={eventData.registration_end_date}
+          registrationStartDate={eventData.registration_start_date}
+          eventStartDate={eventData.start_date}
+        />
+      )
+    }
   }
 
   const heroBackground =

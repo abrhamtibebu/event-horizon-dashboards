@@ -36,6 +36,8 @@ import { Progress } from '@/components/ui/progress';
 import api from '@/lib/api';
 import { getImageUrl } from '@/lib/utils';
 import { EventDescription } from '@/components/ui/event-description';
+import { RegistrationUnavailable, type RegistrationUnavailableVariant } from '@/components/public/RegistrationUnavailable';
+import { validateOptionalText, validatePersonName, validatePublicEmail } from '@/lib/inputQuality';
 
 interface EventData {
   id: number;
@@ -46,16 +48,22 @@ interface EventData {
   location: string;
   max_guests: number;
   event_type: string;
+  status?: string;
   event_image?: string;
+  image_url?: string;
   organizer?: {
     id: number;
     name: string;
     logo?: string;
   };
+  organizer_logo?: string;
   formatted_address?: string;
   latitude?: number;
   longitude?: number;
   venue_name?: string;
+  registration_start_date?: string;
+  registration_end_date?: string;
+  is_registration_open?: boolean;
 }
 
 interface FormData {
@@ -228,114 +236,102 @@ const CustomEventRegistration: React.FC = () => {
     validateField(field, formData[field]);
   };
 
-  const validateField = (field: keyof FormData, value: any) => {
-    const newErrors = { ...errors };
-
+  const validateFieldValue = (field: keyof FormData, value: any): string => {
     switch (field) {
-      case 'fullName':
-        if (!value || value.trim().length < 2) {
-          newErrors.fullName = 'Full name is required and must be at least 2 characters';
-        } else {
-          delete newErrors.fullName;
-        }
-        break;
-
+      case 'fullName': {
+        const result = validatePersonName(String(value ?? ''));
+        return result.valid ? '' : result.message;
+      }
       case 'nationality':
-        if (!value) {
-          newErrors.nationality = 'Nationality is required';
-        } else {
-          delete newErrors.nationality;
-        }
-        break;
-
+        if (!value) return 'Nationality is required';
+        return validateOptionalText(String(value)).valid ? '' : validateOptionalText(String(value)).message;
       case 'passportNumber':
-        if (!value || value.trim().length < 5) {
-          newErrors.passportNumber = 'Passport number is required (minimum 5 characters)';
-        } else {
-          delete newErrors.passportNumber;
+        if (!value || String(value).trim().length < 5) {
+          return 'Passport number is required (minimum 5 characters)';
         }
-        break;
-
-      case 'email':
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!value || !emailRegex.test(value)) {
-          newErrors.email = 'Valid email address is required';
-        } else {
-          delete newErrors.email;
-        }
-        break;
-
+        return validateOptionalText(String(value)).valid ? '' : validateOptionalText(String(value)).message;
+      case 'email': {
+        const result = validatePublicEmail(String(value ?? ''));
+        return result.valid ? '' : result.message;
+      }
       case 'phoneNumber':
-        if (!value || value.trim().length < 7) {
-          newErrors.phoneNumber = 'Phone number with country code is required';
-        } else {
-          delete newErrors.phoneNumber;
+        if (!value || String(value).trim().length < 7) {
+          return 'Phone number with country code is required';
         }
-        break;
-
+        return '';
       case 'jobTitle':
-        if (!value || value.trim().length < 2) {
-          newErrors.jobTitle = 'Job title/role is required';
-        } else {
-          delete newErrors.jobTitle;
+        if (!value || String(value).trim().length < 2) {
+          return 'Job title/role is required';
         }
-        break;
+        return validateOptionalText(String(value)).valid ? '' : validateOptionalText(String(value)).message;
+      case 'organization':
+        if (!value) return '';
+        return validateOptionalText(String(value)).valid ? '' : validateOptionalText(String(value)).message;
 
       case 'joiningAs':
-        if (!value) {
-          newErrors.joiningAs = 'Please select how you will be joining';
-        } else {
-          delete newErrors.joiningAs;
-        }
-        break;
-
+        return !value ? 'Please select how you will be joining' : '';
       case 'otherExplanation':
-        if (formData.joiningAs === 'other' && (!value || value.trim().length < 5)) {
-          newErrors.otherExplanation = 'Please explain how you will be joining (minimum 5 characters)';
-        } else {
-          delete newErrors.otherExplanation;
+        if (formData.joiningAs === 'other' && (!value || String(value).trim().length < 5)) {
+          return 'Please explain how you will be joining (minimum 5 characters)';
         }
-        break;
-
+        return validateOptionalText(String(value ?? '')).valid
+          ? ''
+          : validateOptionalText(String(value ?? '')).message;
       case 'passportBioData':
-        if (!value) {
-          newErrors.passportBioData = 'Passport bio-data page upload is required';
-        } else if (value.size > 10 * 1024 * 1024) { // 10MB
-          newErrors.passportBioData = 'File size must be less than 10MB';
-        } else {
-          delete newErrors.passportBioData;
-        }
-        break;
-
+        if (!value) return 'Passport bio-data page upload is required';
+        if (value.size > 10 * 1024 * 1024) return 'File size must be less than 10MB';
+        return '';
       case 'passportPhoto':
-        if (!value) {
-          newErrors.passportPhoto = 'HD passport photo upload is required';
-        } else if (value.size > 10 * 1024 * 1024) { // 10MB
-          newErrors.passportPhoto = 'File size must be less than 10MB';
-        } else {
-          delete newErrors.passportPhoto;
-        }
-        break;
+        if (!value) return 'HD passport photo upload is required';
+        if (value.size > 10 * 1024 * 1024) return 'File size must be less than 10MB';
+        return '';
+      default:
+        return '';
     }
+  };
 
-    setErrors(newErrors);
+  const validateField = (field: keyof FormData, value: any) => {
+    const message = validateFieldValue(field, value);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (message) next[field] = message;
+      else delete next[field];
+      return next;
+    });
   };
 
   const validateForm = () => {
+    const newErrors: Record<string, string> = {};
     const requiredFields: (keyof FormData)[] = [
       'fullName', 'nationality', 'passportNumber', 'email',
       'phoneNumber', 'jobTitle', 'joiningAs', 'passportBioData', 'passportPhoto'
     ];
 
-    requiredFields.forEach(field => {
-      handleFieldBlur(field);
+    requiredFields.forEach((field) => {
+      const message = validateFieldValue(field, formData[field]);
+      if (message) newErrors[field] = message;
     });
 
     if (formData.joiningAs === 'other') {
-      handleFieldBlur('otherExplanation');
+      const message = validateFieldValue('otherExplanation', formData.otherExplanation);
+      if (message) newErrors.otherExplanation = message;
     }
 
-    return Object.keys(errors).length === 0;
+    if (formData.organization) {
+      const message = validateFieldValue('organization', formData.organization);
+      if (message) newErrors.organization = message;
+    }
+
+    setErrors(newErrors);
+    setTouchedFields((prev) => {
+      const next = { ...prev };
+      Object.keys(newErrors).forEach((field) => {
+        next[field] = true;
+      });
+      return next;
+    });
+
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -399,6 +395,10 @@ const CustomEventRegistration: React.FC = () => {
     );
   }
 
+  if (errors.submit && !eventData) {
+    return <RegistrationUnavailable variant="not-found" />;
+  }
+
   if (eventId !== '33') {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -410,6 +410,39 @@ const CustomEventRegistration: React.FC = () => {
         </Alert>
       </div>
     );
+  }
+
+  // Registration window / lifecycle gating
+  if (eventData) {
+    const now = new Date();
+    const regEnd = eventData.registration_end_date ? new Date(eventData.registration_end_date) : null;
+    const regStart = eventData.registration_start_date ? new Date(eventData.registration_start_date) : null;
+    const eventEnd = eventData.end_date ? new Date(eventData.end_date) : null;
+
+    let gateVariant: RegistrationUnavailableVariant | null = null;
+    if (eventEnd && !Number.isNaN(eventEnd.getTime()) && eventEnd < now) {
+      gateVariant = 'event-passed';
+    } else if (regEnd && !Number.isNaN(regEnd.getTime()) && regEnd < now) {
+      gateVariant = 'registration-ended';
+    } else if (regStart && !Number.isNaN(regStart.getTime()) && regStart > now) {
+      gateVariant = 'registration-not-started';
+    } else if (eventData.status && eventData.status !== 'active') {
+      gateVariant = 'inactive';
+    } else if (eventData.is_registration_open === false) {
+      gateVariant = 'registration-ended';
+    }
+
+    if (gateVariant) {
+      return (
+        <RegistrationUnavailable
+          variant={gateVariant}
+          eventName={eventData.name}
+          registrationEndDate={eventData.registration_end_date}
+          registrationStartDate={eventData.registration_start_date}
+          eventStartDate={eventData.start_date}
+        />
+      );
+    }
   }
 
   // Show registration confirmation

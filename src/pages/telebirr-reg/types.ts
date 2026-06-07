@@ -9,10 +9,15 @@ export interface TelebirrEventData {
   location: string
   max_guests: number
   event_type: string
+  status?: string
   venue_name?: string
   formatted_address?: string
   image?: string
+  registration_start_date?: string
+  registration_end_date?: string
+  is_registration_open?: boolean
   guestTypes?: Array<{ id: number; name: string }>
+  organizer?: { name: string; logo?: string }
 }
 
 export interface TelebirrFormData {

@@ -27,6 +27,8 @@ import type { PublicTicketType } from '@/types/publicTickets';
 import { SpinnerInline } from '@/components/ui/spinner';
 import { EventDescription } from '@/components/ui/event-description';
 import { richTextToPlain } from '@/lib/rich-text';
+import { RegistrationUnavailable, type RegistrationUnavailableVariant } from '@/components/public/RegistrationUnavailable';
+import { validateOptionalText, validatePersonName, validatePublicEmail } from '@/lib/inputQuality';
 
 export default function PublicEventRegister() {
   const { eventUuid } = useParams();
@@ -526,17 +528,18 @@ export default function PublicEventRegister() {
   };
 
   const validateField = (field: string, value: any): string => {
-    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const PHONE_CLEAN_REGEX = /[\s\-\(\)]/g;
     const ETH_PHONE_REGEX = /^(0[97]\d{8}|\+251[97]\d{8}|[97]\d{8})$/;
 
     switch (field) {
-      case 'name':
-        return !value.trim() ? 'Please enter your full name' : '';
+      case 'name': {
+        const nameResult = validatePersonName(String(value ?? ''));
+        return nameResult.valid ? '' : nameResult.message;
+      }
       case 'email': {
         if (!value.trim()) return 'Please enter your email address';
-        if (!EMAIL_REGEX.test(value.trim())) return 'Please enter a valid email address';
-        return '';
+        const emailResult = validatePublicEmail(value.trim());
+        return emailResult.valid ? '' : emailResult.message;
       }
       case 'phone': {
         if (!value.trim()) return 'Please enter your phone number';
@@ -546,10 +549,16 @@ export default function PublicEventRegister() {
         }
         return '';
       }
-      case 'company':
-        return !value.trim() ? 'Please enter your company name' : '';
-      case 'job_title':
-        return !value.trim() ? 'Please enter your job title' : '';
+      case 'company': {
+        if (!value.trim()) return 'Please enter your company name';
+        const companyResult = validateOptionalText(value.trim());
+        return companyResult.valid ? '' : companyResult.message;
+      }
+      case 'job_title': {
+        if (!value.trim()) return 'Please enter your job title';
+        const jobResult = validateOptionalText(value.trim());
+        return jobResult.valid ? '' : jobResult.message;
+      }
       case 'gender':
         return !value.trim() ? 'Please select your gender' : '';
       case 'age': {
@@ -910,15 +919,50 @@ export default function PublicEventRegister() {
   }
 
   if (error || !event) {
+    return <RegistrationUnavailable variant="not-found" />;
+  }
+
+  // Registration window / event-lifecycle gating.
+  // The event loaded successfully, but registration may not be currently open.
+  // We figure out *why* (so we can show a tailored message) before rendering the form.
+  const registrationGate = (() => {
+    if (event.event_type === 'external') return null;
+
+    const now = new Date();
+    const regStart = event.registration_start_date ? new Date(event.registration_start_date) : null;
+    const regEnd = event.registration_end_date ? new Date(event.registration_end_date) : null;
+    const eventEnd = event.end_date ? new Date(event.end_date) : null;
+    const eventStart = event.start_date ? new Date(event.start_date) : null;
+
+    let variant: RegistrationUnavailableVariant | null = null;
+
+    if (eventEnd && !Number.isNaN(eventEnd.getTime()) && eventEnd < now) {
+      variant = 'event-passed';
+    } else if (regEnd && !Number.isNaN(regEnd.getTime()) && regEnd < now) {
+      variant = 'registration-ended';
+    } else if (regStart && !Number.isNaN(regStart.getTime()) && regStart > now) {
+      variant = 'registration-not-started';
+    } else if (event.status && event.status !== 'active') {
+      variant = 'inactive';
+    } else if (event.is_registration_open === false) {
+      variant = 'registration-ended';
+    }
+
+    if (!variant) return null;
+
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-6xl mb-4">⚠️</div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">Event Not Found</h1>
-          <p className="text-muted-foreground">{error || 'This event is not available for registration.'}</p>
-        </div>
-      </div>
+      <RegistrationUnavailable
+        variant={variant}
+        eventName={event.name}
+        registrationEndDate={event.registration_end_date}
+        registrationStartDate={event.registration_start_date}
+        eventStartDate={eventStart && !Number.isNaN(eventStart.getTime()) ? event.start_date : null}
+      />
     );
+  })();
+
+  if (registrationGate) {
+    return registrationGate;
   }
 
   if (success) {

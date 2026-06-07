@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { validateFormFieldValue, validatePublicEmail } from '@/lib/inputQuality';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -195,12 +196,25 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
       // Type-specific validation
       if (value) {
         switch (field.field_type) {
-          case 'email':
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(value)) {
-              newErrors[fieldKey] = 'Please enter a valid email address';
+          case 'email': {
+            const emailResult = validatePublicEmail(String(value));
+            if (!emailResult.valid) newErrors[fieldKey] = emailResult.message;
+            break;
+          }
+
+          case 'text':
+          case 'textarea': {
+            const textResult = validateFormFieldValue(field.field_type, field.label, value);
+            if (!textResult.valid) {
+              newErrors[fieldKey] = textResult.message;
+              break;
+            }
+            const minLength = field.validation_rules?.min_length;
+            if (minLength && String(value).trim().length < minLength) {
+              newErrors[fieldKey] = `${field.label} must be at least ${minLength} characters`;
             }
             break;
+          }
 
           case 'number':
             if (isNaN(Number(value))) {
@@ -208,13 +222,13 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
             }
             break;
 
-          case 'phone':
-            // Basic phone validation
+          case 'phone': {
             const phoneRegex = /^[\+]?[\d\s\-\(\)]{10,}$/;
-            if (!phoneRegex.test(value)) {
+            if (!phoneRegex.test(String(value))) {
               newErrors[fieldKey] = 'Please enter a valid phone number';
             }
             break;
+          }
         }
       }
     });

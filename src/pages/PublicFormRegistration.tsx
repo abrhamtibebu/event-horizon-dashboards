@@ -26,6 +26,7 @@ import { toast } from 'sonner';
 import api from '@/lib/api';
 import { EventDescription } from '@/components/ui/event-description';
 import { getImageUrl } from '@/lib/utils';
+import { validateFormFields } from '@/lib/inputQuality';
 
 export default function PublicFormRegistration() {
   const { formId } = useParams<{ formId: string }>();
@@ -119,6 +120,14 @@ export default function PublicFormRegistration() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form) return;
+
+    const fields = (form as any).formFields || (form as any).form_fields || [];
+    const fieldErrors = validateFormFields(fields, formData);
+    if (Object.keys(fieldErrors).length > 0) {
+      const firstError = Object.values(fieldErrors)[0];
+      toast.error(typeof firstError === 'string' ? firstError : 'Please fix the form errors before submitting');
+      return;
+    }
 
     setSubmitting(true);
 

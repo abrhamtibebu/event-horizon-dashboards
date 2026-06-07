@@ -1,11 +1,23 @@
 import { z } from 'zod';
+import { validateOptionalText, validatePersonName, validatePublicEmail } from '@/lib/inputQuality';
 
 /**
  * Attendee details validation schema
  */
 export const attendeeDetailsSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name is too long'),
-  email: z.string().email('Please enter a valid email address'),
+  name: z
+    .string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(100, 'Name is too long')
+    .refine((val) => validatePersonName(val).valid, {
+      message: 'Please enter your real name.',
+    }),
+  email: z
+    .string()
+    .email('Please enter a valid email address')
+    .refine((val) => validatePublicEmail(val).valid, {
+      message: 'Please use a real email address.',
+    }),
   phone: z
     .string()
     .regex(/^\+?251[0-9]{9}$/, 'Please enter a valid Ethiopian phone number (e.g., +251911234567 or 0911234567)')
@@ -20,8 +32,18 @@ export const attendeeDetailsSchema = z.object({
       }
       return val;
     }),
-  company: z.string().optional(),
-  job_title: z.string().optional(),
+  company: z
+    .string()
+    .optional()
+    .refine((val) => !val || validateOptionalText(val).valid, {
+      message: 'Please enter a valid value.',
+    }),
+  job_title: z
+    .string()
+    .optional()
+    .refine((val) => !val || validateOptionalText(val).valid, {
+      message: 'Please enter a valid value.',
+    }),
   gender: z.enum(['Male', 'Female', 'Other', 'Prefer not to say']).optional(),
   country: z.string().optional(),
   dietary_requirements: z.string().max(500, 'Dietary requirements are too long').optional(),
