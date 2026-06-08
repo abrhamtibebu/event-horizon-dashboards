@@ -12,7 +12,6 @@ export const TELEBIRR_ASSETS = {
   ethioTelecomLogo: '/ethio_telecom_logo.png',
   telebirrLogo: '/telebirr5th year logo.png',
   telebirrQrLogo: '/TeleBirr Logo.png',
-  eventBanner: '/tele birr event banner.png',
   evellaLogo: '/evella-logo.png',
 } as const
 

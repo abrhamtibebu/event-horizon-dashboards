@@ -13,6 +13,8 @@ export interface TelebirrEventData {
   venue_name?: string
   formatted_address?: string
   image?: string
+  image_url?: string
+  event_image?: string
   registration_start_date?: string
   registration_end_date?: string
   is_registration_open?: boolean
@@ -29,10 +31,6 @@ export interface TelebirrFormData {
   joiningAs: string
   guest_type_id?: string
   profilePicture?: File | null
-  country: string
-  otherCountry?: string
-  city: string
-  otherCity?: string
 }
 
 export interface TelebirrRegistrationData {

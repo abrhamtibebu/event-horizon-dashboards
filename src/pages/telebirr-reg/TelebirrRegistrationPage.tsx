@@ -20,15 +20,9 @@ import { validateOptionalText, validatePersonName, validatePublicEmail } from '@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import api from '@/lib/api'
+import { getImageUrl } from '@/lib/utils'
 import { PROFILE_PICTURE_ACCEPT, validateProfilePictureFile } from '@/lib/fileValidation'
 import { useRegistrationShareMeta } from '@/lib/registrationShareMeta'
 import { useTheme } from 'next-themes'
@@ -37,6 +31,7 @@ import { TelebirrRegLayout, TelebirrRegFooter } from './TelebirrRegLayout'
 import { telebirrSuccessPath } from './routes'
 import { saveRegistrationSuccess } from './sessionStorage'
 import type { TelebirrEventData, TelebirrFormData } from './types'
+import { getEthioTelecomPhoneError, validateEthioTelecomPhone } from './phoneValidation'
 import { RegistrationUnavailable, type RegistrationUnavailableVariant } from '@/components/public/RegistrationUnavailable'
 
 const TelebirrRegistrationPage: React.FC = () => {
@@ -66,10 +61,6 @@ const TelebirrRegistrationPage: React.FC = () => {
     joiningAs: 'Visitor',
     guest_type_id: '',
     profilePicture: null,
-    country: '',
-    otherCountry: '',
-    city: '',
-    otherCity: '',
   })
 
   useEffect(() => {
@@ -121,7 +112,7 @@ const TelebirrRegistrationPage: React.FC = () => {
     enabled: Boolean(eventData && !loading && eventData.name),
     title: eventData?.name,
     description: eventData?.description,
-    imageRaw: eventData?.image,
+    imageRaw: eventData?.image ?? eventData?.image_url ?? eventData?.event_image,
     eventId: eventData?.id || eventId,
   })
 
@@ -133,11 +124,6 @@ const TelebirrRegistrationPage: React.FC = () => {
       payload.append('phone', data.phoneNumber)
       payload.append('company', data.organization)
       payload.append('job_title', data.jobTitle)
-      payload.append(
-        'country',
-        data.country === 'Other' ? data.otherCountry || 'Other' : data.country,
-      )
-      payload.append('city', data.city === 'Other' ? data.otherCity || 'Other' : data.city)
       payload.append('guest_type_id', data.guest_type_id || '')
       payload.append(
         'registration_type',
@@ -172,6 +158,21 @@ const TelebirrRegistrationPage: React.FC = () => {
 
   const handleInputChange = (field: keyof TelebirrFormData, value: string | File | null) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+
+    if (field === 'phoneNumber' && typeof value === 'string') {
+      const phoneError = getEthioTelecomPhoneError(value)
+      setErrors((prev) => {
+        const next = { ...prev }
+        if (phoneError) {
+          next.phoneNumber = phoneError
+        } else {
+          delete next.phoneNumber
+        }
+        return next
+      })
+      return
+    }
+
     if (errors[field]) {
       const newErrors = { ...errors }
       delete newErrors[field]
@@ -209,35 +210,9 @@ const TelebirrRegistrationPage: React.FC = () => {
       if (!emailResult.valid) newErrors.email = emailResult.message
     }
 
-    if (!formData.phoneNumber.trim()) {
-      newErrors.phoneNumber = 'Phone number is required'
-    } else if (!/^[+]?[\d\s\-()]{10,}$/.test(formData.phoneNumber.trim())) {
-      newErrors.phoneNumber = 'Please enter a valid phone number'
-    }
-
-    if (!formData.country.trim()) {
-      newErrors.country = 'Country is required'
-    } else if (formData.country === 'Other') {
-      if (!formData.otherCountry?.trim()) {
-        newErrors.country = 'Please specify your country'
-      } else {
-        const otherCountryResult = validateOptionalText(formData.otherCountry)
-        if (!otherCountryResult.valid) newErrors.country = otherCountryResult.message
-      }
-    }
-
-    if (!formData.city.trim()) {
-      newErrors.city = 'City is required'
-    } else if (formData.city === 'Other') {
-      if (!formData.otherCity?.trim()) {
-        newErrors.city = 'Please specify your city'
-      } else {
-        const otherCityResult = validateOptionalText(formData.otherCity)
-        if (!otherCityResult.valid) newErrors.city = otherCityResult.message
-      }
-    } else {
-      const cityResult = validateOptionalText(formData.city)
-      if (!cityResult.valid) newErrors.city = cityResult.message
+    const phoneResult = validateEthioTelecomPhone(formData.phoneNumber)
+    if (!phoneResult.valid) {
+      newErrors.phoneNumber = phoneResult.message!
     }
 
     if (formData.organization?.trim()) {
@@ -319,12 +294,16 @@ const TelebirrRegistrationPage: React.FC = () => {
     }
   }
 
-  const heroBackground =
-    eventId === DEFAULT_TELEBIRR_EVENT_ID
-      ? `url('${TELEBIRR_ASSETS.eventBanner}')`
-      : eventData?.image
-        ? `url(${eventData.image})`
-        : `linear-gradient(135deg, ${TELEBIRR_COLORS.deepGreen} 0%, ${TELEBIRR_COLORS.lightGreen} 100%)`
+  const eventBannerUrl = eventData
+    ? getImageUrl(
+        eventData.image ?? eventData.image_url ?? eventData.event_image,
+        eventData.id,
+      )
+    : null
+
+  const heroBackground = eventBannerUrl
+    ? `url('${eventBannerUrl}')`
+    : `linear-gradient(135deg, ${TELEBIRR_COLORS.deepGreen} 0%, ${TELEBIRR_COLORS.lightGreen} 100%)`
 
   return (
     <TelebirrRegLayout variant="register" isOnsite={isOnsite}>
@@ -429,6 +408,23 @@ const TelebirrRegistrationPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-3">
+                  <Label htmlFor="phoneNumber" className="text-base font-bold text-gray-700 flex items-center gap-2">
+                    <Phone className="w-4 h-4" style={{ color: TELEBIRR_COLORS.deepGreen }} />
+                    Phone Number <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="phoneNumber"
+                    value={formData.phoneNumber}
+                    onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                    className={`h-14 rounded-xl border-2 transition-all focus:ring-4 ${errors.phoneNumber ? 'border-red-300 focus:border-red-500 focus:ring-red-50' : 'border-gray-200 focus:border-[#8DC63F] focus:ring-[#8DC63F]/10'}`}
+                    placeholder="09xx xxx xxx or +251 9xx xxx xxx"
+                  />
+                  {errors.phoneNumber && (
+                    <p className="text-sm text-red-500 font-medium pl-1">{errors.phoneNumber}</p>
+                  )}
+                </div>
+
+                <div className="space-y-3">
                   <Label htmlFor="email" className="text-base font-bold text-gray-700 flex items-center gap-2">
                     <Mail className="w-4 h-4" style={{ color: TELEBIRR_COLORS.deepGreen }} />
                     Email Address
@@ -439,27 +435,10 @@ const TelebirrRegistrationPage: React.FC = () => {
                     value={formData.email}
                     onChange={(e) => handleInputChange('email', e.target.value)}
                     className={`h-14 rounded-xl border-2 transition-all focus:ring-4 ${errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-50' : 'border-gray-200 focus:border-[#8DC63F] focus:ring-[#8DC63F]/10'}`}
-                    placeholder="example@telebirr.et"
+                    placeholder="example@telebirr.et (optional)"
                   />
                   {errors.email && (
                     <p className="text-sm text-red-500 font-medium pl-1">{errors.email}</p>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  <Label htmlFor="phoneNumber" className="text-base font-bold text-gray-700 flex items-center gap-2">
-                    <Phone className="w-4 h-4" style={{ color: TELEBIRR_COLORS.deepGreen }} />
-                    Phone Number <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="phoneNumber"
-                    value={formData.phoneNumber}
-                    onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                    className={`h-14 rounded-xl border-2 transition-all focus:ring-4 ${errors.phoneNumber ? 'border-red-300 focus:border-red-500 focus:ring-red-50' : 'border-gray-200 focus:border-[#8DC63F] focus:ring-[#8DC63F]/10'}`}
-                    placeholder="+251 911 123 456"
-                  />
-                  {errors.phoneNumber && (
-                    <p className="text-sm text-red-500 font-medium pl-1">{errors.phoneNumber}</p>
                   )}
                 </div>
 
@@ -489,92 +468,6 @@ const TelebirrRegistrationPage: React.FC = () => {
                     className="h-14 rounded-xl border-2 border-gray-200 transition-all focus:border-[#8DC63F] focus:ring-4 focus:ring-[#8DC63F]/10"
                     placeholder="e.g. Director, Manager"
                   />
-                </div>
-
-                <div className="space-y-3">
-                  <Label htmlFor="country" className="text-base font-bold text-gray-700 flex items-center gap-2">
-                    <Globe className="w-4 h-4" style={{ color: TELEBIRR_COLORS.deepGreen }} />
-                    Country <span className="text-red-500">*</span>
-                  </Label>
-                  <Select value={formData.country} onValueChange={(value) => handleInputChange('country', value)}>
-                    <SelectTrigger
-                      className={`h-14 w-full px-3 rounded-xl border-2 transition-all bg-transparent outline-none ${errors.country ? 'border-red-300 focus:border-red-500 focus:ring-red-50' : 'border-gray-200 focus:border-[#8DC63F] focus:ring-[#8DC63F]/10'}`}
-                    >
-                      <SelectValue placeholder="Select your country" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Ethiopia">Ethiopia</SelectItem>
-                      <SelectItem value="United States">United States</SelectItem>
-                      <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                      <SelectItem value="Kenya">Kenya</SelectItem>
-                      <SelectItem value="Djibouti">Djibouti</SelectItem>
-                      <SelectItem value="Somalia">Somalia</SelectItem>
-                      <SelectItem value="Sudan">Sudan</SelectItem>
-                      <SelectItem value="South Sudan">South Sudan</SelectItem>
-                      <SelectItem value="Eritrea">Eritrea</SelectItem>
-                      <SelectItem value="China">China</SelectItem>
-                      <SelectItem value="India">India</SelectItem>
-                      <SelectItem value="United Arab Emirates">United Arab Emirates</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {formData.country === 'Other' && (
-                    <Input
-                      value={formData.otherCountry || ''}
-                      onChange={(e) => handleInputChange('otherCountry', e.target.value)}
-                      className="h-14 mt-2 rounded-xl border-2 border-gray-200 transition-all focus:border-[#8DC63F] focus:ring-4 focus:ring-[#8DC63F]/10"
-                      placeholder="Please specify your country"
-                    />
-                  )}
-                  {errors.country && (
-                    <p className="text-sm text-red-500 font-medium pl-1">{errors.country}</p>
-                  )}
-                </div>
-
-                <div className="space-y-3">
-                  <Label htmlFor="city" className="text-base font-bold text-gray-700 flex items-center gap-2">
-                    <MapPin className="w-4 h-4" style={{ color: TELEBIRR_COLORS.deepGreen }} />
-                    City <span className="text-red-500">*</span>
-                  </Label>
-                  <Select value={formData.city} onValueChange={(value) => handleInputChange('city', value)}>
-                    <SelectTrigger
-                      className={`h-14 w-full px-3 rounded-xl border-2 transition-all bg-transparent outline-none ${errors.city ? 'border-red-300 focus:border-red-500 focus:ring-red-50' : 'border-gray-200 focus:border-[#8DC63F] focus:ring-[#8DC63F]/10'}`}
-                    >
-                      <SelectValue placeholder="Select your city" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {formData.country === 'Ethiopia' || !formData.country ? (
-                        <>
-                          <SelectItem value="Addis Ababa">Addis Ababa</SelectItem>
-                          <SelectItem value="Dire Dawa">Dire Dawa</SelectItem>
-                          <SelectItem value="Adama">Adama</SelectItem>
-                          <SelectItem value="Hawassa">Hawassa</SelectItem>
-                          <SelectItem value="Bahir Dar">Bahir Dar</SelectItem>
-                          <SelectItem value="Mekelle">Mekelle</SelectItem>
-                          <SelectItem value="Gondar">Gondar</SelectItem>
-                          <SelectItem value="Jimma">Jimma</SelectItem>
-                          <SelectItem value="Dessie">Dessie</SelectItem>
-                          <SelectItem value="Jijiga">Jijiga</SelectItem>
-                          <SelectItem value="Shashamane">Shashamane</SelectItem>
-                          <SelectItem value="Bishoftu">Bishoftu</SelectItem>
-                          <SelectItem value="Arba Minch">Arba Minch</SelectItem>
-                          <SelectItem value="Harar">Harar</SelectItem>
-                        </>
-                      ) : null}
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {formData.city === 'Other' && (
-                    <Input
-                      value={formData.otherCity || ''}
-                      onChange={(e) => handleInputChange('otherCity', e.target.value)}
-                      className="h-14 mt-2 rounded-xl border-2 border-gray-200 transition-all focus:border-[#8DC63F] focus:ring-4 focus:ring-[#8DC63F]/10"
-                      placeholder="Please specify your city"
-                    />
-                  )}
-                  {errors.city && (
-                    <p className="text-sm text-red-500 font-medium pl-1">{errors.city}</p>
-                  )}
                 </div>
 
                 <div className="space-y-3 md:col-span-2">

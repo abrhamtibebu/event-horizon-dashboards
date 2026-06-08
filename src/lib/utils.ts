@@ -212,12 +212,7 @@ const STORAGE_PATH_PREFIXES = [
  * @param eventId - Optional event ID for hardwiring specific event banners
  * @returns The full URL to the image
  */
-export const getImageUrl = (imagePath: string | null | undefined | any, eventId?: number | string | null): string => {
-  // Hardwire for Telebirr 5th Anniversary (Event 4)
-  if (eventId === 4 || eventId === '4' || (typeof imagePath === 'string' && imagePath.includes('telebirr'))) {
-    return '/tele birr event banner.png'
-  }
-
+export const getImageUrl = (imagePath: string | null | undefined | any, _eventId?: number | string | null): string => {
   if (!imagePath || typeof imagePath !== 'string') {
     return '/placeholder.svg'
   }
