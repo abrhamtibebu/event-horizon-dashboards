@@ -38,6 +38,7 @@ export interface TelebirrRegistrationData {
   guest_uuid?: string
   guest_name?: string
   guest_email?: string
+  guest_phone?: string
   guest_job_title?: string
   guest_company?: string
   registration_code?: string

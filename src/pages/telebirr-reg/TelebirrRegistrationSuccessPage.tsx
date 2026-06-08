@@ -1,7 +1,7 @@
 import React from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { downloadPublicAttendeeBadgeWithToast } from '@/lib/publicBadgeDownload'
-import { CheckCircle, Download, Mail, Share2, Info } from 'lucide-react'
+import { CheckCircle, Download, Mail, Phone, Share2, Info } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { motion } from 'framer-motion'
 import { GuestShareBannerPanel } from '@/components/share/GuestShareBannerPanel'
@@ -32,6 +32,9 @@ const TelebirrRegistrationSuccessPage: React.FC = () => {
   const qrValue = guestUuid
   const eventUuid = eventData?.uuid || ''
   const eventName = eventData?.title || eventData?.name || 'Event'
+  const guestPhone = registrationData?.guest_phone || ''
+  const guestEmail = registrationData?.guest_email || ''
+  const hasRealEmail = Boolean(guestEmail) && !guestEmail.endsWith('@no-email.evella.et')
 
   const handleDownloadBadge = async () => {
     if (!registrationData?.id || !eventData?.id) {
@@ -141,19 +144,28 @@ const TelebirrRegistrationSuccessPage: React.FC = () => {
               </motion.div>
             )}
 
-            <div className="bg-blue-50 border-2 border-blue-100 rounded-[2rem] p-6 mb-12 flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
-              <div className="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-                <Mail className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <h4 className="font-bold text-blue-900 mb-1">Check your inbox!</h4>
-                <p className="text-blue-700 text-sm leading-relaxed">
-                  We&apos;ve sent your digital eBadge to{' '}
-                  <span className="font-bold">{registrationData.guest_email || 'your email'}</span>.
-                  Present this QR code for entry.
-                </p>
+            <div className="mb-12">
+              <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-100 rounded-[2rem] p-6 flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-100 to-blue-100 flex items-center justify-center flex-shrink-0">
+                  <div className="flex items-center gap-1">
+                    <Phone className="w-4 h-4 text-green-700" />
+                    <Mail className="w-4 h-4 text-blue-600" />
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-900 mb-1">Check your phone and inbox!</h4>
+                  <p className="text-gray-700 text-sm leading-relaxed">
+                    We&apos;ve sent a confirmation SMS with your guest ID and eBadge download link to{' '}
+                    <span className="font-bold">{guestPhone || 'your phone number'}</span>
+                    {hasRealEmail && (
+                      <>, and your digital eBadge to <span className="font-bold">{guestEmail}</span></>
+                    )}.
+                  </p>
+                </div>
               </div>
             </div>
+
+            <p className="text-gray-500 text-sm mb-12">Present this QR code for entry.</p>
 
             {!showShareSection && (
               <Button

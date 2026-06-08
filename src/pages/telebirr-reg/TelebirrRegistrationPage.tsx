@@ -129,6 +129,7 @@ const TelebirrRegistrationPage: React.FC = () => {
         'registration_type',
         searchParams.get('reg_type') || searchParams.get('type') || 'prereg',
       )
+      payload.append('registration_source', 'telebirr')
 
       if (data.profilePicture) {
         payload.append('profile_picture', data.profilePicture)
