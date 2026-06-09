@@ -1516,7 +1516,26 @@ export default function EventDetails() {
       toast.success('Event updated successfully!');
       setEditDialogOpen(false);
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to update event');
+      // Handle validation errors
+      if (err.response?.status === 422 && err.response?.data) {
+        const errors = err.response.data;
+        // Check for event_image specific errors
+        if (errors.event_image && Array.isArray(errors.event_image)) {
+          toast.error(errors.event_image[0]);
+        } else if (errors.error) {
+          toast.error(errors.error);
+        } else {
+          // Display all validation errors
+          const errorMessages = Object.values(errors).flat();
+          if (errorMessages.length > 0) {
+            toast.error(errorMessages[0]);
+          } else {
+            toast.error('Failed to update event');
+          }
+        }
+      } else {
+        toast.error(err.response?.data?.error || 'Failed to update event');
+      }
     }
     setEditLoading(false);
   };
