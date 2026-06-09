@@ -23,7 +23,8 @@ export interface TelebirrEventData {
 }
 
 export interface TelebirrFormData {
-  fullName: string
+  firstName: string
+  lastName: string
   email: string
   phoneNumber: string
   organization: string

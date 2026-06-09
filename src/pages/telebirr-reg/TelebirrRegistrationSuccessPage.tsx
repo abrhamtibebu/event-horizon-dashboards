@@ -153,7 +153,7 @@ const TelebirrRegistrationSuccessPage: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <h4 className="font-bold text-gray-900 mb-1">Check your phone and inbox!</h4>
+                  <h4 className="font-bold text-gray-900 mb-1">Check your phone or E-Mail </h4>
                   <p className="text-gray-700 text-sm leading-relaxed">
                     We&apos;ve sent a confirmation SMS with your guest ID and eBadge download link to{' '}
                     <span className="font-bold">{guestPhone || 'your phone number'}</span>

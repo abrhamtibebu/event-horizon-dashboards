@@ -21,7 +21,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import api from '@/lib/api'
+import api, { lookupPublicBadge } from '@/lib/api'
+import { toast } from 'sonner'
 import { getImageUrl } from '@/lib/utils'
 import { PROFILE_PICTURE_ACCEPT, validateProfilePictureFile } from '@/lib/fileValidation'
 import { useRegistrationShareMeta } from '@/lib/registrationShareMeta'
@@ -30,7 +31,7 @@ import { TELEBIRR_ASSETS, TELEBIRR_COLORS, DEFAULT_TELEBIRR_EVENT_ID } from './c
 import { TelebirrRegLayout, TelebirrRegFooter } from './TelebirrRegLayout'
 import { telebirrSuccessPath } from './routes'
 import { saveRegistrationSuccess } from './sessionStorage'
-import type { TelebirrEventData, TelebirrFormData } from './types'
+import type { TelebirrEventData, TelebirrFormData, TelebirrRegistrationData } from './types'
 import { getEthioTelecomPhoneError, validateEthioTelecomPhone } from './phoneValidation'
 import { RegistrationUnavailable, type RegistrationUnavailableVariant } from '@/components/public/RegistrationUnavailable'
 
@@ -53,7 +54,8 @@ const TelebirrRegistrationPage: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const [formData, setFormData] = useState<TelebirrFormData>({
-    fullName: '',
+    firstName: '',
+    lastName: '',
     email: '',
     phoneNumber: '',
     organization: '',
@@ -119,16 +121,23 @@ const TelebirrRegistrationPage: React.FC = () => {
   const registerMutation = useMutation({
     mutationFn: async (data: TelebirrFormData) => {
       const payload = new FormData()
-      payload.append('name', data.fullName)
+      payload.append('first_name', data.firstName)
+      payload.append('last_name', data.lastName)
       payload.append('email', data.email)
       payload.append('phone', data.phoneNumber)
       payload.append('company', data.organization)
       payload.append('job_title', data.jobTitle)
-      payload.append('guest_type_id', data.guest_type_id || '')
-      payload.append(
-        'registration_type',
-        searchParams.get('reg_type') || searchParams.get('type') || 'prereg',
-      )
+      if (data.guest_type_id) {
+        payload.append('guest_type_id', data.guest_type_id)
+      }
+      const regTypeParam = searchParams.get('reg_type')
+      const registrationType =
+        regTypeParam === 'onsite' || regTypeParam === 'prereg' || regTypeParam === 'evella'
+          ? regTypeParam
+          : searchParams.get('type') === 'onsite'
+            ? 'onsite'
+            : 'prereg'
+      payload.append('registration_type', registrationType)
       payload.append('registration_source', 'telebirr')
 
       if (data.profilePicture) {
@@ -147,7 +156,99 @@ const TelebirrRegistrationPage: React.FC = () => {
       saveRegistrationSuccess(successState)
       navigate(telebirrSuccessPath(eventId), { state: successState })
     },
-    onError: (error: { response?: { data?: { error?: string; message?: string } } }) => {
+    onError: async (error: {
+      response?: {
+        status?: number
+        data?: {
+          error?: string
+          message?: string
+          duplicate_type?: string
+          attendee?: TelebirrRegistrationData
+          errors?: Record<string, string[]>
+        }
+      }
+    }) => {
+      const isAlreadyRegistered =
+        error.response?.status === 409 &&
+        error.response?.data?.duplicate_type === 'event_registration'
+
+      if (isAlreadyRegistered && eventData) {
+        const attendeeFromApi = error.response?.data?.attendee
+        const identifier = formData.phoneNumber.trim() || formData.email.trim()
+
+        const buildSuccessState = (registrationData: TelebirrRegistrationData) => ({
+          registrationData,
+          eventData,
+        })
+
+        if (attendeeFromApi?.id) {
+          const successState = buildSuccessState({
+            id: attendeeFromApi.id,
+            guest_uuid: attendeeFromApi.guest_uuid,
+            guest_name: attendeeFromApi.guest_name,
+            guest_email: attendeeFromApi.guest_email,
+            guest_phone: attendeeFromApi.guest_phone,
+            guest_company: attendeeFromApi.guest_company,
+            guest_job_title: attendeeFromApi.guest_job_title,
+          })
+          saveRegistrationSuccess(successState)
+          toast.info("You're already registered. Here's your e-badge.")
+          navigate(telebirrSuccessPath(eventId), { state: successState })
+          return
+        }
+
+        if (identifier && eventData.uuid) {
+          try {
+            const lookup = await lookupPublicBadge(eventData.uuid, identifier)
+            const successState = buildSuccessState({
+              id: lookup.data.attendeeId,
+              guest_uuid: lookup.data.guestUuid,
+              guest_name: lookup.data.guestName,
+              guest_email: formData.email || undefined,
+              guest_phone: formData.phoneNumber,
+              guest_company: formData.organization,
+              guest_job_title: formData.jobTitle,
+            })
+            saveRegistrationSuccess(successState)
+            toast.info("You're already registered. Here's your e-badge.")
+            navigate(telebirrSuccessPath(eventId), { state: successState })
+            return
+          } catch {
+            const params = new URLSearchParams()
+            params.set('identifier', identifier)
+            toast.info("You're already registered. Retrieve your e-badge here.")
+            navigate(`/event/${eventData.uuid}/badge-retrieve?${params.toString()}`)
+            return
+          }
+        }
+
+        setErrors({
+          submit: error.response?.data?.error || 'You are already registered for this event.',
+        })
+        return
+      }
+
+      const apiErrors = error.response?.data?.errors
+      if (apiErrors) {
+        const fieldErrors: Record<string, string> = {}
+        if (apiErrors.first_name?.[0]) fieldErrors.firstName = apiErrors.first_name[0]
+        if (apiErrors.last_name?.[0]) fieldErrors.lastName = apiErrors.last_name[0]
+        if (apiErrors.name?.[0] && !fieldErrors.firstName) fieldErrors.firstName = apiErrors.name[0]
+        if (apiErrors.email?.[0]) fieldErrors.email = apiErrors.email[0]
+        if (apiErrors.phone?.[0]) fieldErrors.phoneNumber = apiErrors.phone[0]
+        if (apiErrors.company?.[0]) fieldErrors.organization = apiErrors.company[0]
+        if (apiErrors.job_title?.[0]) fieldErrors.jobTitle = apiErrors.job_title[0]
+
+        setErrors({
+          ...fieldErrors,
+          submit:
+            error.response?.data?.error ||
+            error.response?.data?.message ||
+            'Registration failed. Please check the highlighted fields.',
+        })
+        return
+      }
+
       setErrors({
         submit:
           error.response?.data?.error ||
@@ -203,8 +304,11 @@ const TelebirrRegistrationPage: React.FC = () => {
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    const nameResult = validatePersonName(formData.fullName)
-    if (!nameResult.valid) newErrors.fullName = nameResult.message
+    const firstNameResult = validatePersonName(formData.firstName)
+    if (!firstNameResult.valid) newErrors.firstName = firstNameResult.message
+
+    const lastNameResult = validatePersonName(formData.lastName)
+    if (!lastNameResult.valid) newErrors.lastName = lastNameResult.message
 
     if (formData.email.trim()) {
       const emailResult = validatePublicEmail(formData.email)
@@ -396,19 +500,36 @@ const TelebirrRegistrationPage: React.FC = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-3">
-                  <Label htmlFor="fullName" className="text-base font-bold text-gray-700 flex items-center gap-2">
+                  <Label htmlFor="firstName" className="text-base font-bold text-gray-700 flex items-center gap-2">
                     <User className="w-4 h-4" style={{ color: TELEBIRR_COLORS.deepGreen }} />
-                    Full Name <span className="text-red-500">*</span>
+                    First Name <span className="text-red-500">*</span>
                   </Label>
                   <Input
-                    id="fullName"
-                    value={formData.fullName}
-                    onChange={(e) => handleInputChange('fullName', e.target.value)}
-                    className={`h-14 rounded-xl border-2 transition-all focus:ring-4 ${errors.fullName ? 'border-red-300 focus:border-red-500 focus:ring-red-50' : 'border-gray-200 focus:border-[#8DC63F] focus:ring-[#8DC63F]/10'}`}
-                    placeholder="Enter your full name"
+                    id="firstName"
+                    value={formData.firstName}
+                    onChange={(e) => handleInputChange('firstName', e.target.value)}
+                    className={`h-14 rounded-xl border-2 transition-all focus:ring-4 ${errors.firstName ? 'border-red-300 focus:border-red-500 focus:ring-red-50' : 'border-gray-200 focus:border-[#8DC63F] focus:ring-[#8DC63F]/10'}`}
+                    placeholder="Enter your first name"
                   />
-                  {errors.fullName && (
-                    <p className="text-sm text-red-500 font-medium pl-1">{errors.fullName}</p>
+                  {errors.firstName && (
+                    <p className="text-sm text-red-500 font-medium pl-1">{errors.firstName}</p>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="lastName" className="text-base font-bold text-gray-700 flex items-center gap-2">
+                    <User className="w-4 h-4" style={{ color: TELEBIRR_COLORS.deepGreen }} />
+                    Last Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="lastName"
+                    value={formData.lastName}
+                    onChange={(e) => handleInputChange('lastName', e.target.value)}
+                    className={`h-14 rounded-xl border-2 transition-all focus:ring-4 ${errors.lastName ? 'border-red-300 focus:border-red-500 focus:ring-red-50' : 'border-gray-200 focus:border-[#8DC63F] focus:ring-[#8DC63F]/10'}`}
+                    placeholder="Enter your last name"
+                  />
+                  {errors.lastName && (
+                    <p className="text-sm text-red-500 font-medium pl-1">{errors.lastName}</p>
                   )}
                 </div>
 
