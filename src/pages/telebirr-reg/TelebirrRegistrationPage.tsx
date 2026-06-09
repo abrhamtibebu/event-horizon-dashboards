@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useSearchParams, useParams, useNavigate } from 'react-router-dom'
 import {
-  Calendar,
-  MapPin,
   AlertCircle,
   User,
   CheckCircle,
@@ -27,10 +25,15 @@ import { getImageUrl } from '@/lib/utils'
 import { PROFILE_PICTURE_ACCEPT, validateProfilePictureFile } from '@/lib/fileValidation'
 import { useRegistrationShareMeta } from '@/lib/registrationShareMeta'
 import { useTheme } from 'next-themes'
-import { TELEBIRR_ASSETS, TELEBIRR_COLORS, DEFAULT_TELEBIRR_EVENT_ID } from './constants'
+import { TELEBIRR_COLORS, DEFAULT_TELEBIRR_EVENT_ID } from './constants'
 import { TelebirrRegLayout, TelebirrRegFooter } from './TelebirrRegLayout'
 import { telebirrSuccessPath } from './routes'
 import { saveRegistrationSuccess } from './sessionStorage'
+import {
+  buildSuccessState,
+  extractRegistrationApiPayload,
+  normalizeRegistrationData,
+} from './successState'
 import type { TelebirrEventData, TelebirrFormData, TelebirrRegistrationData } from './types'
 import { getEthioTelecomPhoneError, validateEthioTelecomPhone } from './phoneValidation'
 import { RegistrationUnavailable, type RegistrationUnavailableVariant } from '@/components/public/RegistrationUnavailable'
@@ -148,59 +151,107 @@ const TelebirrRegistrationPage: React.FC = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
     },
-    onSuccess: (response) => {
-      const successState = {
-        registrationData: response.data?.attendee || response.data,
-        eventData: eventData!,
+  })
+
+  type RegistrationApiError = {
+    response?: {
+      status?: number
+      data?: {
+        error?: string
+        message?: string
+        duplicate_type?: string
+        attendee?: TelebirrRegistrationData
+        event?: Partial<TelebirrEventData>
+        errors?: Record<string, string[]>
       }
-      saveRegistrationSuccess(successState)
-      navigate(telebirrSuccessPath(eventId), { state: successState })
-    },
-    onError: async (error: {
-      response?: {
-        status?: number
-        data?: {
-          error?: string
-          message?: string
-          duplicate_type?: string
-          attendee?: TelebirrRegistrationData
-          errors?: Record<string, string[]>
+    }
+  }
+
+  const goToSuccessPage = (registrationData: TelebirrRegistrationData, apiEvent?: Partial<TelebirrEventData> | null) => {
+    if (!eventData) {
+      return
+    }
+    const successState = buildSuccessState(registrationData, eventData, apiEvent)
+    saveRegistrationSuccess(successState)
+    navigate(telebirrSuccessPath(eventId), { state: successState })
+  }
+
+  const resolveRegistrationDataAfterSuccess = async (
+    response: unknown,
+  ): Promise<TelebirrRegistrationData | null> => {
+    const { attendee } = extractRegistrationApiPayload(response)
+    const normalized = normalizeRegistrationData(attendee)
+    if (normalized?.id) {
+      return normalized
+    }
+
+    const identifier = formData.phoneNumber.trim() || formData.email.trim()
+    if (identifier && eventData?.uuid) {
+      try {
+        const lookup = await lookupPublicBadge(eventData.uuid, identifier)
+        return {
+          id: lookup.data.attendeeId,
+          guest_uuid: lookup.data.guestUuid,
+          guest_name:
+            lookup.data.guestName ||
+            normalized?.guest_name ||
+            `${formData.firstName} ${formData.lastName}`.trim(),
+          guest_email: formData.email || normalized?.guest_email,
+          guest_phone: formData.phoneNumber || normalized?.guest_phone,
+          guest_company: formData.organization || normalized?.guest_company,
+          guest_job_title: formData.jobTitle || normalized?.guest_job_title,
         }
+      } catch {
+        // fall through
       }
-    }) => {
-      const isAlreadyRegistered =
-        error.response?.status === 409 &&
-        error.response?.data?.duplicate_type === 'event_registration'
+    }
 
-      if (isAlreadyRegistered && eventData) {
-        const attendeeFromApi = error.response?.data?.attendee
-        const identifier = formData.phoneNumber.trim() || formData.email.trim()
+    if (normalized?.guest_uuid) {
+      return normalized
+    }
 
-        const buildSuccessState = (registrationData: TelebirrRegistrationData) => ({
-          registrationData,
-          eventData,
-        })
+    return null
+  }
 
-        if (attendeeFromApi?.id) {
-          const successState = buildSuccessState({
-            id: attendeeFromApi.id,
-            guest_uuid: attendeeFromApi.guest_uuid,
-            guest_name: attendeeFromApi.guest_name,
-            guest_email: attendeeFromApi.guest_email,
-            guest_phone: attendeeFromApi.guest_phone,
-            guest_company: attendeeFromApi.guest_company,
-            guest_job_title: attendeeFromApi.guest_job_title,
-          })
-          saveRegistrationSuccess(successState)
+  const handleRegistrationSuccess = async (response: unknown) => {
+    if (!eventData) {
+      return
+    }
+
+    const { event: apiEvent } = extractRegistrationApiPayload(response)
+    const registrationData = await resolveRegistrationDataAfterSuccess(response)
+
+    if (!registrationData) {
+      toast.error('Registration succeeded but confirmation data is incomplete. Please check your SMS for your e-badge.')
+      return
+    }
+
+    goToSuccessPage(registrationData, apiEvent)
+  }
+
+  const handleRegistrationError = async (error: RegistrationApiError) => {
+    const isAlreadyRegistered =
+      error.response?.status === 409 &&
+      error.response?.data?.duplicate_type === 'event_registration'
+
+    if (isAlreadyRegistered && eventData) {
+      const attendeeFromApi = error.response?.data?.attendee
+      const identifier = formData.phoneNumber.trim() || formData.email.trim()
+
+      if (attendeeFromApi?.id) {
+        const registrationData = normalizeRegistrationData(attendeeFromApi)
+        if (registrationData) {
+          goToSuccessPage(registrationData, error.response?.data?.event)
           toast.info("You're already registered. Here's your e-badge.")
-          navigate(telebirrSuccessPath(eventId), { state: successState })
           return
         }
+      }
 
-        if (identifier && eventData.uuid) {
-          try {
-            const lookup = await lookupPublicBadge(eventData.uuid, identifier)
-            const successState = buildSuccessState({
+      if (identifier && eventData.uuid) {
+        try {
+          const lookup = await lookupPublicBadge(eventData.uuid, identifier)
+          goToSuccessPage(
+            {
               id: lookup.data.attendeeId,
               guest_uuid: lookup.data.guestUuid,
               guest_name: lookup.data.guestName,
@@ -208,55 +259,54 @@ const TelebirrRegistrationPage: React.FC = () => {
               guest_phone: formData.phoneNumber,
               guest_company: formData.organization,
               guest_job_title: formData.jobTitle,
-            })
-            saveRegistrationSuccess(successState)
-            toast.info("You're already registered. Here's your e-badge.")
-            navigate(telebirrSuccessPath(eventId), { state: successState })
-            return
-          } catch {
-            const params = new URLSearchParams()
-            params.set('identifier', identifier)
-            toast.info("You're already registered. Retrieve your e-badge here.")
-            navigate(`/event/${eventData.uuid}/badge-retrieve?${params.toString()}`)
-            return
-          }
+            },
+            error.response?.data?.event,
+          )
+          toast.info("You're already registered. Here's your e-badge.")
+          return
+        } catch {
+          const params = new URLSearchParams()
+          params.set('identifier', identifier)
+          toast.info("You're already registered. Retrieve your e-badge here.")
+          navigate(`/event/${eventData.uuid}/badge-retrieve?${params.toString()}`)
+          return
         }
-
-        setErrors({
-          submit: error.response?.data?.error || 'You are already registered for this event.',
-        })
-        return
-      }
-
-      const apiErrors = error.response?.data?.errors
-      if (apiErrors) {
-        const fieldErrors: Record<string, string> = {}
-        if (apiErrors.first_name?.[0]) fieldErrors.firstName = apiErrors.first_name[0]
-        if (apiErrors.last_name?.[0]) fieldErrors.lastName = apiErrors.last_name[0]
-        if (apiErrors.name?.[0] && !fieldErrors.firstName) fieldErrors.firstName = apiErrors.name[0]
-        if (apiErrors.email?.[0]) fieldErrors.email = apiErrors.email[0]
-        if (apiErrors.phone?.[0]) fieldErrors.phoneNumber = apiErrors.phone[0]
-        if (apiErrors.company?.[0]) fieldErrors.organization = apiErrors.company[0]
-        if (apiErrors.job_title?.[0]) fieldErrors.jobTitle = apiErrors.job_title[0]
-
-        setErrors({
-          ...fieldErrors,
-          submit:
-            error.response?.data?.error ||
-            error.response?.data?.message ||
-            'Registration failed. Please check the highlighted fields.',
-        })
-        return
       }
 
       setErrors({
+        submit: error.response?.data?.error || 'You are already registered for this event.',
+      })
+      return
+    }
+
+    const apiErrors = error.response?.data?.errors
+    if (apiErrors) {
+      const fieldErrors: Record<string, string> = {}
+      if (apiErrors.first_name?.[0]) fieldErrors.firstName = apiErrors.first_name[0]
+      if (apiErrors.last_name?.[0]) fieldErrors.lastName = apiErrors.last_name[0]
+      if (apiErrors.name?.[0] && !fieldErrors.firstName) fieldErrors.firstName = apiErrors.name[0]
+      if (apiErrors.email?.[0]) fieldErrors.email = apiErrors.email[0]
+      if (apiErrors.phone?.[0]) fieldErrors.phoneNumber = apiErrors.phone[0]
+      if (apiErrors.company?.[0]) fieldErrors.organization = apiErrors.company[0]
+      if (apiErrors.job_title?.[0]) fieldErrors.jobTitle = apiErrors.job_title[0]
+
+      setErrors({
+        ...fieldErrors,
         submit:
           error.response?.data?.error ||
           error.response?.data?.message ||
-          'Registration failed. Please try again.',
+          'Registration failed. Please check the highlighted fields.',
       })
-    },
-  })
+      return
+    }
+
+    setErrors({
+      submit:
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        'Registration failed. Please try again.',
+    })
+  }
 
   const handleInputChange = (field: keyof TelebirrFormData, value: string | File | null) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -344,9 +394,10 @@ const TelebirrRegistrationPage: React.FC = () => {
 
     setSubmitting(true)
     try {
-      await registerMutation.mutateAsync(formData)
-    } catch {
-      // Handled in onError
+      const response = await registerMutation.mutateAsync(formData)
+      await handleRegistrationSuccess(response)
+    } catch (error) {
+      await handleRegistrationError(error as RegistrationApiError)
     } finally {
       setSubmitting(false)
     }
@@ -410,59 +461,26 @@ const TelebirrRegistrationPage: React.FC = () => {
       )
     : null
 
-  const heroBackground = eventBannerUrl
-    ? `url('${eventBannerUrl}')`
-    : `linear-gradient(135deg, ${TELEBIRR_COLORS.deepGreen} 0%, ${TELEBIRR_COLORS.lightGreen} 100%)`
-
   return (
     <TelebirrRegLayout variant="register" isOnsite={isOnsite}>
-      <section
-        className="relative py-20 overflow-hidden text-white"
-        style={{
-          background: heroBackground,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      >
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" />
-
-        <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
-          <div className="inline-flex justify-center mb-8">
-            <img
-              src={TELEBIRR_ASSETS.telebirrLogo}
-              alt="Telebirr 5th Year Anniversary"
-              className="h-16 md:h-24 w-auto object-contain drop-shadow-md"
-            />
-          </div>
-
-          <h2 className="text-4xl md:text-6xl font-extrabold mb-6 leading-tight drop-shadow-lg">
-            {eventData?.title || eventData?.name || 'Loading...'}
-          </h2>
-
-          <div className="flex flex-wrap justify-center gap-6 text-lg font-medium">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-6 h-6" />
-              <span>
-                {eventData?.start_date && eventData?.end_date
-                  ? `${new Date(eventData.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(eventData.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-                  : eventData?.start_date
-                    ? new Date(eventData.start_date).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })
-                    : 'Loading...'}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <MapPin className="w-6 h-6" />
-              <span>{eventData?.venue_name || eventData?.location || 'Loading...'}</span>
-            </div>
-          </div>
-        </div>
+      <section className="relative w-full h-80 sm:h-[22rem] md:h-[28rem] overflow-hidden">
+        {eventBannerUrl ? (
+          <img
+            src={eventBannerUrl}
+            alt={eventData?.title || eventData?.name || 'Event banner'}
+            className="w-full h-full object-cover object-center"
+          />
+        ) : (
+          <div
+            className="w-full h-full"
+            style={{
+              background: `linear-gradient(135deg, ${TELEBIRR_COLORS.deepGreen} 0%, ${TELEBIRR_COLORS.lightGreen} 100%)`,
+            }}
+          />
+        )}
       </section>
 
-      <main className="max-w-4xl mx-auto px-4 py-16 -mt-10 relative z-20 space-y-8">
+      <main className="max-w-4xl mx-auto px-4 py-16 relative z-20 space-y-8">
         {eventData?.description && (
           <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden p-8 md:p-12">
             <h3 className="text-3xl font-bold text-gray-900 mb-2">About the Event</h3>

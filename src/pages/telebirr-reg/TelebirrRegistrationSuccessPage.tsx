@@ -1,17 +1,19 @@
 import React from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { downloadPublicAttendeeBadgeWithToast } from '@/lib/publicBadgeDownload'
-import { CheckCircle, Download, Mail, Phone, Share2, Info } from 'lucide-react'
+import { CheckCircle, Download, Mail, Phone, Share2, Info, Loader2 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { motion } from 'framer-motion'
 import { GuestShareBannerPanel } from '@/components/share/GuestShareBannerPanel'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import api, { lookupPublicBadge } from '@/lib/api'
 import { TELEBIRR_ASSETS, TELEBIRR_COLORS, DEFAULT_TELEBIRR_EVENT_ID } from './constants'
 import { TelebirrRegLayout, TelebirrRegFooter } from './TelebirrRegLayout'
 import { telebirrRegisterPath } from './routes'
-import { loadRegistrationSuccess } from './sessionStorage'
-import type { TelebirrRegistrationSuccessState } from './types'
+import { loadRegistrationSuccess, saveRegistrationSuccess } from './sessionStorage'
+import { mergeSuccessStates } from './successState'
+import type { TelebirrEventData, TelebirrRegistrationSuccessState } from './types'
 
 const TelebirrRegistrationSuccessPage: React.FC = () => {
   const location = useLocation()
@@ -20,24 +22,128 @@ const TelebirrRegistrationSuccessPage: React.FC = () => {
 
   const routerState = (location.state as TelebirrRegistrationSuccessState | null) || null
   const persistedState = loadRegistrationSuccess()
-  const { registrationData, eventData } = routerState || persistedState || {}
+  const mergedState = React.useMemo(
+    () => mergeSuccessStates(routerState, persistedState),
+    [routerState, persistedState],
+  )
 
+  const [hydratedEvent, setHydratedEvent] = React.useState<TelebirrEventData | null>(null)
+  const [hydratedAttendeeId, setHydratedAttendeeId] = React.useState<number | null>(null)
+  const [hydrating, setHydrating] = React.useState(false)
   const [showShareSection, setShowShareSection] = React.useState(false)
+
+  const registrationData = mergedState?.registrationData
+  const eventData = hydratedEvent ?? mergedState?.eventData
+
+  const resolvedEventId = eventData?.id ?? Number(eventId)
+  const resolvedEventUuid = eventData?.uuid ?? ''
+  const resolvedAttendeeId = hydratedAttendeeId ?? registrationData?.id
+  const guestUuid = registrationData?.guest_uuid || ''
+  const qrValue = guestUuid
+  const eventName = eventData?.title || eventData?.name || 'Event'
+  const guestPhone = registrationData?.guest_phone || ''
+  const guestEmail = registrationData?.guest_email || ''
+  const hasRealEmail = Boolean(guestEmail) && !guestEmail.endsWith('@no-email.evella.et')
+  const canShare = Boolean(guestUuid && resolvedEventUuid)
+  const canDownloadBadge = Boolean(resolvedAttendeeId && resolvedEventId && guestUuid)
 
   React.useEffect(() => {
     window.scrollTo(0, 0)
   }, [])
 
-  const guestUuid = registrationData?.guest_uuid || ''
-  const qrValue = guestUuid
-  const eventUuid = eventData?.uuid || ''
-  const eventName = eventData?.title || eventData?.name || 'Event'
-  const guestPhone = registrationData?.guest_phone || ''
-  const guestEmail = registrationData?.guest_email || ''
-  const hasRealEmail = Boolean(guestEmail) && !guestEmail.endsWith('@no-email.evella.et')
+  React.useEffect(() => {
+    if (!registrationData) {
+      return
+    }
+
+    const needsEvent = !mergedState?.eventData?.id || !mergedState?.eventData?.uuid
+    const needsAttendeeId = !mergedState?.registrationData?.id
+
+    if (!needsEvent && !needsAttendeeId) {
+      return
+    }
+
+    let cancelled = false
+
+    const hydrate = async () => {
+      setHydrating(true)
+      let nextEvent = mergedState?.eventData ?? null
+      let nextAttendeeId = mergedState?.registrationData?.id ?? null
+
+      if (needsEvent) {
+        try {
+          const response = await api.get(`/public/events/id/${eventId}`)
+          nextEvent = response.data as TelebirrEventData
+          if (!cancelled) {
+            setHydratedEvent(nextEvent)
+          }
+        } catch {
+          // keep partial state
+        }
+      }
+
+      if (needsAttendeeId) {
+        const identifier = registrationData.guest_phone || registrationData.guest_email
+        const eventUuid = nextEvent?.uuid ?? mergedState?.eventData?.uuid
+        if (identifier && eventUuid) {
+          try {
+            const lookup = await lookupPublicBadge(eventUuid, identifier)
+            nextAttendeeId = lookup.data.attendeeId
+            if (!cancelled) {
+              setHydratedAttendeeId(nextAttendeeId)
+            }
+          } catch {
+            // keep partial state
+          }
+        }
+      }
+
+      if (!cancelled && nextEvent?.id && nextEvent?.uuid) {
+        saveRegistrationSuccess({
+          registrationData: {
+            ...registrationData,
+            id: nextAttendeeId ?? registrationData.id,
+          },
+          eventData: nextEvent,
+        })
+      }
+
+      if (!cancelled) {
+        setHydrating(false)
+      }
+    }
+
+    void hydrate()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    eventId,
+    registrationData,
+    mergedState?.eventData?.id,
+    mergedState?.eventData?.uuid,
+    mergedState?.registrationData?.id,
+  ])
+
+  const handleOpenShare = () => {
+    if (hydrating) {
+      toast.info('Loading your registration details…')
+      return
+    }
+    if (!canShare) {
+      toast.error('Missing registration data')
+      return
+    }
+    setShowShareSection(true)
+  }
 
   const handleDownloadBadge = async () => {
-    if (!registrationData?.id || !eventData?.id) {
+    if (hydrating) {
+      toast.info('Loading your registration details…')
+      return
+    }
+    if (!canDownloadBadge || !resolvedAttendeeId || !resolvedEventId) {
       toast.error('Missing registration data')
       return
     }
@@ -45,10 +151,10 @@ const TelebirrRegistrationSuccessPage: React.FC = () => {
     try {
       await downloadPublicAttendeeBadgeWithToast(
         {
-          eventId: eventData.id,
-          attendeeId: registrationData.id,
+          eventId: resolvedEventId,
+          attendeeId: resolvedAttendeeId,
           guestUuid,
-          downloadFilename: `telebirr-badge-${registrationData.registration_code || 'ticket'}.pdf`,
+          downloadFilename: `telebirr-badge-${registrationData?.registration_code || 'ticket'}.pdf`,
         },
         'Badge downloaded successfully!',
       )
@@ -170,22 +276,27 @@ const TelebirrRegistrationSuccessPage: React.FC = () => {
             {!showShareSection && (
               <Button
                 variant="outline"
-                onClick={() => setShowShareSection(true)}
+                onClick={handleOpenShare}
+                disabled={hydrating}
                 className="w-full mb-8 h-14 rounded-2xl border-2 border-gray-100 hover:bg-gray-50 font-bold transition-all"
               >
-                <Share2 className="w-5 h-5 mr-2 text-blue-500" />
+                {hydrating ? (
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin text-blue-500" />
+                ) : (
+                  <Share2 className="w-5 h-5 mr-2 text-blue-500" />
+                )}
                 Share your invitation banner
               </Button>
             )}
 
-            {showShareSection && (
+            {showShareSection && canShare && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 className="mb-12 overflow-hidden"
               >
                 <GuestShareBannerPanel
-                  eventUuid={eventUuid}
+                  eventUuid={resolvedEventUuid}
                   eventName={eventName}
                   guestUuid={guestUuid}
                 />
@@ -196,10 +307,15 @@ const TelebirrRegistrationSuccessPage: React.FC = () => {
               <Button
                 type="button"
                 onClick={handleDownloadBadge}
+                disabled={hydrating}
                 className="h-20 w-full rounded-3xl text-xl font-black transition-all shadow-[0_15px_30px_rgba(0,171,78,0.3)] text-white active:scale-95"
                 style={{ backgroundColor: TELEBIRR_COLORS.deepGreen }}
               >
-                <Download className="w-7 h-7 mr-3" />
+                {hydrating ? (
+                  <Loader2 className="w-7 h-7 mr-3 animate-spin" />
+                ) : (
+                  <Download className="w-7 h-7 mr-3" />
+                )}
                 Download E-Badge
               </Button>
             </div>
