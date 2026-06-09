@@ -216,12 +216,16 @@ const TelebirrRegistrationPage: React.FC = () => {
       newErrors.phoneNumber = phoneResult.message!
     }
 
-    if (formData.organization?.trim()) {
+    if (!formData.organization?.trim()) {
+      newErrors.organization = 'Organization is required'
+    } else {
       const orgResult = validateOptionalText(formData.organization)
       if (!orgResult.valid) newErrors.organization = orgResult.message
     }
 
-    if (formData.jobTitle?.trim()) {
+    if (!formData.jobTitle?.trim()) {
+      newErrors.jobTitle = 'Job title is required'
+    } else {
       const jobResult = validateOptionalText(formData.jobTitle)
       if (!jobResult.valid) newErrors.jobTitle = jobResult.message
     }
@@ -446,29 +450,35 @@ const TelebirrRegistrationPage: React.FC = () => {
                 <div className="space-y-3">
                   <Label htmlFor="organization" className="text-base font-bold text-gray-700 flex items-center gap-2">
                     <Building className="w-4 h-4" style={{ color: TELEBIRR_COLORS.deepGreen }} />
-                    Organization
+                    Organization <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="organization"
                     value={formData.organization}
                     onChange={(e) => handleInputChange('organization', e.target.value)}
-                    className="h-14 rounded-xl border-2 border-gray-200 transition-all focus:border-[#8DC63F] focus:ring-4 focus:ring-[#8DC63F]/10"
-                    placeholder="Your company or entity"
+                    className={`h-14 rounded-xl border-2 transition-all focus:ring-4 ${errors.organization ? 'border-red-300 focus:border-red-500 focus:ring-red-50' : 'border-gray-200 focus:border-[#8DC63F] focus:ring-[#8DC63F]/10'}`}
+                    placeholder="Your company or university"
                   />
+                  {errors.organization && (
+                    <p className="text-sm text-red-500 font-medium pl-1">{errors.organization}</p>
+                  )}
                 </div>
 
                 <div className="space-y-3">
                   <Label htmlFor="jobTitle" className="text-base font-bold text-gray-700 flex items-center gap-2">
                     <Globe className="w-4 h-4" style={{ color: TELEBIRR_COLORS.deepGreen }} />
-                    Job Title
+                    Job Title <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="jobTitle"
                     value={formData.jobTitle}
                     onChange={(e) => handleInputChange('jobTitle', e.target.value)}
-                    className="h-14 rounded-xl border-2 border-gray-200 transition-all focus:border-[#8DC63F] focus:ring-4 focus:ring-[#8DC63F]/10"
-                    placeholder="e.g. Director, Manager"
+                    className={`h-14 rounded-xl border-2 transition-all focus:ring-4 ${errors.jobTitle ? 'border-red-300 focus:border-red-500 focus:ring-red-50' : 'border-gray-200 focus:border-[#8DC63F] focus:ring-[#8DC63F]/10'}`}
+                    placeholder="Director, Manager, student"
                   />
+                  {errors.jobTitle && (
+                    <p className="text-sm text-red-500 font-medium pl-1">{errors.jobTitle}</p>
+                  )}
                 </div>
 
                 <div className="space-y-3 md:col-span-2">
