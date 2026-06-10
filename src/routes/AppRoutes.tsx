@@ -233,6 +233,16 @@ const AppWithRealtime = () => {
             }
           />
           <Route
+            path="/badge/:attendeeId/:guestUuidShort"
+            element={
+              <PublicRoute>
+                <Lazy>
+                  <P.PublicBadgeDownloadPage />
+                </Lazy>
+              </PublicRoute>
+            }
+          />
+          <Route
             path="/event/custom-register/:eventId"
             element={
               <PublicRoute>

@@ -2,7 +2,17 @@ import { useCallback, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
-import { Copy, Download, Share2, Loader2 } from 'lucide-react'
+import {
+  Copy,
+  Download,
+  Share2,
+  Loader2,
+  MessageCircle,
+  Send,
+  Facebook,
+  Twitter,
+  Linkedin,
+} from 'lucide-react'
 import { getApiBaseURLForStorage } from '@/config/env'
 import {
   DropdownMenu,
@@ -10,14 +20,41 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  buildPreregistrationUrl,
+  buildTelebirrShareCaption,
+  TELEBIRR_SHARE_MESSAGE_BODY,
+} from '@/pages/telebirr-reg/shareCopy'
+
+type SharePlatform = 'whatsapp' | 'telegram' | 'facebook' | 'twitter' | 'linkedin' | 'native'
 
 type Props = {
   eventUuid: string
   eventName: string
   guestUuid: string
+  variant?: 'default' | 'telebirr'
 }
 
-export function GuestShareBannerPanel({ eventUuid, eventName, guestUuid }: Props) {
+const TELEBIRR_PLATFORMS: Array<{
+  id: SharePlatform
+  label: string
+  icon: typeof MessageCircle
+  iconClass: string
+}> = [
+  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, iconClass: 'text-green-600' },
+  { id: 'telegram', label: 'Telegram', icon: Send, iconClass: 'text-sky-500' },
+  { id: 'facebook', label: 'Facebook', icon: Facebook, iconClass: 'text-blue-700' },
+  { id: 'twitter', label: 'X', icon: Twitter, iconClass: 'text-sky-500' },
+  { id: 'linkedin', label: 'LinkedIn', icon: Linkedin, iconClass: 'text-blue-600' },
+]
+
+export function GuestShareBannerPanel({
+  eventUuid,
+  eventName,
+  guestUuid,
+  variant = 'default',
+}: Props) {
+  const isTelebirr = variant === 'telebirr'
   const [previewFailed, setPreviewFailed] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [copying, setCopying] = useState(false)
@@ -39,53 +76,67 @@ export function GuestShareBannerPanel({ eventUuid, eventName, guestUuid }: Props
     return bannerImageUrl
   }, [bannerImageUrl])
 
-  const shareText = useMemo(() => {
-    const cleanName = eventName?.trim() || 'this event'
-    return `I'm attending "${cleanName}". Join me and secure your spot using this registration link:`
-  }, [eventName])
-
-  const preregLink = useMemo(() => {
-    return `${window.location.origin}/event/register/${eventUuid}?type=prereg`
+  const registrationLink = useMemo(() => {
+    if (!eventUuid) return null
+    return buildPreregistrationUrl(eventUuid)
   }, [eventUuid])
 
+  const shareText = useMemo(() => {
+    if (isTelebirr) {
+      return TELEBIRR_SHARE_MESSAGE_BODY
+    }
+    const cleanName = eventName?.trim() || 'this event'
+    return `I'm attending "${cleanName}". Join me and secure your spot using this registration link:`
+  }, [isTelebirr, eventName])
+
   const fullCaption = useMemo(() => {
+    if (isTelebirr) {
+      if (!eventUuid) return ''
+      return buildTelebirrShareCaption(eventUuid)
+    }
     if (!shareLink) return ''
     return `${shareText} ${shareLink}`
-  }, [shareText, shareLink])
+  }, [isTelebirr, eventUuid, shareLink, shareText])
+
+  const copyText = useMemo(() => {
+    if (isTelebirr) {
+      return fullCaption
+    }
+    if (!registrationLink) return shareText
+    return `${shareText} ${registrationLink}`
+  }, [isTelebirr, fullCaption, shareText, registrationLink])
 
   const handleCopy = useCallback(async () => {
     setCopying(true)
     try {
-      const textToCopy = `${shareText} ${preregLink}`
-
       if (bannerImageUrl && window.ClipboardItem) {
         try {
           const res = await fetch(bannerImageUrl, { cache: 'no-store' })
           const blob = await res.blob()
-          const textBlob = new Blob([textToCopy], { type: 'text/plain' })
-          
+          const textBlob = new Blob([copyText], { type: 'text/plain' })
+
           const item = new ClipboardItem({
             [blob.type]: blob,
-            'text/plain': textBlob
+            'text/plain': textBlob,
           })
-          
+
           await navigator.clipboard.write([item])
           toast.success('Image & caption copied!')
           setCopying(false)
           return
         } catch (e) {
-          console.warn("Rich copy failed, falling back to text", e)
+          console.warn('Rich copy failed, falling back to text', e)
         }
       }
 
-      await navigator.clipboard.writeText(textToCopy)
+      await navigator.clipboard.writeText(copyText)
       toast.success('Caption & link copied!')
     } catch {
       toast.error('Could not copy')
     } finally {
       setCopying(false)
     }
-  }, [bannerImageUrl, shareText, preregLink])
+  }, [bannerImageUrl, copyText])
 
   const handleDownload = useCallback(async () => {
     if (!bannerImageUrl) return
@@ -106,24 +157,28 @@ export function GuestShareBannerPanel({ eventUuid, eventName, guestUuid }: Props
     }
   }, [bannerImageUrl, guestUuid])
 
-  const handleShareClick = async (platform: string) => {
-    if (!shareLink) return
+  const handleShareClick = async (platform: SharePlatform) => {
+    const shareUrl = isTelebirr ? registrationLink : shareLink
+    if (!shareUrl) return
+
     let url = ''
     switch (platform) {
       case 'twitter':
-        url = `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareLink)}&text=${encodeURIComponent(shareText)}`
+        url = `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(isTelebirr ? TELEBIRR_SHARE_MESSAGE_BODY : shareText)}`
         break
       case 'linkedin':
-        url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareLink)}`
+        url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`
         break
       case 'whatsapp':
-        url = `https://api.whatsapp.com/send?text=${encodeURIComponent(fullCaption)}`
+        url = `https://api.whatsapp.com/send?text=${encodeURIComponent(isTelebirr ? fullCaption : `${shareText} ${registrationLink}`)}`
         break
       case 'telegram':
-        url = `https://t.me/share/url?url=${encodeURIComponent(shareLink)}&text=${encodeURIComponent(shareText)}`
+        url = isTelebirr
+          ? `https://t.me/share/url?url=${encodeURIComponent(registrationLink)}&text=${encodeURIComponent(TELEBIRR_SHARE_MESSAGE_BODY)}`
+          : `https://t.me/share/url?url=${encodeURIComponent(shareLink!)}&text=${encodeURIComponent(shareText)}`
         break
       case 'facebook':
-        url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareLink)}`
+        url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`
         break
       case 'native':
         if ('share' in navigator) {
@@ -131,31 +186,33 @@ export function GuestShareBannerPanel({ eventUuid, eventName, guestUuid }: Props
             if (bannerImageUrl) {
               const res = await fetch(bannerImageUrl, { cache: 'no-store' })
               const blob = await res.blob()
-              const file = new File([blob], `event-banner.png`, { type: blob.type })
-              
+              const file = new File([blob], 'event-banner.png', { type: blob.type })
+
               const shareDataWithFile = {
                 title: eventName,
-                text: shareText,
-                url: shareLink,
-                files: [file]
+                text: isTelebirr ? fullCaption : shareText,
+                url: shareUrl,
+                files: [file],
               }
-              
+
               if (navigator.canShare && navigator.canShare(shareDataWithFile)) {
                 await navigator.share(shareDataWithFile)
                 return
               }
             }
           } catch (e) {
-            console.error("Failed to share file directly", e)
+            console.error('Failed to share file directly', e)
           }
 
-          navigator.share({
-            title: eventName,
-            text: shareText,
-            url: shareLink,
-          }).catch((err) => {
-            if (err?.name !== 'AbortError') handleCopy()
-          })
+          navigator
+            .share({
+              title: eventName,
+              text: isTelebirr ? fullCaption : shareText,
+              url: shareUrl,
+            })
+            .catch((err) => {
+              if (err?.name !== 'AbortError') handleCopy()
+            })
           return
         }
         handleCopy()
@@ -198,7 +255,7 @@ export function GuestShareBannerPanel({ eventUuid, eventName, guestUuid }: Props
           ) : (
             <div className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 p-4 text-left">
               <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                Banner preview couldn’t load
+                Banner preview couldn&apos;t load
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Try downloading the image.
@@ -223,39 +280,55 @@ export function GuestShareBannerPanel({ eventUuid, eventName, guestUuid }: Props
         </Button>
       </div>
 
-      <div className="mt-2 flex flex-col sm:flex-row gap-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button type="button" variant="outline" className="sm:flex-1">
-              <Share2 className="w-4 h-4 mr-2" />
-              Share to socials
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            {'share' in navigator && (
-              <DropdownMenuItem onClick={() => handleShareClick('native')}>
-                Native Share
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={() => handleShareClick('telegram')}>
-              Telegram
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleShareClick('whatsapp')}>
-              WhatsApp
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleShareClick('linkedin')}>
-              LinkedIn
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleShareClick('twitter')}>
-              X / Twitter
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleShareClick('facebook')}>
-              Facebook
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      {isTelebirr ? (
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wide">
+            Share to
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+            {TELEBIRR_PLATFORMS.map(({ id, label, icon: Icon, iconClass }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => handleShareClick(id)}
+                aria-label={`Share on ${label}`}
+                className="flex flex-col items-center gap-1.5 group"
+              >
+                <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm transition-all group-hover:border-green-400 group-hover:shadow-md group-active:scale-95">
+                  <Icon className={`w-5 h-5 ${iconClass}`} />
+                </span>
+                <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2 flex flex-col sm:flex-row gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" className="sm:flex-1">
+                <Share2 className="w-4 h-4 mr-2" />
+                Share to socials
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {'share' in navigator && (
+                <DropdownMenuItem onClick={() => handleShareClick('native')}>
+                  Native Share
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => handleShareClick('telegram')}>Telegram</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleShareClick('whatsapp')}>WhatsApp</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleShareClick('linkedin')}>LinkedIn</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleShareClick('twitter')}>X / Twitter</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleShareClick('facebook')}>Facebook</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
 
-        <Button type="button" variant="outline" onClick={handleCopy} disabled={copying} className="sm:flex-1">
+      <div className={`${isTelebirr ? 'mt-4' : 'mt-2'} flex flex-col sm:flex-row gap-2`}>
+        <Button type="button" variant="outline" onClick={handleCopy} disabled={copying} className="flex-1">
           {copying ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           ) : (
@@ -265,15 +338,16 @@ export function GuestShareBannerPanel({ eventUuid, eventName, guestUuid }: Props
         </Button>
       </div>
 
-      {shareLink ? (
+      {registrationLink ? (
         <div className="mt-3">
-          <p className="text-[11px] font-medium text-slate-400 mb-1">Direct pre-registration link:</p>
+          <p className="text-[11px] font-medium text-slate-400 mb-1">
+            Direct pre-registration link:
+          </p>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 break-all bg-slate-100 dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700">
-            {preregLink}
+            {registrationLink}
           </p>
         </div>
       ) : null}
     </Card>
   )
 }
-

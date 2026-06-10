@@ -296,6 +296,7 @@ const TelebirrRegistrationSuccessPage: React.FC = () => {
                 className="mb-12 overflow-hidden"
               >
                 <GuestShareBannerPanel
+                  variant="telebirr"
                   eventUuid={resolvedEventUuid}
                   eventName={eventName}
                   guestUuid={guestUuid}
