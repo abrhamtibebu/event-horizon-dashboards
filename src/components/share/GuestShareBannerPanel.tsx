@@ -2,17 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { toast } from 'sonner'
-import {
-  Copy,
-  Download,
-  Share2,
-  Loader2,
-  MessageCircle,
-  Send,
-  Facebook,
-  Twitter,
-  Linkedin,
-} from 'lucide-react'
+import { Copy, Download, Share2, Loader2 } from 'lucide-react'
 import { getApiBaseURLForStorage } from '@/config/env'
 import {
   DropdownMenu,
@@ -35,18 +25,22 @@ type Props = {
   variant?: 'default' | 'telebirr'
 }
 
-const TELEBIRR_PLATFORMS: Array<{
-  id: SharePlatform
-  label: string
-  icon: typeof MessageCircle
-  iconClass: string
-}> = [
-  { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, iconClass: 'text-green-600' },
-  { id: 'telegram', label: 'Telegram', icon: Send, iconClass: 'text-sky-500' },
-  { id: 'facebook', label: 'Facebook', icon: Facebook, iconClass: 'text-blue-700' },
-  { id: 'twitter', label: 'X', icon: Twitter, iconClass: 'text-sky-500' },
-  { id: 'linkedin', label: 'LinkedIn', icon: Linkedin, iconClass: 'text-blue-600' },
-]
+function escapeHtmlForClipboard(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
 
 export function GuestShareBannerPanel({
   eventUuid,
@@ -58,6 +52,7 @@ export function GuestShareBannerPanel({
   const [previewFailed, setPreviewFailed] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [copying, setCopying] = useState(false)
+  const [sharing, setSharing] = useState(false)
 
   const backendOrigin = useMemo(() => getApiBaseURLForStorage(), [])
 
@@ -109,27 +104,37 @@ export function GuestShareBannerPanel({
   const handleCopy = useCallback(async () => {
     setCopying(true)
     try {
-      if (bannerImageUrl && window.ClipboardItem) {
+      const textPlain = copyText.trim()
+      if (!textPlain) {
+        toast.error('Nothing to copy')
+        return
+      }
+
+      if (bannerImageUrl && window.ClipboardItem && navigator.clipboard?.write) {
         try {
           const res = await fetch(bannerImageUrl, { cache: 'no-store' })
+          if (!res.ok) throw new Error('fetch_failed')
           const blob = await res.blob()
-          const textBlob = new Blob([copyText], { type: 'text/plain' })
+          const pngBlob = blob.type === 'image/png' ? blob : new Blob([blob], { type: 'image/png' })
+          const htmlCaption = escapeHtmlForClipboard(textPlain).replace(/\n/g, '<br>')
+          const imageDataUrl = await blobToDataUrl(pngBlob)
+          const html = `<meta charset="utf-8"><div>${htmlCaption}</div><img src="${imageDataUrl}" alt="Share banner" />`
 
           const item = new ClipboardItem({
-            [blob.type]: blob,
-            'text/plain': textBlob,
+            'text/plain': new Blob([textPlain], { type: 'text/plain' }),
+            'text/html': new Blob([html], { type: 'text/html' }),
+            'image/png': pngBlob,
           })
 
           await navigator.clipboard.write([item])
           toast.success('Image & caption copied!')
-          setCopying(false)
           return
         } catch (e) {
           console.warn('Rich copy failed, falling back to text', e)
         }
       }
 
-      await navigator.clipboard.writeText(copyText)
+      await navigator.clipboard.writeText(textPlain)
       toast.success('Caption & link copied!')
     } catch {
       toast.error('Could not copy')
@@ -157,66 +162,89 @@ export function GuestShareBannerPanel({
     }
   }, [bannerImageUrl, guestUuid])
 
+  const handleNativeShare = useCallback(async () => {
+    if (!('share' in navigator)) {
+      await handleCopy()
+      return
+    }
+
+    setSharing(true)
+    try {
+      const text = isTelebirr ? fullCaption : shareText
+      const url = shareLink ?? undefined
+      const bannerFileName = isTelebirr ? 'telebirr-share-banner.png' : 'event-banner.png'
+
+      let file: File | null = null
+      if (bannerImageUrl) {
+        try {
+          const res = await fetch(bannerImageUrl, { cache: 'no-store' })
+          if (res.ok) {
+            const blob = await res.blob()
+            file = new File([blob], bannerFileName, { type: blob.type || 'image/png' })
+          }
+        } catch (e) {
+          console.error('Failed to fetch banner for share', e)
+        }
+      }
+
+      const attempts: ShareData[] = []
+      if (file) {
+        if (url) {
+          attempts.push({ files: [file], text, title: eventName, url })
+        }
+        attempts.push({ files: [file], text, title: eventName })
+      }
+      if (url) {
+        attempts.push({ text, url })
+      }
+      attempts.push({ text })
+
+      for (const data of attempts) {
+        if (navigator.canShare && !navigator.canShare(data)) {
+          continue
+        }
+        try {
+          await navigator.share(data)
+          return
+        } catch (err) {
+          if ((err as Error)?.name === 'AbortError') {
+            return
+          }
+        }
+      }
+
+      await handleCopy()
+    } finally {
+      setSharing(false)
+    }
+  }, [bannerImageUrl, eventName, fullCaption, handleCopy, isTelebirr, shareLink, shareText])
+
   const handleShareClick = async (platform: SharePlatform) => {
-    const shareUrl = isTelebirr ? registrationLink : shareLink
+    if (platform === 'native') {
+      await handleNativeShare()
+      return
+    }
+
+    const shareUrl = shareLink
     if (!shareUrl) return
 
     let url = ''
     switch (platform) {
       case 'twitter':
-        url = `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(isTelebirr ? TELEBIRR_SHARE_MESSAGE_BODY : shareText)}`
+        url = `https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`
         break
       case 'linkedin':
         url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`
         break
       case 'whatsapp':
-        url = `https://api.whatsapp.com/send?text=${encodeURIComponent(isTelebirr ? fullCaption : `${shareText} ${registrationLink}`)}`
+        url = `https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareText} ${registrationLink}`)}`
         break
       case 'telegram':
-        url = isTelebirr
-          ? `https://t.me/share/url?url=${encodeURIComponent(registrationLink)}&text=${encodeURIComponent(TELEBIRR_SHARE_MESSAGE_BODY)}`
-          : `https://t.me/share/url?url=${encodeURIComponent(shareLink!)}&text=${encodeURIComponent(shareText)}`
+        url = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`
         break
       case 'facebook':
         url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`
         break
-      case 'native':
-        if ('share' in navigator) {
-          try {
-            if (bannerImageUrl) {
-              const res = await fetch(bannerImageUrl, { cache: 'no-store' })
-              const blob = await res.blob()
-              const file = new File([blob], 'event-banner.png', { type: blob.type })
-
-              const shareDataWithFile = {
-                title: eventName,
-                text: isTelebirr ? fullCaption : shareText,
-                url: shareUrl,
-                files: [file],
-              }
-
-              if (navigator.canShare && navigator.canShare(shareDataWithFile)) {
-                await navigator.share(shareDataWithFile)
-                return
-              }
-            }
-          } catch (e) {
-            console.error('Failed to share file directly', e)
-          }
-
-          navigator
-            .share({
-              title: eventName,
-              text: isTelebirr ? fullCaption : shareText,
-              url: shareUrl,
-            })
-            .catch((err) => {
-              if (err?.name !== 'AbortError') handleCopy()
-            })
-          return
-        }
-        handleCopy()
-        return
     }
     if (url) window.open(url, '_blank', 'noopener,noreferrer')
   }
@@ -282,25 +310,20 @@ export function GuestShareBannerPanel({
 
       {isTelebirr ? (
         <div className="mt-4">
-          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wide">
-            Share to
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-            {TELEBIRR_PLATFORMS.map(({ id, label, icon: Icon, iconClass }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => handleShareClick(id)}
-                aria-label={`Share on ${label}`}
-                className="flex flex-col items-center gap-1.5 group"
-              >
-                <span className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-sm transition-all group-hover:border-green-400 group-hover:shadow-md group-active:scale-95">
-                  <Icon className={`w-5 h-5 ${iconClass}`} />
-                </span>
-                <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{label}</span>
-              </button>
-            ))}
-          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleNativeShare}
+            disabled={sharing || copying}
+            className="w-full"
+          >
+            {sharing ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Share2 className="w-4 h-4 mr-2" />
+            )}
+            {sharing ? 'Preparing share...' : 'Share'}
+          </Button>
         </div>
       ) : (
         <div className="mt-2 flex flex-col sm:flex-row gap-2">
