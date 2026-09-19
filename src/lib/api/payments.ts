@@ -151,7 +151,7 @@ export const getPaymentMethods = () => {
       description: 'Mobile money transfer service',
       icon: '/M-PESA_LOGO-01.svg.png',
       processing_fee: 0,
-      is_available: true,
+      is_available: false,
     },
   ];
 };

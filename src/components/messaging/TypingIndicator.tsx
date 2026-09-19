@@ -1,6 +1,5 @@
 import React from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
-import { Badge } from '../ui/badge'
 import type { User } from '../../types/message'
 
 interface TypingIndicatorProps {
@@ -11,66 +10,41 @@ interface TypingIndicatorProps {
 
 export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   users,
-  conversationId,
   isGroup = false,
 }) => {
   if (users.length === 0) return null
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
+  const getInitials = (name: string) =>
+    name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)
 
   const getTypingText = () => {
-    if (users.length === 1) {
-      return `${users[0].name} is typing...`
-    } else if (users.length === 2) {
-      return `${users[0].name} and ${users[1].name} are typing...`
-    } else {
-      return `${users[0].name} and ${users.length - 1} others are typing...`
-    }
+    if (users.length === 1) return `${users[0].name} is typing...`
+    if (users.length === 2) return `${users[0].name} and ${users[1].name} are typing...`
+    return `${users[0].name} and ${users.length - 1} others are typing...`
   }
 
   return (
-    <div className="flex items-center gap-2 animate-in fade-in duration-300">
-      {/* Avatars for group chats */}
+    <div className="flex items-center gap-2">
       {isGroup && (
-        <div className="flex -space-x-2">
+        <div className="flex -space-x-1.5">
           {users.slice(0, 3).map((user) => (
-            <Avatar key={user.id} className="w-5 h-5 border-2 border-white dark:border-gray-900 shadow-sm">
+            <Avatar key={user.id} className="w-5 h-5 border-2 border-background">
               <AvatarImage src={user.profile_image} />
-              <AvatarFallback className="bg-primary text-white text-[8px] font-black">
+              <AvatarFallback className="bg-muted text-[8px]">
                 {getInitials(user.name)}
               </AvatarFallback>
             </Avatar>
           ))}
-          {users.length > 3 && (
-            <div className="w-5 h-5 rounded-full bg-gray-50 dark:bg-gray-800 border-2 border-white dark:border-gray-900 flex items-center justify-center">
-              <span className="text-[8px] text-gray-400 font-black">+{users.length - 3}</span>
-            </div>
-          )}
         </div>
       )}
-
-      {/* Typing animation */}
       <div className="flex items-center gap-2">
         <div className="flex gap-1">
-          <div className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-duration:0.6s]" style={{ animationDelay: '0ms' }}></div>
-          <div className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-duration:0.6s]" style={{ animationDelay: '200ms' }}></div>
-          <div className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-duration:0.6s]" style={{ animationDelay: '400ms' }}></div>
+          <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce [animation-duration:0.7s]" />
+          <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce [animation-duration:0.7s] [animation-delay:120ms]" />
+          <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce [animation-duration:0.7s] [animation-delay:240ms]" />
         </div>
-        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">
-          {getTypingText()}
-        </span>
+        <span className="text-xs text-muted-foreground">{getTypingText()}</span>
       </div>
     </div>
   )
 }
-
-
-
-

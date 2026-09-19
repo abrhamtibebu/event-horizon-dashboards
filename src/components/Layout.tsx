@@ -4,7 +4,10 @@ import { SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/AppSidebar'
 import { Header } from '@/components/Header'
 import { SuspendedOrganizerGuard } from '@/components/SuspendedOrganizerGuard'
+import { VenueSetupGuard } from '@/components/VenueSetupGuard'
 import { UsherBottomNav } from '@/components/UsherBottomNav'
+import { MessagesTrayProvider } from '@/components/messaging/MessagesTrayContext'
+import { MessagesFloatingTray } from '@/components/messaging/MessagesFloatingTray'
 import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 
@@ -16,20 +19,25 @@ export function Layout() {
 
   return (
     <SidebarProvider defaultOpen={false}>
-      <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar />
-          <div className={cn("flex-1 flex flex-col", isUsher && "md:pl-0")}>
-            <div className={cn(isUsher && "hidden md:block")}>
+      <MessagesTrayProvider>
+        <div className="min-h-screen flex w-full bg-background">
+          <AppSidebar />
+          <div className={cn('flex-1 flex flex-col', isUsher && 'md:pl-0')}>
+            <div className={cn(isUsher && 'hidden md:block')}>
               <Header onSearch={setSearchQuery} />
             </div>
-              <main className={cn('flex-1', !isUsher && 'p-6', isUsher && 'p-0 md:p-6 pb-24 md:pb-6')}>
+            <main className={cn('flex-1', !isUsher && 'p-6', isUsher && 'p-0 md:p-6 pb-24 md:pb-6')}>
               <SuspendedOrganizerGuard>
-                <Outlet context={{ searchQuery }} />
+                <VenueSetupGuard>
+                  <Outlet context={{ searchQuery }} />
+                </VenueSetupGuard>
               </SuspendedOrganizerGuard>
             </main>
+          </div>
+          {isUsher && <UsherBottomNav />}
+          <MessagesFloatingTray />
         </div>
-        {isUsher && <UsherBottomNav />}
-      </div>
+      </MessagesTrayProvider>
     </SidebarProvider>
   )
 }

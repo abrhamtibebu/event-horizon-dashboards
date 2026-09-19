@@ -143,13 +143,14 @@ import { EventAccessCodesDialog } from '@/components/EventAccessCodesDialog'
 import React from 'react'
 import QRCode from 'react-qr-code'
 import { QRCodeSVG } from 'qrcode.react'
-import GoogleVenueAutocompleteInput from '@/components/GoogleVenueAutocompleteInput'
+import ListedVenuePicker, { type ListedVenueSelection } from '@/components/ListedVenuePicker'
 import BadgePrint from '@/components/Badge'
 import BadgeTest from '@/components/BadgeTest'
 import { getOfficialBadgeTemplate, getBadgeTemplates } from '@/lib/badgeTemplates'
 import { BadgeTemplate } from '@/types/badge'
 import PrintBadgeTemplateDialog, { type PrintBadgeTemplateChoice } from '@/components/PrintBadgeTemplateDialog'
 import { TicketManagementTab } from '@/components/tickets/TicketManagementTab'
+import { EventSeatingTab } from '@/features/events/tabs/EventSeatingTab'
 import { DateRange } from 'react-date-range'
 import { useModernAlerts } from '@/hooks/useModernAlerts'
 import 'react-date-range/dist/styles.css'
@@ -165,6 +166,35 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { getDefaultEventTab, getEventTabs } from '@/features/events/config/eventTabs'
+import { TicketHoldersTab } from '@/features/events/tabs/TicketHoldersTab'
+import {
+  areAllTicketHolderIdsSelected,
+  getPurchasedDate,
+  getTicketHolderAttendeeIds,
+  getTicketNumbersLabel,
+  getTicketPaidLabel,
+  getTicketQuantity,
+  getTicketTypeLabel,
+} from '@/features/events/lib/ticketHolderGroups'
+
+const LazyEventSalesTab = React.lazy(() =>
+  import('@/features/events/tabs/EventSalesTab').then((module) => ({
+    default: module.EventSalesTab,
+  })),
+)
+
+const LazyEventReferralsTab = React.lazy(() =>
+  import('@/features/events/tabs/EventReferralsTab').then((module) => ({
+    default: module.EventReferralsTab,
+  })),
+)
+
+const LazyEventCheckInTab = React.lazy(() =>
+  import('@/features/events/tabs/EventCheckInTab').then((module) => ({
+    default: module.EventCheckInTab,
+  })),
+)
 
 // Add predefined guest types at the top, after imports
 const PREDEFINED_GUEST_TYPES = [
@@ -254,6 +284,16 @@ export default function EventDetails() {
     latitude: null as number | null,
     longitude: null as number | null,
     city: '' as string,
+  })
+  const [editListedVenue, setEditListedVenue] = useState<ListedVenueSelection>({
+    mode: 'custom',
+    venueId: null,
+    spaceId: null,
+    venueName: '',
+    city: '',
+    formattedAddress: '',
+    latitude: null,
+    longitude: null,
   })
   const editSnapshotRef = useRef<Record<string, unknown> | null>(null)
 
@@ -575,7 +615,8 @@ export default function EventDetails() {
   }, [eventId])
 
   useEffect(() => {
-    if (!eventId || activeTab !== 'analytics') return
+    const analyticsTabValue = eventData?.event_type === 'ticketed' ? 'sales' : 'analytics'
+    if (!eventId || activeTab !== analyticsTabValue) return
     setAnalyticsLoading(true)
     setAnalyticsError(null)
     api
@@ -587,11 +628,12 @@ export default function EventDetails() {
       })
       .catch((err) => setAnalyticsError('Failed to fetch analytics.'))
       .finally(() => setAnalyticsLoading(false))
-  }, [eventId, activeTab])
+  }, [eventId, activeTab, eventData?.event_type])
 
   // Fetch session check-in analytics
   useEffect(() => {
-    if (!eventId || activeTab !== 'analytics') return
+    const analyticsTabValue = eventData?.event_type === 'ticketed' ? 'sales' : 'analytics'
+    if (!eventId || activeTab !== analyticsTabValue) return
     setSessionCheckInLoading(true)
 
     // First fetch all sessions for the event
@@ -654,7 +696,7 @@ export default function EventDetails() {
         setSessionCheckInData([])
       })
       .finally(() => setSessionCheckInLoading(false))
-  }, [eventId, activeTab])
+  }, [eventId, activeTab, eventData?.event_type])
 
   // Fetch share analytics
   useEffect(() => {
@@ -900,11 +942,34 @@ export default function EventDetails() {
     })
   }
 
+  const handleSelectTicketHolderRow = (attendee: any) => {
+    const ids = getTicketHolderAttendeeIds(attendee)
+    setSelectedAttendees((prev) => {
+      const newSelected = new Set(prev)
+      const allSelected = areAllTicketHolderIdsSelected(ids, newSelected)
+
+      if (allSelected) {
+        ids.forEach((id) => newSelected.delete(id))
+      } else {
+        ids.forEach((id) => newSelected.add(id))
+      }
+
+      return newSelected
+    })
+  }
+
+  const getVisibleTicketHolderIds = () =>
+    filteredAttendees.flatMap((attendee) => getTicketHolderAttendeeIds(attendee))
+
   const handleSelectAllAttendees = () => {
-    if (selectedAttendees.size === filteredAttendees.length) {
+    const visibleIds = getVisibleTicketHolderIds()
+    const allSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedAttendees.has(id))
+
+    if (allSelected) {
       setSelectedAttendees(new Set())
     } else {
-      setSelectedAttendees(new Set(filteredAttendees.map((a) => a.id)))
+      setSelectedAttendees(new Set(visibleIds))
     }
   }
 
@@ -1294,6 +1359,16 @@ export default function EventDetails() {
       city: eventData.city || '',
     }
     setEditLocationMeta(locationMeta)
+    setEditListedVenue({
+      mode: eventData.venue_id ? 'listed' : 'custom',
+      venueId: eventData.venue_id || null,
+      spaceId: eventData.space_id || null,
+      venueName: locationMeta.venue_name,
+      city: locationMeta.city,
+      formattedAddress: locationMeta.formatted_address,
+      latitude: locationMeta.latitude,
+      longitude: locationMeta.longitude,
+    })
     editSnapshotRef.current = buildEditableEventPayload(
       { ...eventDataForEdit, guest_types: guestTypes },
       [{ startDate, endDate, key: 'selection' }],
@@ -1341,6 +1416,8 @@ export default function EventDetails() {
       formatted_address: locationMeta.formatted_address || null,
       latitude: locationMeta.latitude,
       longitude: locationMeta.longitude,
+      venue_id: form.venue_id ?? editListedVenue.venueId ?? null,
+      space_id: form.space_id ?? editListedVenue.spaceId ?? null,
     }
     if (featuredRank !== undefined) {
       payload.featured_rank = featuredRank
@@ -2324,6 +2401,30 @@ export default function EventDetails() {
     }
   }
 
+  const isTicketedEvent = eventData?.event_type === 'ticketed'
+  const eventTabs = getEventTabs({
+    eventType: eventData?.event_type,
+    role: user?.role,
+    canManageEvent,
+  })
+  const overviewTabValue = isTicketedEvent ? 'overview' : 'details'
+  const ticketHoldersTabValue = isTicketedEvent ? 'ticket-holders' : 'attendees'
+  const salesTabValue = isTicketedEvent ? 'sales' : 'analytics'
+  const allowedTabValues = new Set(eventTabs.map((tab) => tab.value))
+
+  useEffect(() => {
+    if (!eventData) return
+    if (!allowedTabValues.has(activeTab)) {
+      setActiveTab(
+        getDefaultEventTab({
+          eventType: eventData.event_type,
+          role: user?.role,
+          canManageEvent,
+        }),
+      )
+    }
+  }, [activeTab, allowedTabValues, canManageEvent, eventData, user?.role])
+
   return (
     <>
       <div
@@ -2504,47 +2605,17 @@ export default function EventDetails() {
                   {/* Responsive Tabs List with horizontal scroll on mobile */}
                   <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
                     <TabsList className="bg-transparent border-b border-border w-full justify-start p-0 h-auto gap-4 sm:gap-6 md:gap-8 rounded-none min-w-max sm:min-w-0">
-                      {user?.role === 'usher' ? (
-                        <>
+                      <div className="flex gap-x-4 sm:gap-x-6 md:gap-x-8">
+                        {eventTabs.map((tab) => (
                           <TabsTrigger
-                            value="attendees"
+                            key={tab.value}
+                            value={tab.value}
                             className="px-2 sm:px-0 py-2 sm:py-3 text-xs sm:text-sm font-semibold transition-all border-b-2 border-transparent rounded-none bg-transparent shadow-none data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground hover:text-foreground whitespace-nowrap"
                           >
-                            Attendees
+                            {tab.label}
                           </TabsTrigger>
-                        </>
-                      ) : (
-                        <div className="flex gap-x-4 sm:gap-x-6 md:gap-x-8">
-                          {[
-                            'Details',
-                            ...(eventData?.event_type === 'ticketed' ? ['Tickets'] : []),
-                            'Attendees',
-                            'Ushers',
-                            ...(eventData?.event_type !== 'ticketed' ? ['Bulk Badges'] : []),
-                            'Team',
-                            'Forms',
-                            'Survey',
-                            'Sessions',
-                            'Invitations',
-                            'Analytics'
-                          ].map((tab) => {
-                            const val = tab.toLowerCase().replace(/ /g, '-');
-                            // Filter tabs based on role permissions
-                            if (val === 'bulk-badges' || val === 'tickets' || val === 'forms' || val === 'survey' || val === 'ushers' || val === 'analytics' || val === 'invitations' || val === 'team') {
-                              if (!canManageEvent) return null;
-                            }
-                            return (
-                              <TabsTrigger
-                                key={val}
-                                value={val}
-                                className="px-2 sm:px-0 py-2 sm:py-3 text-xs sm:text-sm font-semibold transition-all border-b-2 border-transparent rounded-none bg-transparent shadow-none data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground hover:text-foreground whitespace-nowrap"
-                              >
-                                {tab}
-                              </TabsTrigger>
-                            );
-                          })}
-                        </div>
-                      )}
+                        ))}
+                      </div>
                     </TabsList>
                   </div>
                 </div>
@@ -2581,15 +2652,16 @@ export default function EventDetails() {
                     <span className="hidden sm:inline">Export</span>
                   </Button>
 
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" className="bg-background border-border text-foreground font-semibold rounded-lg sm:rounded-xl h-9 sm:h-10 px-3 sm:px-5 hover:bg-muted transition-all text-xs sm:text-sm">
-                        <QrCode className="w-3.5 h-3.5 sm:mr-2 text-primary" />
-                        <span className="hidden sm:inline">Registration</span>
-                        <span className="sm:hidden">QR</span>
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-[95vw] sm:max-w-4xl bg-popover border-border text-popover-foreground rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl">
+                  {!isTicketedEvent && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="bg-background border-border text-foreground font-semibold rounded-lg sm:rounded-xl h-9 sm:h-10 px-3 sm:px-5 hover:bg-muted transition-all text-xs sm:text-sm">
+                          <QrCode className="w-3.5 h-3.5 sm:mr-2 text-primary" />
+                          <span className="hidden sm:inline">Registration</span>
+                          <span className="sm:hidden">QR</span>
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-[95vw] sm:max-w-4xl bg-popover border-border text-popover-foreground rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-xl font-bold">
                           <QrCode className="w-5 h-5 text-primary" />
@@ -2774,6 +2846,7 @@ export default function EventDetails() {
                       )}
                     </DialogContent>
                   </Dialog>
+                  )}
 
                   {canManageEvent && eventData?.id && (
                     <EventAccessCodesDialog eventId={Number(eventData.id)} />
@@ -2823,7 +2896,7 @@ export default function EventDetails() {
                   )}
                 </div>
 
-                <TabsContent value="details" className="mt-0 outline-none">
+                <TabsContent value={overviewTabValue} className="mt-0 outline-none">
                   <div className="space-y-4 sm:space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-700">
                     {/* Visibility warning — shown only when event is active but not publicly visible on evella.et */}
                     {eventData?.status === 'active' && eventData?.visibility === 'private' && (
@@ -2999,6 +3072,85 @@ export default function EventDetails() {
                           </div>
                         )}
 
+                        {isTicketedEvent && (
+                          <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
+                            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                <QrCode className="w-4 h-4 sm:w-5 sm:h-5" />
+                              </div>
+                              <div>
+                                <h3 className="text-lg sm:text-xl font-bold text-foreground">Purchase Links</h3>
+                                <p className="text-xs sm:text-sm text-muted-foreground">
+                                  Share direct ticket purchase links for pre-registration and onsite sales.
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                              {[
+                                {
+                                  id: 'prereg',
+                                  title: 'Pre-registration',
+                                  badge: 'Recommended',
+                                  badgeClassName: 'bg-primary/10 text-primary border-primary/20',
+                                  textClassName: 'text-primary',
+                                  description: 'For guests registering before the event.',
+                                  url: `${window.location.origin}/tickets/purchase/${eventData.id}?type=prereg`,
+                                },
+                                {
+                                  id: 'onsite',
+                                  title: 'Onsite purchase',
+                                  badge: 'Walk-in',
+                                  badgeClassName: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+                                  textClassName: 'text-orange-500',
+                                  description: 'For ticket buyers registering at the venue.',
+                                  url: `${window.location.origin}/tickets/purchase/${eventData.id}?type=onsite`,
+                                },
+                              ].map((item) => (
+                                <div key={item.id} className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <h4 className={`text-sm font-bold uppercase tracking-wider ${item.textClassName}`}>
+                                      {item.title}
+                                    </h4>
+                                    <Badge variant="outline" className={`text-[10px] ${item.badgeClassName}`}>
+                                      {item.badge}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">{item.description}</p>
+
+                                  <div className="flex flex-col items-center gap-3 rounded-lg bg-white p-3">
+                                    <QRCode id={`qr-${item.id}-overview`} value={item.url} size={140} />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className={`h-6 text-[10px] hover:bg-primary/5 ${item.textClassName}`}
+                                      onClick={() => downloadQRCode(item.url, `${item.id}-${eventData.name}`)}
+                                    >
+                                      <Download className="mr-1 h-3 w-3" />
+                                      Download QR
+                                    </Button>
+                                  </div>
+
+                                  <div className="flex gap-2">
+                                    <Input value={item.url} readOnly className="h-8 bg-background text-[10px]" />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 w-8 p-0"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(item.url)
+                                        toast.success(`${item.title} link copied!`)
+                                      }}
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Event Type Details */}
                         <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
                           <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
@@ -3011,43 +3163,25 @@ export default function EventDetails() {
                           </div>
 
                           {eventData?.event_type === 'ticketed' ? (
-                            <div className="space-y-4">
-                              {ticketTypes.length > 0 ? (
-                                ticketTypes.map((ticket: any, index: number) => {
-                                  const ticketName = ticket?.name || 'Unknown Ticket';
-                                  const ticketPrice = ticket?.price ? parseFloat(ticket.price).toLocaleString() : '0';
-                                  const ticketQuantity = ticket?.quantity || 'Unlimited';
-                                  const ticketDescription = ticket?.description || '';
-
-                                  return (
-                                    <div key={index} className="bg-gradient-to-r from-primary/10 to-warning/10 border border-primary/30 rounded-lg sm:rounded-xl p-4 sm:p-6">
-                                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0 mb-3">
-                                        <div className="flex-1 min-w-0">
-                                          <h4 className="font-bold text-primary dark:text-primary text-base sm:text-lg break-words">{ticketName}</h4>
-                                          {ticketDescription && (
-                                            <p className="text-primary/80 dark:text-primary/70 text-xs sm:text-sm mt-1 break-words">{ticketDescription}</p>
-                                          )}
-                                        </div>
-                                        <div className="text-left sm:text-right shrink-0">
-                                          <div className="text-xl sm:text-2xl font-bold text-primary dark:text-primary">ETB {ticketPrice}</div>
-                                          <div className="text-xs sm:text-sm text-primary/80 dark:text-primary/70">
-                                            {ticketQuantity === 'Unlimited' ? 'Unlimited' : `${ticketQuantity} available`}
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center gap-2 text-xs text-primary/80 dark:text-primary/70">
-                                        <span>🎫</span>
-                                        <span>Ticket Type</span>
-                                      </div>
-                                    </div>
-                                  );
-                                })
-                              ) : (
-                                <div className="text-center py-8 text-muted-foreground">
-                                  <div className="text-4xl mb-2">🎫</div>
-                                  <p>No ticket types defined for this event</p>
+                            <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
+                              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                  <h4 className="text-base font-semibold text-foreground">
+                                    {ticketTypes.length} ticket type{ticketTypes.length === 1 ? '' : 's'} configured
+                                  </h4>
+                                  <p className="mt-1 text-sm text-muted-foreground">
+                                    Manage pricing, inventory, and ticket availability from the Tickets tab.
+                                  </p>
                                 </div>
-                              )}
+                                <Button
+                                  type="button"
+                                  onClick={() => setActiveTab('tickets')}
+                                  disabled={!canManageEvent}
+                                  className="shrink-0"
+                                >
+                                  Manage ticket types
+                                </Button>
+                              </div>
                             </div>
                           ) : (
                             <div className="space-y-4">
@@ -3291,191 +3425,31 @@ export default function EventDetails() {
                     )}
                   </div>
                 </TabsContent>
-                <TabsContent value="attendees" className="w-full">
-                  <div className="flex flex-col gap-4 sm:gap-6 w-full max-w-full">
-                    {/* Page Header - Responsive */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-2 sm:mb-4">
-                      <div className="flex items-center gap-3 sm:gap-4">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-card rounded-lg flex items-center justify-center border border-border shrink-0">
-                          <Users className="w-5 h-5 sm:w-7 sm:h-7 text-foreground" />
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-                            Attendees List
-                            <Star className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground hidden sm:inline" />
-                          </h3>
-                          <p className="text-xs sm:text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                            <RefreshCw className="w-3 h-3" />
-                            Auto-updates in 2 min
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                        {selectedAttendees.size > 0 && (
-                          <Button
-                            variant="outline"
-                            onClick={() => startBatchPrintFlow(new Set(selectedAttendees))}
-                            disabled={selectedAttendees.size === 0}
-                            className="bg-background border-border hover:bg-accent text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
-                          >
-                            <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
-                            <span className="hidden sm:inline">Print Selected ({selectedAttendees.size})</span>
-                            <span className="sm:hidden">Print ({selectedAttendees.size})</span>
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          onClick={handleImportClick}
-                          className="bg-background border-border hover:bg-accent text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
-                        >
-                          <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
-                          <span className="hidden sm:inline">Import CSV</span>
-                          <span className="sm:hidden">Import</span>
-                        </Button>
-                        <Button
-                          className="bg-success hover:bg-success/90 text-white text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4"
-                          onClick={() => setAddAttendeeDialogOpen(true)}
-                        >
-                          <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
-                          <span className="hidden sm:inline">+ Add New Attendee</span>
-                          <span className="sm:hidden">Add</span>
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Attendees overview + filters */}
-                    <div className="bg-card rounded-lg border border-border p-3 sm:p-4 mb-4 sm:mb-6 space-y-4">
-                      {/* Quick stats */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 sm:px-4 sm:py-3">
-                          <div>
-                            <p className="text-[11px] sm:text-xs uppercase tracking-wide text-muted-foreground">
-                              Total attendees
-                            </p>
-                            <p className="text-lg sm:text-xl font-semibold text-foreground">
-                              {totalAttendeeCount}
-                            </p>
-                          </div>
-                          <div className="rounded-full bg-primary/10 text-primary p-2 sm:p-2.5">
-                            <Ticket className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 sm:px-4 sm:py-3">
-                          <div>
-                            <p className="text-[11px] sm:text-xs uppercase tracking-wide text-muted-foreground">
-                              Checked in
-                            </p>
-                            <p className="text-lg sm:text-xl font-semibold text-foreground">
-                              {checkedInCount}
-                            </p>
-                          </div>
-                          <div className="rounded-full bg-success/10 text-success p-2 sm:p-2.5">
-                            <UserCheck className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2 sm:px-4 sm:py-3">
-                          <div>
-                            <p className="text-[11px] sm:text-xs uppercase tracking-wide text-muted-foreground">
-                              Not checked in
-                            </p>
-                            <p className="text-lg sm:text-xl font-semibold text-foreground">
-                              {notCheckedInCount}
-                            </p>
-                          </div>
-                          <div className="rounded-full bg-muted text-muted-foreground p-2 sm:p-2.5">
-                            <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Filters, search & export */}
-                      <div className="flex flex-col gap-3 sm:gap-4">
-                        {/* Filters - Responsive */}
-                        <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
-                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                            <Select value={guestTypeFilter} onValueChange={handleGuestTypeFilterChange}>
-                              <SelectTrigger className="w-full sm:w-[160px] bg-background border-border text-sm h-9 sm:h-10">
-                                <SelectValue placeholder={eventData?.event_type === 'ticketed' ? "All ticket types" : "All guest types"} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">{eventData?.event_type === 'ticketed' ? "All ticket types" : "All guest types"}</SelectItem>
-                                {(eventData?.event_type === 'ticketed' ? ticketTypes : guestTypes).map((type) => (
-                                  <SelectItem key={type.id} value={type.name.toLowerCase()}>
-                                    {type.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {/* Status pills */}
-                          <div className="inline-flex rounded-full bg-muted/60 p-1 w-full sm:w-auto">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={checkedInFilter === 'all' ? 'default' : 'ghost'}
-                              className="flex-1 sm:flex-none rounded-full text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
-                              onClick={() => handleCheckedInFilterChange('all')}
-                            >
-                              All
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={checkedInFilter === 'checked-in' ? 'default' : 'ghost'}
-                              className="flex-1 sm:flex-none rounded-full text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
-                              onClick={() => handleCheckedInFilterChange('checked-in')}
-                            >
-                              Checked in
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={checkedInFilter === 'not-checked-in' ? 'default' : 'ghost'}
-                              className="flex-1 sm:flex-none rounded-full text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
-                              onClick={() => handleCheckedInFilterChange('not-checked-in')}
-                            >
-                              Not checked in
-                            </Button>
-                          </div>
-                        </div>
-
-                        {/* Search and Export - Responsive */}
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-                          <div className="relative flex-1 w-full sm:w-64">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                            <Input
-                              placeholder="Search by name, email, phone, company or job title..."
-                              value={searchTerm}
-                              onChange={(e) => handleSearchChange(e.target.value)}
-                              className="pl-9 bg-background border-border text-sm h-9 sm:h-10"
-                            />
-                          </div>
-                          <div className="flex gap-2 sm:gap-3">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={exportAttendeesToCSV}
-                              className="bg-background border-border hover:bg-accent text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4 flex-1 sm:flex-initial"
-                            >
-                              <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
-                              <span className="hidden sm:inline">Export PDF</span>
-                              <span className="sm:hidden">PDF</span>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={exportAttendeesToCSV}
-                              className="bg-background border-border hover:bg-accent text-xs sm:text-sm h-9 sm:h-10 px-3 sm:px-4 flex-1 sm:flex-initial"
-                            >
-                              <FileSpreadsheet className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
-                              <span className="hidden sm:inline">Export Excel</span>
-                              <span className="sm:hidden">Excel</span>
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                <TabsContent value={ticketHoldersTabValue} className="w-full">
+                  <TicketHoldersTab
+                    isTicketed={isTicketedEvent}
+                    totalCount={totalAttendeeCount}
+                    checkedInCount={checkedInCount}
+                    notCheckedInCount={notCheckedInCount}
+                    searchTerm={searchTerm}
+                    guestTypeFilter={guestTypeFilter}
+                    checkedInFilter={checkedInFilter}
+                    ticketTypes={ticketTypes}
+                    guestTypes={guestTypes}
+                    selectedCount={selectedAttendees.size}
+                    onSearchChange={handleSearchChange}
+                    onGuestTypeFilterChange={handleGuestTypeFilterChange}
+                    onCheckedInFilterChange={handleCheckedInFilterChange}
+                    onExport={exportAttendeesToCSV}
+                    onImport={handleImportClick}
+                    onAdd={() => setAddAttendeeDialogOpen(true)}
+                    onPrintSelected={() => startBatchPrintFlow(new Set(selectedAttendees))}
+                    searchPlaceholder={
+                      isTicketedEvent
+                        ? 'Search by name, email, phone, or ticket number...'
+                        : 'Search by name, email, phone, company or job title...'
+                    }
+                  >
 
                     {/* Attendees Table - Fully Responsive */}
                     <div className="bg-card rounded-lg border border-border overflow-hidden shadow-sm">
@@ -3485,17 +3459,36 @@ export default function EventDetails() {
                             <TableRow className="bg-muted/50 border-b border-border">
                               <TableHead className="w-10 sm:w-12 px-2">
                                 <Checkbox
-                                  checked={selectedAttendees.size === filteredAttendees.length && filteredAttendees.length > 0}
+                                  checked={
+                                    getVisibleTicketHolderIds().length > 0
+                                    && getVisibleTicketHolderIds().every((id) => selectedAttendees.has(id))
+                                  }
                                   onCheckedChange={handleSelectAllAttendees}
                                 />
                               </TableHead>
 
                               <TableHead className="px-3">Name</TableHead>
-                              <TableHead className="hidden md:table-cell px-3">Company / Job Title</TableHead>
+                              {isTicketedEvent ? (
+                                <>
+                                  <TableHead className="hidden md:table-cell px-3">Ticket type</TableHead>
+                                  <TableHead className="hidden md:table-cell px-3">Ticket #</TableHead>
+                                </>
+                              ) : (
+                                <TableHead className="hidden md:table-cell px-3">Company / Job Title</TableHead>
+                              )}
                               <TableHead className="w-[140px] px-2">Phone</TableHead>
-                              <TableHead className="hidden lg:table-cell w-[160px] px-2">Location</TableHead>
+                              {isTicketedEvent ? (
+                                <>
+                                  <TableHead className="hidden lg:table-cell w-[120px] px-2">Qty</TableHead>
+                                  <TableHead className="hidden lg:table-cell w-[120px] px-2">Paid</TableHead>
+                                </>
+                              ) : (
+                                <TableHead className="hidden lg:table-cell w-[160px] px-2">Location</TableHead>
+                              )}
                               <TableHead className="hidden xl:table-cell w-[200px] px-2">Email</TableHead>
-                              <TableHead className="w-[110px] px-2">Reg Type</TableHead>
+                              <TableHead className="w-[110px] px-2">
+                                {isTicketedEvent ? 'Purchased' : 'Reg Type'}
+                              </TableHead>
                               <TableHead className="w-[130px] px-2">Status</TableHead>
                               <TableHead className="w-[100px] px-2 text-right">Actions</TableHead>
                             </TableRow>
@@ -3503,15 +3496,23 @@ export default function EventDetails() {
 
                           <TableBody>
                             {filteredAttendees.length > 0 ? (
-                              filteredAttendees.map(attendee => (
+                              filteredAttendees.map(attendee => {
+                                const rowAttendeeIds = getTicketHolderAttendeeIds(attendee)
+                                const rowKey = attendee.group_key || attendee.id
+
+                                return (
                                 <TableRow
-                                  key={attendee.id}
+                                  key={rowKey}
                                   className="hover:bg-accent/50 transition-colors border-b border-border"
                                 >
                                   <TableCell className="px-2">
                                     <Checkbox
-                                      checked={selectedAttendees.has(attendee.id)}
-                                      onCheckedChange={() => handleSelectAttendee(attendee.id)}
+                                      checked={areAllTicketHolderIdsSelected(rowAttendeeIds, selectedAttendees)}
+                                      onCheckedChange={() =>
+                                        isTicketedEvent
+                                          ? handleSelectTicketHolderRow(attendee)
+                                          : handleSelectAttendee(attendee.id)
+                                      }
                                     />
                                   </TableCell>
 
@@ -3525,44 +3526,72 @@ export default function EventDetails() {
                                           {attendee.guest?.name}
                                         </div>
                                         <div className="text-[10px] text-muted-foreground truncate">
-                                          {(attendee.guestType || attendee.guest_type)?.name || 'General'}
+                                          {isTicketedEvent
+                                            ? getTicketTypeLabel(attendee)
+                                            : (attendee.guestType || attendee.guest_type)?.name || 'General'}
                                         </div>
                                       </div>
                                     </div>
                                   </TableCell>
 
-                                  <TableCell className="hidden md:table-cell max-w-[200px] px-3">
-                                    <div className="flex flex-col min-w-0">
-                                      <div className="font-bold truncate text-sm">
-                                        {attendee.guest?.company || '-'}
+                                  {isTicketedEvent ? (
+                                    <>
+                                      <TableCell className="hidden md:table-cell max-w-[160px] px-3 text-sm truncate">
+                                        {getTicketTypeLabel(attendee)}
+                                      </TableCell>
+                                      <TableCell className="hidden md:table-cell max-w-[140px] px-3 font-mono text-xs truncate" title={attendee.ticket_numbers?.join(', ')}>
+                                        {getTicketNumbersLabel(attendee)}
+                                      </TableCell>
+                                    </>
+                                  ) : (
+                                    <TableCell className="hidden md:table-cell max-w-[200px] px-3">
+                                      <div className="flex flex-col min-w-0">
+                                        <div className="font-bold truncate text-sm">
+                                          {attendee.guest?.company || '-'}
+                                        </div>
+                                        <div className="text-[11px] text-muted-foreground truncate">
+                                          {attendee.guest?.jobtitle || '-'}
+                                        </div>
                                       </div>
-                                      <div className="text-[11px] text-muted-foreground truncate">
-                                        {attendee.guest?.jobtitle || '-'}
-                                      </div>
-                                    </div>
-                                  </TableCell>
+                                    </TableCell>
+                                  )}
 
                                   <TableCell className="truncate px-2 text-sm w-[140px]">
                                     {attendee.guest?.phone || '-'}
                                   </TableCell>
 
-                                  <TableCell className="hidden lg:table-cell max-w-[160px] px-2">
-                                    <div className="flex flex-col min-w-0">
-                                      <div className="font-medium truncate text-sm">
-                                        {attendee.guest?.city || '-'}
+                                  {isTicketedEvent ? (
+                                    <>
+                                      <TableCell className="hidden lg:table-cell px-2 text-sm w-[120px]">
+                                        {getTicketQuantity(attendee)}
+                                      </TableCell>
+                                      <TableCell className="hidden lg:table-cell px-2 text-sm w-[120px]">
+                                        {getTicketPaidLabel(attendee)}
+                                      </TableCell>
+                                    </>
+                                  ) : (
+                                    <TableCell className="hidden lg:table-cell max-w-[160px] px-2">
+                                      <div className="flex flex-col min-w-0">
+                                        <div className="font-medium truncate text-sm">
+                                          {attendee.guest?.city || '-'}
+                                        </div>
+                                        <div className="text-[11px] text-muted-foreground truncate">
+                                          {attendee.guest?.country || '-'}
+                                        </div>
                                       </div>
-                                      <div className="text-[11px] text-muted-foreground truncate">
-                                        {attendee.guest?.country || '-'}
-                                      </div>
-                                    </div>
-                                  </TableCell>
+                                    </TableCell>
+                                  )}
 
                                   <TableCell className="hidden xl:table-cell max-w-[180px] truncate px-2 text-sm">
                                     {attendee.guest?.email || '-'}
                                   </TableCell>
 
                                   <TableCell className="px-2 w-[130px]">
-                                    {attendee.registration_type === 'onsite' ? (
+                                    {isTicketedEvent ? (
+                                      <span className="text-xs text-muted-foreground">
+                                        {getPurchasedDate(attendee)}
+                                      </span>
+                                    ) : attendee.registration_type === 'onsite' ? (
                                       <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/30 text-[10px] px-1.5 py-0 rounded-full border whitespace-nowrap">
                                         Onsite
                                       </Badge>
@@ -3582,6 +3611,10 @@ export default function EventDetails() {
                                       <Badge className="bg-success/10 text-success border-success/30 text-[10px] px-1.5 py-0 rounded-full border whitespace-nowrap">
                                         ✓ Checked In
                                       </Badge>
+                                    ) : isTicketedEvent && (attendee.checked_in_count ?? 0) > 0 ? (
+                                      <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px] px-1.5 py-0 rounded-full border whitespace-nowrap">
+                                        {attendee.checked_in_count}/{attendee.checked_in_total} Checked In
+                                      </Badge>
                                     ) : (
                                       <Badge className="bg-muted/50 text-muted-foreground border-border text-[10px] px-1.5 py-0 rounded-full border whitespace-nowrap">
                                         Not Checked In
@@ -3591,14 +3624,16 @@ export default function EventDetails() {
 
                                   <TableCell className="px-2 w-[100px] text-right">
                                     <div className="flex justify-end gap-0.5">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => startBatchPrintFlow(new Set([attendee.id]))}
-                                        className="h-7 w-7 p-0 hover:bg-primary/10 hover:text-primary"
-                                      >
-                                        <Printer className="w-3.5 h-3.5" />
-                                      </Button>
+                                      {!isTicketedEvent && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => startBatchPrintFlow(new Set([attendee.id]))}
+                                          className="h-7 w-7 p-0 hover:bg-primary/10 hover:text-primary"
+                                        >
+                                          <Printer className="w-3.5 h-3.5" />
+                                        </Button>
+                                      )}
 
                                       <Button
                                         variant="ghost"
@@ -3620,7 +3655,8 @@ export default function EventDetails() {
                                     </div>
                                   </TableCell>
                                 </TableRow>
-                              ))
+                                )
+                              })
                             ) : (
                               <TableRow>
                                 <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
@@ -3698,8 +3734,17 @@ export default function EventDetails() {
                         ) : null}
                       </div>
                     </div>
-                  </div>
+                  </TicketHoldersTab>
                 </TabsContent>
+                {isTicketedEvent && (
+                  <TabsContent value="check-in">
+                    <div className="min-h-screen bg-background p-6">
+                      <React.Suspense fallback={<Spinner size="lg" variant="primary" text="Loading check-in tab..." />}>
+                        <LazyEventCheckInTab eventId={Number(eventId)} />
+                      </React.Suspense>
+                    </div>
+                  </TabsContent>
+                )}
                 <TabsContent value="ushers">
                   <div className="flex flex-col gap-6">
                     <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
@@ -3940,6 +3985,7 @@ export default function EventDetails() {
                     {/* Add/Edit Team Member Dialogs are implemented elsewhere in the file */}
                   </div>
                 </TabsContent>
+                {!isTicketedEvent && (
                 <TabsContent value="analytics">
                   <div className="min-h-screen bg-background p-6">
                     {/* Header Section */}
@@ -4653,6 +4699,7 @@ export default function EventDetails() {
                     </div>
                   </div>
                 </TabsContent>
+                )}
                 <TabsContent value="forms">
                   <div className="min-h-screen bg-background p-6">
                     <FormsList
@@ -4724,6 +4771,38 @@ export default function EventDetails() {
                     </div>
                   </TabsContent>
                 )}
+                {eventData?.event_type === 'ticketed' && (
+                  <TabsContent value="seating">
+                    <div className="min-h-screen bg-background p-6">
+                      <EventSeatingTab eventId={Number(eventId)} />
+                    </div>
+                  </TabsContent>
+                )}
+                {eventData?.event_type === 'ticketed' && (
+                  <TabsContent value="referrals">
+                    <div className="min-h-screen bg-background p-6">
+                      <React.Suspense fallback={<Spinner size="lg" variant="primary" text="Loading referrals tab..." />}>
+                        <LazyEventReferralsTab
+                          eventId={Number(eventId)}
+                          eventUuid={eventData.uuid}
+                          eventName={eventData.name}
+                        />
+                      </React.Suspense>
+                    </div>
+                  </TabsContent>
+                )}
+                {eventData?.event_type === 'ticketed' && (
+                  <TabsContent value="sales">
+                    <div className="min-h-screen bg-background p-6">
+                      <React.Suspense fallback={<Spinner size="lg" variant="primary" text="Loading sales tab..." />}>
+                        <LazyEventSalesTab
+                          eventId={Number(eventId)}
+                          onOpenReferrals={() => setActiveTab('referrals')}
+                        />
+                      </React.Suspense>
+                    </div>
+                  </TabsContent>
+                )}
               </div>
             </Tabs>
 
@@ -4766,29 +4845,21 @@ export default function EventDetails() {
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="edit_location">Location</Label>
-                            <GoogleVenueAutocompleteInput
-                              value={
-                                editForm.location ||
-                                editLocationMeta.formatted_address ||
-                                editLocationMeta.venue_name ||
-                                ''
-                              }
-                              onChange={(value) => handleEditInput('location', value)}
-                              onPlaceSelected={(selection) => {
-                                handleEditInput(
-                                  'location',
-                                  selection.formattedAddress || selection.venueName,
-                                )
+                            <ListedVenuePicker
+                              value={editListedVenue}
+                              onChange={(next) => {
+                                setEditListedVenue(next)
+                                handleEditInput('location', next.formattedAddress || next.venueName)
+                                handleEditInput('venue_id', next.venueId)
+                                handleEditInput('space_id', next.spaceId)
                                 setEditLocationMeta({
-                                  venue_name: selection.venueName,
-                                  formatted_address: selection.formattedAddress,
-                                  latitude: selection.latitude,
-                                  longitude: selection.longitude,
-                                  city: selection.city,
+                                  venue_name: next.venueName,
+                                  formatted_address: next.formattedAddress,
+                                  latitude: next.latitude,
+                                  longitude: next.longitude,
+                                  city: next.city,
                                 })
                               }}
-                              placeholder="Search for a venue or location"
-                              className="rounded-xl shadow-sm border-muted-foreground/20"
                             />
                           </div>
                           <div className="space-y-2 sm:col-span-2">
@@ -6340,8 +6411,8 @@ export default function EventDetails() {
                       </div>
                     </div>
                   </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                      </DialogContent>
+                    </Dialog>
             </div>
           </>
         )}

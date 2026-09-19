@@ -157,6 +157,16 @@ export const bulkCheckInTickets = async (data: { ticket_ids: number[], event_id:
   return response.data;
 };
 
+export const checkInPurchasePassOne = async (data: { order_id: string; event_id: number }): Promise<ValidationResult> => {
+  const response = await api.post('/tickets/purchase-pass/check-in-one', data);
+  return response.data;
+};
+
+export const checkInPurchasePassAll = async (data: { order_id: string; event_id: number }): Promise<ValidationResult> => {
+  const response = await api.post('/tickets/purchase-pass/check-in-all', data);
+  return response.data;
+};
+
 /**
  * Purchase tickets (creates ticket purchase)
  */

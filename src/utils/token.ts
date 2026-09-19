@@ -80,50 +80,10 @@ export function isTokenExpired(token: string | null): boolean {
 }
 
 /**
- * Check if refresh period (7 days) has expired
- * Token creation time is stored in 'iat' (issued at) claim or token_created_at in storage
+ * @deprecated Use isSessionExpired from @/lib/authSession instead.
  */
-export function isRefreshPeriodExpired(token: string | null): boolean {
-  if (!token) return true
-
-  // Check if token is a mock/invalid token
-  if (token === 'dev-token' || token.length < 20) {
-    return true
-  }
-
-  const payload = parseJWT(token)
-  if (!payload) {
-    // If we can't parse the token, check if we have token_created_at in storage
-    const storage = localStorage.getItem('jwt') ? localStorage : sessionStorage
-    const tokenCreatedAt = storage.getItem('token_created_at')
-    if (tokenCreatedAt) {
-      const createdTime = parseInt(tokenCreatedAt, 10)
-      const now = Date.now()
-      const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000 // 7 days
-      return now - createdTime >= sevenDaysInMs
-    }
-    return true
-  }
-
-  if (!payload.iat) {
-    // Fallback to token_created_at from storage
-    const storage = localStorage.getItem('jwt') ? localStorage : sessionStorage
-    const tokenCreatedAt = storage.getItem('token_created_at')
-    if (tokenCreatedAt) {
-      const createdTime = parseInt(tokenCreatedAt, 10)
-      const now = Date.now()
-      const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000 // 7 days
-      return now - createdTime >= sevenDaysInMs
-    }
-    return true
-  }
-
-  // iat is in seconds, convert to milliseconds
-  const tokenCreatedAt = payload.iat * 1000
-  const now = Date.now()
-  const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000 // 7 days
-
-  return now - tokenCreatedAt >= sevenDaysInMs
+export function isRefreshPeriodExpired(_token: string | null): boolean {
+  return false
 }
 
 /**

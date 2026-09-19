@@ -103,8 +103,13 @@ export const useSendEventMessage = () => {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: ({ eventId, data }: { eventId: string; data: MessageFormData }) =>
-      sendEventMessageWithAttachment(eventId, data),
+    mutationFn: ({
+      eventId,
+      data,
+    }: {
+      eventId: string
+      data: MessageFormData & { temp_id?: string }
+    }) => sendEventMessageWithAttachment(eventId, data),
     onSuccess: (data, variables) => {
       // Invalidate conversations
       queryClient.invalidateQueries({ queryKey: ['conversations'] })

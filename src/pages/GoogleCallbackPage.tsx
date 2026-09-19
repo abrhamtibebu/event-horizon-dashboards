@@ -4,6 +4,7 @@ import api from '@/lib/api'
 import { Spinner } from '@/components/ui/spinner'
 import { AlertCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
+import { persistAuthToken } from '@/lib/authSession'
 
 export default function GoogleCallbackPage() {
   const [searchParams] = useSearchParams()
@@ -31,18 +32,15 @@ export default function GoogleCallbackPage() {
 
     ;(async () => {
       try {
-        const res = await api.post('/auth/google/callback', { code, source: 'dashboard' })
+        const res = await api.post('/auth/google/callback', {
+          code,
+          source: sessionStorage.getItem('google_auth_source') || 'dashboard',
+        })
+        sessionStorage.removeItem('google_auth_source')
 
         const { token, user, expires_in } = res.data
 
-        localStorage.setItem('jwt', token)
-        if (expires_in) {
-          localStorage.setItem(
-            'token_expires_at',
-            (Date.now() + expires_in * 1000).toString(),
-          )
-        }
-        localStorage.setItem('token_created_at', Date.now().toString())
+        persistAuthToken(token, true, expires_in)
         localStorage.removeItem('mock_auth')
 
         setUser(user)

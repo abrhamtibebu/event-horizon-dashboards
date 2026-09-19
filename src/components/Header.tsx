@@ -13,10 +13,11 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import { MessagesDropdown } from '@/components/messaging/MessagesDropdown'
 import { useAuth } from '@/hooks/use-auth'
 import { useSubscription } from '@/hooks/useSubscription'
 import { SubscriptionStatusBadge } from '@/components/subscription/SubscriptionStatusBadge'
+import { useMessagesTray } from '@/components/messaging/MessagesTrayContext'
+import { useConversations } from '@/hooks/use-messages'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '@/lib/api'
@@ -32,12 +33,21 @@ interface SearchResult {
 export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
   const { user, logout } = useAuth()
   const { subscription } = useSubscription()
+  const { expand } = useMessagesTray()
+  const { data: conversationsData = [] } = useConversations()
   const [searchValue, setSearchValue] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [showSearchResults, setShowSearchResults] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+
+  const conversations = Array.isArray(conversationsData)
+    ? conversationsData
+    : Array.isArray((conversationsData as any)?.data)
+      ? (conversationsData as any).data
+      : []
+  const unreadCount = conversations.reduce((acc: number, conv: any) => acc + (conv.unreadCount || 0), 0)
 
   // Helper to get initials
   const getInitials = (name?: string) => {
@@ -209,8 +219,20 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
         {/* Theme Toggle */}
         <ThemeToggle />
 
-        {/* Messages Dropdown */}
-        <MessagesDropdown />
+        {/* Messages tray trigger */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="relative group hover:bg-muted/60 transition-colors"
+          onClick={expand}
+        >
+          <MessageCircle className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+          {unreadCount > 0 && (
+            <Badge className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center p-0 bg-red-500 text-white text-[10px] border-2 border-background">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </Badge>
+          )}
+        </Button>
 
         {/* Notifications Dropdown */}
         <DropdownMenu>

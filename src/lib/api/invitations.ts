@@ -15,12 +15,18 @@ export const useGenerateInvitation = () => {
       recipientName?: string;
       recipientEmail?: string;
       expiresAt?: string;
+      discountType?: 'none' | 'percentage' | 'fixed';
+      discountValue?: number;
+      maxDiscountAmount?: number;
     }) => {
       const response = await api.post(`/events/${data.eventId}/invitations/generate`, {
         invitation_type: data.type,
         recipient_name: data.recipientName,
         recipient_email: data.recipientEmail,
         expires_at: data.expiresAt,
+        discount_type: data.discountType ?? 'none',
+        discount_value: data.discountValue ?? 0,
+        max_discount_amount: data.maxDiscountAmount,
       });
       const responseData = response.data?.data || response.data;
       console.log('[Invitations] Invitation generated:', responseData);

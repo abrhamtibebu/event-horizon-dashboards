@@ -21,7 +21,6 @@ interface VirtualizedInfiniteMessageListProps {
   overscan?: number
   onPin?: (messageId: number) => void
   onUnpin?: (messageId: number) => void
-  onOpenThread?: (message: Message) => void
 }
 
 interface MessageItem {
@@ -44,7 +43,6 @@ export const VirtualizedInfiniteMessageList: React.FC<VirtualizedInfiniteMessage
   isLoading,
   onPin,
   onUnpin,
-  onOpenThread,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null)
   const loadingRef = useRef<HTMLDivElement>(null)
@@ -145,11 +143,8 @@ export const VirtualizedInfiniteMessageList: React.FC<VirtualizedInfiniteMessage
   if (messages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
-        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-          <span className="text-2xl">💬</span>
-        </div>
-        <h3 className="text-lg font-semibold text-gray-600 mb-2">No messages yet</h3>
-        <p className="text-sm text-gray-500">Start the conversation by sending a message</p>
+        <h3 className="text-base font-semibold text-foreground mb-1">No messages yet</h3>
+        <p className="text-sm text-muted-foreground">Send a message to start the conversation.</p>
       </div>
     )
   }
@@ -183,7 +178,7 @@ export const VirtualizedInfiniteMessageList: React.FC<VirtualizedInfiniteMessage
         const showAvatar = shouldShowAvatar(message, messageItems.findIndex(m => m.data === message))
 
         return (
-          <div key={message.id || message.tempId || index}>
+          <div key={message.id || message.tempId || index} id={message.id ? `message-${message.id}` : undefined}>
             {isOptimistic ? (
               <OptimisticMessageBubble
                 message={message}
@@ -208,7 +203,6 @@ export const VirtualizedInfiniteMessageList: React.FC<VirtualizedInfiniteMessage
                 conversationId={conversationId}
                 onPin={onPin}
                 onUnpin={onUnpin}
-                onOpenThread={onOpenThread}
               />
             )}
           </div>

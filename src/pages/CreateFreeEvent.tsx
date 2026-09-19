@@ -39,7 +39,7 @@ import { decodeHtmlEntities } from '@/lib/utils/string'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import GoogleVenueAutocompleteInput from '@/components/GoogleVenueAutocompleteInput'
+import ListedVenuePicker, { type ListedVenueSelection } from '@/components/ListedVenuePicker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar as DateCalendar } from '@/components/ui/calendar'
 import type { DateRange } from 'react-day-picker'
@@ -138,6 +138,16 @@ export default function CreateFreeEvent() {
     latitude: null,
     longitude: null,
     formattedAddress: '',
+  })
+  const [listedVenue, setListedVenue] = useState<ListedVenueSelection>({
+    mode: 'custom',
+    venueId: null,
+    spaceId: null,
+    venueName: '',
+    city: '',
+    formattedAddress: '',
+    latitude: null,
+    longitude: null,
   })
 
   const handleInputChange = (field: string, value: any) => {
@@ -353,8 +363,11 @@ export default function CreateFreeEvent() {
         registration_end_date: regRange[0].endDate
           ? formatDateTime(regRange[0].endDate, regEndTime)
           : formatDateTime(regRange[0].startDate, regEndTime),
-        location: formData.city && formData.venue ? `${formData.city}, ${formData.venue}` : formData.venue || formData.city || '',
-        venue_name: formData.venue,
+        location: formData.city && (listedVenue.venueName || formData.venue) ? `${formData.city}, ${listedVenue.venueName || formData.venue}` : listedVenue.venueName || formData.venue || formData.city || '',
+        venue_name: listedVenue.venueName || formData.venue,
+        ...(listedVenue.venueId
+          ? { venue_id: listedVenue.venueId, space_id: listedVenue.spaceId }
+          : {}),
         ...(locationMeta.latitude !== null && locationMeta.longitude !== null
           ? {
               latitude: locationMeta.latitude,
@@ -1067,33 +1080,22 @@ export default function CreateFreeEvent() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="venue" className="text-sm font-semibold">
-                    Venue <span className="text-destructive">*</span>
-                  </Label>
-                  <GoogleVenueAutocompleteInput
-                    value={formData.venue}
-                    onChange={(venueValue) => {
-                      handleInputChange('venue', venueValue)
-                      setLocationMeta({
-                        latitude: null,
-                        longitude: null,
-                        formattedAddress: '',
-                      })
-                    }}
-                    onPlaceSelected={(selection) => {
-                      handleInputChange('venue', selection.venueName)
-                      if (selection.city && ETHIOPIAN_CITIES.includes(selection.city)) {
-                        handleInputChange('city', selection.city)
+                  <ListedVenuePicker
+                    value={{ ...listedVenue, venueName: listedVenue.venueName || formData.venue, city: listedVenue.city || formData.city }}
+                    cities={ETHIOPIAN_CITIES}
+                    required
+                    onChange={(next) => {
+                      setListedVenue(next)
+                      handleInputChange('venue', next.venueName)
+                      if (next.city && ETHIOPIAN_CITIES.includes(next.city)) {
+                        handleInputChange('city', next.city)
                       }
                       setLocationMeta({
-                        latitude: selection.latitude,
-                        longitude: selection.longitude,
-                        formattedAddress: selection.formattedAddress,
+                        latitude: next.latitude,
+                        longitude: next.longitude,
+                        formattedAddress: next.formattedAddress,
                       })
                     }}
-                    placeholder="Search venue with Google suggestions"
-                    required
-                    className="h-11 border-border focus:border-purple-500 focus:ring-purple-500/20"
                   />
                 </div>
               </div>

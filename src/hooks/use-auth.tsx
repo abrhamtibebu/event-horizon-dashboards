@@ -7,10 +7,16 @@ import {
   useRef,
 } from 'react'
 import api from '@/lib/api'
-import { useNavigate } from 'react-router-dom'
-import { isTokenExpiringSoon, isRefreshPeriodExpired, getTokenExpiration } from '@/utils/token'
+import {
+  clearAuthSession,
+  getStoredToken,
+  isSessionExpired,
+  persistAuthToken,
+  refreshAccessToken,
+  shouldRefreshToken,
+} from '@/lib/authSession'
 
-export type Role = 'superadmin' | 'admin' | 'organizer_admin' | 'organizer' | 'usher' | 'attendee'
+export type Role = 'superadmin' | 'admin' | 'organizer_admin' | 'organizer' | 'usher' | 'attendee' | 'venue_admin' | 'venue_staff'
 
 interface Organizer {
   id: number
@@ -20,6 +26,12 @@ interface Organizer {
   suspended_reason?: string
 }
 
+interface Venue {
+  id: number
+  name: string
+  status: string
+}
+
 interface User {
   id: number | string
   email: string
@@ -27,6 +39,8 @@ interface User {
   roles?: string[]
   organizer_id: number | null
   organizer: Organizer | null
+  venue_id: number | null
+  venue: Venue | null
 }
 
 interface AuthContextType {
@@ -39,7 +53,7 @@ interface AuthContextType {
   ) => Promise<void>
   logout: () => Promise<void>
   isLoading: boolean
-  loginWithGoogle: () => Promise<void>
+  loginWithGoogle: (source?: 'dashboard' | 'venue') => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -49,111 +63,72 @@ const isDev = import.meta.env.DEV
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(true)
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Proactive token refresh function
+  const forceLogout = () => {
+    clearAuthSession()
+    setUser(null)
+    window.location.href = '/'
+  }
+
   const refreshTokenProactively = async () => {
-    const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
+    const token = getStoredToken()
     if (!token) return
 
-    // Check if refresh period has expired (7 days)
-    if (isRefreshPeriodExpired(token)) {
-      if (isDev) console.log('[Auth] Refresh period expired, logging out')
-      // Clear tokens and logout
-      localStorage.removeItem('jwt')
-      sessionStorage.removeItem('jwt')
-      localStorage.removeItem('token_expires_at')
-      sessionStorage.removeItem('token_expires_at')
-      localStorage.removeItem('token_created_at')
-      sessionStorage.removeItem('token_created_at')
-      localStorage.removeItem('user_role')
-      localStorage.removeItem('user_id')
-      localStorage.removeItem('organizer_id')
-      setUser(null)
-      window.location.href = '/'
+    if (isSessionExpired()) {
+      if (isDev) console.log('[Auth] Session period expired, logging out')
+      forceLogout()
       return
     }
 
-    // Check if token is expiring soon (within 5 minutes)
-    if (isTokenExpiringSoon(token, 5)) {
-      try {
-        if (isDev) console.log('[Auth] Token expiring soon, refreshing proactively')
-        const response = await api.post('/refresh', {}, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
+    if (!shouldRefreshToken(token)) {
+      return
+    }
 
-        const { token: newToken, user: userData, expires_in } = response.data
-
-        // Store new token
-        const storage = localStorage.getItem('jwt') ? localStorage : sessionStorage
-        storage.setItem('jwt', newToken)
-
-        // Store token expiration timestamp
-        if (expires_in) {
-          const expiresAt = Date.now() + expires_in * 1000
-          storage.setItem('token_expires_at', expiresAt.toString())
-        }
-
-        // Update user if provided
-        if (userData) {
-          setUser(userData)
-        }
-
-        if (isDev) console.log('[Auth] Token refreshed successfully')
-      } catch (error) {
-        console.error('[Auth] Proactive token refresh failed:', error)
-        // Refresh failed - logout user
-        localStorage.removeItem('jwt')
-        sessionStorage.removeItem('jwt')
-        localStorage.removeItem('token_expires_at')
-        sessionStorage.removeItem('token_expires_at')
-        localStorage.removeItem('token_created_at')
-        sessionStorage.removeItem('token_created_at')
-        localStorage.removeItem('user_role')
-        localStorage.removeItem('user_id')
-        localStorage.removeItem('organizer_id')
-        setUser(null)
-        window.location.href = '/'
-      }
+    try {
+      if (isDev) console.log('[Auth] Token expiring or expired, refreshing proactively')
+      await refreshAccessToken()
+      if (isDev) console.log('[Auth] Token refreshed successfully')
+    } catch (error) {
+      console.error('[Auth] Proactive token refresh failed:', error)
+      forceLogout()
     }
   }
 
   useEffect(() => {
     const checkLoggedIn = async () => {
       console.log('[Auth] Checking authentication status...')
-      let token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
+      let token = getStoredToken()
       console.log('[Auth] Token found:', !!token)
 
       if (token) {
-        // Check if token is valid format (not a mock token)
         if (token === 'dev-token' || token.length < 20) {
           if (isDev) console.log('[Auth] Invalid/mock token found, clearing...')
-          localStorage.removeItem('jwt')
-          sessionStorage.removeItem('jwt')
-          localStorage.removeItem('token_expires_at')
-          sessionStorage.removeItem('token_expires_at')
-          localStorage.removeItem('token_created_at')
-          sessionStorage.removeItem('token_created_at')
+          clearAuthSession()
           setUser(null)
           setIsLoading(false)
           return
         }
 
-        // Check if refresh period has expired
-        if (isRefreshPeriodExpired(token)) {
-          if (isDev) console.log('[Auth] Refresh period expired on init')
-          localStorage.removeItem('jwt')
-          sessionStorage.removeItem('jwt')
-          localStorage.removeItem('token_expires_at')
-          sessionStorage.removeItem('token_expires_at')
-          localStorage.removeItem('token_created_at')
-          sessionStorage.removeItem('token_created_at')
+        if (isSessionExpired()) {
+          if (isDev) console.log('[Auth] Session period expired on init')
+          clearAuthSession()
           setUser(null)
           setIsLoading(false)
           return
+        }
+
+        if (shouldRefreshToken(token)) {
+          try {
+            await refreshAccessToken()
+            token = getStoredToken()
+          } catch (error) {
+            console.error('[Auth] Token refresh on init failed:', error)
+            clearAuthSession()
+            setUser(null)
+            setIsLoading(false)
+            return
+          }
         }
 
         try {
@@ -163,39 +138,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(data)
           localStorage.removeItem('mock_auth')
 
-          // Set up proactive token refresh
-          // Check every minute if token needs refresh
           checkIntervalRef.current = setInterval(() => {
             refreshTokenProactively()
-          }, 60 * 1000) // Check every minute
+          }, 60 * 1000)
         } catch (error) {
           console.error('[Auth] Session expired or invalid:', error)
-          // Clear invalid tokens - no mock mode
-          localStorage.removeItem('jwt')
-          sessionStorage.removeItem('jwt')
-          localStorage.removeItem('token_expires_at')
-          sessionStorage.removeItem('token_expires_at')
-          localStorage.removeItem('token_created_at')
-          sessionStorage.removeItem('token_created_at')
+          clearAuthSession()
           setUser(null)
         }
       } else {
-        // No token found, user is not authenticated
         if (isDev) console.log('[Auth] No token found, user not authenticated')
         setUser(null)
       }
+
       if (isDev) console.log('[Auth] Setting isLoading to false')
       setIsLoading(false)
     }
+
     checkLoggedIn()
 
-    // Cleanup intervals on unmount
     return () => {
       if (checkIntervalRef.current) {
         clearInterval(checkIntervalRef.current)
-      }
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current)
       }
     }
   }, [])
@@ -205,34 +169,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     remember = false
   ) => {
     try {
-      // Login endpoint doesn't require API key, so we don't send it
-      const res = await api.post('/login', credentials)
+      const res = await api.post('/login', { ...credentials, remember })
       const { token, user, expires_in } = res.data
 
-      // Store token based on remember preference
-      const storage = remember ? localStorage : sessionStorage
-      storage.setItem('jwt', token)
-
-      // Store token expiration timestamp
-      if (expires_in) {
-        const expiresAt = Date.now() + expires_in * 1000
-        storage.setItem('token_expires_at', expiresAt.toString())
-      }
-
-      // Store token creation time for refresh period tracking
-      storage.setItem('token_created_at', Date.now().toString())
-
+      persistAuthToken(token, remember, expires_in)
       localStorage.removeItem('mock_auth')
-
       setUser(user)
 
-      // Set up proactive token refresh after login
       if (checkIntervalRef.current) {
         clearInterval(checkIntervalRef.current)
       }
       checkIntervalRef.current = setInterval(() => {
         refreshTokenProactively()
-      }, 60 * 1000) // Check every minute
+      }, 60 * 1000)
     } catch (error) {
       console.error('[Auth] Login failed:', error)
       throw error
@@ -245,35 +194,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Logout failed', error)
     } finally {
-      // Clear refresh intervals
       if (checkIntervalRef.current) {
         clearInterval(checkIntervalRef.current)
         checkIntervalRef.current = null
       }
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current)
-        refreshIntervalRef.current = null
-      }
 
-      // Clear all authentication data
-      localStorage.removeItem('jwt')
-      sessionStorage.removeItem('jwt')
-      localStorage.removeItem('token_expires_at')
-      sessionStorage.removeItem('token_expires_at')
-      localStorage.removeItem('token_created_at')
-      sessionStorage.removeItem('token_created_at')
-      localStorage.removeItem('user_role')
-      localStorage.removeItem('user_id')
-      localStorage.removeItem('organizer_id')
-      localStorage.removeItem('mock_auth')
+      clearAuthSession()
       setUser(null)
       window.location.href = '/'
     }
   }
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (source: 'dashboard' | 'venue' = 'dashboard') => {
     try {
-      const res = await api.get('/auth/google/redirect?source=dashboard')
+      sessionStorage.setItem('google_auth_source', source)
+      const res = await api.get(`/auth/google/redirect?source=${source}`)
       window.location.href = res.data.auth_url
     } catch (error) {
       console.error('[Auth] Failed to start Google sign-in:', error)

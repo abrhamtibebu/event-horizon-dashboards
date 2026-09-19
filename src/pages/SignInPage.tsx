@@ -5,6 +5,7 @@ import { Eye, EyeOff, AlertCircle, Shield } from 'lucide-react'
 import { SpinnerInline } from '@/components/ui/spinner'
 import CloudflareTurnstileWidget from '@/components/CloudflareTurnstileWidget'
 import { getTurnstileSiteKey } from '@/config/env'
+import { persistAuthToken } from '@/lib/authSession'
 import api from '@/lib/api'
 
 export default function AuthPage() {
@@ -89,7 +90,9 @@ function SignInForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
+  const [rememberMe, setRememberMe] = useState(
+    () => localStorage.getItem('auth_remember_me') === 'true',
+  )
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const { login, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
@@ -220,13 +223,20 @@ function SignInForm() {
    ───────────────────────────────────────────── */
 
 function SignUpForm() {
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', confirmPassword: '' })
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    confirmPassword: '',
+    accountType: 'organizer' as 'organizer' | 'venue',
+  })
   const [showPw, setShowPw] = useState(false)
   const [showCpw, setShowCpw] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const { loginWithGoogle } = useAuth()
+  const { loginWithGoogle, setUser } = useAuth()
   const navigate = useNavigate()
 
   const handleChange = (name: string, value: string) => {
@@ -240,7 +250,7 @@ function SignUpForm() {
     if (!formData.email) e.email = 'Required'
     else if (!/\S+@\S+\.\S+/.test(formData.email)) e.email = 'Invalid email'
     if (!formData.password) e.password = 'Required'
-    else if (formData.password.length < 6) e.password = 'Min 6 characters'
+    else if (formData.password.length < 8) e.password = 'Min 8 characters'
     if (!formData.confirmPassword) e.confirmPassword = 'Required'
     else if (formData.password !== formData.confirmPassword) e.confirmPassword = 'Mismatch'
     setErrors(e)
@@ -252,9 +262,34 @@ function SignUpForm() {
     if (!validate()) return
     setIsLoading(true)
     try {
-      await new Promise((r) => setTimeout(r, 1500))
-      navigate('/signin')
-    } catch { /* noop */ } finally {
+      const parts = formData.name.trim().split(/\s+/)
+      const first_name = parts[0]
+      const last_name = parts.slice(1).join(' ') || parts[0]
+      const role = formData.accountType === 'venue' ? 'venue_admin' : 'organizer_admin'
+      const res = await api.post('/register', {
+        first_name,
+        last_name,
+        email: formData.email,
+        phone: formData.phone || undefined,
+        password: formData.password,
+        password_confirmation: formData.confirmPassword,
+        role,
+      })
+      persistAuthToken(res.data.token, true, res.data.expires_in)
+      setUser(res.data.user)
+      navigate('/dashboard')
+    } catch (err: any) {
+      const data = err.response?.data
+      if (data && typeof data === 'object') {
+        const fieldErrors: Record<string, string> = {}
+        Object.entries(data).forEach(([key, val]) => {
+          if (Array.isArray(val)) fieldErrors[key] = val[0]
+        })
+        if (data.error) fieldErrors.password = data.error
+        if (data.message) fieldErrors.email = data.message
+        setErrors((p) => ({ ...p, ...fieldErrors }))
+      }
+    } finally {
       setIsLoading(false)
     }
   }
@@ -262,7 +297,7 @@ function SignUpForm() {
   const handleGoogle = async () => {
     setGoogleLoading(true)
     try {
-      await loginWithGoogle()
+      await loginWithGoogle(formData.accountType === 'venue' ? 'venue' : 'dashboard')
     } catch {
       setGoogleLoading(false)
     }
@@ -272,6 +307,23 @@ function SignUpForm() {
     <>
       <img src="/evella-logo.png" alt="Evella" className="mb-2 h-11 w-11 object-contain" />
       <h1 className="text-2xl font-bold text-foreground">Create Account</h1>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 w-full max-w-[320px]">
+        <button
+          type="button"
+          onClick={() => handleChange('accountType', 'organizer')}
+          className={`h-9 rounded-full text-xs font-semibold ${formData.accountType === 'organizer' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+        >
+          Organizer
+        </button>
+        <button
+          type="button"
+          onClick={() => handleChange('accountType', 'venue')}
+          className={`h-9 rounded-full text-xs font-semibold ${formData.accountType === 'venue' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+        >
+          Venue
+        </button>
+      </div>
 
       <div className="mt-4 flex items-center gap-3">
         <SocialButton onClick={handleGoogle} disabled={googleLoading || isLoading}>
@@ -287,6 +339,8 @@ function SignUpForm() {
 
         <PillInput icon="mail" type="email" placeholder="Email" value={formData.email} onChange={(v) => handleChange('email', v)} disabled={isLoading} error={!!errors.email} />
         {errors.email && <ErrorText>{errors.email}</ErrorText>}
+
+        <PillInput icon="user" placeholder="Phone (optional)" value={formData.phone} onChange={(v) => handleChange('phone', v)} disabled={isLoading} />
 
         <div className="relative">
           <PillInput icon="lock" type={showPw ? 'text' : 'password'} placeholder="Password" value={formData.password} onChange={(v) => handleChange('password', v)} disabled={isLoading} error={!!errors.password} />

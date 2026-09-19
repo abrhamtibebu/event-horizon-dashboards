@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { decodeHtmlEntities } from '@/lib/utils/string'
-import GoogleVenueAutocompleteInput from '@/components/GoogleVenueAutocompleteInput'
+import ListedVenuePicker, { type ListedVenueSelection } from '@/components/ListedVenuePicker'
 import { Calendar as DateCalendar } from '@/components/ui/calendar'
 import type { DateRange } from 'react-day-picker'
 
@@ -128,6 +128,16 @@ export default function CreateTicketedEvent() {
     latitude: null,
     longitude: null,
     formattedAddress: '',
+  })
+  const [listedVenue, setListedVenue] = useState<ListedVenueSelection>({
+    mode: 'custom',
+    venueId: null,
+    spaceId: null,
+    venueName: '',
+    city: '',
+    formattedAddress: '',
+    latitude: null,
+    longitude: null,
   })
 
   const handleInputChange = (field: string, value: any) => {
@@ -299,7 +309,10 @@ export default function CreateTicketedEvent() {
           ? formatDateTime(regRange[0].endDate, regEndTime)
           : formatDateTime(regRange[0].startDate, regEndTime),
         location: formData.city, // Using city as location
-        venue_name: formData.venue,
+        venue_name: listedVenue.venueName || formData.venue,
+        ...(listedVenue.venueId
+          ? { venue_id: listedVenue.venueId, space_id: listedVenue.spaceId }
+          : {}),
         ...(locationMeta.latitude !== null && locationMeta.longitude !== null
           ? {
               latitude: locationMeta.latitude,
@@ -935,36 +948,23 @@ export default function CreateTicketedEvent() {
               </div>
 
               <div>
-                <Label htmlFor="venue" className="flex items-center gap-2 text-foreground font-medium">
-                  <MapPin className="w-4 h-4 text-green-500" /> Venue
-                </Label>
-                <div className="mt-2">
-                  <GoogleVenueAutocompleteInput
-                    value={formData.venue}
-                    onChange={(venueValue) => {
-                      handleInputChange('venue', venueValue)
-                      setLocationMeta({
-                        latitude: null,
-                        longitude: null,
-                        formattedAddress: '',
-                      })
-                    }}
-                    onPlaceSelected={(selection) => {
-                      handleInputChange('venue', selection.venueName)
-                      if (selection.city && ETHIOPIAN_CITIES.includes(selection.city)) {
-                        handleInputChange('city', selection.city)
-                      }
-                      setLocationMeta({
-                        latitude: selection.latitude,
-                        longitude: selection.longitude,
-                        formattedAddress: selection.formattedAddress,
-                      })
-                    }}
-                    placeholder="Enter venue or pick from Google suggestions"
-                    className="h-12 border-border focus:border-green-500 focus:ring-green-500 rounded-xl"
-                    required
-                  />
-                </div>
+                <ListedVenuePicker
+                  value={{ ...listedVenue, venueName: listedVenue.venueName || formData.venue, city: listedVenue.city || formData.city }}
+                  cities={ETHIOPIAN_CITIES}
+                  required
+                  onChange={(next) => {
+                    setListedVenue(next)
+                    handleInputChange('venue', next.venueName)
+                    if (next.city && ETHIOPIAN_CITIES.includes(next.city)) {
+                      handleInputChange('city', next.city)
+                    }
+                    setLocationMeta({
+                      latitude: next.latitude,
+                      longitude: next.longitude,
+                      formattedAddress: next.formattedAddress,
+                    })
+                  }}
+                />
               </div>
 
               <div>

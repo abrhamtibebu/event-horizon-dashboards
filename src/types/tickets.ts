@@ -7,7 +7,7 @@
 export type TicketStatus = 'confirmed' | 'pending' | 'cancelled' | 'used' | 'refunded';
 export type PaymentStatus = 'pending' | 'success' | 'failed' | 'cancelled';
 export type PaymentMethod = 'telebirr' | 'chapa' | 'cbe_birr' | 'm_pesa';
-export type ValidationStatus = 'valid' | 'invalid' | 'expired' | 'already_used' | 'refunded' | 'cancelled' | 'pending' | 'too_early' | 'not_event_checked_in' | 'tampered';
+export type ValidationStatus = 'valid' | 'invalid' | 'expired' | 'already_used' | 'refunded' | 'cancelled' | 'pending' | 'too_early' | 'not_event_checked_in' | 'tampered' | 'pass_valid' | 'pass_fully_used' | 'pass_invalid';
 
 /**
  * Payment interface
@@ -66,16 +66,45 @@ export interface TicketValidationRequest {
 }
 
 /**
+ * Purchase pass summary returned on scan / check-in
+ */
+export interface PurchasePassInfo {
+  order_id: string;
+  guest_name?: string;
+  guest_uuid?: string;
+  ticket_count: {
+    total: number;
+    checked_in: number;
+    remaining: number;
+  };
+}
+
+/**
  * Ticket validation result
  */
 export interface ValidationResult {
   success: boolean;
+  validation_type?: 'single_ticket' | 'purchase_pass';
   validation_status: ValidationStatus;
   message: string;
   icon: string;
   color: 'success' | 'danger' | 'warning' | 'info';
   ticket?: any; // Full ticket object if found
   related_tickets?: any[]; // Other tickets in the same purchase
+  purchase_pass?: PurchasePassInfo;
+  tickets?: Array<{
+    id: number;
+    ticket_number: string;
+    attendee_name?: string;
+    checked_in: boolean;
+    status: string;
+    ticket_type?: string;
+  }>;
+  checked_in_ticket?: {
+    id: number;
+    ticket_number: string;
+    attendee_name?: string;
+  };
 }
 
 /**

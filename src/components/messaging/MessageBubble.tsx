@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { MoreVertical, Reply, Trash2, Download, Check, CheckCheck, Pin, PinOff } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
@@ -11,7 +11,6 @@ import { getMessageFileUrl } from '../../lib/image-utils'
 import MessageContent from './MessageContent'
 import OptimizedImage from './OptimizedImage'
 import { cn } from '@/lib/utils'
-import { motion } from 'framer-motion'
 import type { Message } from '../../types/message'
 
 interface MessageBubbleProps {
@@ -25,7 +24,6 @@ interface MessageBubbleProps {
   conversationId?: string
   onPin?: (messageId: number) => void
   onUnpin?: (messageId: number) => void
-  onOpenThread?: (message: Message) => void
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -39,41 +37,35 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   conversationId,
   onPin,
   onUnpin,
-  onOpenThread,
 }) => {
   const { confirmDelete } = useModernAlerts()
   const isOwnMessage = message.sender_id === currentUserId
   const isPinned = message.is_pinned || false
-
-  const formatMessageTime = (timestamp: string) => {
-    const date = new Date(timestamp)
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  }
-
-  const getInitials = (name: string) => name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)
-
   const isSent = message.status === 'sent' || !!message.id
 
+  const formatMessageTime = (timestamp: string) =>
+    new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+  const getInitials = (name: string) =>
+    name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)
+
   const handleDeleteMessage = async () => {
-    await confirmDelete('Message', 'message', async () => onDelete(message.id))
+    await confirmDelete('Message', 'message', async () => onDelete(Number(message.id)))
   }
 
   const renderFileAttachment = () => {
     if (!(message.file_path || message.file_url)) return null
-
     const fileUrl = getMessageFileUrl(message)
     if (!fileUrl) return null
 
-    const isImage = message.file_type?.startsWith('image/')
-
-    if (isImage) {
+    if (message.file_type?.startsWith('image/')) {
       return (
-        <div className="mt-1" onClick={() => onImageClick?.(fileUrl)}>
+        <div className="mt-1 cursor-pointer" onClick={() => onImageClick?.(fileUrl)}>
           <OptimizedImage
             message={message}
-            containerWidth={320}
-            maxWidth={360}
-            maxHeight={360}
+            containerWidth={280}
+            maxWidth={300}
+            maxHeight={300}
             onClick={(originalUrl) => onImageClick?.(originalUrl || fileUrl)}
             showLoadingIndicator={false}
           />
@@ -81,7 +73,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       )
     }
 
-    const sizeLabel = message.file_size ? `${(message.file_size / 1024).toFixed(2)} KB` : ''
+    const sizeLabel = message.file_size ? `${(message.file_size / 1024).toFixed(1)} KB` : ''
 
     return (
       <a
@@ -89,24 +81,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         target="_blank"
         rel="noopener noreferrer"
         className={cn(
-          "flex items-center gap-3 p-3 rounded-2xl transition-all border",
+          'flex items-center gap-2 p-2.5 rounded-2xl border transition-colors',
           isOwnMessage
-            ? "bg-white/10 border-white/20 hover:bg-white/20"
-            : "bg-muted/50 border-border/50 hover:bg-muted"
+            ? 'bg-black/10 border-white/20 hover:bg-black/15'
+            : 'bg-muted/50 border-border/50 hover:bg-muted'
         )}
       >
-        <div className={cn(
-          "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-          isOwnMessage ? "bg-white/20" : "bg-primary/10 dark:bg-primary/20"
-        )}>
-          <Download className={cn("w-5 h-5", isOwnMessage ? "text-white" : "text-primary")} />
-        </div>
-        <div className="min-w-0 pr-2">
-          <p className={cn("text-sm font-bold truncate", isOwnMessage ? "text-white" : "text-foreground")}>
+        <Download className={cn('w-4 h-4 shrink-0', isOwnMessage ? 'text-white' : 'text-foreground')} />
+        <div className="min-w-0">
+          <p className={cn('text-sm font-medium truncate', isOwnMessage ? 'text-white' : 'text-foreground')}>
             {message.file_name || 'Attachment'}
           </p>
           {sizeLabel && (
-            <p className={cn("text-[10px] font-black uppercase tracking-tighter opacity-60", isOwnMessage ? "text-white/80" : "text-muted-foreground")}>
+            <p className={cn('text-[11px]', isOwnMessage ? 'text-white/70' : 'text-muted-foreground')}>
               {sizeLabel}
             </p>
           )}
@@ -116,135 +103,109 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+    <div
+      id={`message-${message.id}`}
       className={cn(
-        "flex items-end gap-3 mb-6 group",
-        isOwnMessage ? "flex-row-reverse" : "flex-row"
+        'flex items-end gap-2 mb-3 group scroll-mt-20',
+        isOwnMessage ? 'flex-row-reverse' : 'flex-row'
       )}
     >
-      {/* Avatar - Minimalist */}
-      {!isOwnMessage && (
-        <Avatar className="w-8 h-8 shrink-0 border-2 border-background shadow-sm mb-1">
-          <AvatarImage src={message.sender.profile_image} />
-          <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-black">
-            {getInitials(message.sender.name)}
+      {!isOwnMessage && (showAvatar || isGroup) && (
+        <Avatar className="w-7 h-7 shrink-0 mb-0.5">
+          <AvatarImage src={message.sender?.profile_image} />
+          <AvatarFallback className="bg-muted text-muted-foreground text-[10px]">
+            {getInitials(message.sender?.name || '?')}
           </AvatarFallback>
         </Avatar>
       )}
+      {!isOwnMessage && !(showAvatar || isGroup) && <div className="w-7 shrink-0" />}
 
-      {/* Message Container */}
-      <div className={cn(
-        "flex flex-col max-w-[75%] lg:max-w-[65%]",
-        isOwnMessage ? "items-end" : "items-start"
-      )}>
-        {/* Name for Group Chats */}
+      <div className={cn('flex flex-col max-w-[78%]', isOwnMessage ? 'items-end' : 'items-start')}>
         {!isOwnMessage && isGroup && (
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-1.5 ml-2">
-            {message.sender.name}
+          <span className="text-[11px] text-muted-foreground mb-1 ml-1">
+            {message.sender?.name}
           </span>
         )}
 
-        {/* Bubble */}
-        <div className="relative group/bubble flex flex-col items-end">
+        <div className="relative group/bubble">
           <div
             className={cn(
-              "relative px-4 py-3 shadow-md transition-all duration-300",
+              'relative px-3.5 py-2 text-[14px] leading-snug break-words',
               isOwnMessage
-                ? 'bg-primary text-primary-foreground rounded-[24px] rounded-br-[4px] shadow-primary/10'
-                : 'bg-background border border-border/40 text-foreground rounded-[24px] rounded-bl-[4px] shadow-sm'
+                ? 'bg-primary text-primary-foreground rounded-[22px] rounded-br-md'
+                : 'bg-muted text-foreground rounded-[22px] rounded-bl-md'
             )}
           >
-            {/* Quoted Message */}
             {message.parentMessage && (
-              <div className={cn(
-                "px-3 py-2 rounded-xl mb-2 flex flex-col gap-0.5 border-l-[3px] transition-all",
-                isOwnMessage
-                  ? 'bg-black/10 border-white/40 text-white/90 group-hover:bg-black/20'
-                  : 'bg-muted/50 border-primary/40 text-muted-foreground group-hover:bg-muted/80'
-              )}>
-                <span className="text-[10px] font-black uppercase tracking-tight opacity-70 flex items-center gap-1.5">
-                  <Reply className="w-2.5 h-2.5" />
-                  {message.parentMessage.sender.name}
-                </span>
-                <p className="text-xs line-clamp-1 italic font-semibold leading-snug">
-                  {message.parentMessage.content || "📎 Attachment"}
+              <div
+                className={cn(
+                  'px-2.5 py-1.5 rounded-xl mb-1.5 border-l-2 text-xs',
+                  isOwnMessage ? 'bg-black/10 border-white/50' : 'bg-background/60 border-foreground/30'
+                )}
+              >
+                <p className="font-medium opacity-80">{message.parentMessage.sender?.name}</p>
+                <p className="line-clamp-1 opacity-70">
+                  {message.parentMessage.content || 'Attachment'}
                 </p>
               </div>
             )}
 
-            {/* Main Content */}
-            <div className="text-[14px] leading-relaxed font-medium break-words overflow-wrap-anywhere">
-              <MessageContent content={message.content} />
-            </div>
+            <MessageContent content={message.content} />
 
-            {/* Attachments */}
             {(message.file_path || message.file_url) && (
-              <div className="mt-2">
-                {renderFileAttachment()}
-              </div>
+              <div className="mt-1.5">{renderFileAttachment()}</div>
             )}
 
-            {/* Status & Time */}
-            <div className={cn(
-              "flex items-center gap-1.5 mt-1.5 justify-end",
-              isOwnMessage ? "opacity-70" : "opacity-40"
-            )}>
-              <span className="text-[9px] font-black uppercase tracking-tighter">
-                {formatMessageTime(message.created_at)}
-              </span>
+            <div
+              className={cn(
+                'flex items-center gap-1 mt-1 justify-end',
+                isOwnMessage ? 'text-primary-foreground/70' : 'text-muted-foreground'
+              )}
+            >
+              <span className="text-[10px]">{formatMessageTime(message.created_at)}</span>
               {isOwnMessage && (
-                <div className="flex items-center">
-                  {isSent ? (
-                    <CheckCheck className="w-2.5 h-2.5 text-white/80" />
-                  ) : (
-                    <Check className="w-2.5 h-2.5 text-white/40" />
-                  )}
-                </div>
+                isSent ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3 opacity-60" />
               )}
               {isOwnMessage && (
-                <ReadReceipts
-                  message={message}
-                  currentUserId={currentUserId}
-                  isGroup={isGroup}
-                />
+                <ReadReceipts message={message} currentUserId={currentUserId} isGroup={isGroup} />
               )}
             </div>
           </div>
 
-          {/* Quick Actions Panel */}
-          <div className={cn(
-            "absolute top-1/2 -translate-y-1/2 opacity-0 group-hover/bubble:opacity-100 transition-all duration-300 flex items-center gap-1.5 z-20 scale-90 group-hover/bubble:scale-100",
-            isOwnMessage ? "right-full mr-3" : "left-full ml-3"
-          )}>
+          <div
+            className={cn(
+              'absolute top-1/2 -translate-y-1/2 flex items-center gap-1 z-20',
+              'opacity-100 md:opacity-0 md:group-hover/bubble:opacity-100 transition-opacity',
+              isOwnMessage ? 'right-full mr-2' : 'left-full ml-2'
+            )}
+          >
             <Button
               variant="ghost"
               size="icon"
               onClick={() => onReply(message)}
-              className="h-9 w-9 rounded-2xl bg-background border border-border shadow-xl hover:bg-primary/10 hover:text-primary transition-colors"
+              className="h-8 w-8 rounded-full bg-background border border-border"
             >
-              <Reply className="w-4 h-4" />
+              <Reply className="w-3.5 h-3.5" />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-2xl bg-background border border-border shadow-xl hover:bg-primary/10 hover:text-primary transition-colors"
+                  className="h-8 w-8 rounded-full bg-background border border-border"
                 >
-                  <MoreVertical className="w-4 h-4" />
+                  <MoreVertical className="w-3.5 h-3.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align={isOwnMessage ? 'end' : 'start'} className="w-48 rounded-2xl shadow-2xl border-border/40 backdrop-blur-md">
-                <DropdownMenuItem onClick={() => (isPinned ? onUnpin?.(message.id) : onPin?.(message.id))} className="rounded-xl">
+              <DropdownMenuContent align={isOwnMessage ? 'end' : 'start'} className="w-44 rounded-xl">
+                <DropdownMenuItem onClick={() => (isPinned ? onUnpin?.(Number(message.id)) : onPin?.(Number(message.id)))}>
                   {isPinned ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
-                  {isPinned ? 'Unpin Message' : 'Pin to Top'}
+                  {isPinned ? 'Unpin' : 'Pin'}
                 </DropdownMenuItem>
                 {isOwnMessage && (
-                  <DropdownMenuItem onClick={handleDeleteMessage} className="text-red-500 focus:text-red-500 rounded-xl">
+                  <DropdownMenuItem onClick={handleDeleteMessage} className="text-destructive focus:text-destructive">
                     <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Message
+                    Delete
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -252,16 +213,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
         </div>
 
-        {/* Reactions List */}
-        <MessageReactions
-          message={message}
-          currentUserId={currentUserId}
-          className="mt-1"
-        />
+        <MessageReactions message={message} currentUserId={currentUserId} className="mt-1" />
 
-        {/* Inline Thread Access */}
         {conversationId && !message.parentMessage && (
-          <div className="mt-1 ml-1">
+          <div className="mt-0.5">
             <MessageReplies
               message={message}
               currentUserId={currentUserId}
@@ -273,6 +228,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
   )
 }

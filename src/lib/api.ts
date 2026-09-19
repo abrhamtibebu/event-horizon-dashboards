@@ -1,6 +1,13 @@
 import axios from 'axios'
 import { getApiBaseURL } from '@/config/env'
 import { decodeObjectStrings } from '@/lib/utils/string'
+import {
+  clearAuthSession,
+  getStoredToken,
+  isSessionExpired,
+  refreshAccessToken,
+  storeRefreshedToken,
+} from '@/lib/authSession'
 
 const api = axios.create({
   baseURL: getApiBaseURL(),
@@ -37,66 +44,16 @@ const processQueue = (error: any, token: string | null = null) => {
  * Refresh token function
  */
 const refreshToken = async (): Promise<string | null> => {
-  const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
-  if (!token) {
-    throw new Error('No token available')
+  if (isSessionExpired()) {
+    throw new Error('Session expired')
   }
 
-  try {
-    const response = await axios.post(
-      '/refresh',
-      {},
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    )
-
-    const { token: newToken, user, expires_in } = response.data
-
-    // Store new token
-    if (localStorage.getItem('jwt')) {
-      localStorage.setItem('jwt', newToken)
-    } else {
-      sessionStorage.setItem('jwt', newToken)
-    }
-
-    // Store token expiration timestamp
-    if (expires_in) {
-      const expiresAt = Date.now() + expires_in * 1000
-      const storage = localStorage.getItem('jwt')
-        ? localStorage
-        : sessionStorage
-      storage.setItem('token_expires_at', expiresAt.toString())
-    }
-
-    // Store token creation time for refresh period check
-    const storage = localStorage.getItem('jwt') ? localStorage : sessionStorage
-    if (!storage.getItem('token_created_at')) {
-      storage.setItem('token_created_at', Date.now().toString())
-    }
-
-    return newToken
-  } catch (error: any) {
-    // If refresh fails, clear all tokens and logout
-    localStorage.removeItem('jwt')
-    sessionStorage.removeItem('jwt')
-    localStorage.removeItem('token_expires_at')
-    sessionStorage.removeItem('token_expires_at')
-    localStorage.removeItem('token_created_at')
-    sessionStorage.removeItem('token_created_at')
-    localStorage.removeItem('user_role')
-    localStorage.removeItem('user_id')
-    localStorage.removeItem('organizer_id')
-
-    throw error
-  }
+  return refreshAccessToken()
 }
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
+    const token = getStoredToken()
 
     // Check if URL matches public event patterns: /events/{id} or /events/{id}/ticket-types/available
     const isPublicEventEndpoint =
@@ -159,18 +116,8 @@ api.interceptors.response.use(
       response.data = decodeObjectStrings(response.data);
     }
 
-    // Store token expiration if provided in response (e.g., from login)
-    if (response.data?.expires_in) {
-      const expiresAt = Date.now() + response.data.expires_in * 1000
-      const storage = localStorage.getItem('jwt')
-        ? localStorage
-        : sessionStorage
-      storage.setItem('token_expires_at', expiresAt.toString())
-
-      // Store token creation time if this is a new token
-      if (!storage.getItem('token_created_at')) {
-        storage.setItem('token_created_at', Date.now().toString())
-      }
+    if (response.data?.token && response.data?.expires_in) {
+      storeRefreshedToken(response.data.token, response.data.expires_in)
     }
     return response
   },
@@ -179,17 +126,7 @@ api.interceptors.response.use(
 
     // Skip refresh for refresh endpoint itself to avoid infinite loops
     if (originalRequest?.url === '/refresh') {
-      // Clear tokens and logout on refresh failure
-      localStorage.removeItem('jwt')
-      sessionStorage.removeItem('jwt')
-      localStorage.removeItem('token_expires_at')
-      sessionStorage.removeItem('token_expires_at')
-      localStorage.removeItem('token_created_at')
-      sessionStorage.removeItem('token_created_at')
-      localStorage.removeItem('user_role')
-      localStorage.removeItem('user_id')
-      localStorage.removeItem('organizer_id')
-      localStorage.removeItem('mock_auth')
+      clearAuthSession()
 
       if (
         window.location.pathname !== '/' &&
@@ -214,8 +151,7 @@ api.interceptors.response.use(
           failedQueue.push({ resolve, reject, config: originalRequest })
         })
           .then(() => {
-            const token =
-              localStorage.getItem('jwt') || sessionStorage.getItem('jwt')
+            const token = getStoredToken()
             if (token) {
               originalRequest.headers.Authorization = `Bearer ${token}`
             }
@@ -243,17 +179,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         // Refresh failed - clear tokens and logout
         processQueue(refreshError, null)
-
-        localStorage.removeItem('jwt')
-        sessionStorage.removeItem('jwt')
-        localStorage.removeItem('token_expires_at')
-        sessionStorage.removeItem('token_expires_at')
-        localStorage.removeItem('token_created_at')
-        sessionStorage.removeItem('token_created_at')
-        localStorage.removeItem('user_role')
-        localStorage.removeItem('user_id')
-        localStorage.removeItem('organizer_id')
-        localStorage.removeItem('mock_auth')
+        clearAuthSession()
 
         // Redirect to login if not already there
         if (

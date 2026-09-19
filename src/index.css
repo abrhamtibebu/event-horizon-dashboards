@@ -169,14 +169,14 @@
     --radius: 0.5rem;
 
     /* Sidebar (light) */
-    --sidebar-background: 0 0% 100%;
+    --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: var(--color-primary);
-    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: var(--ring);
+    --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Chart colors for light theme */
     --chart-1: 199 89% 48%;
@@ -233,14 +233,14 @@
     --ring: var(--color-warning);
 
     /* Sidebar - slightly darker than base */
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: var(--color-primary);
-    --sidebar-primary-foreground: 222 44% 10%;
-    --sidebar-accent: 221 39% 18%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 221 26% 18%;
-    --sidebar-ring: var(--ring);
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Chart colors for dark theme - brighter for visibility */
     --chart-1: 195 67% 45%;
@@ -663,6 +663,21 @@
   [data-sidebar="content"] {
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
+  }
+
+  /* Keep the collapsed icon rail scrollable without a visible scrollbar. */
+  [data-collapsible="icon"] [data-sidebar="content"] {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  [data-collapsible="icon"] [data-sidebar="content"]::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 
   [data-sidebar="content"]::-webkit-scrollbar {

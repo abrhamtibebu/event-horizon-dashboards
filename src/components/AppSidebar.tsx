@@ -8,6 +8,7 @@ import {
   MessageCircleMore,
   ShieldCheck,
   MapPin,
+  Users,
   ClipboardCheck,
   Ticket,
   UserCheck,
@@ -26,7 +27,9 @@ import {
   Fingerprint,
   CheckSquare,
   Activity,
+  Banknote,
   DollarSign,
+  Wallet,
   Flag,
   Database,
   Key,
@@ -95,6 +98,7 @@ const ADMIN_SIDEBAR_HIDDEN_TITLES = [
   'My Tickets',
   'Tasks',
   'Ushers',
+  'Payouts',
 ]
 
 // Organized navigation items by category
@@ -106,8 +110,37 @@ const navigationCategories = [
         title: 'Dashboard',
         url: '/dashboard',
         icon: LayoutDashboard,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver'],
+        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'venue_admin', 'venue_staff'],
         permission: 'dashboard.view',
+      },
+    ],
+  },
+  {
+    label: 'Venue',
+    items: [
+      {
+        title: 'Bookings',
+        url: '/dashboard/venue/bookings',
+        icon: CalendarDays,
+        roles: ['venue_admin', 'venue_staff'],
+      },
+      {
+        title: 'Spaces',
+        url: '/dashboard/venue/spaces',
+        icon: Store,
+        roles: ['venue_admin', 'venue_staff'],
+      },
+      {
+        title: 'Venue profile',
+        url: '/dashboard/venue/profile',
+        icon: MapPin,
+        roles: ['venue_admin', 'venue_staff'],
+      },
+      {
+        title: 'Team',
+        url: '/dashboard/venue/staff',
+        icon: Users,
+        roles: ['venue_admin'],
       },
     ],
   },
@@ -167,6 +200,12 @@ const navigationCategories = [
         roles: ['superadmin', 'admin'],
       },
       {
+        title: 'Venues',
+        url: '/dashboard/admin/venues',
+        icon: MapPin,
+        roles: ['superadmin', 'admin'],
+      },
+      {
         title: 'Guests',
         url: '/dashboard/guests',
         icon: Users2,
@@ -192,6 +231,19 @@ const navigationCategories = [
         url: '/dashboard/admin/financials',
         icon: DollarSign,
         roles: ['superadmin', 'admin'],
+      },
+      {
+        title: 'Payout Requests',
+        url: '/dashboard/admin/payouts',
+        icon: Banknote,
+        roles: ['superadmin', 'admin', 'finance_manager'],
+        permission: 'finance.manage',
+      },
+      {
+        title: 'Payouts',
+        url: '/dashboard/payouts',
+        icon: Wallet,
+        roles: ['organizer', 'organizer_admin'],
       },
       {
         title: 'System Settings',
@@ -304,7 +356,7 @@ const navigationCategories = [
         title: 'Messages',
         url: '/dashboard/messages',
         icon: MessageCircleMore,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'attendee', 'sales'],
+        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'usher', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'attendee', 'sales', 'venue_admin', 'venue_staff'],
         accessibleToAll: true,
         permission: 'messages.manage',
       },
@@ -368,6 +420,11 @@ export function AppSidebar() {
 
         // Guests menu is only for organizers, not for admin/superadmin
         if (item.title === 'Guests' && (user.role === 'admin' || user.role === 'superadmin')) {
+          return false
+        }
+
+        // Hide venue-operator tools from platform admins (they have Admin > Venues)
+        if ((user.role === 'admin' || user.role === 'superadmin') && item.url.startsWith('/dashboard/venue')) {
           return false
         }
 
@@ -448,7 +505,7 @@ export function AppSidebar() {
     >
       {/* Header */}
       <SidebarHeader className={cn(
-        "flex items-center transition-all duration-300 border-b border-border/50 bg-background",
+        "flex shrink-0 items-center transition-all duration-300 border-b border-border/50 bg-background",
         isCollapsed ? 'p-3 justify-center' : 'px-5 py-6'
       )}>
         <div className={cn(
@@ -478,9 +535,14 @@ export function AppSidebar() {
       </SidebarHeader>
 
       {/* Navigation */}
-      <SidebarContent className="flex-1 overflow-y-auto px-2 py-3 bg-background">
+      <SidebarContent
+        className={cn(
+          "min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-2 py-3 bg-background",
+          isCollapsed && "px-1 py-2 scrollbar-hide"
+        )}
+      >
         {filteredCategories.map((category) => (
-          <SidebarGroup key={category.label} className="p-0 mb-6">
+          <SidebarGroup key={category.label} className={cn("p-0", isCollapsed ? "mb-1" : "mb-6")}>
             {!isCollapsed && (
               <SidebarGroupLabel className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider px-3 mb-2 select-none">
                 {category.label}
@@ -562,7 +624,7 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="mt-auto p-3 border-t border-border/50 bg-background">
+      <SidebarFooter className="mt-auto shrink-0 p-3 border-t border-border/50 bg-background">
         {user && (
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>

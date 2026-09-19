@@ -10,6 +10,7 @@ import { usePermissionCheck } from '@/hooks/use-permission-check'
 import QRCode from 'react-qr-code'
 import QRCodeLib from 'qrcode'
 import { Badge } from '@/components/ui/badge'
+import { getEventTabs } from '../config/eventTabs'
 
 interface EventDetailsTabsProps {
   eventId: string
@@ -33,6 +34,11 @@ export function EventDetailsTabs({
   const { user } = useAuth()
   const { hasPermission } = usePermissionCheck()
   const canManageEvent = hasPermission('events.manage')
+  const tabs = getEventTabs({
+    eventType: event?.event_type,
+    role: user?.role,
+    canManageEvent,
+  })
   const downloadQRCode = async (value: string, filename: string) => {
     try {
       const url = await QRCodeLib.toDataURL(value, {
@@ -59,41 +65,17 @@ export function EventDetailsTabs({
       <div className="flex flex-col gap-6 bg-card rounded-2xl p-6 border border-border shadow-sm">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <TabsList className="bg-transparent border-b border-border w-full justify-start p-0 h-auto gap-8 rounded-none">
-            {user?.role === 'usher' ? (
-              <>
+            <div className="flex flex-wrap gap-x-6">
+              {tabs.map((tab) => (
                 <TabsTrigger
-                  value="attendees"
+                  key={tab.value}
+                  value={tab.value}
                   className="px-0 py-3 text-sm font-semibold transition-all border-b-2 border-transparent rounded-none bg-transparent shadow-none data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground hover:text-foreground"
                 >
-                  Attendees
+                  {tab.label}
                 </TabsTrigger>
-                <TabsTrigger
-                  value="badges"
-                  className="px-0 py-3 text-sm font-semibold transition-all border-b-2 border-transparent rounded-none bg-transparent shadow-none data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground hover:text-foreground"
-                >
-                  Badges
-                </TabsTrigger>
-              </>
-            ) : (
-              <div className="flex flex-wrap gap-x-6">
-                {['Details', 'Attendees', 'Ushers', 'Badges', 'Bulk Badges', 'Team', 'Forms', 'Survey', 'Sessions', 'Invitations', 'Analytics'].map((tab) => {
-                  const val = tab.toLowerCase().replace(/ /g, '-')
-                  // Filter tabs based on role permissions
-                  if (val === 'bulk-badges' || val === 'forms' || val === 'survey' || val === 'ushers' || val === 'analytics' || val === 'invitations' || val === 'team') {
-                    if (!canManageEvent) return null
-                  }
-                  return (
-                    <TabsTrigger
-                      key={val}
-                      value={val}
-                      className="px-0 py-3 text-sm font-semibold transition-all border-b-2 border-transparent rounded-none bg-transparent shadow-none data-[state=active]:border-primary data-[state=active]:text-primary text-muted-foreground hover:text-foreground"
-                    >
-                      {tab}
-                    </TabsTrigger>
-                  )
-                })}
-              </div>
-            )}
+              ))}
+            </div>
           </TabsList>
         </div>
 
@@ -117,7 +99,7 @@ export function EventDetailsTabs({
             Export
           </Button>
 
-          <Dialog>
+          {event.event_type !== 'ticketed' && <Dialog>
             <DialogTrigger asChild>
               <Button
                 variant="outline"
@@ -260,7 +242,7 @@ export function EventDetailsTabs({
                 </div>
               )}
             </DialogContent>
-          </Dialog>
+          </Dialog>}
         </div>
 
         {children}

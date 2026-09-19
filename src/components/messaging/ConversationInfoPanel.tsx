@@ -1,19 +1,16 @@
 import React, { useState } from 'react'
 import {
-  X, Bell, BellOff, Star, Archive, Trash2, Settings,
-  Users, Image as ImageIcon, FileText, Download, ExternalLink,
-  Shield, Lock, Volume2, VolumeX, Pin, MoreVertical, Calendar, Mail
+  X, Bell, BellOff, Star, Archive, Trash2,
+  FileText, Download, MoreVertical,
 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 import { Badge } from '../ui/badge'
 import { Separator } from '../ui/separator'
 import { ScrollArea } from '../ui/scroll-area'
-import { Switch } from '../ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { motion } from 'framer-motion'
 import type { Conversation, Message } from '../../types/message'
 import { getMessageImageUrl, getMessageFileUrl } from '@/lib/image-utils'
 
@@ -39,7 +36,6 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
 
   const getInitials = (name: string) => name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)
 
-  // Extract media and documents
   const mediaFiles = messages.filter(msg =>
     (msg.file_path || msg.file_url) && msg.file_type?.startsWith('image/')
   )
@@ -53,193 +49,136 @@ export const ConversationInfoPanel: React.FC<ConversationInfoPanelProps> = ({
     const k = 1024
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
   }
 
   return (
-    <div className="flex flex-col h-full bg-background animate-in slide-in-from-right duration-500">
+    <div className="flex flex-col h-full bg-background">
+      <div className="h-14 px-4 border-b border-border flex items-center justify-end shrink-0">
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={onClose}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
       <ScrollArea className="flex-1">
-        <div className="p-8 space-y-10">
-          {/* Hero Profile Section */}
+        <div className="p-6 space-y-8">
           <div className="flex flex-col items-center text-center">
-            <div className="relative mb-6">
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="relative"
-              >
-                <Avatar className="w-28 h-28 border-4 border-background shadow-2xl relative z-10">
-                  <AvatarImage src={conversation.avatar} />
-                  <AvatarFallback className="text-3xl font-black bg-primary/10 text-primary dark:bg-primary/30">
-                    {getInitials(conversation.name)}
-                  </AvatarFallback>
-                </Avatar>
-              </motion.div>
-              {isDirect && (
-                <span className="absolute bottom-2 right-2 w-6 h-6 bg-emerald-500 border-4 border-background rounded-full shadow-lg z-20" />
-              )}
-            </div>
+            <Avatar className="w-24 h-24 border border-border mb-4">
+              <AvatarImage src={conversation.avatar} />
+              <AvatarFallback className="text-2xl font-semibold bg-muted">
+                {getInitials(conversation.name)}
+              </AvatarFallback>
+            </Avatar>
 
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold tracking-tight text-foreground">{conversation.name}</h2>
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold tracking-tight">{conversation.name}</h2>
               {isDirect && participant && (
-                <div className="flex items-center justify-center gap-1 text-muted-foreground/60">
-                  <Mail className="w-3 h-3" />
-                  <span className="text-xs font-bold uppercase tracking-widest">{participant.email || 'Private Member'}</span>
-                </div>
+                <p className="text-xs text-muted-foreground">{participant.email || 'Direct message'}</p>
               )}
               {isEventConversation && (
-                <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest px-3 py-1">
-                  <Calendar className="w-3 h-3 mr-1.5" />
-                  Event Collaboration
-                </Badge>
+                <Badge variant="outline" className="text-[10px]">Event chat</Badge>
               )}
             </div>
 
-            {/* Premium Action Grid */}
-            <div className="grid grid-cols-3 gap-3 w-full mt-8">
+            <div className="grid grid-cols-3 gap-2 w-full mt-6">
               <Button
                 variant="outline"
                 onClick={() => setIsMuted(!isMuted)}
-                className={cn(
-                  "flex-col h-16 gap-1 rounded-2xl border-border/40 transition-all",
-                  isMuted ? "bg-muted text-muted-foreground" : "hover:bg-primary/10 hover:border-primary/20 hover:text-primary"
-                )}
+                className={cn('flex-col h-14 gap-1 rounded-xl', isMuted && 'bg-muted')}
               >
                 {isMuted ? <BellOff className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
-                <span className="text-[9px] font-black uppercase tracking-tighter">{isMuted ? 'Muted' : 'Alerts'}</span>
+                <span className="text-[10px]">{isMuted ? 'Muted' : 'Mute'}</span>
               </Button>
               <Button
                 variant="outline"
                 onClick={() => setIsStarred(!isStarred)}
-                className={cn(
-                  "flex-col h-16 gap-1 rounded-2xl border-border/40 transition-all",
-                  isStarred ? "bg-primary text-primary-foreground border-primary" : "hover:bg-primary/10 hover:border-primary/20 hover:text-primary"
-                )}
+                className={cn('flex-col h-14 gap-1 rounded-xl', isStarred && 'bg-muted')}
               >
-                <Star className={cn("w-4 h-4", isStarred && "fill-current")} />
-                <span className="text-[9px] font-black uppercase tracking-tighter">{isStarred ? 'Saved' : 'Save'}</span>
+                <Star className={cn('w-4 h-4', isStarred && 'fill-current')} />
+                <span className="text-[10px]">{isStarred ? 'Saved' : 'Save'}</span>
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="flex-col h-16 gap-1 rounded-2xl border-border/40 hover:bg-primary/10 hover:border-primary/20 hover:text-primary">
+                  <Button variant="outline" className="flex-col h-14 gap-1 rounded-xl">
                     <MoreVertical className="w-4 h-4" />
-                    <span className="text-[9px] font-black uppercase tracking-tighter">More</span>
+                    <span className="text-[10px]">More</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="rounded-2xl border-border/40 p-1.5 shadow-2xl w-48 backdrop-blur-md">
-                  <DropdownMenuItem className="rounded-xl font-bold text-xs p-3">
-                    <Archive className="w-4 h-4 mr-2 opacity-60" />
-                    Archive Conversation
+                <DropdownMenuContent align="center" className="rounded-xl w-44">
+                  <DropdownMenuItem className="rounded-lg text-xs">
+                    <Archive className="w-4 h-4 mr-2" />
+                    Archive
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="rounded-xl font-bold text-xs p-3 text-red-500 focus:text-red-500">
-                    <Trash2 className="w-4 h-4 mr-2 opacity-60" />
-                    Clear Chat History
+                  <DropdownMenuItem className="rounded-lg text-xs text-destructive focus:text-destructive">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Clear chat
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
 
-          <Separator className="bg-border/40" />
+          <Separator />
 
-          {/* Context Sections */}
-          <div className="space-y-8">
-            {/* About / Bio */}
-            <div className="space-y-3">
-              <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">About Context</h3>
-              <p className="text-sm text-foreground/80 leading-relaxed font-medium">
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold text-muted-foreground">About</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 {isEventConversation && conversation.event
-                  ? (conversation.event.description || 'Global collaboration space for event logistics and coordination.')
-                  : (isDirect && (participant as any)?.bio) || 'Professional network communication channel.'
-                }
+                  ? (conversation.event.description || 'Messages related to this event.')
+                  : ((participant as any)?.bio) || 'Direct conversation.'}
               </p>
             </div>
 
-            {/* Shared Assets Hub */}
-            <div className="space-y-4">
-              <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Shared Hub</h3>
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold text-muted-foreground">Shared</h3>
               <Tabs defaultValue="media" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 bg-muted/30 p-1 rounded-2xl h-11 border border-border/20">
-                  <TabsTrigger value="media" className="text-[10px] font-black uppercase tracking-widest rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg">
-                    Media
-                  </TabsTrigger>
-                  <TabsTrigger value="files" className="text-[10px] font-black uppercase tracking-widest rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-lg">
-                    Docs
-                  </TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2 h-9 rounded-lg">
+                  <TabsTrigger value="media" className="text-xs rounded-md">Media</TabsTrigger>
+                  <TabsTrigger value="files" className="text-xs rounded-md">Files</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="media" className="mt-6">
+                <TabsContent value="media" className="mt-4">
                   {mediaFiles.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-3 gap-1.5">
                       {mediaFiles.slice(0, 9).map((msg) => {
                         const fileUrl = getMessageImageUrl(msg, 'medium') || getMessageFileUrl(msg)
                         return fileUrl ? (
-                          <motion.div
-                            key={msg.id}
-                            whileHover={{ scale: 1.05 }}
-                            className="aspect-square rounded-2xl overflow-hidden bg-muted border border-border/40 cursor-pointer shadow-sm"
-                          >
-                            <img src={fileUrl} alt="Shared" className="w-full h-full object-cover transition-transform duration-500" />
-                          </motion.div>
+                          <div key={msg.id} className="aspect-square rounded-lg overflow-hidden bg-muted">
+                            <img src={fileUrl} alt="" className="w-full h-full object-cover" />
+                          </div>
                         ) : null
                       })}
                     </div>
                   ) : (
-                    <div className="py-12 flex flex-col items-center justify-center bg-muted/20 rounded-[2rem] border border-dashed border-border/40">
-                      <ImageIcon className="w-8 h-8 text-muted-foreground/20 mb-2" />
-                      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">No media found</p>
-                    </div>
+                    <p className="text-xs text-muted-foreground text-center py-8">No media yet</p>
                   )}
                 </TabsContent>
 
-                <TabsContent value="files" className="mt-6 space-y-2">
+                <TabsContent value="files" className="mt-4 space-y-2">
                   {documentFiles.length > 0 ? (
                     documentFiles.slice(0, 5).map((msg) => (
-                      <div key={msg.id} className="flex items-center gap-4 p-3 rounded-2xl bg-muted/30 border border-border/20 hover:bg-muted/50 transition-colors group">
-                        <div className="w-10 h-10 bg-primary/10 dark:bg-primary/20 text-primary rounded-xl flex items-center justify-center shrink-0">
-                          <FileText className="w-5 h-5" />
-                        </div>
+                      <div key={msg.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/40">
+                        <FileText className="w-4 h-4 shrink-0" />
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold truncate pr-2">{msg.file_name || 'Document'}</p>
-                          <p className="text-[9px] font-black uppercase tracking-tighter opacity-40">{formatFileSize(msg.file_size)}</p>
+                          <p className="text-xs font-medium truncate">{msg.file_name || 'Document'}</p>
+                          <p className="text-[10px] text-muted-foreground">{formatFileSize(msg.file_size)}</p>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100" onClick={() => window.open(getMessageFileUrl(msg), '_blank')}>
-                          <Download className="w-4 h-4" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => window.open(getMessageFileUrl(msg) || '#', '_blank')}
+                        >
+                          <Download className="w-3.5 h-3.5" />
                         </Button>
                       </div>
                     ))
                   ) : (
-                    <div className="py-12 flex flex-col items-center justify-center bg-muted/20 rounded-[2rem] border border-dashed border-border/40">
-                      <FileText className="w-8 h-8 text-muted-foreground/20 mb-2" />
-                      <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">No docs found</p>
-                    </div>
+                    <p className="text-xs text-muted-foreground text-center py-8">No files yet</p>
                   )}
                 </TabsContent>
               </Tabs>
             </div>
-
-            {/* Security Notice */}
-            <div className="p-6 rounded-[2rem] bg-primary/5 border border-primary/10 relative overflow-hidden group">
-              <Shield className="absolute -right-4 -bottom-4 w-24 h-24 text-primary/5 rotate-12 group-hover:rotate-0 transition-transform duration-700" />
-              <div className="relative z-10 flex gap-4">
-                <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center shrink-0 shadow-lg shadow-primary/30">
-                  <Lock className="w-5 h-5 text-white" />
-                </div>
-                <div className="space-y-1 pr-4">
-                  <h4 className="text-[11px] font-black uppercase tracking-wider text-primary">Privacy Secure</h4>
-                  <p className="text-[10px] font-medium leading-relaxed text-muted-foreground/90">
-                    Advanced end-to-end encryption active for this channel.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="pb-8">
-            <Button variant="ghost" className="w-full h-12 rounded-2xl text-red-500 hover:bg-red-50 hover:text-red-600 font-black uppercase tracking-[0.2em] text-[10px]" onClick={() => { }}>
-              Report Incident
-            </Button>
           </div>
         </div>
       </ScrollArea>

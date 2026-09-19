@@ -1,24 +1,21 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react'
-import { Send, Paperclip, X, Smile, Image as ImageIcon, Upload, Loader2, Plus, Zap } from 'lucide-react'
+import { Send, X, Smile, Image as ImageIcon, Loader2, Heart } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
-import { Badge } from '../ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import EmojiPicker from 'emoji-picker-react'
-import { useMessageInput, useSendDirectMessage } from '../../hooks/use-messages'
+import { useMessageInput, useSendDirectMessage, useSendEventMessage } from '../../hooks/use-messages'
 import { useModernAlerts } from '../../hooks/useModernAlerts'
 import { useTypingIndicator } from '../../hooks/use-typing-indicator'
 import { useAuth } from '../../hooks/use-auth'
-import { usePermissionCheck } from '../../hooks/use-permission-check'
 import { useMentionDetection } from '../../hooks/use-mention-detection'
 import { useUserSearch } from '../../hooks/use-user-search'
 import { MentionDropdown } from './MentionDropdown'
 import { playMessageSent } from '../../lib/sounds'
 import { cn } from '@/lib/utils'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import type { Message, User } from '../../types/message'
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
 const ACCEPTED_FILE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf', '.doc', '.docx', '.xls', '.xlsx']
 
 interface MessageInputProps {
@@ -29,6 +26,7 @@ interface MessageInputProps {
   replyingTo?: Message | null
   onCancelReply?: () => void
   isGroup?: boolean
+  variant?: 'default' | 'compact'
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
@@ -38,7 +36,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onOptimisticMessage,
   replyingTo,
   onCancelReply,
-  isGroup = false,
+  variant = 'default',
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -49,7 +47,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   const { showError } = useModernAlerts()
   const { user } = useAuth()
-  const { checkPermission } = usePermissionCheck()
+  const isCompact = variant === 'compact'
 
   const {
     content,
@@ -61,14 +59,19 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     reset,
   } = useMessageInput()
 
-  const sendMessageMutation = useSendDirectMessage()
+  const sendDirectMutation = useSendDirectMessage()
+  const sendEventMutation = useSendEventMessage()
+
+  const isEvent = Boolean(conversationId?.startsWith('event_'))
+  const eventId = isEvent && conversationId ? conversationId.replace('event_', '') : null
+  const isPending = sendDirectMutation.isPending || sendEventMutation.isPending
+  const canActuallySend = canSend && !!recipientId && !!user?.id && !isPending
 
   const { startTyping, stopTyping } = useTypingIndicator({
     conversationId,
     currentUserId: user?.id ? Number(user.id) : null,
   })
 
-  // Mention logic
   const { mentionState, insertMention } = useMentionDetection(content, cursorPosition)
   const { data: searchResults = [], isLoading: isSearching } = useUserSearch(
     mentionState.query,
@@ -88,13 +91,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     else stopTyping()
   }
 
-  const handleMentionSelect = useCallback((user: User) => {
-    const newContent = insertMention(user.name, user.id)
+  const handleMentionSelect = useCallback((mentionUser: User) => {
+    const newContent = insertMention(mentionUser.name, mentionUser.id)
     handleContentChange(newContent)
     setSelectedMentionIndex(0)
     setTimeout(() => {
       textareaRef.current?.focus()
-      const newPos = mentionState.startIndex + user.name.length + 2
+      const newPos = mentionState.startIndex + mentionUser.name.length + 2
       textareaRef.current?.setSelectionRange(newPos, newPos)
       setCursorPosition(newPos)
     }, 0)
@@ -108,52 +111,65 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }, [mentionState.isActive])
 
   const handleSend = async () => {
-    if (!canSend || !recipientId || !user?.id || sendMessageMutation.isPending) return
+    if (!canActuallySend || !recipientId || !user?.id) return
 
-    const eventId = conversationId?.startsWith('event_') ? parseInt(conversationId.replace('event_', '')) : undefined
+    const trimmed = content.trim()
     const tempId = `temp_${Date.now()}`
+    const parsedEventId = eventId ? parseInt(eventId, 10) : undefined
 
-    // Trigger optimistic UI update immediately
-    if (onOptimisticMessage) {
-      onOptimisticMessage({
-        tempId,
-        content: content.trim(),
-        sender_id: user.id,
-        recipient_id: recipientId,
-        event_id: eventId,
-        file: selectedFile || undefined,
-        parent_message_id: replyingTo?.id,
-        sender: {
-          id: user.id,
-          name: (user as any).username || (user as any).first_name || 'You',
-          profile_image: (user as any).profile_image
-        },
-        created_at: new Date().toISOString()
-      })
-    }
+    onOptimisticMessage?.({
+      tempId,
+      content: trimmed,
+      sender_id: user.id,
+      recipient_id: recipientId,
+      event_id: parsedEventId,
+      file: selectedFile || undefined,
+      parent_message_id: replyingTo?.id,
+      sender: {
+        id: user.id,
+        name: (user as any).username || (user as any).name || 'You',
+        profile_image: (user as any).profile_image,
+      },
+      created_at: new Date().toISOString(),
+    })
 
     playMessageSent()
     stopTyping()
     reset()
-    if (onCancelReply) onCancelReply()
+    onCancelReply?.()
 
     try {
-      const response = await sendMessageMutation.mutateAsync({
+      const payload = {
         recipient_id: recipientId,
-        content: content.trim(),
+        content: trimmed,
         parent_message_id: typeof replyingTo?.id === 'number' ? replyingTo.id : undefined,
         file: selectedFile || undefined,
-        temp_id: tempId
-      })
-      if (onMessageSent) onMessageSent(response.data)
-    } catch (error: any) {
+        temp_id: tempId,
+      }
+
+      if (isEvent && eventId) {
+        const response = await sendEventMutation.mutateAsync({
+          eventId,
+          data: payload,
+        })
+        onMessageSent?.(response.data)
+      } else {
+        const response = await sendDirectMutation.mutateAsync(payload)
+        onMessageSent?.(response.data)
+      }
+    } catch {
       showError('Failed to send', 'Something went wrong. Please try again.')
     }
   }
 
   return (
-    <div className="relative flex flex-col gap-4">
-      {/* Reply Banner */}
+    <div className={cn('relative flex flex-col', isCompact ? 'gap-2' : 'gap-3')}>
+      {!recipientId && (
+        <p className="text-xs text-muted-foreground px-1">
+          Choose who to message before sending.
+        </p>
+      )}
+
       <AnimatePresence>
         {replyingTo && (
           <motion.div
@@ -162,15 +178,19 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-primary/5 dark:bg-primary/10 border border-primary/10 dark:border-primary/20">
-              <div className="flex-1 min-w-0 flex items-center gap-3">
-                <div className="w-1 bg-primary h-8 rounded-full shrink-0" />
+            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-muted/60 border border-border/50">
+              <div className="flex-1 min-w-0 flex items-center gap-2">
+                <div className="w-0.5 bg-foreground h-8 rounded-full shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-0.5">Replying to {replyingTo.sender.name}</p>
-                  <p className="text-xs text-muted-foreground truncate italic">{replyingTo.content || "📎 Shared Asset"}</p>
+                  <p className="text-xs font-semibold text-foreground">
+                    Replying to {replyingTo.sender?.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {replyingTo.content || 'Attachment'}
+                  </p>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" onClick={onCancelReply} className="h-7 w-7 rounded-full text-primary">
+              <Button variant="ghost" size="icon" onClick={onCancelReply} className="h-7 w-7 rounded-full">
                 <X className="w-4 h-4" />
               </Button>
             </div>
@@ -178,46 +198,36 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Main Input Controls */}
-      <div className="flex items-end gap-3 p-2 bg-muted/30 dark:bg-muted/10 rounded-[2.5rem] border border-border/40 focus-within:border-primary/30 transition-all duration-500 shadow-sm focus-within:shadow-primary/5">
-        <div className="flex items-center gap-1 pl-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => fileInputRef.current?.click()}
-            className="h-11 w-11 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-          >
-            <Plus className="h-5 w-5" />
-          </Button>
-          <input ref={fileInputRef} type="file" onChange={(e) => handleFileSelect(e.target.files?.[0]!)} className="hidden" accept={ACCEPTED_FILE_EXTENSIONS.join(',')} />
+      <div
+        className={cn(
+          'flex items-end gap-1 border border-border bg-background focus-within:border-muted-foreground/40 transition-colors',
+          isCompact ? 'rounded-3xl px-2 py-1' : 'rounded-full px-2 py-1.5'
+        )}
+      >
+        <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn('rounded-full text-muted-foreground shrink-0', isCompact ? 'h-8 w-8' : 'h-9 w-9')}
+            >
+              <Smile className={isCompact ? 'h-4 w-4' : 'h-5 w-5'} />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0 border-none rounded-2xl mb-2" align="start">
+            <EmojiPicker onEmojiClick={handleEmojiClick} width={320} height={380} theme={'auto' as any} />
+          </PopoverContent>
+        </Popover>
 
-          <Popover open={isEmojiPickerOpen} onOpenChange={setIsEmojiPickerOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-11 w-11 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-              >
-                <Smile className="h-5 w-5" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 border-none shadow-2xl rounded-3xl mb-4" align="start">
-              <EmojiPicker onEmojiClick={handleEmojiClick} width={340} height={420} theme={'auto' as any} />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        <div className="flex-1 min-w-0 py-1">
+        <div className="flex-1 min-w-0">
           {selectedFile && (
-            <div className="mb-2 p-2 rounded-2xl bg-background border border-border/40 flex items-center justify-between">
-              <div className="flex items-center gap-2 pr-4">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <ImageIcon className="h-4 w-4 text-primary" />
-                </div>
-                <span className="text-xs font-bold truncate max-w-[150px]">{selectedFile.name}</span>
+            <div className="mb-1 px-2 py-1 rounded-lg bg-muted flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <ImageIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs truncate">{selectedFile.name}</span>
               </div>
-              <Button variant="ghost" size="icon" onClick={clearFile} className="h-7 w-7 rounded-full">
-                <X className="h-4 w-4" />
+              <Button variant="ghost" size="icon" onClick={clearFile} className="h-6 w-6 rounded-full">
+                <X className="h-3 w-3" />
               </Button>
             </div>
           )}
@@ -227,39 +237,62 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             onChange={(e) => handleContentChangeWithTyping(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
+                e.preventDefault()
+                handleSend()
               }
             }}
-            placeholder="Write something thoughtful..."
-            className="min-h-[44px] max-h-32 resize-none border-none bg-transparent focus-visible:ring-0 px-1 py-3 text-sm font-medium placeholder:text-muted-foreground/40 leading-relaxed"
+            placeholder={recipientId ? 'Message...' : 'Select a recipient...'}
+            disabled={!recipientId}
+            className={cn(
+              'resize-none border-none bg-transparent focus-visible:ring-0 px-1 text-sm leading-relaxed',
+              isCompact ? 'min-h-[32px] max-h-24 py-1.5' : 'min-h-[36px] max-h-28 py-2'
+            )}
           />
         </div>
 
-        <div className="pr-1.5 pb-1.5 flex items-center gap-2">
-          {content.trim() && (
-            <div className="hidden sm:flex text-[9px] font-black uppercase tracking-[0.2em] text-primary/40 mr-2 items-center gap-1">
-              <Zap className="h-3 w-3 fill-current" />
-              Hit Enter
-            </div>
-          )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+          className="hidden"
+          accept={ACCEPTED_FILE_EXTENSIONS.join(',')}
+        />
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={!recipientId}
+          className={cn('rounded-full text-muted-foreground shrink-0', isCompact ? 'h-8 w-8' : 'h-9 w-9')}
+        >
+          <ImageIcon className={isCompact ? 'h-4 w-4' : 'h-5 w-5'} />
+        </Button>
+
+        {content.trim() || selectedFile ? (
           <Button
             onClick={handleSend}
-            disabled={!canSend || sendMessageMutation.isPending}
-            className={cn(
-              "h-11 w-11 rounded-full shadow-xl transition-all duration-500",
-              canSend
-                ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 shadow-primary/20"
-                : "bg-muted text-muted-foreground/40 shadow-none scale-95"
-            )}
+            disabled={!canActuallySend}
+            variant="ghost"
+            size="icon"
+            className={cn('rounded-full text-primary shrink-0', isCompact ? 'h-8 w-8' : 'h-9 w-9')}
           >
-            {sendMessageMutation.isPending ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+            {isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Send className="h-5 w-5 translate-x-0.5 -translate-y-0.5" />
+              <Send className="h-4 w-4" />
             )}
           </Button>
-        </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn('rounded-full text-muted-foreground shrink-0', isCompact ? 'h-8 w-8' : 'h-9 w-9')}
+            onClick={() => handleContentChange(content + '❤️')}
+            disabled={!recipientId}
+          >
+            <Heart className={isCompact ? 'h-4 w-4' : 'h-5 w-5'} />
+          </Button>
+        )}
       </div>
 
       {mentionState.isActive && (searchResults.length > 0 || isSearching) && (

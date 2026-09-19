@@ -22,6 +22,7 @@ import { MetricCard } from '@/components/MetricCard'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import api from '@/lib/api'
+import { payoutApi, type AdminPayoutStats } from '@/lib/api/payouts'
 import { toast } from 'sonner'
 import { format, subDays, subMonths } from 'date-fns'
 import {
@@ -85,6 +86,7 @@ const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#e
 export default function FinancialDashboard() {
   const navigate = useNavigate()
   const [financialData, setFinancialData] = useState<FinancialData | null>(null)
+  const [settlement, setSettlement] = useState<AdminPayoutStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | '1y' | 'all'>('30d')
@@ -95,66 +97,59 @@ export default function FinancialDashboard() {
     try {
       setLoading(true)
       setRefreshing(true)
-      const response = await api.get('/admin/financials', {
-        params: {
-          date_range: dateRange,
-        },
-      })
-      setFinancialData(response.data)
-      setError(null)
+
+      const [financialsResult, statsResult] = await Promise.allSettled([
+        api.get('/admin/financials', { params: { date_range: dateRange } }),
+        payoutApi.adminStats(),
+      ])
+
+      const ledgerStats = statsResult.status === 'fulfilled' ? statsResult.value.data : null
+      setSettlement(ledgerStats)
+
+      if (financialsResult.status === 'fulfilled') {
+        setFinancialData(financialsResult.value.data)
+        setError(null)
+      } else if (ledgerStats) {
+        // The analytics endpoint is unavailable, but the earnings ledger still
+        // gives us the authoritative totals.
+        setFinancialData(buildFromLedger(ledgerStats))
+        setError(null)
+      } else {
+        setError('Failed to load financial data.')
+      }
+
       setLastUpdate(new Date())
     } catch (err: any) {
       setError('Failed to load financial data.')
       console.error(err)
-      // Use mock data for development
-      setFinancialData(getMockFinancialData())
-      setLastUpdate(new Date())
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
   }
 
-  const getMockFinancialData = (): FinancialData => {
-    const baseRevenue = 50000
-    const periods = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : dateRange === '90d' ? 12 : 12
-
-    return {
-      total_revenue: baseRevenue * (dateRange === 'all' ? 12 : periods),
-      revenue_trend: '+12.5%',
-      monthly_revenue: baseRevenue,
-      monthly_trend: '+8.3%',
-      total_transactions: Math.floor(baseRevenue / 50),
-      transactions_trend: '+15.2%',
-      average_transaction_value: 50,
-      revenue_by_period: Array.from({ length: periods }, (_, i) => ({
-        period:
-          dateRange === '7d'
-            ? format(subDays(new Date(), periods - 1 - i), 'MMM d')
-            : format(subMonths(new Date(), periods - 1 - i), 'MMM yyyy'),
-        revenue: baseRevenue + Math.random() * 10000 - 5000,
-        transactions: Math.floor((baseRevenue + Math.random() * 10000 - 5000) / 50),
-      })),
-      revenue_by_event: [
-        { event_name: 'Tech Conference 2024', revenue: 25000, tickets_sold: 500 },
-        { event_name: 'Music Festival', revenue: 18000, tickets_sold: 360 },
-        { event_name: 'Business Summit', revenue: 15000, tickets_sold: 300 },
-        { event_name: 'Art Exhibition', revenue: 12000, tickets_sold: 240 },
-        { event_name: 'Sports Event', revenue: 10000, tickets_sold: 200 },
-      ],
-      payment_methods: [
-        { method: 'Telebirr', amount: 40000, percentage: 60 },
-        { method: 'CBE Birr', amount: 20000, percentage: 30 },
-        { method: 'Bank Transfer', amount: 5000, percentage: 7.5 },
-        { method: 'Cash', amount: 2000, percentage: 2.5 },
-      ],
-      refunds: {
-        total_refunded: 2500,
-        refund_count: 25,
-        refund_rate: 2.5,
-      },
-    }
-  }
+  /**
+   * Ledger-derived totals. Per-period and per-event breakdowns are not part of
+   * the ledger summary, so those charts stay empty rather than showing invented
+   * numbers.
+   */
+  const buildFromLedger = (stats: AdminPayoutStats): FinancialData => ({
+    total_revenue: stats.gross_collected,
+    revenue_trend: '',
+    monthly_revenue: stats.platform_revenue,
+    monthly_trend: '',
+    total_transactions: 0,
+    transactions_trend: '',
+    average_transaction_value: 0,
+    revenue_by_period: [],
+    revenue_by_event: [],
+    payment_methods: [],
+    refunds: {
+      total_refunded: 0,
+      refund_count: 0,
+      refund_rate: 0,
+    },
+  })
 
   useEffect(() => {
     fetchFinancialData()
@@ -298,6 +293,39 @@ export default function FinancialDashboard() {
           className="bg-card/40 backdrop-blur-xl border-white/10 shadow-2xl"
         />
       </div>
+
+      {/* Settlement position, straight from the earnings ledger */}
+      {settlement && (
+        <DashboardCard title="Settlement position">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <LedgerFigure
+              label="Gross collected"
+              value={`${settlement.currency} ${settlement.gross_collected.toLocaleString()}`}
+              hint="All paid orders"
+            />
+            <LedgerFigure
+              label="Platform commission"
+              value={`${settlement.currency} ${settlement.platform_revenue.toLocaleString()}`}
+              hint={`${(settlement.platform_fee_rate * 100).toFixed(0)}% of gross`}
+            />
+            <LedgerFigure
+              label="Owed to organizers"
+              value={`${settlement.currency} ${settlement.owed_to_organizers.toLocaleString()}`}
+              hint={`${settlement.pending_requests} request(s) awaiting review`}
+            />
+            <LedgerFigure
+              label="Paid out"
+              value={`${settlement.currency} ${settlement.paid_out.toLocaleString()}`}
+              hint="Settled to date"
+            />
+          </div>
+          <div className="mt-4">
+            <Button variant="outline" size="sm" onClick={() => navigate('/dashboard/admin/payouts')}>
+              Review payout requests
+            </Button>
+          </div>
+        </DashboardCard>
+      )}
 
       {/* Revenue Trends Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -523,6 +551,24 @@ export default function FinancialDashboard() {
           </div>
         </DashboardCard>
       </div>
+    </div>
+  )
+}
+
+function LedgerFigure({
+  label,
+  value,
+  hint,
+}: {
+  label: string
+  value: string
+  hint?: string
+}) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-card/40 p-4">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-bold">{value}</p>
+      {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
     </div>
   )
 }

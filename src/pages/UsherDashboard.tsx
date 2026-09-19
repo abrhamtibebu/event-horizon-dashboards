@@ -17,6 +17,10 @@ import {
   DollarSign,
   Mic,
   MonitorPlay,
+  Copy,
+  Ticket,
+  TrendingUp,
+  MousePointer,
 } from 'lucide-react'
 import { MetricCard } from '@/components/MetricCard'
 import { DashboardCard } from '@/components/DashboardCard'
@@ -32,6 +36,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import api from '@/lib/api'
+import { vendorReferralApi, type UsherReferralsResponse } from '@/lib/vendorReferralApi'
+import { buildShareTicketLink, copyText } from '@/features/events/lib/referralLinks'
+import { extractReferralSuffix } from '@/lib/referralCode'
 import { getGuestTypeBadgeClasses, cn } from '@/lib/utils'
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import { Link } from 'react-router-dom'
@@ -65,6 +72,8 @@ export default function UsherDashboard() {
   const [rejectDialogOpenId, setRejectDialogOpenId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [referralData, setReferralData] = useState<UsherReferralsResponse | null>(null);
+  const [referralsLoading, setReferralsLoading] = useState(true);
 
   useEffect(() => {
     const fetchUsherData = async () => {
@@ -93,6 +102,34 @@ export default function UsherDashboard() {
 
     fetchUsherData()
   }, [])
+
+  useEffect(() => {
+    const fetchReferralData = async () => {
+      try {
+        setReferralsLoading(true)
+        const data = await vendorReferralApi.getUsherReferrals()
+        setReferralData(data)
+      } catch (err) {
+        console.error('Failed to fetch usher referrals:', err)
+        setReferralData(null)
+      } finally {
+        setReferralsLoading(false)
+      }
+    }
+
+    fetchReferralData()
+  }, [])
+
+  const handleCopyReferralLink = async (eventUuid: string | undefined, code: string, eventId: number) => {
+    if (!eventUuid) {
+      toast({ title: 'Error', description: 'Event link is not available yet.', variant: 'destructive' })
+      return
+    }
+
+    const link = buildShareTicketLink(eventUuid, code, 'ref', eventId)
+    await copyText(link)
+    toast({ title: 'Copied', description: 'Your ticket referral link was copied.' })
+  }
 
   // Helper to parse tasks from event
   const getTasks = (event: any) => {
@@ -297,6 +334,111 @@ export default function UsherDashboard() {
             <span className="block text-xs text-gray-500 font-medium mt-1">Issues</span>
           </div>
         </div>
+
+        {/* Ticket sales & referral earnings */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-lg font-black uppercase tracking-tight text-white">Ticket Sales & Earnings</h2>
+            <TrendingUp className="h-5 w-5 text-primary" />
+          </div>
+
+          {referralsLoading ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-gray-400">
+              Loading referral earnings...
+            </div>
+          ) : !referralData?.referrals?.length ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-gray-400">
+              No referral links yet. Your organizer can create an usher referral link for ticketed events you are assigned to.
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-primary">
+                    <MousePointer className="h-4 w-4" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Clicks</span>
+                  </div>
+                  <span className="text-2xl font-black text-white">
+                    {referralData.summary.total_clicks}
+                  </span>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-blue-400">
+                    <Ticket className="h-4 w-4" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Sales</span>
+                  </div>
+                  <span className="text-2xl font-black text-white">
+                    {referralData.summary.total_purchases}
+                  </span>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-green-400">
+                    <DollarSign className="h-4 w-4" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Earned</span>
+                  </div>
+                  <span className="text-2xl font-black text-white">
+                    {referralData.summary.total_commission_earned.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {referralData.referrals.map((referral) => (
+                  <div
+                    key={referral.id}
+                    className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm"
+                  >
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate font-bold text-white">{referral.event_name || 'Event'}</h3>
+                        <p className="font-mono text-xs text-gray-400">
+                          REF-{extractReferralSuffix(referral.referral_code)}
+                        </p>
+                      </div>
+                      <Badge className="rounded-full border-none bg-primary/20 text-primary">
+                        {referral.commission_type === 'percentage'
+                          ? `${referral.commission_rate}%`
+                          : `ETB ${referral.commission_rate}`}
+                      </Badge>
+                    </div>
+
+                    <div className="mb-4 grid grid-cols-3 gap-2 text-center text-xs">
+                      <div>
+                        <p className="font-black text-white">{referral.total_clicks}</p>
+                        <p className="text-gray-500">Clicks</p>
+                      </div>
+                      <div>
+                        <p className="font-black text-white">{referral.total_purchases}</p>
+                        <p className="text-gray-500">Sales</p>
+                      </div>
+                      <div>
+                        <p className="font-black text-green-400">
+                          ETB {referral.total_commission_earned.toLocaleString()}
+                        </p>
+                        <p className="text-gray-500">Earned</p>
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      className="w-full border-white/10 bg-white/5 text-white hover:bg-white/10"
+                      onClick={() =>
+                        handleCopyReferralLink(
+                          referral.event_uuid,
+                          referral.referral_code,
+                          referral.event_id,
+                        )
+                      }
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy ticket link
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </section>
 
         {/* Active Assignments Section */}
         <section className="space-y-4">

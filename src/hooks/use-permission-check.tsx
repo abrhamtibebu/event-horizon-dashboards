@@ -68,8 +68,8 @@ export function usePermissionCheck() {
             'badges.locate': ['event_manager', 'organizer', 'organizer_admin', 'usher'],
             'reports.view': ['event_manager', 'marketing_specialist', 'finance_manager', 'organizer', 'organizer_admin'],
             'reports.export': ['event_manager', 'marketing_specialist', 'finance_manager', 'organizer', 'organizer_admin'],
-            'messages.manage': ['organizer', 'organizer_admin', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'usher', 'attendee', 'sales'],
-            'messages.send': ['organizer', 'organizer_admin', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'usher', 'attendee', 'sales'],
+            'messages.manage': ['organizer', 'organizer_admin', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'usher', 'attendee', 'sales', 'venue_admin', 'venue_staff'],
+            'messages.send': ['organizer', 'organizer_admin', 'event_manager', 'marketing_specialist', 'finance_manager', 'procurement_manager', 'operations_manager', 'purchase_requester', 'purchase_approver', 'proforma_manager', 'proforma_approver', 'purchase_order_issuer', 'payment_requester', 'payment_approver', 'usher', 'attendee', 'sales', 'venue_admin', 'venue_staff'],
             // Procurement permissions
             'pr.view': ['procurement_manager', 'procurement_officer', 'finance_manager', 'purchase_requester', 'purchase_approver'],
             'pr.create': ['procurement_manager', 'event_manager', 'operations_manager', 'purchase_requester'],

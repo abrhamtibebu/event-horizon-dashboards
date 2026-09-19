@@ -1,64 +1,157 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent } from '@/components/ui/card';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PaymentProcessingModal } from '@/components/payments/PaymentProcessingModal';
 import {
-  Ticket, CreditCard, User, ArrowLeft, ArrowRight, CheckCircle2,
-  Smartphone, Lock, Calendar, MapPin, Clock, ShieldCheck,
-  ChevronRight, Info, AlertCircle, Wallet
+  ArrowLeft,
+  Clock,
+  ShieldCheck,
+  Smartphone,
 } from 'lucide-react';
-import { Spinner, SpinnerInline } from '@/components/ui/spinner';
+import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { validateGuestPromoCode } from '@/lib/api/guestTicketPurchase';
 import { getPaymentMethods } from '@/lib/api/payments';
 import { useRegistrationShareMeta } from '@/lib/registrationShareMeta';
 import type { PaymentMethod } from '@/types/tickets';
-import type { TicketType } from '@/types';
-import { format } from 'date-fns';
 import EventLocationMapCard from '@/components/EventLocationMapCard';
-import { getImageUrl } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { CheckoutSection } from '@/components/tickets/checkout/CheckoutSection';
+import { CheckoutTopBar } from '@/components/tickets/checkout/CheckoutTopBar';
+import { EventContextCard } from '@/components/tickets/checkout/EventContextCard';
+import { PurchaseStepper } from '@/components/tickets/checkout/PurchaseStepper';
+import { TicketTypeOption } from '@/components/tickets/checkout/TicketTypeOption';
+import { PaymentMethodOption } from '@/components/tickets/checkout/PaymentMethodOption';
+import { PurchaseOrderSummary } from '@/components/tickets/checkout/PurchaseOrderSummary';
+import { CheckoutActionDock } from '@/components/tickets/checkout/CheckoutActionDock';
+import { CheckoutPromoFields } from '@/components/tickets/checkout/CheckoutPromoFields';
+import { SeatMapStep, tierColorsByTicketType } from '@/components/tickets/checkout/SeatMapStep';
+import {
+  fetchBestAvailable,
+  fetchPublicSeatingMap,
+  releaseSeats,
+  releaseSeatsOnUnload,
+  reserveSeats,
+} from '@/lib/api/publicSeating';
+import { referralTracking } from '@/lib/referralTracking';
+import {
+  extractReferralSuffix,
+  isPromoInputReadyForValidation,
+  promoCodeFromUrlParam,
+  toFullReferralCode,
+} from '@/lib/referralCode';
+import { isQaCheckoutPhone } from '@/lib/inputQuality';
 
-type Step = 'select' | 'details' | 'payment';
+type Step = 'select' | 'seats' | 'details' | 'payment';
+
+const MAX_SEATS_PER_ORDER = 10;
+
+/** Ticks down to an ISO deadline, returning null when there is nothing to count. */
+function useSecondsUntil(deadline: string | null): number | null {
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!deadline) {
+      setSecondsLeft(null);
+      return;
+    }
+    const target = new Date(deadline).getTime();
+    const tick = () => setSecondsLeft(Math.max(0, Math.round((target - Date.now()) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [deadline]);
+
+  return secondsLeft;
+}
+
+function formatCountdown(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+const stepMotion = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+};
 
 export default function TicketPurchasePage() {
   const { eventId } = useParams<{ eventId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [invitationCode, setInvitationCode] = useState<string | null>(null);
+  const [promoCode, setPromoCode] = useState<string>('');
+  const [showPromoCodes, setShowPromoCodes] = useState(false);
 
   const [step, setStep] = useState<Step>('select');
-  const [selectedTicketType, setSelectedTicketType] = useState<any>(null);
-  const [quantity, setQuantity] = useState(1);
+  /** Quantity per ticket type id; tiers absent from the map are not in the order. */
+  const [cart, setCart] = useState<Record<number, number>>({});
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'success' | 'failed'>('pending');
   const [paymentMessage, setPaymentMessage] = useState('');
   const [progress, setProgress] = useState(0);
   const [paymentPhoneNumber, setPaymentPhoneNumber] = useState('');
-  
-  // Get all available payment methods
-  const availablePaymentMethods = getPaymentMethods();
+  const [selectedSeatIds, setSelectedSeatIds] = useState<number[]>([]);
+  /** Quantity per standing section id; these tickets have no seat. */
+  const [standingQty, setStandingQty] = useState<Record<number, number>>({});
+  const [seatReservationToken, setSeatReservationToken] = useState<string | undefined>();
+  const [seatHoldExpiresAt, setSeatHoldExpiresAt] = useState<string | null>(null);
+  // Mirrors of state that unload handlers can read without re-subscribing.
+  const seatTokenRef = useRef<string | undefined>(undefined);
+  const paymentStartedRef = useRef(false);
+  const [isHoldingSeats, setIsHoldingSeats] = useState(false);
+  const [isBestAvailableLoading, setIsBestAvailableLoading] = useState(false);
 
-  // Attendee details
+  const availablePaymentMethods = getPaymentMethods().filter((m) => m.is_available);
+
   const [attendeeDetails, setAttendeeDetails] = useState({
     name: '',
     email: '',
     phone: '',
   });
 
-  // Extract invitation code
   useEffect(() => {
     const invParam = searchParams.get('inv');
-    if (invParam) setInvitationCode(invParam);
+    const refParam = searchParams.get('ref');
+    const storedRef = referralTracking.getReferralCode();
+
+    if (invParam) {
+      setPromoCode(promoCodeFromUrlParam(invParam, 'inv'));
+      setShowPromoCodes(true);
+    }
+    if (refParam) {
+      const display = promoCodeFromUrlParam(refParam, 'ref');
+      setPromoCode(display);
+      referralTracking.setReferralCode(toFullReferralCode(display));
+      referralTracking.trackLinkClick().catch(() => {});
+      setShowPromoCodes(true);
+    } else if (storedRef) {
+      setPromoCode(promoCodeFromUrlParam(storedRef, 'ref'));
+    }
   }, [searchParams]);
 
-  // Fetch event details
-  const { data: eventResult, isLoading: eventLoading } = useQuery({
+  const handlePromoCodeChange = (value: string) => {
+    setPromoCode(value);
+    const trimmed = value.trim();
+    if (!trimmed) {
+      referralTracking.clearReferralData();
+      return;
+    }
+    if (!trimmed.match(/^[\d\s+()-]+$/)) {
+      referralTracking.setReferralCode(toFullReferralCode(trimmed));
+    } else {
+      referralTracking.setReferralCode(trimmed);
+    }
+  };
+
+  const { data: eventResult, isLoading: eventLoading, isError } = useQuery({
     queryKey: ['event-public', eventId],
     queryFn: async () => {
       const response = await api.get(`/guest/events/${eventId}/ticket-types`);
@@ -70,6 +163,112 @@ export default function TicketPurchasePage() {
   const event = eventResult?.event;
   const ticketTypes = eventResult?.ticket_types || [];
 
+  const isReservedEvent = event?.seating_mode === 'reserved_seating';
+
+  const { data: seatingMap } = useQuery({
+    queryKey: ['public-seating-map', event?.uuid],
+    queryFn: () => fetchPublicSeatingMap(event!.uuid),
+    enabled: Boolean(event?.uuid && isReservedEvent),
+  });
+
+  const showSeatStep = Boolean(
+    isReservedEvent &&
+      seatingMap?.chart?.sections.some(
+        (section) =>
+          (section.seats ?? section.rows.flatMap((r) => r.seats)).length > 0 ||
+          (section.type === 'standing' && (section.capacity ?? 0) > 0),
+      ),
+  );
+  const standingTicketTypeById = useMemo(() => {
+    const out = new Map<number, number | null>();
+    for (const section of seatingMap?.chart?.sections ?? []) {
+      if (section.type === 'standing') out.set(section.id, section.ticket_type_id ?? null);
+    }
+    return out;
+  }, [seatingMap]);
+  const seatLabelById = useMemo(() => {
+    const out = new Map<number, string>();
+    for (const section of seatingMap?.chart?.sections ?? []) {
+      for (const seat of section.seats ?? section.rows.flatMap((r) => r.seats)) {
+        out.set(seat.id, seat.label);
+      }
+    }
+    return out;
+  }, [seatingMap]);
+
+  // A seat's price comes from its section's ticket type. Sections left unmapped fall
+  // back to the only ticket type, when the event has exactly one.
+  const soleTicketTypeId = ticketTypes.length === 1 ? (ticketTypes[0].id as number) : null;
+  const seatTicketTypeById = useMemo(() => {
+    const out = new Map<number, number>();
+    for (const section of seatingMap?.chart?.sections ?? []) {
+      const typeId = section.ticket_type_id ?? soleTicketTypeId;
+      if (typeId == null) continue;
+      for (const seat of section.seats ?? section.rows.flatMap((r) => r.seats)) {
+        out.set(seat.id, typeId);
+      }
+    }
+    return out;
+  }, [seatingMap, soleTicketTypeId]);
+
+  const ticketLines = useMemo(
+    () =>
+      Object.entries(cart)
+        .map(([id, qty]) => ({ ticket_type_id: Number(id), quantity: qty }))
+        .filter((line) => line.quantity > 0)
+        .sort((a, b) => a.ticket_type_id - b.ticket_type_id),
+    [cart],
+  );
+
+  const totalTickets = ticketLines.reduce((sum, l) => sum + l.quantity, 0);
+  const standingLines = useMemo(
+    () =>
+      Object.entries(standingQty)
+        .map(([id, qty]) => ({ section_id: Number(id), quantity: qty }))
+        .filter((line) => line.quantity > 0),
+    [standingQty],
+  );
+  const standingTotal = standingLines.reduce((sum, l) => sum + l.quantity, 0);
+  /** Seats plus standing spots; both count toward the ticket total. */
+  const placedTotal = selectedSeatIds.length + standingTotal;
+
+  const setCartQuantity = (ticketTypeId: number, qty: number) => {
+    setCart((prev) => {
+      const next = { ...prev };
+      if (qty <= 0) delete next[ticketTypeId];
+      else next[ticketTypeId] = qty;
+      return next;
+    });
+  };
+
+  const tierColorByTicketType = useMemo(
+    () => tierColorsByTicketType(seatingMap?.chart?.sections ?? []),
+    [seatingMap],
+  );
+
+  const orderLines = useMemo(
+    () =>
+      ticketLines.map((line) => {
+        const type = ticketTypes.find((t: any) => t.id === line.ticket_type_id);
+        return {
+          ticketTypeId: line.ticket_type_id,
+          name: type?.name ?? 'Ticket',
+          unitPrice: Number(type?.price ?? 0),
+          quantity: line.quantity,
+        };
+      }),
+    [ticketLines, ticketTypes],
+  );
+
+  const trimmedPromo = promoCode.trim();
+
+  const { data: promoValidation } = useQuery({
+    queryKey: ['promo-validate', event?.uuid, trimmedPromo],
+    queryFn: () => validateGuestPromoCode(event!.uuid, trimmedPromo, 'promo'),
+    enabled: Boolean(event?.uuid && isPromoInputReadyForValidation(trimmedPromo)),
+    retry: false,
+  });
+
   useRegistrationShareMeta({
     enabled: !!event,
     title: event?.name,
@@ -78,8 +277,7 @@ export default function TicketPurchasePage() {
     eventId: event?.id,
   });
 
-  // Real-time Inventory Polling
-  const { data: availabilityData, refetch: refetchTickets } = useQuery({
+  const { data: availabilityData } = useQuery({
     queryKey: ['available-ticket-types', event?.uuid],
     queryFn: async () => {
       const idToUse = event?.uuid || eventId;
@@ -92,80 +290,155 @@ export default function TicketPurchasePage() {
 
   const liveAvailability = availabilityData?.availability || [];
 
-  // Price Calculations
-  const { data: calculatedTotals, isLoading: calculatingTotals } = useQuery({
-    queryKey: ['ticket-totals', selectedTicketType?.id, quantity],
+  const { data: calculatedTotals, isLoading: calculatingTotals, error: calculateError } = useQuery({
+    queryKey: ['ticket-totals', JSON.stringify(ticketLines), trimmedPromo],
     queryFn: async () => {
-      if (!selectedTicketType || !event?.uuid) return null;
+      if (ticketLines.length === 0 || !event?.uuid) return null;
       const response = await api.post('/guest/tickets/calculate', {
         event_uuid: event.uuid,
-        tickets: [{ ticket_type_id: selectedTicketType.id, quantity }]
+        tickets: ticketLines,
+        promo_code: trimmedPromo || undefined,
       });
       return response.data;
     },
-    enabled: !!selectedTicketType && !!event?.uuid,
+    enabled: ticketLines.length > 0 && !!event?.uuid,
   });
 
-  const subtotal = calculatedTotals?.subtotal || (selectedTicketType ? Number(selectedTicketType.price) * quantity : 0);
+  // Changing the cart invalidates seats already picked.
+  // Clearing the selection is enough — the sync effect releases the hold.
+  const cartKey = JSON.stringify(ticketLines);
+  useEffect(() => {
+    setSelectedSeatIds([]);
+  }, [cartKey]);
+
+  useEffect(() => {
+    seatTokenRef.current = seatReservationToken;
+  }, [seatReservationToken]);
+
+
+  const seatHoldSecondsLeft = useSecondsUntil(seatHoldExpiresAt);
+
+  // The server drops the hold when it lapses, so mirror that in the UI.
+  useEffect(() => {
+    if (seatHoldSecondsLeft !== 0) return;
+    setSelectedSeatIds([]);
+    setStandingQty({});
+    setSeatReservationToken(undefined);
+    setSeatHoldExpiresAt(null);
+    setStep((current) => (current === 'select' ? current : 'seats'));
+    toast.error('Your seat hold expired. Please pick your seats again.');
+  }, [seatHoldSecondsLeft]);
+
+  useEffect(() => {
+    if (!calculateError) return;
+    if (!trimmedPromo) return;
+    const err = calculateError as { response?: { data?: { message?: string } } };
+    toast.error(err.response?.data?.message || 'Could not apply referral code');
+  }, [calculateError, trimmedPromo]);
+
+  const linesSubtotal = orderLines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
+  const subtotal = calculatedTotals?.subtotal || linesSubtotal;
+  const discount = calculatedTotals?.discount ?? 0;
   const total = calculatedTotals?.total || subtotal;
-  const organizerServiceFee = calculatedTotals?.organizer_service_fee || (subtotal * 0.05);
+  const isQaCheckout = isQaCheckoutPhone(attendeeDetails.phone);
+  const selectedSeatLabels = selectedSeatIds.map((id) => seatLabelById.get(id) ?? String(id));
+  const seatHoldLabel =
+    seatHoldSecondsLeft && seatHoldSecondsLeft > 0
+      ? `Seats held for ${formatCountdown(seatHoldSecondsLeft)}`
+      : null;
+  const storedReferralCode = referralTracking.getReferralCode();
 
   const purchaseMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedTicketType || !selectedPaymentMethod) {
-        throw new Error('Please select a ticket type and payment method');
+      if (ticketLines.length === 0) {
+        throw new Error(
+          'Add at least one ticket to your order',
+        );
       }
+      if (!selectedPaymentMethod) {
+        throw new Error('Please select a payment method');
+      }
+      // From here the hold belongs to the payment, not the browser session.
+      paymentStartedRef.current = true;
 
       const response = await api.post('/guest/payments/initiate', {
         event_uuid: event?.uuid,
-        tickets: [{ ticket_type_id: selectedTicketType.id, quantity }],
+        tickets: ticketLines,
+        seat_ids: showSeatStep ? selectedSeatIds : undefined,
+        standing: showSeatStep && standingLines.length > 0 ? standingLines : undefined,
+        seat_reservation_token: showSeatStep ? seatReservationToken : undefined,
         attendee_details: {
           name: attendeeDetails.name,
           email: attendeeDetails.email,
           phone: attendeeDetails.phone,
-          agreed_to_terms: true
+          agreed_to_terms: true,
         },
         payment_method: selectedPaymentMethod,
-        phone_number: paymentPhoneNumber,
+        phone_number: paymentPhoneNumber || attendeeDetails.phone,
         registration_type: searchParams.get('type') || 'prereg',
-        invitation_code: invitationCode || undefined,
+        promo_code: trimmedPromo || undefined,
+        referral_code: storedReferralCode || undefined,
+        frontend_origin: typeof window !== 'undefined' ? window.location.origin : undefined,
       });
 
       return response.data.data;
     },
     onSuccess: async (payment) => {
+      const paymentId = payment.payment_id ?? payment.id;
+      if (!paymentId) {
+        toast.error('Payment reference missing');
+        return;
+      }
+
       setIsProcessing(true);
       setPaymentStatus('pending');
       setPaymentMessage('Securely processing your payment...');
       setProgress(20);
 
-      // Polling for Chapa/Telebirr status if it's integrated via backend
-      // Or redirect if it returns a checkout URL
-      if (payment.checkout_url) {
-        window.location.href = payment.checkout_url;
+      const checkoutUrl = payment.checkout_url ?? '';
+      const isApiCallback = checkoutUrl.includes('/api/guest/payments/');
+
+      if (checkoutUrl && !isApiCallback) {
+        window.location.href = checkoutUrl;
         return;
       }
 
-      // Fallback polling logic for mobile payments
       try {
+        const confirmResponse = await api.post(`/guest/payments/${paymentId}/confirm`);
+
+        if (confirmResponse.data?.tickets_issued) {
+          setProgress(100);
+          setPaymentStatus('success');
+          setPaymentMessage('Success! Your tickets have been issued.');
+          setTimeout(() => {
+            setIsProcessing(false);
+            navigate(`/tickets/purchase/success?paymentId=${paymentId}`, { replace: true });
+          }, 800);
+          return;
+        }
+
         let attempts = 0;
         const maxAttempts = 45;
         let isSuccess = false;
 
-        const intervalId = setInterval(() => setProgress(p => Math.min(p + 1.5, 95)), 1000);
+        const intervalId = setInterval(() => setProgress((p) => Math.min(p + 1.5, 95)), 1000);
 
         while (attempts < maxAttempts) {
           try {
-            const response = await api.get(`/guest/payments/${payment.id}/status`);
+            const response = await api.get(`/guest/payments/${paymentId}/status`);
             if (response.data.payment_status === 'success') {
-              isSuccess = true;
-              break;
+              if (response.data.tickets_issued || response.data.purchase_pass) {
+                isSuccess = true;
+                break;
+              }
             } else if (response.data.payment_status === 'failed') {
               break;
             }
-          } catch (e) { }
+          } catch {
+            // keep polling
+          }
           attempts++;
-          await new Promise(r => setTimeout(r, 2000));
+          await new Promise((r) => setTimeout(r, 2000));
         }
 
         clearInterval(intervalId);
@@ -174,25 +447,151 @@ export default function TicketPurchasePage() {
         if (isSuccess) {
           setPaymentStatus('success');
           setPaymentMessage('Success! Your tickets have been issued.');
-          setTimeout(() => navigate('/tickets/purchase/success'), 2000);
+          setTimeout(() => {
+            setIsProcessing(false);
+            navigate(`/tickets/purchase/success?paymentId=${paymentId}`, { replace: true });
+          }, 800);
         } else {
           setPaymentStatus('failed');
           setPaymentMessage('Payment could not be verified. Please try again.');
         }
-      } catch (error) {
+      } catch {
         setPaymentStatus('failed');
+        setPaymentMessage('Payment could not be verified. Please try again.');
       }
     },
     onError: (error: any) => {
+      paymentStartedRef.current = false;
       setIsProcessing(false);
       toast.error(error.response?.data?.message || 'Failed to initiate purchase');
     },
   });
 
-  const handleNext = () => {
+  /**
+   * Holds exactly what is on screen. The server replaces any previous hold on the same
+   * token, so this doubles as "extend" when re-run with an unchanged selection.
+   */
+  const holdSeats = async (
+    seatIds: number[],
+    options?: { silent?: boolean; standing?: Array<{ section_id: number; quantity: number }> },
+  ) => {
+    const standing = options?.standing ?? standingLines;
+    if (!event?.uuid || (seatIds.length === 0 && standing.length === 0)) return false;
+
+    // Hold exactly what is picked, grouped by each seat's own tier.
+    const counts = new Map<number, number>();
+    for (const seatId of seatIds) {
+      const typeId = seatTicketTypeById.get(seatId);
+      if (typeId == null) continue;
+      counts.set(typeId, (counts.get(typeId) ?? 0) + 1);
+    }
+    for (const line of standing) {
+      const typeId = standingTicketTypeById.get(line.section_id) ?? soleTicketTypeId;
+      if (typeId == null) continue;
+      counts.set(typeId, (counts.get(typeId) ?? 0) + line.quantity);
+    }
+    if (counts.size === 0) return false;
+
+    if (!options?.silent) setIsHoldingSeats(true);
+    try {
+      const result = await reserveSeats({
+        event_uuid: event.uuid,
+        seat_ids: seatIds,
+        standing: standing.length > 0 ? standing : undefined,
+        tickets: [...counts.entries()].map(([ticket_type_id, qty]) => ({
+          ticket_type_id,
+          quantity: qty,
+        })),
+        reservation_token: seatTokenRef.current,
+      });
+      setSeatReservationToken(result.reservation_token);
+      setSeatHoldExpiresAt(result.expires_at);
+      return true;
+    } catch (error: any) {
+      if (!options?.silent) {
+        toast.error(error.response?.data?.message || 'Those seats are no longer available');
+      }
+      return false;
+    } finally {
+      if (!options?.silent) setIsHoldingSeats(false);
+    }
+  };
+
+  const dropHold = () => {
+    const token = seatTokenRef.current;
+    setSeatReservationToken(undefined);
+    setSeatHoldExpiresAt(null);
+    if (token) void releaseSeats(token).catch(() => {});
+  };
+
+  // Seats are held as soon as they are picked, and freed the moment the cart is emptied.
+  useEffect(() => {
+    if (!showSeatStep) return;
+    if (placedTotal === 0) {
+      if (seatTokenRef.current) dropHold();
+      return;
+    }
+    const id = setTimeout(() => void holdSeats(selectedSeatIds, { silent: true }), 500);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSeatIds, standingQty, showSeatStep]);
+
+  // Keep the hold alive while the buyer is still working through checkout.
+  useEffect(() => {
+    if (!seatReservationToken || placedTotal === 0) return;
+    const id = setInterval(
+      () => void holdSeats(selectedSeatIds, { silent: true }),
+      5 * 60 * 1000,
+    );
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seatReservationToken, selectedSeatIds, standingQty]);
+
+  // Leaving checkout without paying must not leave seats locked for the full TTL.
+  useEffect(() => {
+    const release = () => {
+      const token = seatTokenRef.current;
+      if (!token || paymentStartedRef.current) return;
+      releaseSeatsOnUnload(token);
+    };
+    window.addEventListener('pagehide', release);
+    return () => {
+      window.removeEventListener('pagehide', release);
+      release();
+    };
+  }, []);
+
+  const handleBestAvailable = async (sectionId?: number) => {
+    if (!event?.uuid || ticketLines.length === 0) return;
+    setIsBestAvailableLoading(true);
+    try {
+      const result = await fetchBestAvailable({
+        event_uuid: event.uuid,
+        tickets: ticketLines,
+        section_id: sectionId,
+      });
+      setSelectedSeatIds(result.seat_ids);
+      await holdSeats(result.seat_ids);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Could not find seats together');
+    } finally {
+      setIsBestAvailableLoading(false);
+    }
+  };
+
+  const handleNext = async () => {
     if (step === 'select') {
-      if (!selectedTicketType) return toast.error('Choose your ticket type first');
-      setStep('details');
+      if (totalTickets === 0) return toast.error('Add at least one ticket');
+      setStep(showSeatStep ? 'seats' : 'details');
+    } else if (step === 'seats') {
+      if (placedTotal !== totalTickets) {
+        return toast.error(
+          `Select ${totalTickets} seat${totalTickets === 1 ? '' : 's'} to continue`,
+        );
+      }
+      if (await holdSeats(selectedSeatIds)) {
+        setStep('details');
+      }
     } else if (step === 'details') {
       if (!attendeeDetails.name || !attendeeDetails.email || !attendeeDetails.phone) {
         return toast.error('Please provide all required attendee details');
@@ -201,49 +600,331 @@ export default function TicketPurchasePage() {
     }
   };
 
+  const handleBack = () => {
+    if (step === 'payment') setStep('details');
+    else if (step === 'details') setStep(showSeatStep ? 'seats' : 'select');
+    else if (step === 'seats') setStep('select');
+    else navigate(-1);
+  };
+
+  const handlePrimaryAction = () => {
+    if (step === 'payment') {
+      purchaseMutation.mutate();
+    } else {
+      void handleNext();
+    }
+  };
+
+  const primaryLabel =
+    step === 'select'
+      ? 'Continue'
+      : step === 'seats'
+        ? isHoldingSeats
+          ? 'Holding seats…'
+          : 'Continue'
+        : step === 'details'
+          ? 'Review & pay'
+          : `Pay ETB ${total.toLocaleString()}`;
+
+  const primaryDisabled =
+    step === 'select'
+      ? totalTickets === 0
+      : step === 'seats'
+        ? placedTotal !== totalTickets || isHoldingSeats
+        : step === 'details'
+        ? !attendeeDetails.name || !attendeeDetails.email || !attendeeDetails.phone
+        : !selectedPaymentMethod ||
+          (selectedPaymentMethod !== 'chapa' &&
+            selectedPaymentMethod !== 'm_pesa' &&
+            !paymentPhoneNumber) ||
+          purchaseMutation.isPending;
+
   if (eventLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background pt-20">
+      <div className="relative flex min-h-screen flex-col items-center justify-center gap-3 overflow-hidden bg-background">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.12),transparent_55%)]" />
         <Spinner size="lg" variant="primary" />
-        <p className="mt-4 text-muted-foreground animate-pulse">Loading Event Experience...</p>
+        <p className="text-sm text-muted-foreground">Loading checkout…</p>
       </div>
     );
   }
 
+  if (isError || !event) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="text-lg font-semibold tracking-tight">Event not available</p>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          This event may be inactive or ticket sales are not open yet.
+        </p>
+        <Button variant="outline" className="rounded-full" onClick={() => navigate(-1)}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Go back
+        </Button>
+      </div>
+    );
+  }
+
+  const isFirstStep = step === 'select';
   const startDate = event?.start_date ? new Date(event.start_date) : null;
+  const locationLabel = event?.venue_name || event?.location;
+  const eventImage = event?.image_url || event?.image || event?.event_image;
+  const showLocation =
+    event?.latitude ||
+    event?.longitude ||
+    event?.venue_name ||
+    event?.location ||
+    event?.formatted_address;
+
+  const sectionLabel =
+    step === 'select'
+      ? 'Choose tickets'
+      : step === 'seats'
+        ? 'Select seats'
+        : step === 'details'
+          ? 'Your details'
+          : 'Payment';
+  const sectionDescription =
+    step === 'select'
+      ? 'Add the tickets you want — mix tiers freely'
+      : step === 'seats'
+        ? `Choose ${totalTickets} seat${totalTickets === 1 ? '' : 's'} to match your tickets`
+        : step === 'details'
+          ? 'Tickets are sent to the email you enter'
+          : 'Select how you’d like to pay';
+
+  const stepContent = (
+    <AnimatePresence mode="wait">
+      {step === 'select' && (
+        <motion.div key="select" {...stepMotion} className="space-y-3">
+          {ticketTypes.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border/60 bg-card/30 p-8 text-center text-sm text-muted-foreground">
+              No tickets are available for this event right now.
+            </div>
+          ) : (
+            ticketTypes.map((type: any) => {
+              const availability = liveAvailability.find((a: any) => a.ticket_type_id === type.id);
+              const isSoldOut = availability
+                ? !availability.is_available
+                : type.availability_status === 'sold_out';
+              const remaining = availability?.remaining ?? type.available_for_sale ?? null;
+
+              return (
+                <TicketTypeOption
+                  key={type.id}
+                  id={type.id}
+                  name={type.name}
+                  description={type.description}
+                  price={Number(type.price)}
+                  benefits={type.benefits}
+                  isSoldOut={isSoldOut}
+                  quantity={cart[type.id] ?? 0}
+                  maxQuantity={Math.max(1, Math.min(MAX_SEATS_PER_ORDER, remaining ?? MAX_SEATS_PER_ORDER))}
+                  remaining={remaining}
+                  availabilityStatus={type.availability_status}
+                  tierColor={showSeatStep ? tierColorByTicketType.get(type.id) ?? null : null}
+                  onQuantityChange={(qty) => setCartQuantity(type.id, qty)}
+                />
+              );
+            })
+          )}
+          <CheckoutPromoFields
+            promoCode={promoCode}
+            onPromoCodeChange={handlePromoCodeChange}
+            expanded={showPromoCodes}
+            onExpandedChange={setShowPromoCodes}
+            discountHint={promoValidation?.valid ? promoValidation.discount_label : null}
+            error={
+              trimmedPromo && promoValidation && !promoValidation.valid
+                ? promoValidation.message ?? 'Invalid referral code'
+                : null
+            }
+            className="pt-1"
+          />
+        </motion.div>
+      )}
+
+      {step === 'seats' && seatingMap && (
+        <motion.div key="seats" {...stepMotion} className="space-y-4">
+          {seatHoldLabel && (
+            <div className="flex items-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              {seatHoldLabel} — finish checkout before the hold expires.
+            </div>
+          )}
+          <SeatMapStep
+            map={seatingMap}
+            requiredCount={totalTickets}
+            tierQuota={cart}
+            fallbackTicketTypeId={soleTicketTypeId}
+            selectedSeatIds={selectedSeatIds}
+            onChange={(ids) => setSelectedSeatIds(ids)}
+            standingQty={standingQty}
+            onStandingChange={setStandingQty}
+            onBestAvailable={handleBestAvailable}
+            isBestAvailableLoading={isBestAvailableLoading}
+          />
+        </motion.div>
+      )}
+
+      {step === 'details' && (
+        <motion.div key="details" {...stepMotion} className="space-y-4">
+          <div className="space-y-4 rounded-2xl border border-border/40 bg-card/40 p-4 sm:p-5">
+            <div className="space-y-2">
+              <Label htmlFor="name">Full name</Label>
+              <Input
+                id="name"
+                placeholder="Abebe Kebede"
+                value={attendeeDetails.name}
+                onChange={(e) => setAttendeeDetails((prev) => ({ ...prev, name: e.target.value }))}
+                className="h-11 rounded-xl border-border/50 bg-background/50"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="abebe@example.com"
+                value={attendeeDetails.email}
+                onChange={(e) => setAttendeeDetails((prev) => ({ ...prev, email: e.target.value }))}
+                className="h-11 rounded-xl border-border/50 bg-background/50"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone number</Label>
+              <Input
+                id="phone"
+                placeholder="0911223344"
+                value={attendeeDetails.phone}
+                onChange={(e) => setAttendeeDetails((prev) => ({ ...prev, phone: e.target.value }))}
+                className="h-11 rounded-xl border-border/50 bg-background/50"
+              />
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {step === 'payment' && (
+        <motion.div key="payment" {...stepMotion} className="space-y-4">
+          <div className="space-y-2.5">
+            {availablePaymentMethods.map((method) => (
+              <PaymentMethodOption
+                key={method.id}
+                id={method.id}
+                label={method.name}
+                description={method.description}
+                icon={method.icon}
+                selected={selectedPaymentMethod === method.id}
+                onClick={() => {
+                  setSelectedPaymentMethod(method.id);
+                  setPaymentPhoneNumber(attendeeDetails.phone);
+                }}
+              />
+            ))}
+          </div>
+
+          {selectedPaymentMethod &&
+            selectedPaymentMethod !== 'chapa' &&
+            selectedPaymentMethod !== 'm_pesa' && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-2 rounded-2xl border border-border/40 bg-card/40 p-4"
+              >
+                <Label htmlFor="payment-phone">Payment phone number</Label>
+                <div className="relative">
+                  <Smartphone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="payment-phone"
+                    type="tel"
+                    placeholder="0911223344"
+                    value={paymentPhoneNumber}
+                    onChange={(e) => setPaymentPhoneNumber(e.target.value)}
+                    className="h-11 rounded-xl border-border/50 bg-background/50 pl-10"
+                  />
+                </div>
+              </motion.div>
+            )}
+
+          {selectedPaymentMethod === 'chapa' && (
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              You’ll finish securely on Chapa — cards, Telebirr, CBE, and more.
+            </p>
+          )}
+
+          {isQaCheckout && selectedPaymentMethod !== 'chapa' && (
+            <p className="text-xs text-muted-foreground">
+              QA checkout: payment will auto-confirm after you complete this step.
+            </p>
+          )}
+
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-500" />
+            Secure payment · tickets emailed after confirmation
+          </p>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  const dockDetails = orderLines.length > 0 ? (
+    <PurchaseOrderSummary
+      variant="inline"
+      lines={orderLines}
+      quantity={totalTickets}
+      subtotal={subtotal}
+      discount={discount}
+      discountPercent={calculatedTotals?.discount_percent}
+      discountLabel={calculatedTotals?.discount_label}
+      total={total}
+      calculating={calculatingTotals}
+      seatLabels={showSeatStep ? selectedSeatLabels : undefined}
+    />
+  ) : undefined;
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-background text-foreground transition-colors duration-500">
-      {/* Dynamic Header / Banner */}
-      <div className="relative min-h-[28vh] h-[28vh] sm:h-[30vh] md:h-[40vh] overflow-hidden">
-        {event?.image_url || event?.image || event?.event_image ? (
-          <img src={getImageUrl(event.image_url || event.image || event.event_image, event.id)} alt={event.name} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/5 to-background" />
+    <div className="relative min-h-screen overflow-x-hidden bg-background pb-[calc(10rem+env(safe-area-inset-bottom,0px))] text-foreground">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.08),transparent_55%)]" />
+
+      <CheckoutTopBar
+        eventName={event.name}
+        imageUrl={eventImage}
+        eventId={event.id}
+        startDate={startDate}
+        onBack={handleBack}
+      />
+
+      <main
+        className={cn(
+          'relative mx-auto w-full px-4 py-6 sm:px-6 sm:py-8',
+          step === 'seats' ? 'max-w-6xl' : 'max-w-3xl',
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+      >
+        <PurchaseStepper
+          current={step}
+          showSeats={showSeatStep}
+          className="mb-8"
+        />
 
-        <div className="absolute bottom-0 left-0 w-full p-4 sm:p-6 md:p-12 min-w-0">
-          <div className="max-w-6xl mx-auto min-w-0">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="min-w-0">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20 mb-3">
-                <ShieldCheck className="w-3 h-3 mr-1" /> Official Event Sales
-              </span>
-              <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tighter mb-3 sm:mb-4 break-words hyphens-auto leading-tight">{event?.name}</h1>
-              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm font-medium text-muted-foreground">
-                {startDate && (
-                  <div className="flex items-start gap-1.5 min-w-0"><Calendar className="w-4 h-4 text-primary shrink-0 mt-0.5" /> <span className="break-words">{format(startDate, 'PPPP')}</span></div>
-                )}
-                <div className="flex items-start gap-1.5 min-w-0"><MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" /> <span className="break-words">{event?.venue_name || event?.location}</span></div>
-              </div>
-            </motion.div>
-          </div>
+        {isFirstStep && (
+          <EventContextCard
+            eventName={event.name}
+            imageUrl={eventImage}
+            eventId={event.id}
+            startDate={startDate}
+            location={locationLabel}
+            className="mb-6"
+          />
+        )}
+
+        <div className="rounded-3xl border border-border/40 bg-card/40 p-5 sm:p-7">
+          <CheckoutSection label={sectionLabel} description={sectionDescription}>
+            {stepContent}
+          </CheckoutSection>
         </div>
-      </div>
 
-      <div className="max-w-6xl mx-auto min-w-0 px-4 sm:px-6 py-8 sm:py-12 -mt-6 sm:-mt-8 relative z-10">
-        {(event?.latitude || event?.longitude || event?.venue_name || event?.location || event?.formatted_address) && (
-          <div className="mb-8">
+        {showLocation && isFirstStep && (
+          <div className="mt-6">
             <EventLocationMapCard
               latitude={event?.latitude}
               longitude={event?.longitude}
@@ -253,277 +934,24 @@ export default function TicketPurchasePage() {
             />
           </div>
         )}
+      </main>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
-
-          {/* Main Checkout Flow */}
-          <div className="lg:col-span-8 space-y-6 sm:space-y-8 min-w-0">
-            {/* Step Progress */}
-            <div className="flex items-center justify-between px-1 sm:px-2 gap-1 min-w-0">
-              <ProgressDot active={step === 'select'} completed={step !== 'select'} label="Tickets" />
-              <div className="flex-1 h-px bg-border mx-2 sm:mx-4 min-w-[8px]" />
-              <ProgressDot active={step === 'details'} completed={step === 'payment'} label="Details" />
-              <div className="flex-1 h-px bg-border mx-2 sm:mx-4 min-w-[8px]" />
-              <ProgressDot active={step === 'payment'} completed={false} label="Secure Pay" />
-            </div>
-
-            <AnimatePresence mode="wait">
-              {step === 'select' && (
-                <motion.div key="step-select" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                  <div className="grid grid-cols-1 gap-4">
-                    {ticketTypes.map((type: any) => {
-                      const availability = liveAvailability.find((a: any) => a.ticket_type_id === type.id);
-                      const isSoldOut = availability ? !availability.is_available : false;
-                      const isSelected = selectedTicketType?.id === type.id;
-
-                      return (
-                        <Card
-                          key={type.id}
-                          onClick={() => !isSoldOut && setSelectedTicketType(type)}
-                          className={`
-                            relative overflow-hidden cursor-pointer transition-all duration-300 group
-                            ${isSelected ? 'ring-2 ring-primary border-transparent' : 'hover:border-primary/50'}
-                            ${isSoldOut ? 'opacity-60 grayscale cursor-not-allowed' : ''}
-                          `}
-                        >
-                          <CardContent className="p-4 sm:p-6">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6 min-w-0">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                  <h3 className="text-lg sm:text-xl font-bold tracking-tight break-words">{type.name}</h3>
-                                  {isSoldOut && <span className="bg-destructive/10 text-destructive text-[10px] uppercase font-bold px-2 py-0.5 rounded">Sold Out</span>}
-                                </div>
-                                <p className="text-muted-foreground text-sm leading-relaxed mb-3 line-clamp-2">{type.description}</p>
-
-                                <div className="flex items-center gap-3">
-                                  {type.benefits?.slice(0, 2).map((b: string, i: number) => (
-                                    <span key={i} className="flex items-center text-[11px] font-semibold text-primary uppercase tracking-wider">
-                                      <CheckCircle2 className="w-3 h-3 mr-1" /> {b}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="text-left md:text-right shrink-0">
-                                <div className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Price per Ticket</div>
-                                <div className="text-2xl sm:text-3xl font-black tracking-tighter">ETB {Number(type.price).toLocaleString()}</div>
-                                {isSelected && (
-                                  <div className="mt-2 text-primary font-bold flex items-center md:justify-end text-sm">
-                                    Selected <CheckCircle2 className="w-4 h-4 ml-1.5" />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </CardContent>
-                          {isSelected && <div className="absolute top-0 right-0 w-16 h-16 bg-primary/10 rounded-bl-full border-t border-r border-primary/20" />}
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </motion.div>
-              )}
-
-              {step === 'details' && (
-                <motion.div key="step-details" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                  <Card>
-                    <CardContent className="p-4 sm:p-8 space-y-6">
-                      <div className="flex items-center gap-3 p-4 bg-primary/5 rounded-xl border border-primary/10 text-primary">
-                        <Info className="w-5 h-5 shrink-0" />
-                        <p className="text-sm font-medium">Please provide accurate info. Your tickets will be delivered to this email.</p>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Full Name</Label>
-                            <Input
-                              placeholder="Abebe Kebede"
-                              value={attendeeDetails.name}
-                              onChange={e => setAttendeeDetails(prev => ({ ...prev, name: e.target.value }))}
-                              className="h-12 bg-muted/30"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Email Address</Label>
-                            <Input
-                              type="email"
-                              placeholder="abekebe@gmail.com"
-                              value={attendeeDetails.email}
-                              onChange={e => setAttendeeDetails(prev => ({ ...prev, email: e.target.value }))}
-                              className="h-12 bg-muted/30"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Phone Number</Label>
-                          <Input
-                            placeholder="0911223344"
-                            value={attendeeDetails.phone}
-                            onChange={e => setAttendeeDetails(prev => ({ ...prev, phone: e.target.value }))}
-                            className="h-12 bg-muted/30"
-                          />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )}
-
-              {step === 'payment' && (
-                <motion.div key="step-payment" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {availablePaymentMethods.map((method) => (
-                      <PaymentOption
-                        key={method.id}
-                        id={method.id}
-                        label={method.name}
-                        description={method.description}
-                        icon={method.icon}
-                        selected={selectedPaymentMethod === method.id}
-                        onClick={() => {
-                          setSelectedPaymentMethod(method.id);
-                          setPaymentPhoneNumber(attendeeDetails.phone);
-                        }}
-                      />
-                    ))}
-                  </div>
-
-                  <AnimatePresence>
-                    {selectedPaymentMethod && (
-                      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mt-8">
-                        <Card className="border-primary/20 bg-primary/[0.02]">
-                          <CardContent className="p-6 space-y-4">
-                            <Label className="text-base font-bold">Payment Phone Number</Label>
-                            <div className="relative">
-                              <Input
-                                type="tel"
-                                placeholder="0911223344"
-                                value={paymentPhoneNumber}
-                                onChange={e => setPaymentPhoneNumber(e.target.value)}
-                                className="h-14 text-lg font-black tracking-widest pl-12"
-                              />
-                              <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
-                            </div>
-                            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                              <ShieldCheck className="w-3.5 h-3.5" /> 256-bit Secure Encryption Application
-                            </p>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Checkout Sticky Summary — sticky from lg only */}
-          <div className="lg:col-span-4 lg:sticky lg:top-24 min-w-0">
-            <Card className="shadow-2xl border-primary/10 overflow-hidden">
-              <div className="p-4 sm:p-6 border-b bg-muted/30">
-                <h2 className="font-bold flex items-center gap-2">
-                  <Ticket className="w-5 h-5 text-primary" /> Purchase Summary
-                </h2>
-              </div>
-              <CardContent className="p-6 space-y-6">
-                {selectedTicketType ? (
-                  <>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-bold text-lg">{selectedTicketType.name}</p>
-                          <p className="text-sm text-muted-foreground">ETB {Number(selectedTicketType.price).toLocaleString()} / ticket</p>
-                        </div>
-                        <div className="flex items-center gap-2 sm:gap-3 bg-muted rounded-lg p-1 shrink-0">
-                          <button
-                            type="button"
-                            aria-label="Decrease quantity"
-                            onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                            disabled={step !== 'select'}
-                            className="min-h-11 min-w-11 flex items-center justify-center rounded-md hover:bg-background disabled:opacity-50 transition-colors text-lg font-bold"
-                          >-</button>
-                          <span className="font-bold min-w-[28px] text-center tabular-nums">{quantity}</span>
-                          <button
-                            type="button"
-                            aria-label="Increase quantity"
-                            onClick={() => setQuantity(q => Math.min(10, q + 1))}
-                            disabled={step !== 'select'}
-                            className="min-h-11 min-w-11 flex items-center justify-center rounded-md hover:bg-background disabled:opacity-50 transition-colors text-lg font-bold"
-                          >+</button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2.5 pt-4 border-t border-dashed">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Subtotal</span>
-                          <span className="font-semibold">{calculatingTotals ? <SpinnerInline /> : `ETB ${subtotal.toLocaleString()}`}</span>
-                        </div>
-                        <div className="flex justify-between text-sm items-center">
-                          <span className="text-muted-foreground inline-flex items-center gap-1">
-                            Service Fee (5%) <InfoTooltip text="Organizers cover the service fee for you." />
-                          </span>
-                          <span className="text-green-600 font-bold uppercase text-[10px] tracking-tighter bg-green-500/10 px-1.5 py-0.5 rounded">Paid by Organizer</span>
-                        </div>
-                      </div>
-
-                      <div className="pt-4 flex justify-between items-end">
-                        <span className="text-base font-bold">Total Payable</span>
-                        <div className="text-right">
-                          <span className="block text-3xl font-black tracking-tighter text-primary">{calculatingTotals ? <SpinnerInline /> : `ETB ${total.toLocaleString()}`}</span>
-                          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Secure Checkout</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      {step !== 'payment' ? (
-                        <Button onClick={handleNext} size="lg" className="w-full h-14 text-lg font-bold group shadow-lg shadow-primary/20">
-                          Next Step <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={() => purchaseMutation.mutate()}
-                          disabled={!selectedPaymentMethod || purchaseMutation.isPending}
-                          size="lg"
-                          className="w-full h-14 text-lg font-bold bg-green-600 hover:bg-green-700 shadow-xl shadow-green-600/20"
-                        >
-                          {purchaseMutation.isPending ? <SpinnerInline className="mr-2" /> : <Lock className="w-5 h-5 mr-2" />}
-                          {purchaseMutation.isPending ? 'Processing...' : `Pay ETB ${total.toLocaleString()}`}
-                        </Button>
-                      )}
-
-                      {step !== 'select' && (
-                        <Button variant="ghost" onClick={() => setStep(step === 'payment' ? 'details' : 'select')} className="w-full text-muted-foreground">
-                          <ArrowLeft className="w-4 h-4 mr-2" /> Previous Step
-                        </Button>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
-                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                      <Ticket className="w-8 h-8 text-muted-foreground/40" />
-                    </div>
-                    <p className="text-muted-foreground font-medium">Choose a ticket to <br /> see your summary</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <div className="mt-8 flex items-center justify-center gap-6 opacity-30 grayscale hover:opacity-100 hover:grayscale-0 transition-all">
-              <div className="flex flex-col items-center gap-1">
-                <ShieldCheck className="w-6 h-6" />
-                <span className="text-[10px] font-black uppercase">Secure</span>
-              </div>
-              <div className="w-px h-8 bg-border" />
-              <div className="flex flex-col items-center gap-1">
-                <Lock className="w-6 h-6" />
-                <span className="text-[10px] font-black uppercase">SSL</span>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
+      <CheckoutActionDock
+        total={total}
+        calculating={calculatingTotals}
+        label={primaryLabel}
+        helper={
+          step === 'seats'
+            ? `${placedTotal} of ${totalTickets} ticket${totalTickets === 1 ? '' : 's'} placed`
+            : seatHoldLabel
+        }
+        disabled={primaryDisabled}
+        loading={purchaseMutation.isPending}
+        isPayStep={step === 'payment'}
+        onAction={handlePrimaryAction}
+        onBack={step === 'select' ? undefined : handleBack}
+        details={dockDetails}
+      />
 
       <PaymentProcessingModal
         isOpen={isProcessing}
@@ -533,75 +961,6 @@ export default function TicketPurchasePage() {
         progress={progress}
         onRetry={() => setIsProcessing(false)}
       />
-    </div>
-  );
-}
-
-function ProgressDot({ active, completed, label }: { active: boolean, completed: boolean, label: string }) {
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <div className={`
-        w-4 h-4 rounded-full transition-all duration-500
-        ${active ? 'bg-primary ring-4 ring-primary/20 scale-125' : completed ? 'bg-primary' : 'bg-muted'}
-      `} />
-      <span className={`text-[10px] font-bold uppercase tracking-widest ${active ? 'text-primary' : 'text-muted-foreground/60'}`}>{label}</span>
-    </div>
-  );
-}
-
-function PaymentOption({ id, label, description, icon, selected, onClick }: any) {
-  return (
-    <Card
-      onClick={onClick}
-      className={`
-        cursor-pointer transition-all duration-300 border-2 touch-manipulation min-h-[3.25rem]
-        ${selected ? 'border-primary bg-primary/[0.03] shadow-inner shadow-primary/5' : 'hover:border-primary/30'}
-      `}
-    >
-      <CardContent className="p-4 sm:p-5 min-w-0">
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-          <div className={`
-            w-12 h-12 rounded-2xl flex items-center justify-center transition-colors bg-white border
-            ${selected ? 'border-primary shadow-sm' : 'border-gray-200'}
-          `}>
-            <img 
-              src={icon} 
-              alt={label}
-              className="w-10 h-10 object-contain"
-              onError={(e) => {
-                // Fallback to emoji if image fails to load
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const fallback = target.nextElementSibling as HTMLElement;
-                if (fallback) fallback.style.display = 'flex';
-              }}
-            />
-            <div className="w-10 h-10 items-center justify-center" style={{ display: 'none' }}>
-              {id === 'telebirr' ? <Smartphone className="w-6 h-6" /> :
-               id === 'cbe_birr' ? <Wallet className="w-6 h-6" /> :
-               id === 'chapa' ? <CreditCard className="w-6 h-6" /> :
-               id === 'm_pesa' ? <Smartphone className="w-6 h-6" /> :
-               <Wallet className="w-6 h-6" />}
-            </div>
-          </div>
-          <div>
-            <h4 className="font-bold">{label}</h4>
-            <p className="text-[11px] text-muted-foreground">{description}</p>
-          </div>
-          {selected && <CheckCircle2 className="w-5 h-5 text-primary ml-auto" />}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function InfoTooltip({ text }: { text: string }) {
-  return (
-    <div className="group relative inline-block cursor-help ml-1">
-      <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-popover text-popover-foreground text-[10px] rounded-lg shadow-xl border border-border z-50">
-        {text}
-      </div>
     </div>
   );
 }

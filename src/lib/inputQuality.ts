@@ -203,3 +203,21 @@ export function validateFormFields(
 
   return errors
 }
+
+const QA_CHECKOUT_LOCAL_NUMBER = '913815469'
+
+export function phoneLocalDigits(phone: string): string {
+  let digits = phone.replace(/\D/g, '')
+  if (digits.startsWith('251')) {
+    digits = digits.slice(3)
+  }
+  if (digits.startsWith('0')) {
+    digits = digits.slice(1)
+  }
+  return digits
+}
+
+/** QA/dev checkout only — matches validity_backend QaCheckout helper. */
+export function isQaCheckoutPhone(phone: string): boolean {
+  return phoneLocalDigits(phone) === QA_CHECKOUT_LOCAL_NUMBER
+}

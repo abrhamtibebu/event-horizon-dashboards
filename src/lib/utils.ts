@@ -204,6 +204,7 @@ const STORAGE_PATH_PREFIXES = [
   'guest_profiles/',
   'user_profiles/',
   'badge_templates/',
+  'seating_backgrounds/',
 ] as const
 
 /**

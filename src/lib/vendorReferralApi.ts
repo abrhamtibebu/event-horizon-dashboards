@@ -1,16 +1,36 @@
 import { api } from './api';
 
+export type ReferrerType =
+  | 'sales_agent'
+  | 'usher'
+  | 'shop'
+  | 'food_vendor'
+  | 'souvenir_vendor'
+  | 'booth_holder'
+  | 'event_vendor'
+  | 'sponsor'
+  | 'other';
+
 export interface VendorReferral {
   id: number;
-  vendor_id: number;
+  vendor_id?: number | null;
+  usher_id?: number | null;
   event_id: number;
   referral_code: string;
   referral_link: string;
+  dashboard_referral_link?: string;
   campaign_name?: string;
   description?: string;
   commission_rate: number;
   commission_amount?: number;
   commission_type: 'percentage' | 'fixed';
+  discount_type?: 'none' | 'percentage' | 'fixed';
+  discount_value?: number;
+  max_discount_amount?: number;
+  referrer_type?: ReferrerType;
+  partner_name?: string;
+  partner_phone?: string;
+  display_name?: string;
   status: 'active' | 'inactive' | 'expired';
   expires_at?: string;
   max_uses?: number;
@@ -25,6 +45,12 @@ export interface VendorReferral {
     name: string;
     email: string;
     phone: string;
+  };
+  usher?: {
+    id: number;
+    name: string;
+    email: string;
+    phone?: string;
   };
   event?: {
     id: number;
@@ -86,16 +112,50 @@ export interface ReferralAnalytics {
 }
 
 export interface CreateReferralRequest {
-  vendor_id: number;
+  vendor_id?: number;
+  usher_id?: number;
   event_id: number;
+  referrer_type: ReferrerType;
+  partner_name?: string;
+  partner_phone?: string;
   campaign_name?: string;
   description?: string;
   commission_rate: number;
   commission_amount?: number;
   commission_type: 'percentage' | 'fixed';
+  discount_type?: 'none' | 'percentage' | 'fixed';
+  discount_value?: number;
+  max_discount_amount?: number;
   expires_at?: string;
   max_uses?: number;
   tracking_params?: Record<string, any>;
+}
+
+export interface UsherReferralSummary {
+  total_clicks: number;
+  total_purchases: number;
+  total_commission_earned: number;
+}
+
+export interface UsherReferralItem {
+  id: number;
+  event_id: number;
+  event_name?: string;
+  event_type?: string;
+  event_uuid?: string;
+  referral_code: string;
+  referral_link: string;
+  commission_rate: number;
+  commission_type: 'percentage' | 'fixed';
+  status: string;
+  total_clicks: number;
+  total_purchases: number;
+  total_commission_earned: number;
+}
+
+export interface UsherReferralsResponse {
+  summary: UsherReferralSummary;
+  referrals: UsherReferralItem[];
 }
 
 export interface UpdateReferralRequest {
@@ -130,6 +190,7 @@ class VendorReferralApiService {
   async getReferrals(params: {
     vendor_id?: number;
     event_id?: number;
+    referrer_type?: string;
     status?: string;
     search?: string;
     sort_by?: string;
@@ -154,8 +215,8 @@ class VendorReferralApiService {
       // Handle both { success: true, data: [...] } and direct array responses
       let data = [];
       if (response.data?.success && response.data?.data) {
-        // Laravel API response format: { success: true, data: [...] }
-        data = response.data.data;
+        const payload = response.data.data;
+        data = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
       } else if (Array.isArray(response.data)) {
         // Direct array response
         data = response.data;
@@ -203,6 +264,36 @@ class VendorReferralApiService {
 
   async deleteReferral(id: number): Promise<void> {
     await api.delete(`${this.baseUrl}/${id}`);
+  }
+
+  async exportPerformance(eventId: number): Promise<void> {
+    const response = await api.get('/vendor-referrals/performance-export', {
+      params: { event_id: eventId },
+      responseType: 'blob',
+    });
+
+    const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `referral-performance-event-${eventId}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  async getUsherReferrals(params: { event_id?: number; status?: string } = {}): Promise<UsherReferralsResponse> {
+    const searchParams = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, value.toString());
+      }
+    });
+
+    const response = await api.get(`/usher/referrals?${searchParams.toString()}`);
+    return response.data?.data ?? response.data;
   }
 
   async getAnalytics(params: {

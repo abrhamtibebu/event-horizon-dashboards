@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { QrCode, Search, UserCheck, History, Info, AlertCircle, CheckCircle, Smartphone, Camera, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
-import { validateTicket, bulkCheckInTickets } from '@/lib/api/tickets';
+import { validateTicket, bulkCheckInTickets, checkInPurchasePassOne, checkInPurchasePassAll } from '@/lib/api/tickets';
 import { ValidationResultCard } from '@/components/checkin/ValidationResultCard';
 import type { ValidationResult } from '@/types/tickets';
 import api from '@/lib/api';
@@ -50,8 +50,19 @@ export default function TicketRedemption() {
         }),
         onSuccess: (data) => {
             setLastResult(data);
-            setHistory(prev => [data, ...prev].slice(0, 10)); // Keep last 10
-            if (data.validation_status === 'valid') {
+            setHistory(prev => [data, ...prev].slice(0, 10));
+            if (data.validation_type === 'purchase_pass') {
+                if (data.validation_status === 'pass_valid') {
+                    setScanFeedback({
+                        type: 'success',
+                        message: data.purchase_pass?.guest_name || data.message || 'Purchase pass found',
+                    });
+                } else if (data.validation_status === 'pass_fully_used') {
+                    setScanFeedback({ type: 'error', message: 'All tickets already checked in' });
+                } else {
+                    setScanFeedback({ type: 'error', message: data.message || 'Invalid purchase pass' });
+                }
+            } else if (data.validation_status === 'valid') {
                 setScanFeedback({ type: 'success', message: data.attendee?.guest?.name || data.message || 'Check-in successful' });
             } else if (data.validation_status === 'not_event_checked_in') {
                 setScanFeedback({ type: 'error', message: 'Not checked in at main entry' });
@@ -59,7 +70,6 @@ export default function TicketRedemption() {
                 setScanFeedback({ type: 'error', message: data.message || 'Validation failed' });
             }
             setTicketNumber('');
-            // Auto-dismiss feedback after 2 seconds
             setTimeout(() => setScanFeedback(null), 2000);
         },
         onError: (error: any) => {
@@ -84,6 +94,42 @@ export default function TicketRedemption() {
         }
     });
 
+    const checkInOneMutation = useMutation({
+        mutationFn: (orderId: string) => checkInPurchasePassOne({
+            order_id: orderId,
+            event_id: selectedEventId!,
+        }),
+        onSuccess: (data) => {
+            setLastResult(data);
+            setHistory(prev => [data, ...prev].slice(0, 10));
+            toast.success(data.message || 'Checked in 1 ticket');
+            setScanFeedback({ type: 'success', message: data.message || 'Checked in 1' });
+            setTimeout(() => setScanFeedback(null), 2000);
+            queryClient.invalidateQueries({ queryKey: ['usher-stats', selectedEventId] });
+        },
+        onError: (error: any) => {
+            toast.error(error.response?.data?.message || 'Check-in failed');
+        },
+    });
+
+    const checkInAllMutation = useMutation({
+        mutationFn: (orderId: string) => checkInPurchasePassAll({
+            order_id: orderId,
+            event_id: selectedEventId!,
+        }),
+        onSuccess: (data) => {
+            setLastResult(data);
+            setHistory(prev => [data, ...prev].slice(0, 10));
+            toast.success(data.message || 'All tickets checked in');
+            setScanFeedback({ type: 'success', message: data.message || 'All checked in' });
+            setTimeout(() => setScanFeedback(null), 2000);
+            queryClient.invalidateQueries({ queryKey: ['usher-stats', selectedEventId] });
+        },
+        onError: (error: any) => {
+            toast.error(error.response?.data?.message || 'Bulk check-in failed');
+        },
+    });
+
     const handleManualSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!ticketNumber) return;
@@ -96,6 +142,22 @@ export default function TicketRedemption() {
             return;
         }
         bulkCheckInMutation.mutate(ticketIds);
+    };
+
+    const handleCheckInOne = (orderId: string) => {
+        if (!selectedEventId) {
+            toast.error('Event context missing. Please re-select event.');
+            return;
+        }
+        checkInOneMutation.mutate(orderId);
+    };
+
+    const handleCheckInAll = (orderId: string) => {
+        if (!selectedEventId) {
+            toast.error('Event context missing. Please re-select event.');
+            return;
+        }
+        checkInAllMutation.mutate(orderId);
     };
 
     if (eventsLoading) {
@@ -402,7 +464,14 @@ export default function TicketRedemption() {
                                 <h3 className="font-bold text-[9px] uppercase tracking-wider text-gray-500">Live Result</h3>
                                 <Button variant="ghost" size="sm" className="h-6 text-[8px] font-bold uppercase" onClick={() => setLastResult(null)}>Dismiss</Button>
                             </div>
-                            <ValidationResultCard result={lastResult} onBulkCheckIn={handleBulkCheckIn} />
+                            <ValidationResultCard
+                                result={lastResult}
+                                onBulkCheckIn={handleBulkCheckIn}
+                                onCheckInOne={handleCheckInOne}
+                                onCheckInAll={handleCheckInAll}
+                                isCheckInOnePending={checkInOneMutation.isPending}
+                                isCheckInAllPending={checkInAllMutation.isPending}
+                            />
                         </div>
                     )}
                 </div>
