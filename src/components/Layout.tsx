@@ -6,6 +6,7 @@ import { Header } from '@/components/Header'
 import { SuspendedOrganizerGuard } from '@/components/SuspendedOrganizerGuard'
 import { VenueSetupGuard } from '@/components/VenueSetupGuard'
 import { UsherBottomNav } from '@/components/UsherBottomNav'
+import { VenueBottomNav } from '@/components/venue/VenueBottomNav'
 import { MessagesTrayProvider } from '@/components/messaging/MessagesTrayContext'
 import { MessagesFloatingTray } from '@/components/messaging/MessagesFloatingTray'
 import { useAuth } from '@/hooks/use-auth'
@@ -16,6 +17,7 @@ export function Layout() {
   const { user } = useAuth()
   const location = useLocation()
   const isUsher = user?.role === 'usher' || location.pathname.startsWith('/dashboard/usher')
+  const isVenue = user?.role === 'venue_admin' || user?.role === 'venue_staff'
 
   return (
     <SidebarProvider defaultOpen={false}>
@@ -26,7 +28,7 @@ export function Layout() {
             <div className={cn(isUsher && 'hidden md:block')}>
               <Header onSearch={setSearchQuery} />
             </div>
-            <main className={cn('flex-1', !isUsher && 'p-6', isUsher && 'p-0 md:p-6 pb-24 md:pb-6')}>
+            <main className={cn('flex-1', !isUsher && 'p-6', isUsher && 'p-0 md:p-6 pb-24 md:pb-6', isVenue && !isUsher && 'pb-24 md:pb-6')}>
               <SuspendedOrganizerGuard>
                 <VenueSetupGuard>
                   <Outlet context={{ searchQuery }} />
@@ -35,6 +37,7 @@ export function Layout() {
             </main>
           </div>
           {isUsher && <UsherBottomNav />}
+          {isVenue && !isUsher && <VenueBottomNav />}
           <MessagesFloatingTray />
         </div>
       </MessagesTrayProvider>

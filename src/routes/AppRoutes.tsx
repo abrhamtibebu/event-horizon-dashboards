@@ -731,6 +731,46 @@ const AppWithRealtime = () => {
               }
             />
             <Route
+              path="venue/revenue"
+              element={
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff']}>
+                  <Lazy>
+                    <P.VenueRevenuePage />
+                  </Lazy>
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="venue/inbox"
+              element={
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff']}>
+                  <Lazy>
+                    <P.VenueInboxPage />
+                  </Lazy>
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="venue/calendar"
+              element={
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff']}>
+                  <Lazy>
+                    <P.VenueCalendarPage />
+                  </Lazy>
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="venue/spaces/:spaceId"
+              element={
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff']}>
+                  <Lazy>
+                    <P.VenueSpaceDetailPage />
+                  </Lazy>
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
               path="venue/staff"
               element={
                 <RoleProtectedRoute allowedRoles={['venue_admin']}>

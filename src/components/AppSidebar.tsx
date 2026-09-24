@@ -24,6 +24,8 @@ import {
   UserCircle,
   MessageCircle,
   LayoutDashboard,
+  LayoutGrid,
+  Inbox,
   Fingerprint,
   CheckSquare,
   Activity,
@@ -119,19 +121,37 @@ const navigationCategories = [
     label: 'Venue',
     items: [
       {
+        title: 'Inbox',
+        url: '/dashboard/venue/inbox',
+        icon: Inbox,
+        roles: ['venue_admin', 'venue_staff'],
+      },
+      {
+        title: 'Calendar',
+        url: '/dashboard/venue/calendar',
+        icon: CalendarDays,
+        roles: ['venue_admin', 'venue_staff'],
+      },
+      {
         title: 'Bookings',
         url: '/dashboard/venue/bookings',
         icon: CalendarDays,
         roles: ['venue_admin', 'venue_staff'],
       },
       {
-        title: 'Spaces',
-        url: '/dashboard/venue/spaces',
-        icon: Store,
+        title: 'Revenue',
+        url: '/dashboard/venue/revenue',
+        icon: Banknote,
         roles: ['venue_admin', 'venue_staff'],
       },
       {
-        title: 'Venue profile',
+        title: 'Spaces',
+        url: '/dashboard/venue/spaces',
+        icon: LayoutGrid,
+        roles: ['venue_admin', 'venue_staff'],
+      },
+      {
+        title: 'Listing',
         url: '/dashboard/venue/profile',
         icon: MapPin,
         roles: ['venue_admin', 'venue_staff'],
@@ -398,9 +418,14 @@ export function AppSidebar() {
 
   // Simplified navigation for organizers
   const isOrganizer = user?.role === 'organizer' || user?.role === 'organizer_admin'
+  const isVenueUser = user?.role === 'venue_admin' || user?.role === 'venue_staff'
 
   // Filter categories and items based on user role and permissions
   const filteredCategories = navigationCategories
+    .filter((category) => {
+      if (!isVenueUser) return true
+      return category.label === 'Overview' || category.label === 'Venue' || category.label === 'Connect'
+    })
     .map((category) => ({
       ...category,
       // Simplify category labels for organizers
@@ -410,7 +435,12 @@ export function AppSidebar() {
             user?.role === 'usher' && category.label === 'Operations' ? 'My Duties' :
               user?.role === 'usher' && category.label === 'Connect' ? 'Communicate' :
                 category.label,
-      items: category.items.filter((item) => {
+      items: category.items.map((item) => {
+        if (isVenueUser && item.url === '/dashboard') {
+          return { ...item, title: 'Today' }
+        }
+        return item
+      }).filter((item) => {
         if (!user) return false
 
         // Skip permission checks but still enforce role-based access

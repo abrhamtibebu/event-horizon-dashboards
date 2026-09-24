@@ -88,9 +88,38 @@ export interface VenueBooking {
   contact_email?: string | null
   contact_phone?: string | null
   created_at?: string
+  package_id?: number | null
+  quoted_amount?: number | null
+  currency?: string | null
+  paid_total?: number
+  balance_status?: 'unquoted' | 'unpaid' | 'partial' | 'paid' | string
   space?: VenueSpace
+  package?: VenueSpacePackage | null
+  payments?: VenueBookingPayment[]
   event?: { id: number; name: string }
   organizer?: { id: number; name: string }
+}
+
+export interface VenueBookingPayment {
+  id: number
+  venue_booking_id: number
+  amount: number
+  method: 'cash' | 'bank' | 'chapa' | string
+  reference?: string | null
+  paid_at: string
+  notes?: string | null
+}
+
+export interface VenueRevenueReport {
+  from: string
+  to: string
+  currency: string
+  collected: number
+  quoted: number
+  outstanding: number
+  byMethod: { method: string; amount: number }[]
+  bySpace: { id: number; name: string; quoted: number; collected: number; outstanding: number }[]
+  daily: { date: string; collected: number }[]
 }
 
 export interface VenueBlackout {
@@ -159,6 +188,8 @@ export interface VenueDashboardData {
     upcomingDelta?: number
     pendingDelta?: number
     confirmedDelta?: number
+    collectedThisMonth?: number
+    outstanding?: number
   }
   upcomingBookings: VenueBooking[]
   pendingRequests: VenueBooking[]
@@ -202,6 +233,13 @@ export const venueApi = {
     api.patch<VenueBooking>(`/venue/bookings/${id}`, data),
   replyBooking: (id: number, data: { message: string; subject?: string }) =>
     api.post(`/venue/bookings/${id}/reply`, data),
+  recordPayment: (
+    bookingId: number,
+    data: { amount: number; method: string; reference?: string; paid_at?: string; notes?: string },
+  ) => api.post<VenueBooking>(`/venue/bookings/${bookingId}/payments`, data),
+  deletePayment: (bookingId: number, paymentId: number) =>
+    api.delete<VenueBooking>(`/venue/bookings/${bookingId}/payments/${paymentId}`),
+  revenue: (params?: { from?: string; to?: string }) => api.get<VenueRevenueReport>('/venue/revenue', { params }),
   blackouts: (params?: { space_id?: number; from?: string; to?: string }) =>
     api.get<VenueBlackout[]>('/venue/blackouts', { params }),
   createBlackout: (data: Record<string, unknown>) => api.post<VenueBlackout>('/venue/blackouts', data),
