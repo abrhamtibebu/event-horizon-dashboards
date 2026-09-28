@@ -795,7 +795,7 @@ export default function PublicEventRegister() {
         throw new Error('Payment initiation failed');
       }
 
-      const paymentId = paymentResponse.data.data.payment_id;
+      const paymentId = paymentResponse.data.data.payment_token ?? paymentResponse.data.data.payment_id;
 
       // Poll payment status (simulating payment processing)
       let attempts = 0;

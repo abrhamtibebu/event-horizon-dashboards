@@ -172,9 +172,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const res = await api.post('/login', { ...credentials, remember })
       const { token, user, expires_in } = res.data
 
+      if (res.data.requires_2fa) {
+        const error = Object.assign(new Error('2FA_REQUIRED'), {
+          requires_2fa: true,
+          two_factor_challenge: res.data.two_factor_challenge,
+          user: res.data.user,
+        })
+        throw error
+      }
+
       persistAuthToken(token, remember, expires_in)
       localStorage.removeItem('mock_auth')
       setUser(user)
+
+      if (res.data.requires_2fa_setup) {
+        const error = Object.assign(new Error('2FA_SETUP_REQUIRED'), {
+          requires_2fa_setup: true,
+        })
+        throw error
+      }
 
       if (checkIntervalRef.current) {
         clearInterval(checkIntervalRef.current)

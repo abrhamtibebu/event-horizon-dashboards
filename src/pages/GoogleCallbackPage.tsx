@@ -35,17 +35,28 @@ export default function GoogleCallbackPage() {
         const res = await api.post('/auth/google/callback', {
           code,
           source: sessionStorage.getItem('google_auth_source') || 'dashboard',
+          state: searchParams.get('state') || undefined,
         })
         sessionStorage.removeItem('google_auth_source')
 
+        if (res.data.requires_2fa) {
+          sessionStorage.setItem('two_factor_challenge', res.data.two_factor_challenge)
+          navigate('/signin?2fa=1', { replace: true })
+          return
+        }
+
         const { token, user, expires_in } = res.data
+        if (!token) {
+          setError('Google sign-in did not return a session.')
+          return
+        }
 
         persistAuthToken(token, true, expires_in)
         localStorage.removeItem('mock_auth')
 
         setUser(user)
 
-        navigate('/dashboard', { replace: true })
+        navigate(res.data.requires_2fa_setup ? '/signin?2fa_setup=1' : '/dashboard', { replace: true })
       } catch (err: any) {
         // Handle double-call in dev mode
         if (err?.response?.status === 400 && localStorage.getItem('jwt')) {

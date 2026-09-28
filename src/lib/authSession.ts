@@ -1,3 +1,8 @@
+/**
+ * Tokens currently live in web storage because the dashboard SPA calls the
+ * Validity API cross-origin. Planned follow-up: HttpOnly cookies via a BFF
+ * or same-site cookie domain. Do not put JWTs in query strings.
+ */
 import axios from 'axios'
 import { getApiBaseURL } from '@/config/env'
 import { isTokenExpired, isTokenExpiringSoon } from '@/utils/token'

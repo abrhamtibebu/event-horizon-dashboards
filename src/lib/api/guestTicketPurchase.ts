@@ -25,12 +25,12 @@ export type GuestPaymentStatusResponse = {
   }>;
 };
 
-export async function confirmGuestPayment(paymentId: number): Promise<unknown> {
+export async function confirmGuestPayment(paymentId: string | number): Promise<unknown> {
   const { data } = await api.post(`/guest/payments/${paymentId}/confirm`);
   return data;
 }
 
-export async function fetchGuestPaymentStatus(paymentId: number): Promise<GuestPaymentStatusResponse> {
+export async function fetchGuestPaymentStatus(paymentId: string | number): Promise<GuestPaymentStatusResponse> {
   const { data } = await api.get(`/guest/payments/${paymentId}/status`);
   return data;
 }
@@ -40,7 +40,7 @@ export async function fetchGuestPaymentStatus(paymentId: number): Promise<GuestP
  * Stays in-app as a blob download — does not navigate to the API URL.
  */
 export async function downloadGuestPurchasePass(
-  paymentId: number,
+  paymentId: string | number,
   downloadFilename?: string,
 ): Promise<void> {
   try {

@@ -96,7 +96,7 @@ export const useInitiateGuestPayment = () => {
  * Confirm payment
  */
 export const useConfirmGuestPayment = () => {
-  return useMutation<PaymentConfirmationResponse, Error, number>({
+  return useMutation<PaymentConfirmationResponse, Error, string | number>({
     mutationFn: async (paymentId) => {
       const response = await api.post(`/guest/payments/${paymentId}/confirm`);
       return response.data;

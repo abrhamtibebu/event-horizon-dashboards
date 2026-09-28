@@ -384,7 +384,7 @@ export default function TicketPurchasePage() {
       return response.data.data;
     },
     onSuccess: async (payment) => {
-      const paymentId = payment.payment_id ?? payment.id;
+      const paymentId = payment.payment_token ?? payment.payment_id ?? payment.id;
       if (!paymentId) {
         toast.error('Payment reference missing');
         return;

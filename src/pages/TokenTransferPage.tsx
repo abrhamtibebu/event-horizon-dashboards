@@ -4,11 +4,10 @@ import { useAuth } from '@/hooks/use-auth'
 import { Spinner } from '@/components/ui/spinner'
 import { AlertCircle } from 'lucide-react'
 import api from '@/lib/api'
+import { persistAuthToken } from '@/lib/authSession'
 
 /**
- * TokenTransferPage — handles cross-app redirect when an organizer-type user
- * signs in via evella.et and gets redirected here with their JWT token.
- * URL: /auth/google/transfer?token=<JWT>
+ * Cross-app OAuth handoff. The URL may only contain a one-time code.
  */
 export default function TokenTransferPage() {
   const [searchParams] = useSearchParams()
@@ -17,10 +16,14 @@ export default function TokenTransferPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const token = searchParams.get('token')
+    if (searchParams.get('token')) {
+      setError('This sign-in link is no longer valid. Please sign in again.')
+      return
+    }
 
-    if (!token) {
-      setError('No token received.')
+    const code = searchParams.get('code')
+    if (!code) {
+      setError('No transfer code received.')
       return
     }
 
@@ -28,23 +31,15 @@ export default function TokenTransferPage() {
 
     ;(async () => {
       try {
-        // Store the token
-        localStorage.setItem('jwt', token)
-        localStorage.setItem('token_created_at', Date.now().toString())
-        localStorage.removeItem('mock_auth')
-
-        // Fetch user data to validate token and populate context
-        const { data } = await api.get('/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-
+        const { data } = await api.post('/auth/handoff/consume', { code })
         if (cancelled) return
 
-        setUser(data)
+        persistAuthToken(data.token, true, data.expires_in)
+        window.history.replaceState({}, document.title, window.location.pathname)
+        setUser(data.user)
         navigate('/dashboard', { replace: true })
       } catch (err: any) {
         if (cancelled) return
-        localStorage.removeItem('jwt')
         setError(
           err?.response?.data?.error ??
           err?.message ??

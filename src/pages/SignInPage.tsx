@@ -94,15 +94,71 @@ function SignInForm() {
     () => localStorage.getItem('auth_remember_me') === 'true',
   )
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
-  const { login, loginWithGoogle } = useAuth()
+  const [twoFactor, setTwoFactor] = useState<{
+    mode: 'verify' | 'setup'
+    challenge?: string
+    secret?: string
+    qr?: string
+    recoveryCodes?: string[]
+  } | null>(null)
+  const [otp, setOtp] = useState('')
+  const { login, loginWithGoogle, setUser } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const turnstileSiteKey = getTurnstileSiteKey()
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const challenge = sessionStorage.getItem('two_factor_challenge')
+    if (params.get('2fa') === '1' && challenge) {
+      setTwoFactor({ mode: 'verify', challenge })
+      sessionStorage.removeItem('two_factor_challenge')
+    }
+    if (params.get('2fa_setup') === '1') {
+      api.post('/two-factor/setup', { method: 'totp' }).then((setup) => {
+        setTwoFactor({
+          mode: 'setup',
+          secret: setup.data.data.secret,
+          qr: setup.data.data.qr_code_data_uri,
+          recoveryCodes: setup.data.data.recovery_codes,
+        })
+      }).catch(() => {
+        setError({ message: 'Could not start two-factor setup.' })
+      })
+    }
+  }, [location.search])
+
+  const completeLogin = (token: string, user: any, expiresIn?: number) => {
+    persistAuthToken(token, rememberMe, expiresIn)
+    localStorage.removeItem('mock_auth')
+    setUser(user)
+    navigate('/dashboard')
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setIsLoading(true)
     try {
+      if (twoFactor?.mode === 'verify' && twoFactor.challenge) {
+        const { data } = await api.post('/two-factor/verify', {
+          code: otp,
+          challenge: twoFactor.challenge,
+        })
+        completeLogin(data.token, data.user)
+        return
+      }
+
+      if (twoFactor?.mode === 'setup' && twoFactor.secret && twoFactor.recoveryCodes) {
+        await api.post('/two-factor/enable', {
+          code: otp,
+          secret: twoFactor.secret,
+          recovery_codes: twoFactor.recoveryCodes,
+        })
+        navigate('/dashboard')
+        return
+      }
+
       if (turnstileSiteKey && !turnstileToken) {
         setError({ message: 'Please complete the security challenge.' })
         return
@@ -113,6 +169,24 @@ function SignInForm() {
       )
       navigate('/dashboard')
     } catch (err: any) {
+      if (err.requires_2fa) {
+        setTwoFactor({ mode: 'verify', challenge: err.two_factor_challenge })
+        return
+      }
+      if (err.requires_2fa_setup) {
+        try {
+          const setup = await api.post('/two-factor/setup', { method: 'totp' })
+          setTwoFactor({
+            mode: 'setup',
+            secret: setup.data.data.secret,
+            qr: setup.data.data.qr_code_data_uri,
+            recoveryCodes: setup.data.data.recovery_codes,
+          })
+        } catch {
+          setError({ message: 'Could not start two-factor setup.' })
+        }
+        return
+      }
       if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
         setError({ message: 'Cannot connect to the server.' })
         return
@@ -157,13 +231,24 @@ function SignInForm() {
       <p className="mt-3 text-[11px] text-muted-foreground">Or use your email password</p>
 
       <form onSubmit={handleSubmit} className="mt-3 w-full max-w-[320px] space-y-2.5">
-        <PillInput icon="mail" type="email" placeholder="Email" required value={email} onChange={setEmail} disabled={isLoading} />
+        <PillInput icon="mail" type="email" placeholder="Email" required value={email} onChange={setEmail} disabled={isLoading || !!twoFactor} />
         <div className="relative">
-          <PillInput icon="lock" type={showPassword ? 'text' : 'password'} placeholder="Password" required value={password} onChange={setPassword} disabled={isLoading} />
+          <PillInput icon="lock" type={showPassword ? 'text' : 'password'} placeholder="Password" required value={password} onChange={setPassword} disabled={isLoading || !!twoFactor} />
           <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
+        {twoFactor && (
+          <div className="space-y-2 rounded-xl border border-border/70 p-3">
+            <p className="text-xs font-medium text-foreground">
+              {twoFactor.mode === 'setup'
+                ? 'Scan the QR code, then enter the 6-digit code to enable 2FA.'
+                : 'Enter the 6-digit code from your authenticator app.'}
+            </p>
+            {twoFactor.qr && <img src={twoFactor.qr} alt="Two-factor QR code" className="mx-auto h-36 w-36" />}
+            <PillInput icon="lock" type="text" placeholder="Authentication code" required value={otp} onChange={setOtp} disabled={isLoading} />
+          </div>
+        )}
 
         {error && (
           <div className="flex items-start gap-2 rounded-xl bg-destructive/10 p-2.5 text-destructive">
@@ -189,7 +274,7 @@ function SignInForm() {
           </div>
         )}
 
-        <PillButton disabled={isLoading}>{isLoading ? <SpinnerInline /> : 'SIGN IN'}</PillButton>
+        <PillButton disabled={isLoading}>{isLoading ? <SpinnerInline /> : twoFactor ? 'VERIFY' : 'SIGN IN'}</PillButton>
       </form>
 
       <p className="mt-4 text-xs text-muted-foreground md:hidden">

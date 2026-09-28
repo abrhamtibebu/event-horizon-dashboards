@@ -2,7 +2,7 @@
     "info": {
         "_postman_id": "b1e7e2c0-1234-4cde-9a1a-abcdef123456",
         "name": "Validity Backend API",
-        "description": "A comprehensive Postman collection for the Validity Event Management Backend.\n\n**Authentication:**\n- All endpoints (except register/login) require JWT in the Authorization header.\n- Registration and login require an `x-api-key` header.\n- Admin, organizer, and usher roles are enforced via middleware.\n\n**Note:** All request/response bodies, required fields, and error cases are described in each request.\n\n**Super Admin Credentials:**\n- Email: superadmin@validity.et\n- Password: 72A47F39-550B-4038-BD40-D6809C90B9CA\n\n**Base URL:**\n- http://localhost:8000/api/\n",
+        "description": "A comprehensive Postman collection for the Validity Event Management Backend.\n\n**Authentication:**\n- All endpoints (except register/login) require JWT in the Authorization header.\n- Registration and login require an `x-api-key` header.\n- Admin, organizer, and usher roles are enforced via middleware.\n\n**Note:** All request/response bodies, required fields, and error cases are described in each request.\n\nUse collection variables for credentials. Never commit real passwords.\n\n**Base URL:**\n- http://localhost:8000/api/\n",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "item": [
@@ -59,7 +59,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"email\": \"superadmin@validity.et\",\n  \"password\": \"72A47F39-550B-4038-BD40-D6809C90B9CA\"\n}"
+                            "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}"
                         },
                         "url": {
                             "raw": "{{base_url}}/login",
