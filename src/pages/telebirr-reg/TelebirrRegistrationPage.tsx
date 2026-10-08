@@ -21,7 +21,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import api, { lookupPublicBadge } from '@/lib/api'
 import { toast } from 'sonner'
-import { getImageUrl } from '@/lib/utils'
+import { applyEventBannerFallback, getEventBannerUrl } from '@/lib/utils'
 import { PROFILE_PICTURE_ACCEPT, validateProfilePictureFile } from '@/lib/fileValidation'
 import { useRegistrationShareMeta } from '@/lib/registrationShareMeta'
 import { useTheme } from 'next-themes'
@@ -454,30 +454,21 @@ const TelebirrRegistrationPage: React.FC = () => {
     }
   }
 
-  const eventBannerUrl = eventData
-    ? getImageUrl(
-        eventData.image ?? eventData.image_url ?? eventData.event_image,
-        eventData.id,
-      )
-    : null
+  const eventBannerUrl = getEventBannerUrl(
+    eventData?.image,
+    eventData?.image_url,
+    eventData?.event_image,
+  )
 
   return (
     <TelebirrRegLayout variant="register" isOnsite={isOnsite}>
       <section className="relative w-full h-80 sm:h-[22rem] md:h-[28rem] overflow-hidden">
-        {eventBannerUrl ? (
-          <img
-            src={eventBannerUrl}
-            alt={eventData?.title || eventData?.name || 'Event banner'}
-            className="w-full h-full object-cover object-center"
-          />
-        ) : (
-          <div
-            className="w-full h-full"
-            style={{
-              background: `linear-gradient(135deg, ${TELEBIRR_COLORS.deepGreen} 0%, ${TELEBIRR_COLORS.lightGreen} 100%)`,
-            }}
-          />
-        )}
+        <img
+          src={eventBannerUrl}
+          alt={eventData?.title || eventData?.name || 'Event banner'}
+          className="w-full h-full object-cover object-center"
+          onError={(e) => applyEventBannerFallback(e.currentTarget)}
+        />
       </section>
 
       <main className="max-w-4xl mx-auto px-4 py-16 relative z-20 space-y-8">

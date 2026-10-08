@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle, Building, UserCog, Mail, Phone as PhoneIcon, X, Mic2, ArrowRight } from 'lucide-react';
 import { useRegistrationShareMeta } from '@/lib/registrationShareMeta';
 import { telebirrRegisterPathWithSearch } from '@/pages/telebirr-reg/routes';
-import { getImageUrl } from '@/lib/utils';
+import { applyEventBannerFallback, getEventBannerUrl, getImageUrl } from '@/lib/utils';
 import { PROFILE_PICTURE_ACCEPT, validateProfilePictureFile } from '@/lib/fileValidation';
 import { PublicTicketSelector } from '@/components/public/PublicTicketSelector';
 import { PublicPaymentSelector } from '@/components/public/PublicPaymentSelector';
@@ -1054,16 +1054,12 @@ export default function PublicEventRegister() {
         <div className="bg-white dark:bg-slate-900 rounded-none sm:rounded-[3rem] shadow-none sm:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden border-none sm:border border-slate-100 dark:border-slate-800 mb-0 sm:mb-12">
           {/* Banner */}
           <div className="relative h-64 sm:h-96">
-            {(event.event_image || event.image_url || event.image) ? (
-              <img
-                src={getImageUrl(event.image_url || event.event_image || event.image, event.id)}
-                alt={event.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full bg-slate-900 flex items-center justify-center">
-              </div>
-            )}
+            <img
+              src={getEventBannerUrl(event.image_url, event.event_image, event.image)}
+              alt={event.name}
+              className="w-full h-full object-cover"
+              onError={(e) => applyEventBannerFallback(e.currentTarget)}
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-80" />
             <div className="absolute bottom-0 left-0 w-full p-6 sm:p-12">
               <div className="inline-flex items-center gap-2 bg-[#f97316] text-white px-3 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-widest mb-2 sm:mb-4 shadow-lg">

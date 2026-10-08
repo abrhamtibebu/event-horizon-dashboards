@@ -4,7 +4,7 @@ import { TicketStatusBadge } from './TicketStatusBadge';
 import { Calendar, MapPin, DollarSign, Hash } from 'lucide-react';
 import type { Ticket } from '@/types';
 import { format } from 'date-fns';
-import { getImageUrl } from '@/lib/utils';
+import { applyEventBannerFallback, getEventBannerUrl } from '@/lib/utils';
 
 interface TicketCardProps {
   ticket: Ticket;
@@ -27,11 +27,12 @@ export function TicketCard({ ticket, onViewQR, onDownload, onRefund, className }
             </h3>
             <TicketStatusBadge status={ticket.status} />
           </div>
-          {(ticket.event?.image || ticket.event?.image_url || ticket.event?.event_image) && (
+          {ticket.event && (
             <img
-              src={getImageUrl(ticket.event.image || ticket.event.image_url || ticket.event.event_image, ticket.event.id)}
+              src={getEventBannerUrl(typeof ticket.event.image === 'string' ? ticket.event.image : null)}
               alt={ticket.event.title}
               className="w-16 h-16 rounded object-cover ml-3"
+              onError={(e) => applyEventBannerFallback(e.currentTarget)}
             />
           )}
         </div>

@@ -1,6 +1,6 @@
 import { Calendar, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn, getImageUrl } from '@/lib/utils';
+import { applyEventBannerFallback, cn, getEventBannerUrl } from '@/lib/utils';
 
 interface EventContextCardProps {
   eventName: string;
@@ -14,12 +14,11 @@ interface EventContextCardProps {
 export function EventContextCard({
   eventName,
   imageUrl,
-  eventId,
   startDate,
   location,
   className,
 }: EventContextCardProps) {
-  const src = imageUrl ? getImageUrl(imageUrl, eventId) : null;
+  const src = getEventBannerUrl(imageUrl);
 
   return (
     <div
@@ -30,11 +29,13 @@ export function EventContextCard({
     >
       <div className="flex flex-col sm:flex-row">
         <div className="relative h-40 w-full shrink-0 sm:h-auto sm:w-52">
-          {src ? (
-            <img src={src} alt={eventName} className="h-full w-full object-cover" loading="eager" />
-          ) : (
-            <div className="h-full w-full bg-gradient-to-br from-primary/30 via-primary/10 to-muted" />
-          )}
+          <img
+            src={src}
+            alt={eventName}
+            className="h-full w-full object-cover"
+            loading="eager"
+            onError={(e) => applyEventBannerFallback(e.currentTarget)}
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent sm:bg-gradient-to-r" />
         </div>
 

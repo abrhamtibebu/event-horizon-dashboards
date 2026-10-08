@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { getImageUrl } from '@/lib/utils';
+import { getEventBannerUrl } from '@/lib/utils';
 
 type BackupEntry =
   | { kind: 'title'; prev: string }
@@ -68,8 +68,8 @@ export function useRegistrationShareMeta(opts: {
     const pageOrigin = window.location.origin;
     const canonicalUrl = `${pageOrigin}${location.pathname}${location.search}`;
 
-    const resolved = opts.imageRaw ? getImageUrl(opts.imageRaw, opts.eventId) : '';
-    const ogImage = resolved ? toAbsoluteOgImage(resolved, pageOrigin) : null;
+    const resolved = getEventBannerUrl(opts.imageRaw);
+    const ogImage = toAbsoluteOgImage(resolved, pageOrigin);
 
     const backup: BackupEntry[] = [];
     backup.push({ kind: 'title', prev: document.title });

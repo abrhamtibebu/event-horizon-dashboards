@@ -1,6 +1,6 @@
 import { ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn, getImageUrl } from '@/lib/utils';
+import { applyEventBannerFallback, cn, getEventBannerUrl } from '@/lib/utils';
 
 interface CheckoutTopBarProps {
   eventName: string;
@@ -14,12 +14,11 @@ interface CheckoutTopBarProps {
 export function CheckoutTopBar({
   eventName,
   imageUrl,
-  eventId,
   startDate,
   onBack,
   className,
 }: CheckoutTopBarProps) {
-  const src = imageUrl ? getImageUrl(imageUrl, eventId) : null;
+  const src = getEventBannerUrl(imageUrl);
 
   return (
     <header
@@ -38,14 +37,13 @@ export function CheckoutTopBar({
           <ArrowLeft className="h-4 w-4" />
         </button>
 
-        {src && (
-          <img
-            src={src}
-            alt=""
-            className="hidden h-9 w-9 shrink-0 rounded-xl object-cover sm:block"
-            loading="eager"
-          />
-        )}
+        <img
+          src={src}
+          alt=""
+          className="hidden h-9 w-9 shrink-0 rounded-xl object-cover sm:block"
+          loading="eager"
+          onError={(e) => applyEventBannerFallback(e.currentTarget)}
+        />
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold tracking-tight text-foreground">

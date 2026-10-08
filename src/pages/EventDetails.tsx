@@ -38,7 +38,6 @@ import {
   User,
   UserCog,
   UserCheck,
-  Image,
   ExternalLink,
   Share2,
   Facebook,
@@ -106,7 +105,7 @@ import api, {
   trackShare,
 } from '@/lib/api'
 import { format, parseISO } from 'date-fns'
-import { getGuestTypeBadgeClasses, getImageUrl } from '@/lib/utils'
+import { applyEventBannerFallback, getEventBannerUrl, getGuestTypeBadgeClasses } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import Pagination from '@/components/Pagination'
 import { usePagination } from '@/hooks/usePagination'
@@ -1379,7 +1378,7 @@ export default function EventDetails() {
         : undefined,
     )
     setEditImagePreview(
-      eventData.event_image ? getImageUrl(eventData.event_image) : null
+      getEventBannerUrl(eventData.image_url, eventData.event_image, eventData.image)
     )
     setEditDialogOpen(true)
   }
@@ -2531,17 +2530,12 @@ export default function EventDetails() {
             {/* Fancy Hero Banner */}
             {/* Simplified Hero Header */}
             <div className="relative w-full h-[300px] rounded-3xl overflow-hidden mb-8 shadow-lg border border-border">
-              {(eventData.event_image || eventData.image_url || eventData.image) ? (
-                <img
-                  src={getImageUrl(eventData.image_url || eventData.event_image || eventData.image, eventData.id)}
-                  alt={eventData.name}
-                  className="object-cover w-full h-full transition-transform duration-700"
-                />
-              ) : (
-                <div className="w-full h-full bg-muted flex items-center justify-center">
-                  <Image className="w-16 h-16 text-muted-foreground/20" />
-                </div>
-              )}
+              <img
+                src={getEventBannerUrl(eventData.image_url, eventData.event_image, eventData.image)}
+                alt={eventData.name}
+                className="object-cover w-full h-full transition-transform duration-700"
+                onError={(e) => applyEventBannerFallback(e.currentTarget)}
+              />
 
               {/* Gradient Overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />

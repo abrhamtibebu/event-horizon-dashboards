@@ -9,7 +9,6 @@ import {
   Eye,
   DollarSign,
   Settings as SettingsIcon,
-  Image as ImageIcon,
 } from 'lucide-react'
 import Breadcrumbs from '@/components/Breadcrumbs'
 import { Button } from '@/components/ui/button'
@@ -26,7 +25,7 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import api from '@/lib/api'
-import { getImageUrl } from '@/lib/utils'
+import { applyEventBannerFallback, getEventBannerUrl } from '@/lib/utils'
 import { richTextToPlain } from '@/lib/rich-text'
 import EventCategoryManager from './EventCategoryManager'
 import EventTypeManager from './EventTypeManager'
@@ -639,17 +638,12 @@ export default function Events() {
                             <div className="bg-card rounded-2xl shadow-sm border border-border h-full flex flex-col overflow-hidden hover:shadow-lg transition-all duration-300">
                               {/* Event Image */}
                               <div className="relative h-48 w-full overflow-hidden">
-                                {(event.event_image || event.image_url || event.image) ? (
-                                  <img
-                                    src={getImageUrl(event.image_url || event.event_image || event.image, event.id)}
-                                    alt={event.name}
-                                    className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-muted flex items-center justify-center">
-                                    <ImageIcon className="w-16 h-16 text-muted-foreground/20" />
-                                  </div>
-                                )}
+                                <img
+                                  src={getEventBannerUrl(event.image_url, event.event_image, event.image)}
+                                  alt={event.name}
+                                  className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
+                                  onError={(e) => applyEventBannerFallback(e.currentTarget)}
+                                />
                                 {/* Status Badge */}
                                 <div className="absolute top-3 right-3">
                                   <span className={`${getStatusColor(event.status)} px-3 py-1 rounded-full text-xs font-semibold shadow-sm`}>

@@ -213,6 +213,48 @@ const STORAGE_PATH_PREFIXES = [
  * @param eventId - Optional event ID for hardwiring specific event banners
  * @returns The full URL to the image
  */
+export const DEFAULT_EVENT_BANNER = '/default-event-banner.png'
+
+export function isMissingEventBanner(imagePath: string | null | undefined): boolean {
+  if (!imagePath || typeof imagePath !== 'string') return true
+  const lower = imagePath.trim().toLowerCase()
+  if (
+    !lower ||
+    lower === 'null' ||
+    lower === 'undefined' ||
+    lower === 'placeholder.svg' ||
+    lower.endsWith('/placeholder.svg')
+  ) {
+    return true
+  }
+
+  return (
+    lower === 'banner.png' ||
+    lower.endsWith('/banner.png') ||
+    lower.includes('placeholder-event') ||
+    lower.includes('default-event-banner')
+  )
+}
+
+/** Event cover image, or the Evella brand banner when none was uploaded. */
+export function getEventBannerUrl(
+  ...candidates: Array<string | null | undefined>
+): string {
+  for (const candidate of candidates) {
+    if (isMissingEventBanner(candidate)) continue
+    const resolved = getImageUrl(candidate)
+    if (!isMissingEventBanner(resolved)) return resolved
+  }
+
+  return DEFAULT_EVENT_BANNER
+}
+
+export function applyEventBannerFallback(image: HTMLImageElement) {
+  if (image.dataset.bannerFallback === '1') return
+  image.dataset.bannerFallback = '1'
+  image.src = DEFAULT_EVENT_BANNER
+}
+
 export const getImageUrl = (imagePath: string | null | undefined | any, _eventId?: number | string | null): string => {
   if (!imagePath || typeof imagePath !== 'string') {
     return '/placeholder.svg'

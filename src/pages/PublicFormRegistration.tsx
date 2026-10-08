@@ -25,7 +25,7 @@ import type { Form, FormSubmissionRequest } from '@/types/forms';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { EventDescription } from '@/components/ui/event-description';
-import { getImageUrl } from '@/lib/utils';
+import { applyEventBannerFallback, getEventBannerUrl, getImageUrl } from '@/lib/utils';
 import { validateFormFields } from '@/lib/inputQuality';
 
 export default function PublicFormRegistration() {
@@ -272,7 +272,7 @@ export default function PublicFormRegistration() {
   const organizerName = event?.organizer?.name || 'Event Organizer';
   const organizerLogoPath = event?.organizer?.logo || event?.organizer_logo;
   const organizerLogo = organizerLogoPath ? getImageUrl(organizerLogoPath) : null;
-  const eventImage = (event?.event_image || event?.image_url) ? getImageUrl(event.event_image || event.image_url, event.id) : null;
+  const eventImage = getEventBannerUrl(event?.image_url, event?.event_image, event?.image);
 
   if (form.status !== 'active') {
     return (
@@ -346,7 +346,7 @@ export default function PublicFormRegistration() {
           <div className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-8 sm:py-12 lg:py-16">
             <div className="text-center space-y-6 sm:space-y-8">
               {/* Event Image with Modern Styling */}
-              {eventImage && (
+              {event && (
                 <div className="flex justify-center mb-6 sm:mb-8">
                   <div className="relative group">
                     <div className="absolute -inset-1 bg-gradient-to-r from-primary via-primary to-warning rounded-3xl blur opacity-25 group-hover:opacity-40 transition duration-300"></div>
@@ -355,9 +355,7 @@ export default function PublicFormRegistration() {
                         src={eventImage}
                         alt={event.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
+                        onError={(e) => applyEventBannerFallback(e.currentTarget)}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                     </div>

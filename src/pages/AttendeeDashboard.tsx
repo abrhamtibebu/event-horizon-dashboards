@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/select'
 import { Link, useOutletContext } from 'react-router-dom'
 import api from '@/lib/api'
-import { getImageUrl } from '@/lib/utils'
+import { applyEventBannerFallback, getEventBannerUrl } from '@/lib/utils'
 import { richTextToPlain } from '@/lib/rich-text'
 
 export default function AttendeeDashboard() {
@@ -192,17 +192,12 @@ export default function AttendeeDashboard() {
               className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-md transition-shadow"
             >
               <div className="h-48 bg-gradient-to-r from-[hsl(var(--color-warning))]/20 to-[hsl(var(--primary))]/20 overflow-hidden">
-                {(event.event_image || event.image_url || event.image) ? (
-                  <img
-                    src={getImageUrl(event.image_url || event.event_image || event.image, event.id)}
-                    alt={event.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center w-full h-full text-muted-foreground/50">
-                    <Calendar className="w-16 h-16" />
-                  </div>
-                )}
+                <img
+                  src={getEventBannerUrl(event.image_url, event.event_image, event.image)}
+                  alt={event.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => applyEventBannerFallback(e.currentTarget)}
+                />
               </div>
 
               <div className="p-4 space-y-3">
