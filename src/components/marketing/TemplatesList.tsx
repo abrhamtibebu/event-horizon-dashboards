@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import axios from 'axios';
+import { sanitizeEmailPreview } from '@/lib/rich-text';
 
 export function TemplatesList() {
   const [templates, setTemplates] = useState([]);
@@ -330,7 +331,7 @@ export function TemplatesList() {
                   </label>
                   <div 
                     className="border rounded-lg overflow-hidden"
-                    dangerouslySetInnerHTML={{ __html: previewContent.email_body }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeEmailPreview(previewContent.email_body) }}
                   />
                 </div>
               )}

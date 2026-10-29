@@ -34,6 +34,7 @@ export const NotFoundPage = lazy(() => import('@/pages/NotFound'))
 
 // Public event + forms
 export const PublicEventRegisterPage = lazy(() => import('@/pages/PublicEventRegister'))
+export const EventRsvpPage = lazy(() => import('@/pages/EventRsvp'))
 export const BadgeRetrievePage = lazy(() => import('@/pages/BadgeRetrieve'))
 export const PublicBadgeDownloadPage = lazy(() => import('@/pages/PublicBadgeDownload'))
 export const CustomEventRegistrationPage = lazy(

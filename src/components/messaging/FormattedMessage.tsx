@@ -1,6 +1,7 @@
 import React from 'react'
-import { formatMessageContent, hasSpecialFormatting, extractUrls } from '../../lib/message-formatting'
+import { extractUrls } from '../../lib/message-formatting'
 import LinkPreview from './LinkPreview'
+import { MarkdownMessage } from './MarkdownMessage'
 
 interface FormattedMessageProps {
   content: string
@@ -15,37 +16,12 @@ export const FormattedMessage: React.FC<FormattedMessageProps> = ({
   onClick,
   showLinkPreviews = true
 }) => {
-  // Check if content has special formatting
-  const needsFormatting = hasSpecialFormatting(content)
-
   // Extract URLs for link previews
   const urls = extractUrls(content)
 
-  if (!needsFormatting) {
-    // Return plain text if no formatting needed
-    return (
-      <div className={className} onClick={onClick}>
-        <span className="break-words">{content}</span>
-        {showLinkPreviews && urls.length > 0 && (
-          <div className="mt-2">
-            {urls.map((url, index) => (
-              <LinkPreview key={index} url={url} />
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // Format the content
-  const formattedContent = formatMessageContent(content)
-
   return (
     <div className={className} onClick={onClick}>
-      <span
-        className="break-words"
-        dangerouslySetInnerHTML={{ __html: formattedContent }}
-      />
+      <MarkdownMessage content={content} className="break-words" />
       {showLinkPreviews && urls.length > 0 && (
         <div className="mt-2">
           {urls.map((url, index) => (

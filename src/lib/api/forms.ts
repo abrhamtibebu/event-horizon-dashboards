@@ -21,19 +21,40 @@ import type {
   FormTemplateCategory,
 } from '@/types/forms';
 
+/** Laravel serializes relations as snake_case (`form_fields`, `field_options`). */
+export function normalizeForm(form: Form): Form {
+  const raw = form as Form & { form_fields?: FormField[]; fields?: FormField[] };
+  const fields = raw.formFields || raw.form_fields || raw.fields || [];
+  return {
+    ...form,
+    formFields: fields.map((field) => {
+      const rawField = field as FormField & {
+        field_options?: FormField['fieldOptions'];
+        badge_mappings?: FormField['badgeMappings'];
+      };
+      return {
+        ...field,
+        fieldOptions: field.fieldOptions || rawField.field_options || [],
+        badgeMappings: field.badgeMappings || rawField.badge_mappings || [],
+      };
+    }),
+  };
+}
+
 // Form API functions
 export const formApi = {
   // Get all forms for an event
   getEventForms: async (eventId: number, guestTypeId?: number): Promise<Form[]> => {
     const params = guestTypeId ? { guest_type_id: guestTypeId } : {};
     const response = await api.get(`/events/${eventId}/forms`, { params });
-    return response.data;
+    const forms = Array.isArray(response.data) ? response.data : response.data?.data || [];
+    return forms.map((form: Form) => normalizeForm(form));
   },
 
   // Get form by guest type for an event
   getFormByGuestType: async (eventId: number, guestTypeId: number): Promise<Form> => {
     const response = await api.get(`/events/${eventId}/forms/by-guest-type/${guestTypeId}`);
-    return response.data;
+    return normalizeForm(response.data?.data ?? response.data);
   },
 
   // Create a new form
@@ -45,7 +66,7 @@ export const formApi = {
   // Get a specific form
   getForm: async (formId: number): Promise<Form> => {
     const response = await api.get(`/forms/${formId}`);
-    return response.data;
+    return normalizeForm(response.data?.data ?? response.data);
   },
 
   // Update a form

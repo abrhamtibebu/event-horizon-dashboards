@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { getApiBaseURL } from '@/config/env'
 import { decodeObjectStrings } from '@/lib/utils/string'
+import { containsUnsafeUserInput } from '@/lib/unsafeUserInput'
 import {
   clearAuthSession,
   getStoredToken,
@@ -53,6 +54,9 @@ const refreshToken = async (): Promise<string | null> => {
 
 api.interceptors.request.use(
   (config) => {
+    if (containsUnsafeUserInput(config.data) || containsUnsafeUserInput(config.params)) {
+      return Promise.reject(new Error('Script or executable HTML is not allowed in form fields.'))
+    }
     const token = getStoredToken()
 
     // Check if URL matches public event patterns: /events/{id} or /events/{id}/ticket-types/available

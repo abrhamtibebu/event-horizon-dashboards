@@ -53,17 +53,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from '@/components/ui/alert-dialog';
+import { ModernConfirmationDialog } from '@/components/ui/ModernConfirmationDialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -227,7 +217,17 @@ export const FormsList: React.FC<FormsListProps> = ({
 
       // Handle specific error cases
       if (errorMessage.includes('already exists') || errorMessage.includes('already exists for this guest type')) {
-        toast.error('A form already exists for this guest type. Please edit the existing form instead.');
+        toast.info('This guest type already has a form. Opening it to edit.');
+        if (selectedGuestTypeId) {
+          formApi.getFormByGuestType(eventId, selectedGuestTypeId).then((existing) => {
+            setShowCreateFormDialog(false);
+            setCreateFormStep(1);
+            setSelectedForm(existing);
+            setShowFormBuilder(true);
+          }).catch(() => {
+            toast.error('A form already exists for this guest type. Edit it from the list.');
+          });
+        }
       } else if (errorMessage.includes('Integrity constraint') || errorMessage.includes('UNIQUE constraint')) {
         toast.error('A form with these details already exists. Please check for duplicate forms.');
       } else {
@@ -315,6 +315,16 @@ export const FormsList: React.FC<FormsListProps> = ({
 
   const handleCreateForm = () => {
     if (!selectedGuestTypeId || !newFormName.trim()) {
+      return;
+    }
+
+    const existingForm = forms?.find((f) => f.guest_type_id === selectedGuestTypeId);
+    if (existingForm) {
+      toast.info('This guest type already has a form. Opening it to edit.');
+      setShowCreateFormDialog(false);
+      setCreateFormStep(1);
+      setSelectedForm(existingForm);
+      setShowFormBuilder(true);
       return;
     }
 
@@ -753,9 +763,19 @@ export const FormsList: React.FC<FormsListProps> = ({
       )}
 
       {/* Form Builder Dialog */}
-      <Dialog open={showFormBuilder} onOpenChange={setShowFormBuilder}>
-        <DialogContent className="w-[95vw] max-w-7xl max-h-[90vh] overflow-hidden p-4 sm:p-6">
-          <DialogHeader>
+      <Dialog modal={false} open={showFormBuilder} onOpenChange={setShowFormBuilder}>
+        <DialogContent
+          className="flex h-[90vh] w-[95vw] max-w-6xl flex-col gap-0 overflow-hidden p-0"
+          onPointerDownOutside={(event) => {
+            const target = event.target as HTMLElement | null;
+            if (target?.closest('[data-radix-popper-content-wrapper]')) event.preventDefault();
+          }}
+          onInteractOutside={(event) => {
+            const target = event.target as HTMLElement | null;
+            if (target?.closest('[data-radix-popper-content-wrapper]')) event.preventDefault();
+          }}
+        >
+          <DialogHeader className="sr-only">
             <DialogTitle>
               {selectedForm ? `Edit: ${selectedForm.name}` : 'Create New Form'}
             </DialogTitle>
@@ -802,31 +822,21 @@ export const FormsList: React.FC<FormsListProps> = ({
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!formToDelete} onOpenChange={() => setFormToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Form</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{formToDelete?.name}"? This action cannot be undone.
-              {formToDelete?.formSubmissions_count && formToDelete.formSubmissions_count > 0 && (
-                <span className="block mt-2 font-medium text-destructive">
-                  Warning: This form has {formToDelete.formSubmissions_count} submissions that will also be deleted.
-                </span>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeleteForm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deleteFormMutation.isPending}
-            >
-              {deleteFormMutation.isPending ? 'Deleting...' : 'Delete Form'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ModernConfirmationDialog
+        isOpen={!!formToDelete}
+        onClose={() => {
+          if (!deleteFormMutation.isPending) setFormToDelete(null);
+        }}
+        onConfirm={confirmDeleteForm}
+        title="Delete form"
+        description={formToDelete
+          ? `Delete “${formToDelete.name}”? This cannot be undone.${formToDelete.formSubmissions_count ? ` This form has ${formToDelete.formSubmissions_count} submission${formToDelete.formSubmissions_count === 1 ? '' : 's'} that will also be deleted.` : ''}`
+          : undefined}
+        confirmText="Delete form"
+        cancelText="Keep form"
+        variant="danger"
+        isLoading={deleteFormMutation.isPending}
+      />
 
       {/* Registration Link Dialog */}
       <Dialog open={!!formForRegistrationLink} onOpenChange={(open) => !open && setFormForRegistrationLink(null)}>

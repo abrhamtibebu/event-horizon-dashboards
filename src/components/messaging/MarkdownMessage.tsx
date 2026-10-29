@@ -22,17 +22,20 @@ export const MarkdownMessage: React.FC<MarkdownMessageProps> = ({
         rehypePlugins={[rehypeHighlight]}
         components={{
           // Customize link rendering
-          a: ({ href, children, ...props }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500 hover:text-blue-700 underline"
-              {...props}
-            >
-              {children}
-            </a>
-          ),
+          a: ({ href, children, ...props }) => {
+            let safeHref: string | undefined
+            try {
+              const parsed = new URL(href ?? '', 'https://message.local')
+              if (['http:', 'https:', 'mailto:'].includes(parsed.protocol)) safeHref = href
+            } catch {
+              safeHref = undefined
+            }
+            return safeHref ? (
+              <a href={safeHref} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline" {...props}>
+                {children}
+              </a>
+            ) : <span>{children}</span>
+          },
           // Customize code block rendering
           code: ({ node, inline, className, children, ...props }) => {
             if (inline) {

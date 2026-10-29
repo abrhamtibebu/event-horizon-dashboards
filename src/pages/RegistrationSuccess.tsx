@@ -41,6 +41,9 @@ export default function RegistrationSuccess() {
   const eventIdParam = searchParams.get('eventId');
   const eventNameParam = searchParams.get('eventName');
   const guestUuid = searchParams.get('guestUuid')?.trim() ?? '';
+  const guestEmail = searchParams.get('guestEmail')?.trim() ?? '';
+  const invitationCode = searchParams.get('inv')?.trim() ?? '';
+  const isRsvp = invitationCode.length > 0;
   const qrValue = guestUuid.slice(0, 8);
 
   const displayNameRaw = decodeQueryParam(eventNameParam) ?? '';
@@ -123,19 +126,28 @@ export default function RegistrationSuccess() {
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-black mb-4 tracking-tight text-slate-900 dark:text-white">
-              Success!
+              {isRsvp ? 'RSVP Confirmed' : 'Success!'}
             </h1>
 
-            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mb-8 leading-relaxed font-medium px-1 sm:px-2 break-words">
-              You&apos;ve successfully registered for{' '}
-              <span className="text-[#f97316] font-bold">&ldquo;{displayName || eventNameParam}&rdquo;</span>. A
-              confirmation email with your details has been sent to your inbox.
-            </p>
+            {isRsvp ? (
+              <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mb-8 leading-relaxed font-medium px-1 sm:px-2 break-words">
+                You&apos;re confirmed for{' '}
+                <span className="text-[#f97316] font-bold">&ldquo;{displayName || eventNameParam}&rdquo;</span>. Your
+                e-badge has been emailed{guestEmail ? <> to <span className="font-semibold text-slate-700 dark:text-slate-200">{guestEmail}</span></> : null}.
+                Download it below, or screenshot the QR code for check-in.
+              </p>
+            ) : (
+              <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mb-8 leading-relaxed font-medium px-1 sm:px-2 break-words">
+                You&apos;ve successfully registered for{' '}
+                <span className="text-[#f97316] font-bold">&ldquo;{displayName || eventNameParam}&rdquo;</span>. A
+                confirmation email with your details has been sent to your inbox.
+              </p>
+            )}
 
             {guestUuid.length > 0 ? (
               <div className="flex flex-col items-center mb-10 px-2">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                  Guest check-in QR
+                  {isRsvp ? 'Your check-in QR — screenshot this' : 'Guest check-in QR'}
                 </p>
                 <div className="bg-white dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-inner">
                   <QRCodeSVG value={qrValue} size={176} level="M" includeMargin />

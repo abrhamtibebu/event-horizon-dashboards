@@ -16,9 +16,11 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { FormField, CreateFormFieldRequest } from '@/types/forms';
+import { AlertDialog } from '@/components/ui/AlertDialog';
 
 interface FormFieldEditorProps {
   field: FormField | null;
+  initialType?: string;
   onSave: (fieldData: CreateFormFieldRequest) => void;
   onCancel: () => void;
   onDelete?: () => void;
@@ -27,11 +29,13 @@ interface FormFieldEditorProps {
 
 export const FormFieldEditor: React.FC<FormFieldEditorProps> = ({
   field,
+  initialType = 'text',
   onSave,
   onCancel,
   onDelete,
   availableFields = []
 }) => {
+  const [notice, setNotice] = useState<string | null>(null);
   const [fieldData, setFieldData] = useState<CreateFormFieldRequest>({
     field_type: 'text',
     label: '',
@@ -64,9 +68,9 @@ export const FormFieldEditor: React.FC<FormFieldEditorProps> = ({
         })) || []
       });
     } else {
-      // Reset for new field
+      // Reset for new field, keeping the type chosen from the palette
       setFieldData({
-        field_type: 'text',
+        field_type: (initialType || 'text') as CreateFormFieldRequest['field_type'],
         label: '',
         placeholder: '',
         is_required: false,
@@ -78,18 +82,18 @@ export const FormFieldEditor: React.FC<FormFieldEditorProps> = ({
         options: []
       });
     }
-  }, [field]);
+  }, [field, initialType]);
 
   const handleSave = () => {
     if (!fieldData.label.trim()) {
-      alert('Field label is required');
+      setNotice('Add a label so guests know what to fill in.');
       return;
     }
 
     // Validate options for select/radio/checkbox
     if (['select', 'radio', 'checkbox'].includes(fieldData.field_type)) {
       if (!fieldData.options || fieldData.options.length === 0) {
-        alert('At least one option is required for this field type');
+        setNotice('Add at least one option for this field type.');
         return;
       }
     }
@@ -138,7 +142,7 @@ export const FormFieldEditor: React.FC<FormFieldEditorProps> = ({
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full border-0 shadow-none">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
         <CardTitle className="text-lg font-semibold">
           {field ? 'Edit Field' : 'Add New Field'}
@@ -158,7 +162,7 @@ export const FormFieldEditor: React.FC<FormFieldEditorProps> = ({
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="basic">Basic</TabsTrigger>
             <TabsTrigger value="validation">Validation</TabsTrigger>
-            <TabsTrigger value="payment" disabled={fieldData.field_type !== 'payment'}>Payment</TabsTrigger>
+            <TabsTrigger value="payment" disabled>Payment</TabsTrigger>
             <TabsTrigger value="logic">Logic</TabsTrigger>
           </TabsList>
 
@@ -186,7 +190,6 @@ export const FormFieldEditor: React.FC<FormFieldEditorProps> = ({
                   <SelectItem value="number">Number</SelectItem>
                   <SelectItem value="address">Address</SelectItem>
                   <SelectItem value="file">File Upload</SelectItem>
-                  <SelectItem value="payment">Payment Field</SelectItem>
                   <SelectItem value="hidden">Hidden Field</SelectItem>
                 </SelectContent>
               </Select>
@@ -636,6 +639,14 @@ export const FormFieldEditor: React.FC<FormFieldEditorProps> = ({
           )}
         </div>
       </CardContent>
+      <AlertDialog
+        isOpen={!!notice}
+        onClose={() => setNotice(null)}
+        title="Check this field"
+        description={notice || undefined}
+        variant="warning"
+        closeText="OK"
+      />
     </Card>
   );
 };

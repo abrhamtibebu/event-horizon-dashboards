@@ -27,7 +27,8 @@ import FormFieldEditor from './FormFieldEditor';
 import FormPreview from './FormPreview';
 import BadgeFieldMapper from './BadgeFieldMapper';
 
-import { formApi, formFieldApi } from '@/lib/api/forms';
+import { formApi, formFieldApi, normalizeForm } from '@/lib/api/forms';
+import { ModernConfirmationDialog } from '@/components/ui/ModernConfirmationDialog';
 import type { Form, FormField, CreateFormFieldRequest, FormBuilderState } from '@/types/forms';
 
 interface FormBuilderProps {
@@ -54,9 +55,11 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
 
   const [showFieldEditor, setShowFieldEditor] = useState(false);
   const [editingField, setEditingField] = useState<FormField | null>(null);
+  const [draftFieldType, setDraftFieldType] = useState('text');
   const [paletteCategory, setPaletteCategory] = useState('basic');
   const [errors, setErrors] = useState<string[]>([]);
   const [showBadgeMapper, setShowBadgeMapper] = useState(false);
+  const [fieldToDelete, setFieldToDelete] = useState<FormField | null>(null);
 
   // Fetch form data
   const { data: formData, isLoading: formLoading, error: formError } = useQuery({
@@ -69,10 +72,11 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
   // Update builder state when form data loads
   useEffect(() => {
     if (formData) {
+      const form = normalizeForm(formData);
       setBuilderState(prev => ({
         ...prev,
-        form: formData,
-        fields: formData.formFields || []
+        form,
+        fields: [...(form.formFields || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
       }));
     }
   }, [formData]);
@@ -116,6 +120,9 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
   const deleteFieldMutation = useMutation({
     mutationFn: (fieldId: number) => formFieldApi.deleteField(formId, fieldId),
     onSuccess: (_, fieldId) => {
+      setFieldToDelete(null);
+      setShowFieldEditor(false);
+      setEditingField(null);
       setBuilderState(prev => ({
         ...prev,
         fields: prev.fields.filter(f => f.id !== fieldId),
@@ -142,24 +149,10 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
   });
 
   const handleFieldSelect = useCallback((fieldType: string) => {
-    // Create a new field with basic data
-    const newField: CreateFormFieldRequest = {
-      field_type: fieldType as any,
-      label: `New ${fieldType} field`,
-      placeholder: '',
-      is_required: false,
-      default_value: null,
-      validation_rules: {},
-      conditional_logic: null,
-      order: builderState.fields.length + 1,
-      page_number: 1,
-      options: []
-    };
-
     setEditingField(null);
+    setDraftFieldType(fieldType);
     setShowFieldEditor(true);
-    // The editor will handle creating the field
-  }, [builderState.fields.length]);
+  }, []);
 
   const handleFieldEdit = useCallback((field: FormField) => {
     setEditingField(field);
@@ -167,10 +160,9 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
   }, []);
 
   const handleFieldDelete = useCallback((fieldId: number) => {
-    if (confirm('Are you sure you want to delete this field?')) {
-      deleteFieldMutation.mutate(fieldId);
-    }
-  }, [deleteFieldMutation]);
+    const field = builderState.fields.find((item) => item.id === fieldId) ?? null;
+    setFieldToDelete(field);
+  }, [builderState.fields]);
 
   const handleFieldSave = useCallback((fieldData: CreateFormFieldRequest) => {
     if (editingField) {
@@ -256,9 +248,9 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex h-full min-h-0 flex-1 flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b p-4 pr-12">
         <div>
           <h2 className="text-xl font-semibold">{formData.name}</h2>
           <p className="text-sm text-muted-foreground">
@@ -356,7 +348,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
           </div>
         </div>
       ) : (
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {showBadgeMapper ? (
           <div className="flex-1 p-4 overflow-auto">
             <BadgeFieldMapper
@@ -373,7 +365,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
         ) : (
           <>
             {/* Form Canvas */}
-            <div className="flex-1 p-4 overflow-auto">
+            <div className="min-h-0 flex-1 overflow-auto p-4">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -494,11 +486,12 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
             </div>
 
             {/* Field Editor Panel */}
-            <div className="w-96 border-l bg-background">
+            <div className="flex h-full w-96 shrink-0 flex-col overflow-y-auto border-l bg-background">
               {showFieldEditor ? (
                 <div className="p-4">
                   <FormFieldEditor
                     field={editingField}
+                    initialType={draftFieldType}
                     onSave={handleFieldSave}
                     onCancel={() => {
                       setShowFieldEditor(false);
@@ -524,6 +517,21 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
         )}
       </div>
       )}
+      <ModernConfirmationDialog
+        isOpen={!!fieldToDelete}
+        onClose={() => {
+          if (!deleteFieldMutation.isPending) setFieldToDelete(null);
+        }}
+        onConfirm={() => {
+          if (fieldToDelete) deleteFieldMutation.mutate(fieldToDelete.id);
+        }}
+        title="Delete field"
+        description={fieldToDelete ? `Remove “${fieldToDelete.label}” from this form? Guests will no longer see this question.` : undefined}
+        confirmText="Delete field"
+        cancelText="Keep field"
+        variant="danger"
+        isLoading={deleteFieldMutation.isPending}
+      />
     </div>
   );
 };

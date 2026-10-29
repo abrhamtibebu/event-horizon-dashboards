@@ -53,14 +53,6 @@ const SearchResult: React.FC<SearchResultProps> = ({
   }
 
   const renderMessageContent = () => {
-    if (message.highlighted_content) {
-      return (
-        <div
-          className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium"
-          dangerouslySetInnerHTML={{ __html: message.highlighted_content }}
-        />
-      )
-    }
     return <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium">{message.content}</div>
   }
 
@@ -77,11 +69,7 @@ const SearchResult: React.FC<SearchResultProps> = ({
           <FileText className="w-3.5 h-3.5 text-gray-400" />
         )}
         <span className="text-[11px] font-bold text-gray-500 truncate">
-          {message.highlighted_file_name ? (
-            <span dangerouslySetInnerHTML={{ __html: message.highlighted_file_name }} />
-          ) : (
-            message.file_name
-          )}
+          {message.file_name}
         </span>
       </div>
     )

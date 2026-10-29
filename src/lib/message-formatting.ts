@@ -101,7 +101,14 @@ export function formatMessageContent(content: string): string {
  */
 export function extractUrls(content: string): string[] {
   const links = find(content, 'url')
-  return links.map(link => link.href)
+  return links.flatMap(link => {
+    try {
+      const parsed = new URL(link.href)
+      return ['http:', 'https:'].includes(parsed.protocol) ? [parsed.href] : []
+    } catch {
+      return []
+    }
+  })
 }
 
 /**

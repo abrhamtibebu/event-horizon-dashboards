@@ -42,9 +42,77 @@ interface DynamicFormRendererProps {
   guestTypeId: number;
   invitationCode?: string | null;
   participantType?: string; // Deprecated - kept for backward compatibility
+  /** Explicit initial values keyed by field_key. */
+  initialValues?: Record<string, any>;
+  /** Known guest details; mapped onto fields by type or label. Phone is used exactly as stored. */
+  prefill?: {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    company?: string | null;
+    jobTitle?: string | null;
+    location?: string | null;
+  };
+  /** Label for the final submit button. */
+  submitLabel?: string;
   onSuccess?: (result: SubmissionResult) => void;
   onError?: (error: string) => void;
   onFallback?: () => void; // Called when no custom form is available
+}
+
+/**
+ * Map known guest details onto a form's fields.
+ */
+export function buildPrefillValues(
+  fields: FormField[],
+  prefill?: {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    company?: string | null;
+    jobTitle?: string | null;
+    location?: string | null;
+  },
+): Record<string, any> {
+  const out: Record<string, any> = {};
+  if (!prefill) return out;
+  let emailDone = false;
+  let phoneDone = false;
+  let nameDone = false;
+  let companyDone = false;
+  let jobDone = false;
+  let locationDone = false;
+  for (const field of fields) {
+    const key = field.field_key;
+    const label = String(field.label ?? '').toLowerCase();
+    const lowerKey = String(key ?? '').toLowerCase();
+    if (!emailDone && prefill.email && field.field_type === 'email') {
+      out[key] = prefill.email;
+      emailDone = true;
+    } else if (!phoneDone && prefill.phone && (field.field_type === 'phone' || /phone|mobile/.test(lowerKey) || /phone|mobile/.test(label))) {
+      out[key] = prefill.phone;
+      phoneDone = true;
+    } else if (
+      !nameDone &&
+      prefill.name &&
+      (field.field_type === 'text' || !field.field_type) &&
+      (/\b(full\s*)?name\b/.test(label) || /name/.test(lowerKey)) &&
+      !/company|organi[sz]ation|business|last|first|sur|job|title/.test(label)
+    ) {
+      out[key] = prefill.name;
+      nameDone = true;
+    } else if (!companyDone && prefill.company && (/compan|organi[sz]/.test(label) || /compan|organi[sz]/.test(lowerKey))) {
+      out[key] = prefill.company;
+      companyDone = true;
+    } else if (!jobDone && prefill.jobTitle && (/job|position|occupation/.test(label) || /job|position|occupation/.test(lowerKey))) {
+      out[key] = prefill.jobTitle;
+      jobDone = true;
+    } else if (!locationDone && prefill.location && (/location|address|\bcity\b/.test(label) || /location|address|city/.test(lowerKey))) {
+      out[key] = prefill.location;
+      locationDone = true;
+    }
+  }
+  return out;
 }
 
 export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
@@ -52,6 +120,9 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   guestTypeId,
   invitationCode,
   participantType,
+  initialValues,
+  prefill,
+  submitLabel,
   onSuccess,
   onError,
   onFallback
@@ -65,6 +136,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   const {
     data: activeForm,
     isLoading: formsLoading,
+    isFetched: formFetched,
     error: formsError
   } = useQuery({
     queryKey: ['event-form-by-guest-type', eventId, guestTypeId],
@@ -107,22 +179,31 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
     };
   }, [formData]);
 
-  // If no active form, use fallback
+  // Only the "no form for this guest type" response falls back. A loading or
+  // failed request must not skip the page — opening the link is not a confirmation.
   useEffect(() => {
-    if (!formsLoading && !activeForm) {
-      onFallback?.();
-    }
-  }, [formsLoading, activeForm, onFallback]);
+    if (!formFetched || formsLoading || activeForm) return;
+    const status = (formsError as { response?: { status?: number } } | null)?.response?.status;
+    if (status === 404) onFallback?.();
+  }, [formFetched, formsLoading, activeForm, formsError, onFallback]);
 
   // Initialize form values when form data loads or form changes
   useEffect(() => {
     if (formPreview?.fields) {
-      const initialValues: Record<string, any> = {};
+      const values: Record<string, any> = {};
       formPreview.fields.forEach(field => {
-        initialValues[field.field_key] = field.default_value || getDefaultValueForType(field.field_type);
+        values[field.field_key] = field.default_value || getDefaultValueForType(field.field_type);
       });
-      setFormValues(initialValues);
+      const prefilled = buildPrefillValues(formPreview.fields, prefill);
+      Object.entries(prefilled).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') values[k] = v;
+      });
+      Object.entries(initialValues ?? {}).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') values[k] = v;
+      });
+      setFormValues(values);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formPreview?.form?.id]); // Only re-run when the form ID specifically changes
 
   const getDefaultValueForType = (fieldType: string): any => {
@@ -669,6 +750,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-6 border-t border-slate-100 dark:border-slate-800">
         <Button
+          type="button"
           variant="ghost"
           onClick={handlePrevPage}
           disabled={currentPage === 1}
@@ -681,6 +763,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto order-1 sm:order-2">
           {currentPage < totalPages ? (
             <Button
+              type="button"
               onClick={handleNextPage}
               className="h-12 px-8 rounded-2xl bg-primary hover:bg-primary-hover text-white font-bold shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98] w-full"
             >
@@ -689,6 +772,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
             </Button>
           ) : (
             <Button
+              type="button"
               onClick={handleSubmit}
               disabled={isSubmitting}
               className="h-12 px-10 rounded-2xl bg-primary hover:bg-primary-hover text-white font-extrabold shadow-2xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 w-full"
@@ -699,7 +783,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                   <span>Submitting...</span>
                 </div>
               ) : (
-                'Register Now'
+                submitLabel || 'Register Now'
               )}
             </Button>
           )}

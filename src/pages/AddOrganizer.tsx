@@ -117,7 +117,7 @@ export default function AddOrganizer() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xl">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto p-0 animate-fade-in relative">
         {/* Breadcrumbs */}
         <div className="px-8 pt-6 pb-2">

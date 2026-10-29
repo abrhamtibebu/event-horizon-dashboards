@@ -128,26 +128,21 @@ export default function Events() {
       if (!user) return
 
       try {
-        // Fetch all events without pagination to get accurate counts
-        // For event_manager/organizer, also use this to populate events if main fetch fails
-        const res = await api.get('/events', {
-          params: {
-            per_page: 1000, // Large number to get all events
-          }
-        })
+        // Organizers receive the full list. Admins are paginated, and the API rejects per_page above 100.
+        const first = await api.get('/events', { params: { page: 1, per_page: 100 } })
 
-        // Handle both paginated and non-paginated responses
         let allEvents: any[] = []
-        if (res.data.data) {
-          // Paginated response - get all pages if needed
-          allEvents = res.data.data
-          // If there are more pages, we might need to fetch them, but for now use what we have
-          // For organizers, backend returns all events in one response, so this should work
-        } else if (Array.isArray(res.data)) {
-          // Non-paginated response (organizers/event_managers)
-          allEvents = res.data
-        } else {
-          allEvents = []
+        if (Array.isArray(first.data)) {
+          allEvents = first.data
+        } else if (Array.isArray(first.data?.data)) {
+          allEvents = [...first.data.data]
+          const lastPage = Number(first.data.last_page || 1)
+          for (let page = 2; page <= lastPage; page++) {
+            const next = await api.get('/events', { params: { page, per_page: 100 } })
+            if (Array.isArray(next.data?.data)) {
+              allEvents.push(...next.data.data)
+            }
+          }
         }
 
         // Count events by type - handle both event_type_column and event_type
@@ -200,10 +195,7 @@ export default function Events() {
         // Only add pagination params for admin/superadmin
         if (isAdmin) {
           params.append('page', currentPage.toString());
-          params.append('per_page', perPage.toString());
-        } else {
-          // For non-admin users, request all events (backend will return array)
-          params.append('per_page', '1000');
+          params.append('per_page', String(Math.min(perPage, 100)));
         }
 
         if (searchTerm) {

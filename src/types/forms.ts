@@ -172,6 +172,7 @@ export interface CreateFormRequest {
   guest_type_id: number;
   form_type?: FormType; // Deprecated - kept for backward compatibility
   description?: string;
+  status?: FormStatus;
   is_multi_page?: boolean;
   registration_limit?: number;
   expires_at?: string;

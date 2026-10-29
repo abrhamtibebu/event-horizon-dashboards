@@ -171,13 +171,27 @@ const SalespersonManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  const parseBoundedQueryInt = (value: string | null, fallback: number, max: number) => {
+    const trimmed = value?.trim() ?? ''
+    if (!/^\d+$/.test(trimmed)) return fallback
+    const parsed = Number(trimmed)
+    return Number.isSafeInteger(parsed) ? Math.min(max, Math.max(1, parsed)) : fallback
+  }
+
   // Initialize state from URL parameters
   useEffect(() => {
-    const tab = searchParams.get('tab') as 'overview' | 'jobs' | 'invitations' | 'registrations' | 'salespersons' || 'overview';
-    const page = parseInt(searchParams.get('page') || '1');
-    const perPageParam = parseInt(searchParams.get('per_page') || '10');
-    const search = searchParams.get('search') || '';
-    const status = searchParams.get('status') || 'all';
+    const tabValue = searchParams.get('tab');
+    const allowedTabs = ['overview', 'jobs', 'invitations', 'registrations', 'salespersons'] as const;
+    const tab = allowedTabs.includes(tabValue as typeof allowedTabs[number])
+      ? (tabValue as typeof allowedTabs[number])
+      : 'overview';
+    const page = parseBoundedQueryInt(searchParams.get('page'), 1, 10000);
+    const perPageParam = parseBoundedQueryInt(searchParams.get('per_page'), 10, 100);
+    const search = (searchParams.get('search') || '').slice(0, 255);
+    const statusValue = searchParams.get('status') || 'all';
+    const status = ['all', 'pending', 'approved', 'rejected', 'interview_scheduled'].includes(statusValue)
+      ? statusValue
+      : 'all';
 
     setActiveTab(tab);
     setCurrentPage(page);
@@ -620,11 +634,11 @@ const SalespersonManagement: React.FC = () => {
 
   // Pagination handlers
   const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+    setCurrentPage(Number.isSafeInteger(page) ? Math.min(10000, Math.max(1, page)) : 1);
   };
 
   const handlePerPageChange = (newPerPage: number) => {
-    setPerPage(newPerPage);
+    setPerPage(Number.isSafeInteger(newPerPage) ? Math.min(100, Math.max(1, newPerPage)) : 10);
     setCurrentPage(1); // Reset to first page when changing per page
   };
 
@@ -1579,7 +1593,7 @@ const SalespersonManagement: React.FC = () => {
 
       {/* Invitation Form Modal */}
       {showInvitationForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xl flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Create New Invitation</h3>
@@ -1651,7 +1665,7 @@ const SalespersonManagement: React.FC = () => {
 
       {/* Bulk Invitation Form Modal */}
       {showBulkInvitationForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xl flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Generate Bulk Invitations</h3>
@@ -1734,7 +1748,7 @@ const SalespersonManagement: React.FC = () => {
 
       {/* Registration Details Modal */}
       {showRegistrationDetails && selectedRegistration && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xl flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Registration Details</h3>
@@ -1910,7 +1924,7 @@ const SalespersonManagement: React.FC = () => {
 
       {/* Edit Invitation Modal */}
       {showEditInvitationForm && editingInvitationData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xl flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Edit Invitation</h3>
@@ -2049,7 +2063,7 @@ const SalespersonManagement: React.FC = () => {
 
       {/* Job Form Modal */}
       {showJobForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xl flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Create New Job</h3>
@@ -2144,7 +2158,7 @@ const SalespersonManagement: React.FC = () => {
 
       {/* Create Salesperson Form Modal */}
       {showCreateSalespersonForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xl flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Create New Salesperson</h3>
@@ -2268,7 +2282,7 @@ const SalespersonManagement: React.FC = () => {
 
       {/* Edit Salesperson Form Modal */}
       {showEditSalespersonForm && editingSalesperson && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xl flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Edit Salesperson</h3>

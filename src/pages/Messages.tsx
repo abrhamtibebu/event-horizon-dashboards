@@ -321,7 +321,7 @@ export default function Messages() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowSidebar(false)}
-            className="fixed inset-0 z-40 bg-background/70 lg:hidden"
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xl lg:hidden"
           />
         )}
       </AnimatePresence>

@@ -66,7 +66,7 @@ export function SuspendedOrganizerBanner() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xl flex items-center justify-center p-4">
       <Card className="w-full max-w-2xl bg-white shadow-2xl border-red-200">
         <CardContent className="p-8">
           <div className="flex items-start gap-4">

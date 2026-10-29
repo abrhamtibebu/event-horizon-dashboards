@@ -1,18 +1,11 @@
-import { useState } from 'react';
+import { useRef } from 'react';
 import { InvitationGenerator } from './InvitationGenerator';
-import { SocialShareButtons } from './SocialShareButtons';
 import { InvitationAnalytics } from './InvitationAnalytics';
 import { InvitationsList } from './InvitationsList';
+import { RsvpPageSettingsCard, type RsvpEventPreview } from './RsvpPageSettings';
 import { useAuth } from '@/hooks/use-auth';
-import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Link as LinkIcon,
-  UserCheck, 
-  TrendingUp,
-  Briefcase,
-  Crown
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Mail, Users } from 'lucide-react';
 import { useInvitationStats } from '@/lib/api/invitations';
 
 interface InvitationsTabProps {
@@ -21,61 +14,68 @@ interface InvitationsTabProps {
   eventName: string;
   eventType: 'free' | 'ticketed';
   isOrganizer: boolean;
+  eventPreview?: RsvpEventPreview;
 }
 
-export function InvitationsTab({
-  eventId,
-  eventUuid,
-  eventName,
-  eventType,
-  isOrganizer
-}: InvitationsTabProps) {
+export function InvitationsTab({ eventId, eventUuid, eventName, isOrganizer, eventPreview }: InvitationsTabProps) {
   const { user } = useAuth();
   const { data: stats } = useInvitationStats(eventId);
-  const [currentInvitation, setCurrentInvitation] = useState<{
-    code: string;
-    url: string;
-  } | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  const handleInvitationGenerated = (invitation: { code: string; url: string }) => {
-    setCurrentInvitation(invitation);
-  };
+  const invited = stats?.total_invitations ?? 0;
+  const sent = stats?.email?.sent ?? 0;
+  const failed = stats?.email?.failed ?? 0;
+  const confirmed = stats?.rsvp?.accepted ?? 0;
+
+  const cards = [
+    { label: 'Invited', value: invited, icon: Users, color: 'text-blue-500' },
+    { label: 'Emails sent', value: sent, icon: Mail, color: 'text-indigo-500' },
+    { label: 'Failed', value: failed, icon: AlertTriangle, color: failed > 0 ? 'text-rose-500' : 'text-slate-400' },
+    {
+      label: 'RSVP confirmed',
+      value: `${confirmed}${invited > 0 ? ` (${Math.round((confirmed / invited) * 100)}%)` : ''}`,
+      icon: CheckCircle2,
+      color: 'text-emerald-500',
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Minimal Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Links', value: stats?.total_invitations || 0, icon: LinkIcon, color: 'text-blue-500' },
-          { label: 'Clicks', value: stats?.total_clicks || 0, icon: TrendingUp, color: 'text-indigo-500' },
-          { label: 'RSVP Responses', value: stats?.total_registrations || 0, icon: UserCheck, color: 'text-emerald-500' },
-          { label: 'Conversion', value: `${stats?.conversion_rate || 0}%`, icon: UserCheck, color: 'text-amber-500' },
-        ].map((stat, i) => (
-          <div key={i} className="p-4 bg-card border border-border rounded-xl">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-tight">{stat.label}</p>
+        {cards.map((stat) => (
+          <div key={stat.label} className="p-4 bg-card border border-border rounded-xl">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-tight">{stat.label}</p>
+              <stat.icon className={`w-4 h-4 ${stat.color}`} />
+            </div>
             <p className="text-2xl font-bold mt-1">{stat.value}</p>
           </div>
         ))}
       </div>
 
-      <Tabs defaultValue="all" className="w-full">
+      <Tabs defaultValue="guests" className="w-full">
         <TabsList className="bg-transparent border-b border-border rounded-none h-auto p-0 w-full justify-start gap-6">
-          <TabsTrigger value="all" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-0 py-2">
-            All Invitations
+          <TabsTrigger
+            value="guests"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-0 py-2"
+          >
+            Guests & RSVPs
           </TabsTrigger>
-          <TabsTrigger value="exhibitors" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-0 py-2">
-            Exhibitors
-          </TabsTrigger>
-          <TabsTrigger value="vip-media" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-0 py-2">
-            VIP & Media
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-0 py-2">
+          <TabsTrigger
+            value="analytics"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-0 py-2"
+          >
             Analytics
           </TabsTrigger>
         </TabsList>
 
-        <div className="mt-6 space-y-6">
-          <TabsContent value="all" className="space-y-6 mt-0">
+        <div className="mt-6">
+          <TabsContent value="guests" className="mt-0 space-y-6">
+            <RsvpPageSettingsCard
+              eventId={eventId}
+              isOrganizer={isOrganizer}
+              event={eventPreview ?? { name: eventName }}
+            />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-1">
                 <InvitationGenerator
@@ -83,62 +83,21 @@ export function InvitationsTab({
                   eventUuid={eventUuid}
                   eventName={eventName}
                   isOrganizer={isOrganizer}
-                  onGenerated={handleInvitationGenerated}
+                  onSent={() => listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                 />
               </div>
-              <div className="lg:col-span-2">
-                <InvitationsList
-                  eventId={eventId}
-                  isOrganizer={isOrganizer}
-                />
+              <div className="lg:col-span-2" ref={listRef}>
+                <InvitationsList eventId={eventId} isOrganizer={isOrganizer} />
               </div>
             </div>
-            
-            {currentInvitation && (
-              <Card className="p-4 bg-muted/20 border-border border-dashed">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Recently generated: <code className="text-primary">{currentInvitation.code}</code></p>
-                  <SocialShareButtons
-                    invitationUrl={currentInvitation.url}
-                    invitationCode={currentInvitation.code}
-                    eventName={eventName}
-                    eventType={eventType}
-                  />
-                </div>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="exhibitors" className="mt-0">
-            <InvitationsList
-              eventId={eventId}
-              isOrganizer={isOrganizer}
-              filterType="exhibitor"
-              title="Exhibitor Invitations"
-            />
-          </TabsContent>
-
-          <TabsContent value="vip-media" className="mt-0">
-            <InvitationsList
-              eventId={eventId}
-              isOrganizer={isOrganizer}
-              filterType={['vip', 'media', 'speaker']}
-              title="VIP & Press Invitations"
-            />
           </TabsContent>
 
           <TabsContent value="analytics" className="mt-0">
-            <InvitationAnalytics
-              eventId={eventId}
-              userId={user?.id ? parseInt(user.id) : undefined}
-              isOrganizer={isOrganizer}
-            />
+            <InvitationAnalytics eventId={eventId} userId={user?.id ? Number(user.id) : undefined} isOrganizer={isOrganizer} />
           </TabsContent>
         </div>
       </Tabs>
     </div>
   );
 }
-
-
 

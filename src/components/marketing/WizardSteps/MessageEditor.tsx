@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import api from '@/lib/api'
+import { sanitizeEmailPreview } from '@/lib/rich-text'
 
 interface MessageEditorProps {
   campaignType: 'email' | 'sms' | 'both'
@@ -126,7 +127,7 @@ export function MessageEditor({
                   <div className="text-sm font-semibold mb-2">{subject}</div>
                   <div 
                     className="text-sm text-gray-700 whitespace-pre-wrap"
-                    dangerouslySetInnerHTML={{ __html: formatContent(emailContent) }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeEmailPreview(formatContent(emailContent)) }}
                   />
                 </div>
                 <Alert variant="info">

@@ -1,81 +1,185 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import type { Invitation, InvitationAnalytics, SocialPlatform } from '@/types/invitations';
+import type {
+  BulkInvitationResult,
+  BulkInvitationRow,
+  Invitation,
+  InvitationAnalytics,
+  InvitationGuestType,
+  InvitationRsvpStatus,
+  InvitationStats,
+  LegacyInvitationType,
+  PublicInvitation,
+  RsvpPageSettings,
+  SocialPlatform,
+} from '@/types/invitations';
+
+const invalidateInvitationQueries = (queryClient: ReturnType<typeof useQueryClient>) => {
+  queryClient.invalidateQueries({ queryKey: ['invitations'] });
+  queryClient.invalidateQueries({ queryKey: ['invitation-stats'] });
+  queryClient.invalidateQueries({ queryKey: ['invitation-analytics'] });
+};
 
 /**
- * Generate invitation
+ * Event guest types (the organizer picks one of these when inviting).
+ */
+export const useEventGuestTypes = (eventId: number) => {
+  return useQuery<InvitationGuestType[]>({
+    queryKey: ['event-guest-types', eventId],
+    queryFn: async () => {
+      const response = await api.get(`/events/${eventId}/guest-types`);
+      const data = response.data?.data ?? response.data;
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!eventId,
+    staleTime: 60_000,
+  });
+};
+
+/**
+ * Generate a single invitation (optionally public link when no recipient is given).
  */
 export const useGenerateInvitation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: async (data: { 
-      eventId: number; 
-      type: 'generic' | 'personalized' | 'exhibitor' | 'speaker' | 'vip' | 'media';
+    mutationFn: async (data: {
+      eventId: number;
+      guestTypeId?: number | null;
+      /** Legacy role for ticketed discount links. */
+      type?: LegacyInvitationType;
       recipientName?: string;
       recipientEmail?: string;
+      recipientPhone?: string;
       expiresAt?: string;
       discountType?: 'none' | 'percentage' | 'fixed';
       discountValue?: number;
       maxDiscountAmount?: number;
     }) => {
       const response = await api.post(`/events/${data.eventId}/invitations/generate`, {
+        guest_type_id: data.guestTypeId ?? undefined,
         invitation_type: data.type,
         recipient_name: data.recipientName,
         recipient_email: data.recipientEmail,
+        recipient_phone: data.recipientPhone,
         expires_at: data.expiresAt,
         discount_type: data.discountType ?? 'none',
         discount_value: data.discountValue ?? 0,
         max_discount_amount: data.maxDiscountAmount,
       });
-      const responseData = response.data?.data || response.data;
-      console.log('[Invitations] Invitation generated:', responseData);
-      return responseData;
+      return (response.data?.data || response.data) as Invitation;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invitations'] });
-      queryClient.invalidateQueries({ queryKey: ['invitation-analytics'] });
-    }
+    onSuccess: () => invalidateInvitationQueries(queryClient),
   });
 };
 
 /**
- * Update RSVP status
+ * Bulk create + send RSVP invitations for one guest type.
+ */
+export const useBulkGenerateInvitations = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: {
+      eventId: number;
+      guestTypeId: number | null;
+      invitations: BulkInvitationRow[];
+    }) => {
+      const response = await api.post(`/events/${data.eventId}/invitations/bulk-generate`, {
+        guest_type_id: data.guestTypeId ?? undefined,
+        invitations: data.invitations,
+      });
+      return response.data as BulkInvitationResult;
+    },
+    onSuccess: () => invalidateInvitationQueries(queryClient),
+  });
+};
+
+/**
+ * Guest decline / re-open (acceptance is recorded when the form is submitted).
  */
 export const useRSVPInvitation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: { invitationCode: string; status: 'accepted' | 'declined' }) => {
       const response = await api.post('/invitations/rsvp', {
         invitation_code: data.invitationCode,
-        status: data.status
+        status: data.status,
       });
       return response.data?.data || response.data;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['invitations'] });
-      queryClient.invalidateQueries({ queryKey: ['invitation-analytics'] });
-    }
+    onSuccess: () => invalidateInvitationQueries(queryClient),
   });
 };
 
 /**
- * Get invitations list
+ * Public invitation lookup for the RSVP landing page.
  */
-export const useInvitations = (eventId: number, userId?: number) => {
+export const fetchPublicInvitation = async (code: string): Promise<PublicInvitation> => {
+  const response = await api.get(`/public/invitations/${encodeURIComponent(code)}`);
+  return (response.data?.data || response.data) as PublicInvitation;
+};
+
+/**
+ * Invitations list. Polls while any email is still queued.
+ */
+export const useInvitations = (
+  eventId: number,
+  filters?: { userId?: number; guestTypeId?: number; emailStatus?: string; rsvpStatus?: string },
+) => {
   return useQuery<Invitation[]>({
-    queryKey: ['invitations', eventId, userId],
+    queryKey: ['invitations', eventId, filters],
     queryFn: async () => {
       const response = await api.get(`/events/${eventId}/invitations`, {
-        params: userId ? { user_id: userId } : {}
+        params: {
+          user_id: filters?.userId,
+          guest_type_id: filters?.guestTypeId,
+          email_status: filters?.emailStatus,
+          rsvp_status: filters?.rsvpStatus,
+        },
       });
       const data = response.data?.data || response.data;
-      console.log('[Invitations] Invitations list fetched:', data);
-      return data;
+      return Array.isArray(data) ? data : [];
     },
-    enabled: !!eventId
+    enabled: !!eventId,
+    refetchInterval: (query) => {
+      const rows = query.state.data;
+      if (Array.isArray(rows) && rows.some((r) => r.email_status === 'queued')) return 5000;
+      // Pick up confirmations and rejections while the list is open.
+      return 10000;
+    },
   });
+};
+
+export interface InvitationResponse {
+  invitation_id: number;
+  recipient_name: string | null;
+  recipient_email: string | null;
+  recipient_phone: string | null;
+  guest_type: string | null;
+  rsvp_status: InvitationRsvpStatus;
+  rsvp_label: string;
+  rsvp_at: string | null;
+  submitted_at: string | null;
+  answers: Array<{ label: string; value: string }>;
+}
+
+export const fetchInvitationResponse = async (eventId: number, invitationId: number): Promise<InvitationResponse> => {
+  const response = await api.get(`/events/${eventId}/invitations/${invitationId}/response`);
+  return response.data?.data as InvitationResponse;
+};
+
+export const downloadInvitationsCsv = async (eventId: number): Promise<void> => {
+  const response = await api.get(`/events/${eventId}/invitations/export`, { responseType: 'blob' });
+  const url = URL.createObjectURL(response.data);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `rsvp-guests-${eventId}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 };
 
 /**
@@ -87,36 +191,33 @@ export const useInvitationAnalytics = (
     start_date?: string;
     end_date?: string;
     user_id?: number;
-  }
+  },
 ) => {
   return useQuery<InvitationAnalytics>({
     queryKey: ['invitation-analytics', eventId, filters],
     queryFn: async () => {
       const response = await api.get(`/events/${eventId}/invitations/analytics`, {
-        params: filters
+        params: filters,
       });
-      const data = response.data?.data || response.data;
-      console.log('[Invitations] Analytics fetched:', data);
-      return data;
+      return response.data?.data || response.data;
     },
     enabled: !!eventId,
-    refetchInterval: 30000 // Refresh every 30 seconds
+    refetchInterval: 30000,
   });
 };
 
 /**
- * Get real-time stats summary
+ * Summary counts: invited, emails sent/failed, RSVP confirmed.
  */
 export const useInvitationStats = (eventId: number) => {
-  return useQuery({
+  return useQuery<InvitationStats>({
     queryKey: ['invitation-stats', eventId],
     queryFn: async () => {
       const response = await api.get(`/events/${eventId}/invitations/stats`);
-      const data = response.data?.data || response.data;
-      return data;
+      return response.data?.data || response.data;
     },
     enabled: !!eventId,
-    refetchInterval: 10000 // Refresh every 10 seconds
+    refetchInterval: 15000,
   });
 };
 
@@ -128,10 +229,9 @@ export const useTrackShare = () => {
     mutationFn: async (data: { invitationCode: string; platform: SocialPlatform }) => {
       await api.post('/invitations/track-share', {
         invitation_code: data.invitationCode,
-        platform: data.platform
+        platform: data.platform,
       });
-      console.log('[Invitations] Share tracked:', data.platform);
-    }
+    },
   });
 };
 
@@ -140,21 +240,18 @@ export const useTrackShare = () => {
  */
 export const useRevokeInvitation = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (invitationId: number) => {
       const response = await api.post(`/invitations/${invitationId}/revoke`);
       return response.data?.data || response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invitations'] });
-      queryClient.invalidateQueries({ queryKey: ['invitation-analytics'] });
-    }
+    onSuccess: () => invalidateInvitationQueries(queryClient),
   });
 };
 
 /**
- * Resend invitation email to the stored recipient (or override address).
+ * Resend / retry the invitation email.
  */
 export const useResendInvitationEmail = () => {
   const queryClient = useQueryClient();
@@ -164,38 +261,32 @@ export const useResendInvitationEmail = () => {
       const response = await api.post(`/invitations/${params.invitationId}/resend-email`, {
         email: params.email || undefined,
       });
-      return response.data;
+      return response.data as { success: boolean; message: string; data?: Invitation };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invitations'] });
-      queryClient.invalidateQueries({ queryKey: ['invitation-analytics'] });
-    },
+    onSettled: () => invalidateInvitationQueries(queryClient),
   });
 };
 
-/**
- * Bulk generate invitations
- */
-export const useBulkGenerateInvitations = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (data: { 
-      eventId: number; 
-      invitations: Array<{
-        name: string;
-        email: string;
-        type: string;
-      }>;
-    }) => {
-      const response = await api.post(`/events/${data.eventId}/invitations/bulk-generate`, {
-        invitations: data.invitations
-      });
-      return response.data?.data || response.data;
+export const useRsvpPage = (eventId: number) => {
+  return useQuery<RsvpPageSettings>({
+    queryKey: ['rsvp-page', eventId],
+    queryFn: async () => {
+      const response = await api.get(`/events/${eventId}/rsvp-page`);
+      return response.data?.data as RsvpPageSettings;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invitations'] });
-      queryClient.invalidateQueries({ queryKey: ['invitation-analytics'] });
-    }
+    enabled: !!eventId,
+  });
+};
+
+export const useUpdateRsvpPage = (eventId: number) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (settings: RsvpPageSettings) => {
+      const response = await api.put(`/events/${eventId}/rsvp-page`, settings);
+      return response.data?.data as RsvpPageSettings;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(['rsvp-page', eventId], data);
+    },
   });
 };

@@ -40,7 +40,16 @@ export default function PublicEventRegister() {
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [invitationCode, setInvitationCode] = useState<string | null>(null);
   const [invitationDetails, setInvitationDetails] = useState<any>(null);
-  const [rsvpLoading, setRsvpLoading] = useState(false);
+
+  // Invitation links open the dedicated RSVP page. The RSVP page sends guests back here
+  // (with &fallback=1) only when their guest type has no custom form.
+  const invParamForRedirect = searchParams.get('inv');
+  const isInvitationFallback = searchParams.get('fallback') === '1';
+  useEffect(() => {
+    if (invParamForRedirect && !isInvitationFallback) {
+      navigate(`/event/rsvp/${encodeURIComponent(invParamForRedirect)}`, { replace: true });
+    }
+  }, [invParamForRedirect, isInvitationFallback, navigate]);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -75,8 +84,6 @@ export default function PublicEventRegister() {
   const [existingGuestInfo, setExistingGuestInfo] = useState<any>(null);
   const [guestTypes, setGuestTypes] = useState<any[]>([]);
 
-  // RSVP and Speaker states
-  const [rsvpStatus, setRsvpStatus] = useState<'pending' | 'accepted' | 'declined'>('pending');
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
   const profileImageObjectUrlRef = useRef<string | null>(null);
@@ -91,13 +98,35 @@ export default function PublicEventRegister() {
   }, []);
 
   const handleCustomFormSuccess = useCallback((result?: SubmissionResult) => {
+    const attendee = result?.attendee as
+      | (SubmissionResult['attendee'] & { guest?: { uuid?: string; name?: string; email?: string }; guest_uuid?: string })
+      | undefined;
+    const guest = (result as (SubmissionResult & { guest?: { uuid?: string; name?: string; email?: string } }) | undefined)?.guest;
+    const u = attendee?.guest?.uuid?.trim() || attendee?.guest_uuid?.trim() || guest?.uuid?.trim() || '';
+
+    toast.success(invitationCode ? 'RSVP confirmed! Your e-badge is on its way.' : 'Registration successful! Your e-badge is on its way.');
+
+    if (attendee?.id && event?.id) {
+      const params = new URLSearchParams({
+        attendeeId: String(attendee.id),
+        eventId: String(event.id),
+        eventUuid: event.uuid ?? '',
+        eventName: event.name ?? '',
+        eventDate: event.start_date || '',
+        eventLocation: event.venue_name || event.location || '',
+        guestUuid: u,
+        guestName: attendee?.guest?.name || guest?.name || '',
+        guestEmail: attendee?.guest?.email || guest?.email || '',
+      });
+      if (invitationCode) params.set('inv', invitationCode);
+      navigate(`/registration/success?${params.toString()}`);
+      return;
+    }
+
+    // Fallback when the response has no attendee id: show the inline confirmation.
     setSuccess(true);
-    const u =
-      result?.attendee?.guest?.uuid?.trim() ||
-      (result?.attendee as { guest_uuid?: string } | undefined)?.guest_uuid?.trim();
     setSuccessGuestUuid(u || null);
-    toast.success('Registration successful! Your e-badge is on its way.');
-  }, []);
+  }, [event, invitationCode, navigate]);
 
   const handleCustomFormError = useCallback((error: string) => {
     toast.error(error);
@@ -232,76 +261,33 @@ export default function PublicEventRegister() {
     }
   }, [searchParams, eventUuid]);
 
-  // Extract invitation code from URL parameters and track click
+  // Invitation fallback mode: load the invitation so we can prefill and lock the guest type.
   useEffect(() => {
     const invParam = searchParams.get('inv');
-    if (invParam) {
-      setInvitationCode(invParam);
-      console.log('[Invitation] Invitation code detected:', invParam);
+    if (!invParam || !isInvitationFallback) return;
+    setInvitationCode(invParam);
 
-      // Track invitation link click
-      const trackInvitationClick = async () => {
-        try {
-          await api.post('/invitations/track-click', {
-            invitation_code: invParam,
-            user_agent: navigator.userAgent,
-            ip_address: '', // Will be captured on backend
-            referrer: document.referrer
-          });
-          console.log('[Invitation] Click tracked successfully');
-          
-          // Fetch invitation details
-          const response = await api.get(`/public/invitations/${invParam}`);
-          const invData = response.data?.data || response.data;
-          setInvitationDetails(invData);
-          
-          // Pre-fill form if recipient details are available
-          if (invData.recipient_name) {
-            setForm(prev => ({
-              ...prev,
-              name: invData.recipient_name || prev.name,
-              email: invData.recipient_email || prev.email
-            }));
-          }
+    let cancelled = false;
+    api.get(`/public/invitations/${encodeURIComponent(invParam)}`)
+      .then((response) => {
+        if (cancelled) return;
+        const invData = response.data?.data || response.data;
+        setInvitationDetails(invData);
+        setForm((prev) => ({
+          ...prev,
+          name: invData?.recipient_name || prev.name,
+          email: invData?.recipient_email || prev.email,
+          phone: invData?.recipient_phone || prev.phone,
+        }));
+      })
+      .catch((error) => {
+        console.warn('[Invitation] Failed to fetch details:', error);
+      });
 
-          // Auto-select guest type based on invitation type
-          if (invData.invitation_type && guestTypes.length > 0) {
-            const mapping: Record<string, string[]> = {
-              'personalized': ['Regular', 'Standard'],
-              'generic': ['Visitor', 'Guest'],
-              'exhibitor': ['Exhibitor', 'Vendor', 'Sponsor', 'Booth'],
-              'speaker': ['Speaker', 'Presenter', 'Keynote'],
-              'vip': ['VIP', 'V.I.P', 'Very Important'],
-              'media': ['Media', 'Press', 'Journalist', 'News'],
-            };
-            
-            const variants = mapping[invData.invitation_type] || [invData.invitation_type];
-            const matchingType = guestTypes.find((gt: any) => 
-              variants.some(v => gt.name.toLowerCase().includes(v.toLowerCase()))
-            );
-            
-            if (matchingType) {
-              console.log('[Invitation] Auto-selecting guest type:', matchingType.name);
-              setSelectedGuestTypeId(matchingType.id);
-              
-              // Check if this type has a custom form
-              api.get(`/events/${event.id}/forms/by-guest-type/${matchingType.id}`)
-                .then(formRes => {
-                  if (formRes.data?.status === 'active') {
-                    setUseCustomForm(true);
-                  }
-                })
-                .catch(() => {});
-            }
-          }
-        } catch (error) {
-          console.warn('[Invitation] Failed to track click or fetch details:', error);
-        }
-      };
-
-      trackInvitationClick();
-    }
-  }, [searchParams, eventUuid]);
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, isInvitationFallback]);
 
   useEffect(() => {
     if (!eventUuid) return;
@@ -367,38 +353,17 @@ export default function PublicEventRegister() {
     });
   }, [event]);
   
-  // Sync selected guest type with invitation details when guest types are loaded
+  // Invitation fallback: lock the guest type to the one on the invitation (no name guessing).
   useEffect(() => {
-    if (invitationDetails?.invitation_type && guestTypes.length > 0) {
-      const mapping: Record<string, string[]> = {
-        'personalized': ['Regular', 'Standard'],
-        'generic': ['Visitor', 'Guest'],
-        'exhibitor': ['Exhibitor', 'Vendor', 'Sponsor', 'Booth'],
-        'speaker': ['Speaker', 'Presenter', 'Keynote'],
-        'vip': ['VIP', 'V.I.P', 'Very Important'],
-        'media': ['Media', 'Press', 'Journalist', 'News'],
-      };
-      
-      const variants = mapping[invitationDetails.invitation_type] || [invitationDetails.invitation_type];
-      const matchingType = guestTypes.find((gt: any) => 
-        variants.some(v => gt.name.toLowerCase().includes(v.toLowerCase()))
-      );
-      
-      if (matchingType) {
-        console.log('[Invitation Sync] Selecting guest type:', matchingType.name);
-        setSelectedGuestTypeId(matchingType.id);
-        
-        // Also check for custom form
-        api.get(`/events/${event.id}/forms/by-guest-type/${matchingType.id}`)
-          .then(formRes => {
-            if (formRes.data?.status === 'active') {
-              setUseCustomForm(true);
-            }
-          })
-          .catch(() => {});
-      }
+    const gtId = invitationDetails?.guest_type_id;
+    if (!gtId || guestTypes.length === 0) return;
+    const match = guestTypes.find((gt) => Number(gt.id) === Number(gtId));
+    if (match) {
+      setSelectedGuestTypeId(match.id);
+      // We only land here when the guest type has no active custom form.
+      setUseCustomForm(false);
     }
-  }, [invitationDetails, guestTypes, event?.id]);
+  }, [invitationDetails?.guest_type_id, guestTypes]);
 
 
   const checkExistingGuest = async (email: string, phone: string) => {
@@ -502,28 +467,6 @@ export default function PublicEventRegister() {
       }, 500);
 
       return () => clearTimeout(timeoutId);
-    }
-  };
-
-  const handleRsvp = async (status: 'accepted' | 'declined') => {
-    if (!invitationCode) return;
-    setRsvpLoading(true);
-    try {
-      await api.post('/invitations/rsvp', { 
-        invitation_code: invitationCode,
-        status 
-      });
-      setRsvpStatus(status);
-      if (status === 'accepted') {
-        toast.success("We're thrilled you can join us!");
-      } else {
-        toast.info("Thank you for letting us know.");
-      }
-    } catch (error) {
-      console.error('RSVP error:', error);
-      toast.error("Failed to update RSVP status.");
-    } finally {
-      setRsvpLoading(false);
     }
   };
 
@@ -688,6 +631,7 @@ export default function PublicEventRegister() {
           guestTypeName: response.data.attendee.guest_type_name,
           guestTypePrice: response.data.attendee.guest_type_price?.toString() || '0',
         });
+        if (invitationCode) params.set('inv', invitationCode);
         navigate(`/registration/success?${params.toString()}`);
       } else {
         toast.success('Registration successful!');
@@ -860,34 +804,6 @@ export default function PublicEventRegister() {
     setIsProcessingPayment(false);
     setPaymentProgress(0);
     setPaymentStatus('pending');
-  };
-
-  const handleRSVP = async (status: 'accepted' | 'declined') => {
-    if (!invitationCode) return;
-    
-    setRsvpLoading(true);
-    try {
-      await api.post('/invitations/rsvp', {
-        invitation_code: invitationCode,
-        status
-      });
-      
-      setInvitationDetails(prev => ({
-        ...prev,
-        rsvp_status: status,
-        is_rsvp_completed: true
-      }));
-
-      if (status === 'accepted') {
-        toast.success('Thank you for accepting the invitation! You can now complete your registration.');
-      } else {
-        toast.info('You have declined the invitation. We hope to see you at future events.');
-      }
-    } catch (err) {
-      toast.error('Failed to update RSVP. Please try again.');
-    } finally {
-      setRsvpLoading(false);
-    }
   };
 
   const handleRetryPayment = () => {
@@ -1077,7 +993,7 @@ export default function PublicEventRegister() {
               { label: 'Date', value: startDate ? startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD', icon: Calendar },
               { label: 'Time', value: event.time || 'Flexible', icon: Clock },
               { label: 'Venue', value: event.venue_name || event.location || 'Online', icon: MapPin },
-              { label: 'Guest Type', value: invitationDetails?.invitation_type || 'Attendee', icon: Users },
+              { label: 'Guest Type', value: invitationDetails?.guest_type?.name || invitationDetails?.invitation_type || 'Attendee', icon: Users },
             ].map((item, i) => (
               <div key={i} className={`min-w-0 p-3 sm:p-6 text-center border-slate-50 dark:border-slate-800 ${i % 2 === 0 ? 'border-r' : 'md:border-r'} ${i < 2 ? 'border-b md:border-b-0' : ''}`}>
                 <item.icon className="w-4 h-4 sm:w-5 sm:h-5 text-[#f97316] mx-auto mb-1.5 sm:mb-2 opacity-80 shrink-0" />
@@ -1121,65 +1037,8 @@ export default function PublicEventRegister() {
               </div>
             )}
 
-            {/* RSVP Section for Invitations */}
-            {invitationCode && rsvpStatus === 'pending' && (
-              <div className="max-w-2xl mx-auto mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 sm:p-12 border-2 border-[#f97316]/20 shadow-xl text-center">
-                  <div className="w-20 h-20 bg-[#f97316]/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                    <Mail className="w-10 h-10 text-[#f97316]" />
-                  </div>
-                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-3">You're Invited!</h2>
-                  <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-md mx-auto leading-relaxed">
-                    Hello <span className="text-[#f97316] font-bold">{invitationDetails?.recipient_name || 'there'}</span>, 
-                    we've sent you a special invitation to join us. Would you like to attend?
-                  </p>
-                  
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <Button
-                      onClick={() => handleRsvp('accepted')}
-                      disabled={rsvpLoading}
-                      className="h-14 px-10 rounded-2xl bg-[#f97316] hover:bg-[#ea580c] text-white font-black shadow-lg shadow-orange-500/20 w-full sm:w-auto min-w-[180px]"
-                    >
-                      {rsvpLoading ? <SpinnerInline /> : 'Yes, I\'ll attend!'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => handleRsvp('declined')}
-                      disabled={rsvpLoading}
-                      className="h-14 px-10 rounded-2xl border-slate-200 dark:border-slate-800 text-slate-600 font-bold w-full sm:w-auto min-w-[180px]"
-                    >
-                      Declined
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Declined State */}
-            {invitationCode && rsvpStatus === 'declined' && (
-              <div className="max-w-2xl mx-auto mb-12 animate-in zoom-in duration-500">
-                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 sm:p-12 border border-slate-100 dark:border-slate-800 shadow-xl text-center">
-                  <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                    <CheckCircle className="w-10 h-10 text-slate-400" />
-                  </div>
-                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-3">Response Received</h2>
-                  <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-md mx-auto leading-relaxed">
-                    Thank you for letting us know. We've recorded your response. 
-                    If you change your mind, you can still register below.
-                  </p>
-                  <Button
-                    onClick={() => setRsvpStatus('accepted')}
-                    variant="link"
-                    className="text-[#f97316] font-black uppercase tracking-widest text-xs"
-                  >
-                    I changed my mind, I want to attend
-                  </Button>
-                </div>
-              </div>
-            )}
-
             {/* Registration Form Area */}
-            {(!invitationCode || rsvpStatus === 'accepted') && (
+            {(
               <div className="max-w-2xl mx-auto animate-in fade-in duration-500">
                 {/* Payment Step for Selected Tickets */}
                 {purchaseStep === 'payment' && selectedTickets.length > 0 && (
@@ -1336,8 +1195,12 @@ export default function PublicEventRegister() {
                 ) : purchaseStep !== 'payment' && (
                   <div className="space-y-8 sm:space-y-12">
                     <div className="text-center px-4">
-                      <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-2">Secure Your Spot</h2>
-                      <p className="text-xs sm:text-sm text-slate-500 font-medium">Please fill in your details to complete registration</p>
+                      <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-2">
+                        {invitationCode ? 'Confirm your RSVP' : 'Secure Your Spot'}
+                      </h2>
+                      <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                        {invitationCode ? 'Check your details below and confirm to receive your e-badge' : 'Please fill in your details to complete registration'}
+                      </p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6 sm:gap-y-8">
@@ -1520,7 +1383,7 @@ export default function PublicEventRegister() {
                       disabled={submitting}
                       className="sm:col-span-2 h-14 sm:h-18 bg-[#f97316] hover:bg-[#ea580c] text-white font-black text-lg sm:text-xl rounded-xl sm:rounded-2xl shadow-xl shadow-orange-500/20 transition-all active:scale-[0.98] mt-2 sm:mt-4"
                     >
-                      {submitting ? <SpinnerInline size="sm" /> : 'Confirm Registration'}
+                      {submitting ? <SpinnerInline size="sm" /> : invitationCode ? 'Confirm RSVP' : 'Confirm Registration'}
                     </Button>
 
                   </form>

@@ -4727,6 +4727,16 @@ export default function EventDetails() {
                       eventName={eventData?.name || ''}
                       eventType={eventData?.event_type as 'free' | 'ticketed' || 'free'}
                       isOrganizer={user?.role === 'organizer' || user?.role === 'organizer_admin' || user?.role === 'event_manager' || user?.role === 'admin' || user?.role === 'superadmin'}
+                      eventPreview={{
+                        name: eventData?.name || '',
+                        description: eventData?.description,
+                        startDate: eventData?.start_date,
+                        venueName: eventData?.venue_name,
+                        location: eventData?.location,
+                        imageUrl: eventData?.image_url || eventData?.event_image || eventData?.image,
+                        organizerName: eventData?.organizer?.name || eventData?.organizer_name,
+                        organizerLogo: eventData?.organizer?.logo || eventData?.organizer_logo,
+                      }}
                     />
                   </TabsContent>
                 {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'organizer' || user?.role === 'organizer_admin' || user?.role === 'event_manager') && eventData?.event_type !== 'ticketed' ? (
