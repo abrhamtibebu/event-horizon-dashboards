@@ -1,22 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Settings, Eye, EyeOff } from 'lucide-react';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
+import React, { useState } from 'react';
+import { AlertCircle, ChevronDown, Copy, Loader2, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { FormField, CreateFormFieldRequest } from '@/types/forms';
-import { AlertDialog } from '@/components/ui/AlertDialog';
+import type { ConditionalLogic, CreateFormFieldRequest, FieldType, FormField, ValidationRules } from '@/types/forms';
+import {
+  CONDITION_OPERATORS,
+  FIELD_TYPES,
+  conditionParent,
+  fieldTypeInfo,
+  isChoiceType,
+  operatorNeedsValue,
+} from './fieldTypes';
 
 interface FormFieldEditorProps {
   field: FormField | null;
@@ -24,8 +22,57 @@ interface FormFieldEditorProps {
   onSave: (fieldData: CreateFormFieldRequest) => void;
   onCancel: () => void;
   onDelete?: () => void;
-  availableFields?: FormField[]; // For conditional logic
+  onDuplicate?: () => void;
+  /** Other fields in the form, used for follow-up conditions. */
+  availableFields?: FormField[];
+  isSaving?: boolean;
 }
+
+type OptionDraft = { label: string; value: string };
+
+const blankOptions = (): OptionDraft[] => [
+  { label: '', value: '' },
+  { label: '', value: '' },
+];
+
+const comparable = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+const initialFieldData = (field: FormField | null, initialType: string): CreateFormFieldRequest => {
+  if (!field) {
+    return {
+      field_type: (initialType || 'text') as FieldType,
+      label: '',
+      placeholder: '',
+      is_required: false,
+      default_value: null,
+      validation_rules: {},
+      conditional_logic: null,
+      order: 0,
+      page_number: 1,
+      options: isChoiceType(initialType) ? blankOptions() : [],
+    };
+  }
+  return {
+    field_type: field.field_type,
+    label: field.label,
+    placeholder: field.placeholder || '',
+    is_required: field.is_required,
+    default_value: field.default_value,
+    validation_rules: field.validation_rules || {},
+    conditional_logic: field.conditional_logic || null,
+    order: field.order,
+    page_number: field.page_number,
+    options: field.fieldOptions?.map((option) => ({ label: option.option_label, value: option.option_value })) || [],
+  };
+};
+
+const hasExtraSettings = (data: CreateFormFieldRequest): boolean => {
+  const rules = Object.values(data.validation_rules || {}).some(
+    (value) => value !== null && value !== undefined && value !== '',
+  );
+  const hasDefault = data.field_type !== 'hidden' && data.default_value != null && data.default_value !== '';
+  return rules || hasDefault || !!data.placeholder;
+};
 
 export const FormFieldEditor: React.FC<FormFieldEditorProps> = ({
   field,
@@ -33,621 +80,516 @@ export const FormFieldEditor: React.FC<FormFieldEditorProps> = ({
   onSave,
   onCancel,
   onDelete,
-  availableFields = []
+  onDuplicate,
+  availableFields = [],
+  isSaving = false,
 }) => {
-  const [notice, setNotice] = useState<string | null>(null);
-  const [fieldData, setFieldData] = useState<CreateFormFieldRequest>({
-    field_type: 'text',
-    label: '',
-    placeholder: '',
-    is_required: false,
-    default_value: null,
-    validation_rules: {},
-    conditional_logic: null,
-    order: 0,
-    page_number: 1,
-    options: []
-  });
+  // The builder remounts this editor (via `key`) whenever a different field is opened.
+  const [fieldData, setFieldData] = useState<CreateFormFieldRequest>(() => initialFieldData(field, initialType));
+  const [showMore, setShowMore] = useState(() => hasExtraSettings(initialFieldData(field, initialType)));
+  const [error, setError] = useState<string | null>(null);
 
-  // Initialize form data when field changes
-  useEffect(() => {
-    if (field) {
-      setFieldData({
-        field_type: field.field_type,
-        label: field.label,
-        placeholder: field.placeholder || '',
-        is_required: field.is_required,
-        default_value: field.default_value,
-        validation_rules: field.validation_rules || {},
-        conditional_logic: field.conditional_logic,
-        order: field.order,
-        page_number: field.page_number,
-        options: field.fieldOptions?.map(opt => ({
-          label: opt.option_label,
-          value: opt.option_value
-        })) || []
-      });
-    } else {
-      // Reset for new field, keeping the type chosen from the palette
-      setFieldData({
-        field_type: (initialType || 'text') as CreateFormFieldRequest['field_type'],
-        label: '',
-        placeholder: '',
-        is_required: false,
-        default_value: null,
-        validation_rules: {},
-        conditional_logic: null,
-        order: 0,
-        page_number: 1,
-        options: []
-      });
+  const type = fieldData.field_type;
+  const typeInfo = fieldTypeInfo(type);
+  const isChoice = isChoiceType(type);
+  const isHidden = type === 'hidden';
+  const rules = fieldData.validation_rules || {};
+  const logic = fieldData.conditional_logic || null;
+  const parent = conditionParent(logic, availableFields);
+  const parentOptions = parent && isChoiceType(parent.field_type) ? parent.fieldOptions || [] : [];
+
+  const update = (patch: Partial<CreateFormFieldRequest>) => {
+    setError(null);
+    setFieldData((prev) => ({ ...prev, ...patch }));
+  };
+
+  const updateRule = (key: keyof ValidationRules, value: string | number | null) => {
+    setError(null);
+    setFieldData((prev) => ({ ...prev, validation_rules: { ...prev.validation_rules, [key]: value } }));
+  };
+
+  const numberRule = (key: keyof ValidationRules, raw: string) =>
+    updateRule(key, raw === '' ? null : Number(raw));
+
+  const changeType = (next: FieldType) => {
+    update({
+      field_type: next,
+      options: isChoiceType(next) && !(fieldData.options || []).length ? blankOptions() : fieldData.options,
+    });
+  };
+
+  const options: OptionDraft[] = fieldData.options || [];
+
+  const setOptionLabel = (index: number, label: string) => {
+    update({
+      options: options.map((option, i) => {
+        if (i !== index) return option;
+        // Keep the stored value in step with the label unless it was set to something different on purpose.
+        const follows = !option.value || comparable(option.value) === comparable(option.label);
+        return { label, value: follows ? label : option.value };
+      }),
+    });
+  };
+
+  const addOption = () => update({ options: [...options, { label: '', value: '' }] });
+  const removeOption = (index: number) => update({ options: options.filter((_, i) => i !== index) });
+
+  const setLogic = (next: ConditionalLogic | null) => update({ conditional_logic: next });
+
+  const logicFor = (target: FormField | undefined, current: ConditionalLogic | null): ConditionalLogic => {
+    const targetOptions = target && isChoiceType(target.field_type) ? target.fieldOptions || [] : [];
+    const currentValue = current?.value ?? '';
+    const stillValid = targetOptions.some((option) => option.option_value === String(currentValue));
+    return {
+      ...(current || {}),
+      field_id: target?.id,
+      field_key: target?.field_key,
+      operator: current?.operator || 'equals',
+      value: targetOptions.length > 0 && !stillValid ? targetOptions[0].option_value : currentValue,
+    };
+  };
+
+  const toggleFollowUp = (enabled: boolean) => {
+    if (!enabled) {
+      setLogic(null);
+      return;
     }
-  }, [field, initialType]);
+    const preferred = availableFields.find((item) => isChoiceType(item.field_type)) ?? availableFields[0];
+    setLogic(logicFor(preferred, null));
+  };
 
   const handleSave = () => {
-    if (!fieldData.label.trim()) {
-      setNotice('Add a label so guests know what to fill in.');
+    const label = fieldData.label.trim();
+    if (!label) {
+      setError('Add a label so guests know what to answer.');
       return;
     }
 
-    // Validate options for select/radio/checkbox
-    if (['select', 'radio', 'checkbox'].includes(fieldData.field_type)) {
-      if (!fieldData.options || fieldData.options.length === 0) {
-        setNotice('Add at least one option for this field type.');
+    let cleanOptions: OptionDraft[] = [];
+    if (isChoice) {
+      cleanOptions = options
+        .map((option) => ({ label: option.label.trim(), value: (option.value || option.label).trim() }))
+        .filter((option) => option.label);
+      if (cleanOptions.length === 0) {
+        setError('Add at least one option for guests to choose from.');
+        return;
+      }
+      const distinct = new Set(cleanOptions.map((option) => option.value.toLowerCase()));
+      if (distinct.size !== cleanOptions.length) {
+        setError('Two options are the same. Give each option a different name.');
         return;
       }
     }
 
-    onSave(fieldData);
-  };
-
-  const addOption = () => {
-    setFieldData(prev => ({
-      ...prev,
-      options: [...(prev.options || []), { label: '', value: '' }]
-    }));
-  };
-
-  const updateOption = (index: number, key: 'label' | 'value', value: string) => {
-    setFieldData(prev => ({
-      ...prev,
-      options: prev.options?.map((opt, i) =>
-        i === index ? { ...opt, [key]: value } : opt
-      ) || []
-    }));
-  };
-
-  const removeOption = (index: number) => {
-    setFieldData(prev => ({
-      ...prev,
-      options: prev.options?.filter((_, i) => i !== index) || []
-    }));
-  };
-
-  const updateValidationRule = (key: string, value: any) => {
-    setFieldData(prev => ({
-      ...prev,
-      validation_rules: {
-        ...prev.validation_rules,
-        [key]: value
+    if (logic) {
+      if (!parent) {
+        setError('Choose which answer this follow-up depends on.');
+        return;
       }
-    }));
+      if (operatorNeedsValue(logic.operator) && String(logic.value ?? '').trim() === '') {
+        setError('Choose the answer that should show this field.');
+        return;
+      }
+    }
+
+    const cleanRules = Object.fromEntries(
+      Object.entries(rules).filter(([, value]) => value !== null && value !== undefined && value !== ''),
+    ) as ValidationRules;
+
+    onSave({
+      ...fieldData,
+      label,
+      placeholder: isHidden ? '' : (fieldData.placeholder || '').trim(),
+      is_required: isHidden ? false : !!fieldData.is_required,
+      default_value: fieldData.default_value === '' ? null : fieldData.default_value,
+      validation_rules: cleanRules,
+      conditional_logic: logic,
+      options: cleanOptions,
+    });
   };
 
-  const updateConditionalLogic = (logic: any) => {
-    setFieldData(prev => ({
-      ...prev,
-      conditional_logic: logic
-    }));
-  };
+  const TypeIcon = typeInfo.icon;
+  const showsLength = type === 'text' || type === 'textarea' || type === 'email';
 
   return (
-    <Card className="w-full border-0 shadow-none">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-        <CardTitle className="text-lg font-semibold">
-          {field ? 'Edit Field' : 'Add New Field'}
-        </CardTitle>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onCancel}
-          className="h-8 w-8 p-0"
-        >
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <TypeIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <h3 className="truncate text-sm font-semibold">{field ? 'Edit field' : `New ${typeInfo.label.toLowerCase()} field`}</h3>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel} className="h-8 w-8 p-0" aria-label="Close field editor">
           <X className="h-4 w-4" />
         </Button>
-      </CardHeader>
+      </div>
 
-      <CardContent className="space-y-6">
-        <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="basic">Basic</TabsTrigger>
-            <TabsTrigger value="validation">Validation</TabsTrigger>
-            <TabsTrigger value="payment" disabled>Payment</TabsTrigger>
-            <TabsTrigger value="logic">Logic</TabsTrigger>
-          </TabsList>
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="field-label">{isHidden ? 'Name' : 'Label'}</Label>
+          <Input
+            id="field-label"
+            autoFocus={!field}
+            value={fieldData.label}
+            onChange={(e) => update({ label: e.target.value })}
+            placeholder={isHidden ? 'e.g. Campaign source' : 'e.g. Are you bringing a guest?'}
+          />
+          {!isHidden && <p className="text-xs text-muted-foreground">The question guests see above this field.</p>}
+        </div>
 
-          <TabsContent value="basic" className="space-y-4 mt-4">
-            {/* Field Type */}
+        <div className="space-y-1.5">
+          <Label htmlFor="field-type">Answer type</Label>
+          <Select value={type} onValueChange={(value) => changeType(value as FieldType)}>
+            <SelectTrigger id="field-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {FIELD_TYPES.map((item) => (
+                <SelectItem key={item.type} value={item.type}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">{typeInfo.hint}.</p>
+        </div>
+
+        {isChoice && (
+          <div className="space-y-2">
+            <Label>Options</Label>
             <div className="space-y-2">
-              <Label htmlFor="field_type">Field Type</Label>
-              <Select
-                value={fieldData.field_type}
-                onValueChange={(value) => setFieldData(prev => ({ ...prev, field_type: value as any }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select field type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="text">Single Line Text</SelectItem>
-                  <SelectItem value="textarea">Multi-line Text</SelectItem>
-                  <SelectItem value="email">Email</SelectItem>
-                  <SelectItem value="phone">Phone Number</SelectItem>
-                  <SelectItem value="date">Date</SelectItem>
-                  <SelectItem value="datetime">Date & Time</SelectItem>
-                  <SelectItem value="select">Dropdown</SelectItem>
-                  <SelectItem value="radio">Radio Buttons</SelectItem>
-                  <SelectItem value="checkbox">Checkboxes</SelectItem>
-                  <SelectItem value="number">Number</SelectItem>
-                  <SelectItem value="address">Address</SelectItem>
-                  <SelectItem value="file">File Upload</SelectItem>
-                  <SelectItem value="hidden">Hidden Field</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Label */}
-            <div className="space-y-2">
-              <Label htmlFor="label">Field Label *</Label>
-              <Input
-                id="label"
-                value={fieldData.label}
-                onChange={(e) => setFieldData(prev => ({ ...prev, label: e.target.value }))}
-                placeholder="Enter field label"
-              />
-            </div>
-
-            {/* Placeholder */}
-            {fieldData.field_type !== 'hidden' && (
-              <div className="space-y-2">
-                <Label htmlFor="placeholder">Placeholder Text</Label>
-                <Input
-                  id="placeholder"
-                  value={fieldData.placeholder}
-                  onChange={(e) => setFieldData(prev => ({ ...prev, placeholder: e.target.value }))}
-                  placeholder="Enter placeholder text"
-                />
-              </div>
-            )}
-
-            {/* Required Toggle */}
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="required"
-                checked={fieldData.is_required}
-                onCheckedChange={(checked) => setFieldData(prev => ({ ...prev, is_required: checked }))}
-              />
-              <Label htmlFor="required">Required field</Label>
-            </div>
-
-            {/* Default Value */}
-            <div className="space-y-2">
-              <Label htmlFor="default_value">Default Value</Label>
-              {fieldData.field_type === 'textarea' ? (
-                <Textarea
-                  id="default_value"
-                  value={fieldData.default_value || ''}
-                  onChange={(e) => setFieldData(prev => ({ ...prev, default_value: e.target.value }))}
-                  placeholder="Enter default value"
-                  rows={3}
-                />
-              ) : (
-                <Input
-                  id="default_value"
-                  value={fieldData.default_value || ''}
-                  onChange={(e) => setFieldData(prev => ({ ...prev, default_value: e.target.value }))}
-                  placeholder="Enter default value"
-                />
-              )}
-            </div>
-
-            {/* Options for select/radio/checkbox */}
-            {['select', 'radio', 'checkbox'].includes(fieldData.field_type) && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Options</Label>
+              {options.map((option, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input
+                    value={option.label}
+                    onChange={(e) => setOptionLabel(index, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addOption();
+                      }
+                    }}
+                    autoFocus={index > 0 && index === options.length - 1 && option.label === '' && options.length > 2}
+                    placeholder={`Option ${index + 1}`}
+                    aria-label={`Option ${index + 1}`}
+                  />
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    onClick={addOption}
+                    onClick={() => removeOption(index)}
+                    className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-destructive"
+                    aria-label={`Remove option ${index + 1}`}
+                    title="Remove option"
                   >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Option
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
-
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {fieldData.options?.map((option, index) => (
-                    <div key={index} className="flex gap-2 items-center">
-                      <Input
-                        placeholder="Label"
-                        value={option.label}
-                        onChange={(e) => updateOption(index, 'label', e.target.value)}
-                        className="flex-1"
-                      />
-                      <Input
-                        placeholder="Value"
-                        value={option.value}
-                        onChange={(e) => updateOption(index, 'value', e.target.value)}
-                        className="flex-1"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeOption(index)}
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )) || []}
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="validation" className="space-y-4 mt-4">
-            <div className="text-sm text-muted-foreground mb-4">
-              Configure validation rules for this field
+              ))}
             </div>
+            <Button type="button" variant="outline" size="sm" onClick={addOption}>
+              <Plus className="mr-1 h-4 w-4" />
+              Add option
+            </Button>
+          </div>
+        )}
 
-            {/* Text/Email validation */}
-            {(fieldData.field_type === 'text' || fieldData.field_type === 'textarea' || fieldData.field_type === 'email') && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="min_length">Min Length</Label>
-                    <Input
-                      id="min_length"
-                      type="number"
-                      value={fieldData.validation_rules?.min_length || ''}
-                      onChange={(e) => updateValidationRule('min_length', e.target.value ? parseInt(e.target.value) : null)}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="max_length">Max Length</Label>
-                    <Input
-                      id="max_length"
-                      type="number"
-                      value={fieldData.validation_rules?.max_length || ''}
-                      onChange={(e) => updateValidationRule('max_length', e.target.value ? parseInt(e.target.value) : null)}
-                      placeholder="255"
-                    />
-                  </div>
-                </div>
+        {isHidden ? (
+          <div className="space-y-1.5">
+            <Label htmlFor="hidden-value">Value</Label>
+            <Input
+              id="hidden-value"
+              value={fieldData.default_value ?? ''}
+              onChange={(e) => update({ default_value: e.target.value })}
+              placeholder="Saved with every response"
+            />
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
+            <div>
+              <Label htmlFor="field-required">Required</Label>
+              <p className="text-xs text-muted-foreground">Guests must answer before submitting.</p>
+            </div>
+            <Switch
+              id="field-required"
+              checked={!!fieldData.is_required}
+              onCheckedChange={(checked) => update({ is_required: checked })}
+            />
+          </div>
+        )}
 
-                {fieldData.field_type === 'email' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="pattern">Email Pattern (Regex)</Label>
-                    <Input
-                      id="pattern"
-                      value={fieldData.validation_rules?.pattern || ''}
-                      onChange={(e) => updateValidationRule('pattern', e.target.value)}
-                      placeholder="Custom regex pattern"
-                    />
-                  </div>
-                )}
-              </>
-            )}
+        <div className="space-y-3 rounded-lg border px-3 py-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Label htmlFor="field-follow-up">Follow-up question</Label>
+              <p className="text-xs text-muted-foreground">
+                {availableFields.length === 0 && !logic
+                  ? 'Add another field first, then show this one based on its answer.'
+                  : 'Only show this field when another answer matches.'}
+              </p>
+            </div>
+            <Switch
+              id="field-follow-up"
+              checked={!!logic}
+              disabled={availableFields.length === 0 && !logic}
+              onCheckedChange={toggleFollowUp}
+            />
+          </div>
 
-            {/* Number validation */}
-            {fieldData.field_type === 'number' && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="min_value">Min Value</Label>
-                  <Input
-                    id="min_value"
-                    type="number"
-                    value={fieldData.validation_rules?.min_value || ''}
-                    onChange={(e) => updateValidationRule('min_value', e.target.value ? parseFloat(e.target.value) : null)}
-                    placeholder="0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="max_value">Max Value</Label>
-                  <Input
-                    id="max_value"
-                    type="number"
-                    value={fieldData.validation_rules?.max_value || ''}
-                    onChange={(e) => updateValidationRule('max_value', e.target.value ? parseFloat(e.target.value) : null)}
-                    placeholder="100"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* File validation */}
-            {fieldData.field_type === 'file' && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="accepted_types">Accepted File Types</Label>
-                  <Input
-                    id="accepted_types"
-                    value={fieldData.validation_rules?.accepted_types || ''}
-                    onChange={(e) => updateValidationRule('accepted_types', e.target.value)}
-                    placeholder="image/*, .pdf, .doc"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="max_size">Max File Size (MB)</Label>
-                  <Input
-                    id="max_size"
-                    type="number"
-                    value={fieldData.validation_rules?.max_size || ''}
-                    onChange={(e) => updateValidationRule('max_size', e.target.value ? parseFloat(e.target.value) : null)}
-                    placeholder="5"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Custom error message */}
+          {logic && (
             <div className="space-y-2">
-              <Label htmlFor="custom_message">Custom Error Message</Label>
-              <Input
-                id="custom_message"
-                value={fieldData.validation_rules?.custom_message || ''}
-                onChange={(e) => updateValidationRule('custom_message', e.target.value)}
-                placeholder="Custom validation error message"
-              />
-            </div>
-          </TabsContent>
+              <p className="text-xs font-medium text-foreground">Show this field when</p>
+              <Select
+                value={parent ? String(parent.id) : ''}
+                onValueChange={(value) =>
+                  setLogic(logicFor(availableFields.find((item) => String(item.id) === value), logic))
+                }
+              >
+                <SelectTrigger aria-label="Field to check">
+                  <SelectValue placeholder="Choose a field" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableFields.map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-          <TabsContent value="payment" className="space-y-4 mt-4">
-            <div className="text-sm text-muted-foreground mb-4">
-              Configure payment settings for this field
-            </div>
-
-            {/* Payment Methods */}
-            <div className="space-y-3">
-              <Label>Payment Methods</Label>
-              <div className="space-y-2">
-                {[
-                  { value: 'telebirr', label: 'TeleBirr' },
-                  { value: 'cbe_birr', label: 'CBE Birr' },
-                  { value: 'card', label: 'Credit/Debit Card' },
-                  { value: 'bank_transfer', label: 'Bank Transfer' },
-                ].map((method) => (
-                  <label key={method.value} className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fieldData.validation_rules?.payment_methods?.includes(method.value) || false}
-                      onChange={(e) => {
-                        const currentMethods = fieldData.validation_rules?.payment_methods || [];
-                        const newMethods = e.target.checked
-                          ? [...currentMethods, method.value]
-                          : currentMethods.filter(m => m !== method.value);
-                        updateValidationRule('payment_methods', newMethods);
-                      }}
-                      className="rounded"
-                    />
-                    <span className="text-sm">{method.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Amount Settings */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="amount">Fixed Amount (ETB)</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  value={fieldData.validation_rules?.amount || ''}
-                  onChange={(e) => updateValidationRule('amount', e.target.value ? parseFloat(e.target.value) : null)}
-                  placeholder="0.00"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="currency">Currency</Label>
+              <div className="grid grid-cols-2 gap-2">
                 <Select
-                  value={fieldData.validation_rules?.currency || 'ETB'}
-                  onValueChange={(value) => updateValidationRule('currency', value)}
+                  value={logic.operator || 'equals'}
+                  onValueChange={(value) => setLogic({ ...logic, operator: value as ConditionalLogic['operator'] })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Condition">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ETB">ETB (Ethiopian Birr)</SelectItem>
-                    <SelectItem value="USD">USD (US Dollar)</SelectItem>
-                    <SelectItem value="EUR">EUR (Euro)</SelectItem>
+                    {CONDITION_OPERATORS.map((operator) => (
+                      <SelectItem key={operator.value} value={operator.value}>
+                        {operator.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-              </div>
-            </div>
 
-            {/* Payment Description */}
-            <div className="space-y-2">
-              <Label htmlFor="payment_description">Payment Description</Label>
-              <Textarea
-                id="payment_description"
-                value={fieldData.validation_rules?.payment_description || ''}
-                onChange={(e) => updateValidationRule('payment_description', e.target.value)}
-                placeholder="Describe what this payment is for"
-                rows={3}
-              />
-            </div>
-
-            {/* Recurring Payment */}
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="is_recurring"
-                  checked={fieldData.validation_rules?.is_recurring || false}
-                  onChange={(e) => updateValidationRule('is_recurring', e.target.checked)}
-                  className="rounded"
-                />
-                <Label htmlFor="is_recurring">Recurring Payment</Label>
-              </div>
-
-              {fieldData.validation_rules?.is_recurring && (
-                <div className="grid grid-cols-2 gap-4 pl-6 border-l-2 border-muted">
-                  <div className="space-y-2">
-                    <Label htmlFor="recurring_interval">Interval</Label>
-                    <Select
-                      value={fieldData.validation_rules?.recurring_interval || 'monthly'}
-                      onValueChange={(value) => updateValidationRule('recurring_interval', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
+                {operatorNeedsValue(logic.operator) &&
+                  (parentOptions.length > 0 ? (
+                    <Select value={String(logic.value ?? '')} onValueChange={(value) => setLogic({ ...logic, value })}>
+                      <SelectTrigger aria-label="Answer">
+                        <SelectValue placeholder="Choose an answer" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="yearly">Yearly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="recurring_count">Number of Payments</Label>
-                    <Input
-                      id="recurring_count"
-                      type="number"
-                      value={fieldData.validation_rules?.recurring_count || ''}
-                      onChange={(e) => updateValidationRule('recurring_count', e.target.value ? parseInt(e.target.value) : null)}
-                      placeholder="12"
-                      min="1"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="logic" className="space-y-4 mt-4">
-            <div className="text-sm text-muted-foreground mb-4">
-              Configure conditional logic to show/hide this field
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="has_logic"
-                  checked={!!fieldData.conditional_logic}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      updateConditionalLogic({
-                        field_id: availableFields[0]?.id || null,
-                        operator: 'equals',
-                        value: ''
-                      });
-                    } else {
-                      updateConditionalLogic(null);
-                    }
-                  }}
-                />
-                <Label htmlFor="has_logic">Enable conditional logic</Label>
-              </div>
-
-              {fieldData.conditional_logic && (
-                <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
-                  <div className="space-y-2">
-                    <Label>When this field:</Label>
-                    <Select
-                      value={fieldData.conditional_logic.field_id?.toString() || ''}
-                      onValueChange={(value) => updateConditionalLogic({
-                        ...fieldData.conditional_logic,
-                        field_id: parseInt(value)
-                      })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select field" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableFields.map((availableField) => (
-                          <SelectItem key={availableField.id} value={availableField.id.toString()}>
-                            {availableField.label}
+                        {parentOptions.map((option) => (
+                          <SelectItem key={option.id ?? option.option_value} value={option.option_value}>
+                            {option.option_label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Operator:</Label>
-                    <Select
-                      value={fieldData.conditional_logic.operator || 'equals'}
-                      onValueChange={(value) => updateConditionalLogic({
-                        ...fieldData.conditional_logic,
-                        operator: value as any
-                      })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="equals">Equals</SelectItem>
-                        <SelectItem value="not_equals">Not Equals</SelectItem>
-                        <SelectItem value="contains">Contains</SelectItem>
-                        <SelectItem value="greater_than">Greater Than</SelectItem>
-                        <SelectItem value="less_than">Less Than</SelectItem>
-                        <SelectItem value="is_empty">Is Empty</SelectItem>
-                        <SelectItem value="is_not_empty">Is Not Empty</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Value:</Label>
+                  ) : (
                     <Input
-                      value={fieldData.conditional_logic.value || ''}
-                      onChange={(e) => updateConditionalLogic({
-                        ...fieldData.conditional_logic,
-                        value: e.target.value
-                      })}
-                      placeholder="Enter value to match"
+                      value={logic.value ?? ''}
+                      onChange={(e) => setLogic({ ...logic, value: e.target.value })}
+                      placeholder="Answer to match"
+                      aria-label="Answer"
                     />
-                  </div>
-                </div>
-              )}
+                  ))}
+              </div>
             </div>
-          </TabsContent>
-        </Tabs>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-4">
-          <Button onClick={handleSave} className="flex-1">
-            {field ? 'Update Field' : 'Add Field'}
-          </Button>
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          {field && onDelete && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={onDelete}
-              className="ml-2"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
           )}
         </div>
-      </CardContent>
-      <AlertDialog
-        isOpen={!!notice}
-        onClose={() => setNotice(null)}
-        title="Check this field"
-        description={notice || undefined}
-        variant="warning"
-        closeText="OK"
-      />
-    </Card>
+
+        {!isHidden && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowMore((open) => !open)}
+              aria-expanded={showMore}
+              className="flex w-full items-center justify-between rounded-md py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              More settings
+              <ChevronDown className={`h-4 w-4 transition-transform ${showMore ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showMore && (
+              <div className="mt-3 space-y-4">
+                {!isChoice && type !== 'file' && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="field-placeholder">Hint text</Label>
+                    <Input
+                      id="field-placeholder"
+                      value={fieldData.placeholder || ''}
+                      onChange={(e) => update({ placeholder: e.target.value })}
+                      placeholder="Shown inside the empty field"
+                    />
+                  </div>
+                )}
+
+                {type !== 'file' && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="field-default">Pre-filled answer</Label>
+                    {type === 'textarea' ? (
+                      <Textarea
+                        id="field-default"
+                        rows={3}
+                        value={fieldData.default_value ?? ''}
+                        onChange={(e) => update({ default_value: e.target.value })}
+                        placeholder="Leave empty for no default"
+                      />
+                    ) : (
+                      <Input
+                        id="field-default"
+                        value={fieldData.default_value ?? ''}
+                        onChange={(e) => update({ default_value: e.target.value })}
+                        placeholder="Leave empty for no default"
+                      />
+                    )}
+                  </div>
+                )}
+
+                {showsLength && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="field-min-length">Min characters</Label>
+                      <Input
+                        id="field-min-length"
+                        type="number"
+                        min={0}
+                        value={rules.min_length ?? ''}
+                        onChange={(e) => numberRule('min_length', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="field-max-length">Max characters</Label>
+                      <Input
+                        id="field-max-length"
+                        type="number"
+                        min={0}
+                        value={rules.max_length ?? ''}
+                        onChange={(e) => numberRule('max_length', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {type === 'number' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="field-min-value">Smallest number</Label>
+                      <Input
+                        id="field-min-value"
+                        type="number"
+                        value={rules.min_value ?? ''}
+                        onChange={(e) => numberRule('min_value', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="field-max-value">Largest number</Label>
+                      <Input
+                        id="field-max-value"
+                        type="number"
+                        value={rules.max_value ?? ''}
+                        onChange={(e) => numberRule('max_value', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {type === 'file' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="field-file-types">Allowed file types</Label>
+                      <Input
+                        id="field-file-types"
+                        value={rules.accepted_types ?? ''}
+                        onChange={(e) => updateRule('accepted_types', e.target.value)}
+                        placeholder="image/*, .pdf"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="field-file-size">Max size (MB)</Label>
+                      <Input
+                        id="field-file-size"
+                        type="number"
+                        min={0}
+                        value={rules.max_size ?? ''}
+                        onChange={(e) => numberRule('max_size', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {type === 'email' && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="field-pattern">Custom format (regex)</Label>
+                    <Input
+                      id="field-pattern"
+                      value={rules.pattern ?? ''}
+                      onChange={(e) => updateRule('pattern', e.target.value)}
+                      placeholder="Optional"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="field-error-message">Error message</Label>
+                  <Input
+                    id="field-error-message"
+                    value={rules.custom_message ?? ''}
+                    onChange={(e) => updateRule('custom_message', e.target.value)}
+                    placeholder="Shown when the answer is not valid"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="shrink-0 space-y-2 border-t px-4 py-3">
+        {error && (
+          <p role="alert" className="flex items-start gap-1.5 text-sm text-destructive">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            {error}
+          </p>
+        )}
+        <div className="flex items-center gap-2">
+          <Button type="button" onClick={handleSave} disabled={isSaving} className="flex-1">
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {field ? 'Save changes' : 'Add field'}
+          </Button>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving}>
+            Cancel
+          </Button>
+        </div>
+        {field && (onDuplicate || onDelete) && (
+          <div className="flex items-center justify-between">
+            {onDuplicate ? (
+              <Button type="button" variant="ghost" size="sm" onClick={onDuplicate} disabled={isSaving} className="text-muted-foreground">
+                <Copy className="mr-1.5 h-4 w-4" />
+                Duplicate
+              </Button>
+            ) : (
+              <span />
+            )}
+            {onDelete && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onDelete}
+                disabled={isSaving}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="mr-1.5 h-4 w-4" />
+                Delete field
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

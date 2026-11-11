@@ -17,7 +17,6 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
-  Zap,
   Target,
   Activity,
   ArrowUpRight,
@@ -331,12 +330,9 @@ export default function Marketing() {
           />
           <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
             <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-blue-600" />
-                <CardDescription className="text-sm font-medium text-blue-700">
-                  Quick Actions
-                </CardDescription>
-              </div>
+              <CardDescription className="text-sm font-medium">
+                Quick actions
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">

@@ -18,10 +18,10 @@ export function FeatureComparison({ plans, currentPlanId }: FeatureComparisonPro
   const features = Array.from(allFeatures).sort()
 
   return (
-    <Card>
+    <Card className="border-border shadow-none">
       <CardHeader>
-        <CardTitle>Feature Comparison</CardTitle>
-        <CardDescription>Compare features across all subscription plans</CardDescription>
+        <CardTitle className="text-base font-semibold">Feature comparison</CardTitle>
+        <CardDescription>What each plan includes.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">

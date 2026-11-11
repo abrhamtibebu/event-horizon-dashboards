@@ -893,8 +893,11 @@ export const generatePrintableBadges = (eventId: number, badgeIds: number[]) =>
   )
 
 // QR Code Check-in
-export const checkInByQR = (eventId: number, uuid: string) =>
-  api.post(`/events/${eventId}/check-in/qr`, { uuid })
+export const checkInByQR = (eventId: number, uuid: string, confirmDeclined = false) =>
+  api.post(`/events/${eventId}/check-in/qr`, {
+    uuid,
+    confirm_declined: confirmDeclined || undefined,
+  })
 
 // Auto-detect event check-in by QR (for ushers)
 export const checkInByQRAuto = (uuid: string) =>

@@ -98,10 +98,13 @@ export interface ValidationRules {
   min_value?: number;
   max_value?: number;
   custom_message?: string;
+  accepted_types?: string;
+  max_size?: number;
 }
 
 export interface ConditionalLogic {
   field_id?: number;
+  field_key?: string;
   operator?: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty';
   value?: any;
   logic_group?: 'AND' | 'OR';

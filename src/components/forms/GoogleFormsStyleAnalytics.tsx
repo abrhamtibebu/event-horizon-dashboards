@@ -118,18 +118,23 @@ export const GoogleFormsStyleAnalytics: React.FC<GoogleFormsStyleAnalyticsProps>
           while (hasMore) {
             const response = await formSubmissionApi.getSubmissions(form.id, {
               page,
-              per_page: 100, // Fetch in smaller chunks for better performance
+              per_page: 100,
               status: statusFilter === 'all' ? undefined : statusFilter,
               search: searchTerm || undefined
             });
-            
-            // response.data contains the paginated response, response.data.data contains the submissions array
-            const submissions = response.data.data || [];
-            allSubmissions.push(...submissions);
-            
-            // Check if there are more pages
-            const pagination = response.data;
-            hasMore = pagination.current_page < pagination.last_page;
+
+            const payload = response as any
+            const pagePayload = Array.isArray(payload?.data) ? payload : payload?.data
+            const submissions = Array.isArray(pagePayload?.data)
+              ? pagePayload.data
+              : Array.isArray(pagePayload)
+                ? pagePayload
+                : []
+            allSubmissions.push(...submissions)
+
+            const currentPage = Number(pagePayload?.current_page ?? page)
+            const lastPage = Number(pagePayload?.last_page ?? page)
+            hasMore = currentPage < lastPage
             page++;
           }
         } catch (error) {
@@ -296,9 +301,9 @@ export const GoogleFormsStyleAnalytics: React.FC<GoogleFormsStyleAnalyticsProps>
     return (
       <div className="text-center py-12">
         <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No completed submissions yet</h3>
+        <h3 className="text-lg font-semibold mb-2">No submissions yet</h3>
         <p className="text-muted-foreground">
-          Form submissions will appear here once guests start filling out and completing forms.
+          Form submissions will appear here once guests start filling out forms.
         </p>
       </div>
     );

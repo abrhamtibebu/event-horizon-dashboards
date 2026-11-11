@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,8 @@ type PendingUser = Parameters<ReturnType<typeof useAuth>['setUser']>[0]
 export default function VenueSetupPage() {
   const navigate = useNavigate()
   const { user, setUser } = useAuth()
-  const [step, setStep] = useState(1)
+  const storageKey = `venue-setup-step:${user?.id ?? 'current'}`
+  const [step, setStep] = useState(() => Math.min(3, Math.max(1, Number(sessionStorage.getItem(storageKey) || 1))))
   const [saving, setSaving] = useState(false)
   const [pendingUser, setPendingUser] = useState<PendingUser>(null)
   const [spaceId, setSpaceId] = useState<number | null>(null)
@@ -42,8 +43,42 @@ export default function VenueSetupPage() {
     Object.fromEntries(DAYS.map((day) => [day, { open: '09:00', close: '18:00', closed: false }])),
   )
 
+  const goToStep = (next: number) => {
+    sessionStorage.setItem(storageKey, String(next))
+    setStep(next)
+  }
+
+  useEffect(() => {
+    if (!user?.venue_id) return
+    venueApi.profile().then(({ data: venue }) => {
+      setForm((current) => ({
+        ...current,
+        name: venue.name || current.name,
+        email: venue.email || current.email,
+        phone: venue.phone || current.phone,
+        city: venue.city || current.city,
+        formatted_address: venue.formatted_address || current.formatted_address,
+        description: venue.description || current.description,
+        website: venue.website || current.website,
+        latitude: venue.latitude ?? current.latitude,
+        longitude: venue.longitude ?? current.longitude,
+      }))
+      const defaultSpace = venue.spaces?.find((item) => item.is_default) || venue.spaces?.[0]
+      if (defaultSpace) {
+        setSpaceId(defaultSpace.id)
+        setSpace({ name: defaultSpace.name, capacity: defaultSpace.capacity ? String(defaultSpace.capacity) : '' })
+      }
+      setListed(venue.is_listed !== false)
+      if (venue.opening_hours) {
+        setHours((current) => ({ ...current, ...venue.opening_hours }))
+      }
+      if (!sessionStorage.getItem(storageKey)) goToStep(defaultSpace && venue.opening_hours ? 3 : defaultSpace ? 2 : 1)
+    }).catch(() => toast.error('Could not resume venue setup'))
+  }, [user?.venue_id])
+
   const finish = (nextUser = pendingUser) => {
     if (nextUser && typeof nextUser === 'object') setUser(nextUser)
+    sessionStorage.removeItem(storageKey)
     navigate('/dashboard', { replace: true })
   }
 
@@ -65,7 +100,7 @@ export default function VenueSetupPage() {
       if (created?.name) setSpace((prev) => ({ ...prev, name: created.name }))
       setPendingUser(res.data.user)
       toast.success('Venue created')
-      setStep(2)
+      goToStep(2)
     } catch (err: any) {
       toast.error(err.response?.data?.error || err.response?.data?.name?.[0] || 'Could not create venue')
     } finally {
@@ -86,7 +121,7 @@ export default function VenueSetupPage() {
       if (spaceId) await venueApi.updateSpace(spaceId, data)
       else await venueApi.createSpace(data)
       toast.success('Space saved')
-      setStep(3)
+      goToStep(3)
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Could not save space')
     } finally {
@@ -188,7 +223,7 @@ export default function VenueSetupPage() {
             <Input type="number" value={space.capacity} onChange={(e) => setSpace({ ...space, capacity: e.target.value })} />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setStep(3)} disabled={saving}>
+            <Button variant="outline" className="flex-1" onClick={() => goToStep(3)} disabled={saving}>
               Skip
             </Button>
             <Button className="flex-1 bg-brand-gradient bg-brand-gradient-hover text-foreground" onClick={submitSpace} disabled={saving}>

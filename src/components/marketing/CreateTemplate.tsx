@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Layout, Mail, MessageSquare, Sparkles, Save, Eye, Code, Copy, Monitor } from 'lucide-react';
+import { X, Layout, Mail, MessageSquare, Save, Eye, Code, Copy, Monitor } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -512,7 +512,6 @@ export function CreateTemplate({ open, onClose }: CreateTemplateProps) {
             </SelectItem>
             <SelectItem value="both">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
                 Email + SMS
               </div>
             </SelectItem>

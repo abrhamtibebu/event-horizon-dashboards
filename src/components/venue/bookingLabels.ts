@@ -1,4 +1,4 @@
-import { differenceInCalendarDays } from 'date-fns'
+import { differenceInCalendarDays, format, isSameDay } from 'date-fns'
 import type { VenueBooking } from '@/lib/api/venues'
 
 export const PENDING_HOLD_DAYS = 7
@@ -11,6 +11,14 @@ export function bookingSourceLabel(source?: string | null) {
 
 export function bookingTitle(booking: Pick<VenueBooking, 'title' | 'event'>) {
   return booking.title || booking.event?.name || 'Booking'
+}
+
+export function bookingDateRange(startsAt: string, endsAt: string) {
+  const start = new Date(startsAt)
+  const end = new Date(endsAt)
+  return isSameDay(start, end)
+    ? format(start, 'MMM d, yyyy')
+    : `${format(start, 'MMM d, yyyy')} – ${format(end, 'MMM d, yyyy')}`
 }
 
 export function pendingExpiresSoon(createdAt?: string | null) {

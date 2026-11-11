@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { subscriptionsApi, type Subscription, type SubscriptionPlan } from '@/lib/api/subscriptions'
 import { useToast } from '@/hooks/use-toast'
@@ -10,6 +11,11 @@ export function useSubscription() {
 
   // Only fetch subscription for organizers (backend /subscriptions is for organizer context)
   const isOrganizer = user?.role === 'organizer' || user?.role === 'organizer_admin'
+  const [deferHeavyFetch, setDeferHeavyFetch] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setDeferHeavyFetch(true), 18000)
+    return () => clearTimeout(timer)
+  }, [])
 
   const {
     data: subscription,
@@ -19,7 +25,7 @@ export function useSubscription() {
   } = useQuery<Subscription | null>({
     queryKey: ['subscription'],
     queryFn: () => subscriptionsApi.getCurrentSubscription(),
-    enabled: !!user && isOrganizer,
+    enabled: !!user && isOrganizer && deferHeavyFetch,
     retry: (failureCount, error: any) => failureCount < 1 && error?.response?.status !== 404,
     staleTime: 5 * 60 * 1000, // 5 minutes
   })

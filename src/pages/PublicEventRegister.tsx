@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { Calendar, MapPin, Users, Clock, Star, Sparkles, AlertCircle, Lamp, User, CheckCircle, Building, UserCog, Mail, Phone as PhoneIcon, X, Mic2, ArrowRight } from 'lucide-react';
+import { Calendar, MapPin, Users, Clock, Star, AlertCircle, Lamp, User, CheckCircle, Building, UserCog, Mail, Phone as PhoneIcon, X, Mic2, ArrowRight } from 'lucide-react';
 import { useRegistrationShareMeta } from '@/lib/registrationShareMeta';
 import { telebirrRegisterPathWithSearch } from '@/pages/telebirr-reg/routes';
 import { applyEventBannerFallback, getEventBannerUrl, getImageUrl } from '@/lib/utils';

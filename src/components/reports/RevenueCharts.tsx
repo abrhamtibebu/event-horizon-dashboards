@@ -1,5 +1,4 @@
 import React from 'react';
-import { DollarSign, Ticket } from 'lucide-react';
 import { ReportMetrics } from '@/types/reports';
 import { RevenueLineChart } from './RevenueLineChart';
 import { PieChartComponent } from './PieChartComponent';
@@ -21,64 +20,47 @@ export const RevenueCharts: React.FC<RevenueChartsProps> = ({ metrics }) => {
   const ticketTypeData = transformTicketsByType(metrics.tickets_by_type || {}, CHART_COLORS.tickets);
 
   return (
-    <>
-      <div className="bg-card rounded-2xl shadow-sm border border-green-100 dark:border-green-800/50 p-6 mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-green-900 dark:text-green-300">Revenue Over Time</h3>
-            <p className="text-sm text-muted-foreground">Daily revenue generation trends</p>
-          </div>
-          <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-            <DollarSign className="w-4 h-4 text-white" />
-          </div>
-        </div>
-        <RevenueLineChart
-          data={revenueTimeline}
-          dataKey="revenue"
-          gradientId="revenueGradient"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">Revenue by Event Type</h3>
-              <p className="text-sm text-muted-foreground">Financial performance by category</p>
-            </div>
-            <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <BarChartComponent
-            data={eventTypeRevenue}
-            height={300}
-            showGradient
-            gradientId="revenueBarGradient"
-            emptyMessage="No revenue data available"
-            dataKey="value"
-          />
-        </div>
-
-        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">Ticket Sales by Type</h3>
-              <p className="text-sm text-muted-foreground">Breakdown of tickets sold</p>
-            </div>
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center">
-              <Ticket className="w-4 h-4 text-white" />
-            </div>
-          </div>
-          <PieChartComponent
-            data={ticketTypeData}
-            height={300}
-            colorPalette="tickets"
-            emptyMessage="No ticket data available"
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <div className="rounded-xl border border-border bg-card p-5 xl:col-span-2">
+        <h3 className="text-base font-semibold text-foreground">Revenue over time</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Daily revenue</p>
+        <div className="mt-4">
+          <RevenueLineChart
+            data={revenueTimeline}
+            dataKey="revenue"
+            gradientId="revenueGradient"
           />
         </div>
       </div>
-    </>
+
+      <div className="space-y-4">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-base font-semibold text-foreground">Revenue by event type</h3>
+          <p className="mt-1 text-sm text-muted-foreground">By category</p>
+          <div className="mt-4">
+            <BarChartComponent
+              data={eventTypeRevenue}
+              height={220}
+              showGradient
+              gradientId="revenueBarGradient"
+              emptyMessage="No revenue data available"
+              dataKey="value"
+            />
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-base font-semibold text-foreground">Tickets by type</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Sold tickets</p>
+          <div className="mt-4">
+            <PieChartComponent
+              data={ticketTypeData}
+              height={220}
+              colorPalette="tickets"
+              emptyMessage="No ticket data available"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
-

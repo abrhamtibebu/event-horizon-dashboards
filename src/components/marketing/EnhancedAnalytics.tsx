@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, Mail, MousePointer, Users, AlertCircle, Sparkles, Zap, Target } from 'lucide-react'
+import { TrendingUp, TrendingDown, Mail, MousePointer, Users, AlertCircle, Target } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -205,16 +205,12 @@ export function EnhancedAnalytics() {
       {/* Quick Insights */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-yellow-600" />
-            Performance Insights
-          </CardTitle>
+          <CardTitle>Performance Insights</CardTitle>
           <CardDescription>AI-powered recommendations based on your data</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {isAboveIndustry && (
             <Alert className="bg-green-50 border-green-200">
-              <Zap className="w-4 h-4 text-green-600" />
               <AlertDescription className="text-green-800">
                 🎉 Your open and click rates are above industry average! Your campaigns are performing excellently.
               </AlertDescription>

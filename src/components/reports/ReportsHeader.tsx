@@ -1,6 +1,4 @@
 import React from 'react';
-import { BarChart3, Download, FileText, RefreshCw } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProtectedButton } from '@/components/ProtectedButton';
 import { Event } from '@/types/reports';
@@ -29,68 +27,37 @@ export const ReportsHeader: React.FC<ReportsHeaderProps> = ({
   refreshing,
 }) => {
   return (
-    <div className="space-y-4">
-      <div className="flex items-start gap-3">
-        <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <BarChart3 className="h-5 w-5" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Reports</h1>
-          <p className="text-sm text-muted-foreground">
-            Clear performance, revenue, and attendee insights.
-          </p>
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <h1 className="text-2xl font-semibold">Reports</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Performance, revenue, and attendees.</p>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Select value={selectedEventId} onValueChange={onEventChange}>
+          <SelectTrigger className="w-full sm:w-64">
+            <SelectValue placeholder="All events" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All events</SelectItem>
+            {eventsList.map((event) => (
+              <SelectItem key={event.id} value={String(event.id)}>
+                {event.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="flex flex-wrap gap-2">
+          <ProtectedButton permission="reports.export" onClick={onRefresh} disabled={refreshing} variant="outline" actionName="refresh reports">
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </ProtectedButton>
+          <ProtectedButton permission="reports.export" onClick={onExportCSV} disabled={exporting} variant="outline" actionName="export reports to CSV">
+            {exporting ? 'Exporting...' : 'CSV'}
+          </ProtectedButton>
+          <ProtectedButton permission="reports.export" onClick={onExportPDF} disabled={generating} actionName="export reports to PDF">
+            {generating ? 'Generating...' : 'PDF'}
+          </ProtectedButton>
         </div>
       </div>
-
-      <Card className="border-border/80">
-        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <Select value={selectedEventId} onValueChange={onEventChange}>
-            <SelectTrigger className="w-full sm:w-72">
-              <SelectValue placeholder="All Events" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Events</SelectItem>
-              {eventsList.map((event) => (
-                <SelectItem key={event.id} value={String(event.id)}>
-                  {event.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="flex flex-wrap gap-2">
-            <ProtectedButton
-              permission="reports.export"
-              onClick={onRefresh}
-              disabled={refreshing}
-              variant="outline"
-              actionName="refresh reports"
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Refreshing...' : 'Refresh'}
-            </ProtectedButton>
-            <ProtectedButton
-              permission="reports.export"
-              onClick={onExportCSV}
-              disabled={exporting}
-              variant="outline"
-              actionName="export reports to CSV"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              {exporting ? 'Exporting...' : 'CSV'}
-            </ProtectedButton>
-            <ProtectedButton
-              permission="reports.export"
-              onClick={onExportPDF}
-              disabled={generating}
-              actionName="export reports to PDF"
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              {generating ? 'Generating...' : 'PDF'}
-            </ProtectedButton>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

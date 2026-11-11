@@ -10,6 +10,8 @@ interface ImportMetaEnv {
   readonly VITE_TURNSTILE_SITE_KEY?: string
   /** Public site URL for share/register links (e.g. https://events.example.com); falls back to window.location.origin */
   readonly VITE_PUBLIC_URL?: string
+  /** Public venue discovery site used for reservation links and iframe embeds. */
+  readonly VITE_VENUE_PUBLIC_URL?: string
   readonly VITE_SHARE_PREVIEW_URL?: string
   /** Optional origin for Laravel /share/register and /share/tickets OG previews (frontend falls back to direct SPA URLs) */
   readonly VITE_REGISTRATION_SHARE_BRIDGE_ORIGIN?: string

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Ban, RotateCw, Sparkles, Unlock } from 'lucide-react'
+import { Ban, RotateCw, Unlock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -507,9 +507,7 @@ function SeatProperties({
       )}
 
       <div className="space-y-3 rounded-lg border border-border/60 p-3">
-        <p className="flex items-center gap-1.5 text-xs font-semibold">
-          <Sparkles className="h-3.5 w-3.5" /> Auto-label selection
-        </p>
+        <p className="text-xs font-semibold">Auto-label selection</p>
 
         <Select value={scheme} onValueChange={(value) => setScheme(value as LabelScheme)}>
           <SelectTrigger>

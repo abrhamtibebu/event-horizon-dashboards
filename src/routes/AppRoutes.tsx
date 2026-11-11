@@ -12,6 +12,7 @@ import { RoleProtectedRoute } from '@/components/RoleProtectedRoute'
 import { useAuth } from '@/hooks/use-auth'
 import { useRealtimeMessages } from '@/hooks/use-realtime-messages'
 import * as P from './lazyPages'
+import { isVenueRole } from '@/lib/roles'
 
 const PageFallback = ({ text = 'Loading…' }: { text?: string }) => (
   <div className="flex items-center justify-center min-h-screen">
@@ -77,7 +78,7 @@ const DashboardRouter = () => {
       </Lazy>
     )
   }
-  if (user.role === 'venue_admin' || user.role === 'venue_staff') {
+  if (isVenueRole(user.role)) {
     return (
       <Lazy>
         <P.VenueDashboardPage />
@@ -228,6 +229,18 @@ const AppWithRealtime = () => {
                 </Lazy>
               </PublicRoute>
             }
+          />
+          <Route
+            path="/venue/quotation/:token"
+            element={
+              <PublicRoute>
+                <Lazy><P.PublicVenueQuotationPage /></Lazy>
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/venue/document/:token"
+            element={<PublicRoute><Lazy><P.PublicVenueCommercialDocumentPage /></Lazy></PublicRoute>}
           />
           <Route
             path="/event/rsvp/:code"
@@ -701,6 +714,14 @@ const AppWithRealtime = () => {
               }
             />
             <Route
+              path="venue"
+              element={
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}>
+                  <Lazy><P.VenueSpacesPage /></Lazy>
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
               path="venue/setup"
               element={
                 <RoleProtectedRoute allowedRoles={['venue_admin']}>
@@ -713,7 +734,7 @@ const AppWithRealtime = () => {
             <Route
               path="venue/profile"
               element={
-                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff']}>
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}>
                   <Lazy>
                     <P.VenueProfilePage />
                   </Lazy>
@@ -721,39 +742,54 @@ const AppWithRealtime = () => {
               }
             />
             <Route
-              path="venue/spaces"
+              path="venue/events"
               element={
-                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff']}>
-                  <Lazy>
-                    <P.VenueSpacesPage />
-                  </Lazy>
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}>
+                  <Lazy><P.VenueEventsPage mode="overview" /></Lazy>
                 </RoleProtectedRoute>
               }
             />
+            <Route path="venue/resources" element={<RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}><Lazy><P.VenueEventsPage mode="resources" /></Lazy></RoleProtectedRoute>} />
+            <Route path="venue/tasks" element={<RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}><Lazy><P.VenueEventsPage mode="tasks" /></Lazy></RoleProtectedRoute>} />
+            <Route path="venue/event-schedule" element={<RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}><Lazy><P.VenueEventsPage mode="schedule" /></Lazy></RoleProtectedRoute>} />
+            <Route path="venue/contracts" element={<RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}><Lazy><P.VenueCommercialDocumentsPage type="contract" /></Lazy></RoleProtectedRoute>} />
+            <Route path="venue/invoices" element={<RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}><Lazy><P.VenueCommercialDocumentsPage type="invoice" /></Lazy></RoleProtectedRoute>} />
+            <Route path="venue/spaces" element={<Navigate to="/dashboard/venue" replace />} />
             <Route
               path="venue/bookings"
-              element={
-                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff']}>
-                  <Lazy>
-                    <P.VenueBookingsPage />
-                  </Lazy>
-                </RoleProtectedRoute>
-              }
+              element={<Navigate to="/dashboard/venue/calendar?view=list" replace />}
             />
             <Route
               path="venue/revenue"
               element={
-                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff']}>
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}>
                   <Lazy>
                     <P.VenueRevenuePage />
                   </Lazy>
                 </RoleProtectedRoute>
               }
             />
+            <Route path="venue/finances" element={<Navigate to="/dashboard/venue/revenue" replace />} />
+            <Route
+              path="venue/quotes"
+              element={
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}>
+                  <Lazy><P.VenueQuotesPage /></Lazy>
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="venue/reports"
+              element={
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}>
+                  <Lazy><P.VenueReportsPage /></Lazy>
+                </RoleProtectedRoute>
+              }
+            />
             <Route
               path="venue/inbox"
               element={
-                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff']}>
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}>
                   <Lazy>
                     <P.VenueInboxPage />
                   </Lazy>
@@ -763,7 +799,7 @@ const AppWithRealtime = () => {
             <Route
               path="venue/calendar"
               element={
-                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff']}>
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}>
                   <Lazy>
                     <P.VenueCalendarPage />
                   </Lazy>
@@ -773,10 +809,34 @@ const AppWithRealtime = () => {
             <Route
               path="venue/spaces/:spaceId"
               element={
-                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff']}>
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}>
                   <Lazy>
                     <P.VenueSpaceDetailPage />
                   </Lazy>
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="venue/clients"
+              element={
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}>
+                  <Lazy><P.VenueClientsPage /></Lazy>
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="venue/expenses"
+              element={
+                <RoleProtectedRoute allowedRoles={['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security']}>
+                  <Lazy><P.VenueExpensesPage /></Lazy>
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="venue/users"
+              element={
+                <RoleProtectedRoute allowedRoles={['venue_admin']}>
+                  <Lazy><P.VenueStaffPage /></Lazy>
                 </RoleProtectedRoute>
               }
             />

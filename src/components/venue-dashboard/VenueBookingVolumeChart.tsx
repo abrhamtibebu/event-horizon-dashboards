@@ -51,7 +51,7 @@ export function VenueBookingVolumeChart({
   const total = chartRows.reduce((sum, row) => sum + row.bookings, 0)
 
   return (
-    <Card className={cn('rounded-2xl border-border shadow-sm md:col-span-2 lg:col-span-3 dark:ring-0', className)}>
+    <Card className={cn('min-w-0 rounded-2xl border-border shadow-sm dark:ring-0', className)}>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { UserPlus, Users } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { LockKeyhole, UserPlus, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,11 +38,14 @@ function initials(member: VenueStaffMember) {
 
 export default function VenueStaffPage() {
   const { user } = useAuth()
+  const location = useLocation()
+  const permissionsView = location.pathname.endsWith('/users')
   const [staff, setStaff] = useState<VenueStaffMember[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', phone: '', role: 'venue_staff' })
+  const [form, setForm] = useState({ name: '', email: '', phone: '', role: 'booking_officer' })
   const [tempPassword, setTempPassword] = useState<string | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<VenueStaffMember | null>(null)
 
   const load = () =>
     venueApi
@@ -68,7 +72,7 @@ export default function VenueStaffPage() {
       })
       setTempPassword(res.data.temporary_password || null)
       toast.success(res.data.message || 'Staff invited')
-      setForm({ name: '', email: '', phone: '', role: 'venue_staff' })
+      setForm({ name: '', email: '', phone: '', role: 'booking_officer' })
       if (!res.data.temporary_password) setOpen(false)
       load()
     } catch (err: any) {
@@ -87,10 +91,10 @@ export default function VenueStaffPage() {
   }
 
   const remove = async (member: VenueStaffMember) => {
-    if (!window.confirm(`Remove ${displayName(member)} from this venue?`)) return
     try {
       await venueApi.removeStaff(member.id)
       toast.success('Staff removed')
+      setRemoveTarget(null)
       load()
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Could not remove staff')
@@ -110,9 +114,9 @@ export default function VenueStaffPage() {
   return (
     <div className="space-y-8">
       <VenuePageHeader
-        icon={Users}
-        title="Team"
-        subtitle="Invite venue admins and staff for this venue."
+        icon={permissionsView ? LockKeyhole : Users}
+        title={permissionsView ? 'Users & Permissions' : 'Staff & Teams'}
+        subtitle={permissionsView ? 'Manage venue accounts and review the access each role receives.' : 'Invite venue admins and staff for this venue.'}
         actions={
           <Button
             className="bg-brand-gradient bg-brand-gradient-hover text-foreground shadow-lg"
@@ -126,6 +130,24 @@ export default function VenueStaffPage() {
           </Button>
         }
       />
+
+      {permissionsView ? <section className="rounded-2xl border bg-card p-5">
+        <div className="mb-4"><h2 className="font-semibold">Role access</h2><p className="text-sm text-muted-foreground">Permissions are enforced by venue role. Assign a role from the team list below.</p></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-sm"><thead><tr className="border-b text-left"><th className="py-3 pr-4">Area</th><th className="px-4 py-3">Venue admin</th><th className="px-4 py-3">Venue staff</th></tr></thead><tbody>
+          {[
+            ['Bookings, clients & quotes', 'Manage', 'Manage'],
+            ['Payments, invoices & expenses', 'Manage', 'Manage'],
+            ['Event schedules, tasks & attendance', 'Manage', 'Manage'],
+            ['Resource allocation for events', 'Manage', 'Manage'],
+            ['Venue profile, spaces & pricing', 'Manage', 'View'],
+            ['Staff accounts and role assignment', 'Manage', 'No access'],
+            ['Resource inventory changes', 'Manage', 'No access'],
+            ['Staff conflict overrides', 'Manage', 'No access'],
+            ['Reports', 'View', 'View'],
+          ].map(([area, admin, staffRole]) => <tr key={area} className="border-b last:border-0"><td className="py-3 pr-4 font-medium">{area}</td><td className="px-4 py-3">{admin}</td><td className="px-4 py-3">{staffRole}</td></tr>)}
+        </tbody></table></div>
+        <Button asChild size="sm" variant="outline" className="mt-4"><Link to="/dashboard/venue/staff">Manage team accounts</Link></Button>
+      </section> : null}
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         {loading ? (
@@ -146,7 +168,7 @@ export default function VenueStaffPage() {
                     <p className="font-medium">{displayName(member)}</p>
                     {member.is_primary_contact ? <Badge variant="secondary">Primary</Badge> : null}
                     <Badge variant="outline" className="capitalize">
-                      {member.role === 'venue_admin' ? 'Admin' : 'Staff'}
+                      {member.role.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase())}
                     </Badge>
                     {member.id === user?.id ? <span className="text-xs text-muted-foreground">You</span> : null}
                   </div>
@@ -158,12 +180,17 @@ export default function VenueStaffPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="venue_admin">Admin</SelectItem>
-                    <SelectItem value="venue_staff">Staff</SelectItem>
+                    <SelectItem value="venue_admin">Venue Admin</SelectItem>
+                    <SelectItem value="venue_manager">Venue Manager</SelectItem>
+                    <SelectItem value="booking_officer">Booking Officer</SelectItem>
+                    <SelectItem value="venue_event_manager">Event Manager</SelectItem>
+                    <SelectItem value="finance_officer">Finance Officer</SelectItem>
+                    <SelectItem value="operations_staff">Operations Staff</SelectItem>
+                    <SelectItem value="security">Security</SelectItem>
                   </SelectContent>
                 </Select>
                 {member.id !== user?.id ? (
-                  <Button size="sm" variant="outline" onClick={() => remove(member)}>
+                  <Button size="sm" variant="outline" onClick={() => setRemoveTarget(member)}>
                     Remove
                   </Button>
                 ) : null}
@@ -211,8 +238,12 @@ export default function VenueStaffPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="venue_staff">Staff</SelectItem>
-                    <SelectItem value="venue_admin">Admin</SelectItem>
+                    <SelectItem value="venue_manager">Venue Manager</SelectItem>
+                    <SelectItem value="booking_officer">Booking Officer</SelectItem>
+                    <SelectItem value="venue_event_manager">Event Manager</SelectItem>
+                    <SelectItem value="finance_officer">Finance Officer</SelectItem>
+                    <SelectItem value="operations_staff">Operations Staff</SelectItem>
+                    <SelectItem value="security">Security</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -220,6 +251,16 @@ export default function VenueStaffPage() {
           )}
           <DialogFooter>
             {tempPassword ? <Button onClick={() => setOpen(false)}>Done</Button> : <Button onClick={invite}>Invite</Button>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!removeTarget} onOpenChange={(open) => !open && setRemoveTarget(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Remove team member?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">{removeTarget ? `${displayName(removeTarget)} will lose access to this venue.` : ''}</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveTarget(null)}>Keep member</Button>
+            <Button variant="destructive" onClick={() => removeTarget && remove(removeTarget)}>Remove</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

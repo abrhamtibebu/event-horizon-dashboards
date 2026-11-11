@@ -1,37 +1,29 @@
 import { useEffect, useState } from 'react'
-import { format } from 'date-fns'
+import { addDays, format } from 'date-fns'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
-import { venueApi, type VenueBooking, type VenueSpacePackage } from '@/lib/api/venues'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { venueApi, type VenueBooking, type VenueCommercialDocument } from '@/lib/api/venues'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
-import { bookingSourceLabel, bookingTitle } from './bookingLabels'
+import { bookingDateRange, bookingSourceLabel, bookingTitle, PENDING_HOLD_DAYS } from './bookingLabels'
 import { VenueStatusBadge } from './VenueStatusBadge'
-
-const balanceClass: Record<string, string> = {
-  unquoted: 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/20',
-  unpaid: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20',
-  partial: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20',
-  paid: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20',
-}
+import { usePermissionCheck } from '@/hooks/use-permission-check'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 function money(amount?: number | null, currency = 'ETB') {
   if (amount == null || Number.isNaN(Number(amount))) return '—'
@@ -48,56 +40,82 @@ export function VenueBookingSheet({
   onChanged: (booking: VenueBooking) => void
 }) {
   const [current, setCurrent] = useState<VenueBooking | null>(booking)
-  const [reply, setReply] = useState('')
-  const [replySubject, setReplySubject] = useState('')
-  const [replying, setReplying] = useState(false)
   const [updating, setUpdating] = useState(false)
-  const [packages, setPackages] = useState<VenueSpacePackage[]>([])
-  const [quotePackage, setQuotePackage] = useState('custom')
-  const [quoteAmount, setQuoteAmount] = useState('')
-  const [quoteCurrency, setQuoteCurrency] = useState('ETB')
-  const [savingQuote, setSavingQuote] = useState(false)
-  const [payAmount, setPayAmount] = useState('')
-  const [payMethod, setPayMethod] = useState('cash')
-  const [payReference, setPayReference] = useState('')
-  const [payDate, setPayDate] = useState('')
-  const [savingPayment, setSavingPayment] = useState(false)
+  const [commercialDocuments, setCommercialDocuments] = useState<VenueCommercialDocument[]>([])
+  const [acceptedQuoteId, setAcceptedQuoteId] = useState<number | null>(null)
+  const [acceptedDeposit, setAcceptedDeposit] = useState(0)
+  const [documentsLoading, setDocumentsLoading] = useState(false)
+  const [manualConfirmOpen, setManualConfirmOpen] = useState(false)
+  const { hasRole } = usePermissionCheck()
+  const canManuallyConfirm = hasRole(['admin', 'superadmin', 'venue_admin', 'venue_manager'])
 
   useEffect(() => {
     setCurrent(booking)
-    setReply('')
-    setReplySubject(booking ? `Re: ${bookingTitle(booking)}` : '')
+    setManualConfirmOpen(false)
   }, [booking])
 
   useEffect(() => {
-    if (!current) return
-    setQuotePackage(current.package_id ? String(current.package_id) : 'custom')
-    setQuoteAmount(current.quoted_amount != null ? String(current.quoted_amount) : '')
-    setQuoteCurrency(current.currency || 'ETB')
-  }, [current])
-
-  useEffect(() => {
-    if (!current?.space_id) {
-      setPackages([])
+    if (!current) {
+      setCommercialDocuments([])
+      setAcceptedQuoteId(null)
+      setAcceptedDeposit(0)
       return
     }
-    venueApi
-      .packages(current.space_id)
-      .then((res) => setPackages(res.data))
-      .catch(() => setPackages(current.space?.packages || []))
-  }, [current?.space_id, current?.space?.packages])
+    let active = true
+    const refreshCommercialState = () => {
+      setDocumentsLoading(true)
+      Promise.all([venueApi.commercialDocuments(current.id), venueApi.bookingQuotes(current.id)])
+        .then(([documents, quotes]) => {
+          if (!active) return
+          setCommercialDocuments(documents.data)
+          const accepted = quotes.data.find((quote) => quote.status === 'accepted')
+          setAcceptedQuoteId(accepted?.id ?? null)
+          setAcceptedDeposit(Number(accepted?.deposit_amount ?? 0))
+        })
+        .catch(() => undefined)
+        .finally(() => { if (active) setDocumentsLoading(false) })
+    }
+    refreshCommercialState()
+    const intervalId = window.setInterval(refreshCommercialState, 15000)
+    window.addEventListener('focus', refreshCommercialState)
+    return () => {
+      active = false
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refreshCommercialState)
+    }
+  }, [current?.id])
+
 
   const applyBooking = (next: VenueBooking) => {
     setCurrent(next)
     onChanged(next)
+    Promise.all([venueApi.commercialDocuments(next.id), venueApi.bookingQuotes(next.id)])
+      .then(([documents, quotes]) => {
+        setCommercialDocuments(documents.data)
+        const accepted = quotes.data.find((quote) => quote.status === 'accepted')
+        setAcceptedQuoteId(accepted?.id ?? null)
+        setAcceptedDeposit(Number(accepted?.deposit_amount ?? 0))
+      })
+      .catch(() => undefined)
   }
 
-  const setStatus = async (next: string) => {
+  const signedAcceptedContract = commercialDocuments.some((document) =>
+    document.type === 'contract' && document.venue_booking_quote_id === acceptedQuoteId && document.status === 'signed')
+  const depositDue = Math.max(0, acceptedDeposit - Number(current?.paid_total ?? 0))
+  const confirmationBlockers = [
+    !acceptedQuoteId ? 'Client acceptance of a quotation is required.' : null,
+    acceptedQuoteId && !signedAcceptedContract ? 'The accepted quotation contract must be signed.' : null,
+    acceptedQuoteId && depositDue > 0.001 ? `Required deposit outstanding: ${money(depositDue, current?.currency || 'ETB')}.` : null,
+  ].filter(Boolean) as string[]
+  const setStatus = async (next: string, manualConfirmation = false) => {
     if (!current) return
     setUpdating(true)
     try {
-      const res = await venueApi.updateBooking(current.id, { status: next })
+      const res = manualConfirmation
+        ? await venueApi.manuallyConfirmBooking(current.id)
+        : await venueApi.updateBooking(current.id, { status: next })
       applyBooking(res.data)
+      setManualConfirmOpen(false)
       toast.success(`Booking ${next}`)
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Could not update booking')
@@ -106,110 +124,29 @@ export function VenueBookingSheet({
     }
   }
 
-  const sendReply = async () => {
-    if (!current || !reply.trim()) return
-    setReplying(true)
-    try {
-      const res = await venueApi.replyBooking(current.id, {
-        message: reply.trim(),
-        subject: replySubject.trim() || undefined,
-      })
-      const next = res.data.booking as VenueBooking
-      setCurrent(next)
-      setReply('')
-      onChanged(next)
-      toast.success('Reply sent')
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Could not send reply')
-    } finally {
-      setReplying(false)
-    }
-  }
-
-  const saveQuote = async () => {
-    if (!current) return
-    setSavingQuote(true)
-    try {
-      const payload: Record<string, unknown> = {
-        currency: (quoteCurrency || 'ETB').toUpperCase(),
-        package_id: quotePackage === 'custom' ? null : Number(quotePackage),
-        quoted_amount: quoteAmount.trim() === '' ? null : Number(quoteAmount),
-      }
-      const res = await venueApi.updateBooking(current.id, payload)
-      applyBooking(res.data)
-      toast.success('Quote saved')
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Could not save quote')
-    } finally {
-      setSavingQuote(false)
-    }
-  }
-
-  const recordPayment = async () => {
-    if (!current || !payAmount) {
-      toast.error('Amount is required')
-      return
-    }
-    setSavingPayment(true)
-    try {
-      const res = await venueApi.recordPayment(current.id, {
-        amount: Number(payAmount),
-        method: payMethod,
-        reference: payReference.trim() || undefined,
-        paid_at: payDate || undefined,
-      })
-      applyBooking(res.data)
-      setPayAmount('')
-      setPayReference('')
-      setPayDate('')
-      toast.success('Payment recorded')
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Could not record payment')
-    } finally {
-      setSavingPayment(false)
-    }
-  }
-
-  const removePayment = async (paymentId: number) => {
-    if (!current || !window.confirm('Remove this payment?')) return
-    try {
-      const res = await venueApi.deletePayment(current.id, paymentId)
-      applyBooking(res.data)
-      toast.success('Payment removed')
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Could not remove payment')
-    }
-  }
-
-  const balance = current?.balance_status || 'unquoted'
-  const currency = current?.currency || quoteCurrency || 'ETB'
-
   return (
-    <Sheet open={!!booking} onOpenChange={onOpenChange}>
-      <SheetContent className="overflow-y-auto sm:max-w-md">
+    <Dialog open={!!booking} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         {current ? (
           <>
-            <SheetHeader>
-              <SheetTitle>{bookingTitle(current)}</SheetTitle>
-              <SheetDescription>
+            <DialogHeader>
+              <DialogTitle>{bookingTitle(current)}</DialogTitle>
+              <DialogDescription>
                 {bookingSourceLabel(current.source)} · {current.space?.name || 'Space'}
-              </SheetDescription>
-            </SheetHeader>
+              </DialogDescription>
+            </DialogHeader>
             <div className="mt-6 space-y-4 text-sm">
               <div>
                 <p className="text-muted-foreground">When</p>
                 <p className="font-medium">
-                  {format(new Date(current.starts_at), 'MMM d, yyyy HH:mm')} –{' '}
-                  {format(new Date(current.ends_at), 'MMM d, yyyy HH:mm')}
+                  {bookingDateRange(current.starts_at, current.ends_at)}
                 </p>
+                {current.status === 'pending' && current.created_at ? <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">7-day hold ends {format(addDays(new Date(current.created_at), PENDING_HOLD_DAYS), 'MMM d, yyyy HH:mm')}</p> : null}
               </div>
               <div>
-                <p className="text-muted-foreground">Status</p>
+                <p className="text-muted-foreground">Event status</p>
                 <div className="mt-1 flex flex-wrap gap-2">
                   <VenueStatusBadge status={current.status} />
-                  <Badge variant="outline" className={cn('capitalize', balanceClass[balance])}>
-                    {balance}
-                  </Badge>
                 </div>
               </div>
               <div>
@@ -224,12 +161,21 @@ export function VenueBookingSheet({
                   <p className="whitespace-pre-wrap">{current.notes}</p>
                 </div>
               ) : null}
+              {current.event_type || current.expected_attendance || current.event_requirements ? (
+                <div className="space-y-2 rounded-lg bg-muted/40 p-3">
+                  <p className="text-sm font-semibold">Event requirements</p>
+                  {current.event_type ? <p className="text-sm"><span className="text-muted-foreground">Type: </span>{current.event_type}</p> : null}
+                  {current.expected_attendance ? <p className="text-sm"><span className="text-muted-foreground">Expected attendance: </span>{current.expected_attendance.toLocaleString()}</p> : null}
+                  {current.event_requirements ? <p className="whitespace-pre-wrap text-sm">{current.event_requirements}</p> : null}
+                </div>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 {current.status === 'pending' && (
                   <>
-                    <Button size="sm" disabled={updating} onClick={() => setStatus('confirmed')}>
+                    <Button size="sm" disabled={updating || documentsLoading || confirmationBlockers.length > 0} onClick={() => setStatus('confirmed')}>
                       Confirm
                     </Button>
+                    {canManuallyConfirm && confirmationBlockers.length > 0 ? <Button size="sm" variant="outline" disabled={updating} onClick={() => setManualConfirmOpen(true)}>Confirm manually</Button> : null}
                     <Button size="sm" variant="outline" disabled={updating} onClick={() => setStatus('cancelled')}>
                       Reject
                     </Button>
@@ -246,137 +192,42 @@ export function VenueBookingSheet({
                   </>
                 )}
               </div>
+              {current.status === 'pending' && confirmationBlockers.length > 0 ? <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">Before confirmation: {confirmationBlockers.join(' ')}</p> : null}
 
               <div className="space-y-3 border-t border-border pt-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-medium">Quote</p>
-                  <p className="text-right text-muted-foreground">
-                    Paid {money(current.paid_total ?? 0, currency)}
-                    {current.quoted_amount != null ? ` of ${money(current.quoted_amount, currency)}` : ''}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <Label>Package</Label>
-                  <Select
-                    value={quotePackage}
-                    onValueChange={(value) => {
-                      setQuotePackage(value)
-                      if (value === 'custom') return
-                      const selected = packages.find((pkg) => String(pkg.id) === value)
-                      if (selected) {
-                        setQuoteAmount(String(selected.price))
-                        setQuoteCurrency(selected.currency || 'ETB')
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Custom amount" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="custom">Custom amount</SelectItem>
-                      {packages.map((pkg) => (
-                        <SelectItem key={pkg.id} value={String(pkg.id)}>
-                          {pkg.name} · {pkg.currency || 'ETB'} {Number(pkg.price).toLocaleString()}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-[1fr_88px] gap-2">
-                  <div className="space-y-1">
-                    <Label>Amount</Label>
-                    <Input type="number" min="0" value={quoteAmount} onChange={(e) => setQuoteAmount(e.target.value)} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Currency</Label>
-                    <Input
-                      maxLength={3}
-                      value={quoteCurrency}
-                      onChange={(e) => setQuoteCurrency(e.target.value.toUpperCase())}
-                    />
-                  </div>
-                </div>
-                <Button size="sm" variant="outline" disabled={savingQuote} onClick={saveQuote}>
-                  {savingQuote ? 'Saving…' : 'Save quote'}
-                </Button>
-              </div>
-
-              <div className="space-y-3 border-t border-border pt-4">
-                <p className="font-medium">Payments</p>
-                {(current.payments ?? []).length === 0 ? (
-                  <p className="text-muted-foreground">No payments recorded yet.</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {(current.payments ?? []).map((payment) => (
-                      <li key={payment.id} className="flex items-start justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2">
-                        <div>
-                          <p className="font-medium capitalize">
-                            {payment.method} · {money(payment.amount, currency)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(payment.paid_at), 'MMM d, yyyy')}
-                            {payment.reference ? ` · ${payment.reference}` : ''}
-                          </p>
-                        </div>
-                        <Button size="sm" variant="ghost" onClick={() => removePayment(payment.id)}>
-                          Remove
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label>Amount</Label>
-                    <Input type="number" min="0" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Method</Label>
-                    <Select value={payMethod} onValueChange={setPayMethod}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="bank">Bank</SelectItem>
-                        <SelectItem value="chapa">Chapa</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label>Reference</Label>
-                    <Input value={payReference} onChange={(e) => setPayReference(e.target.value)} placeholder="Receipt or tx ref" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Paid on</Label>
-                    <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
-                  </div>
-                </div>
-                <Button size="sm" disabled={savingPayment} onClick={recordPayment}>
-                  {savingPayment ? 'Saving…' : 'Record payment'}
-                </Button>
-              </div>
-
-              <div className="space-y-2 border-t border-border pt-4">
-                <Label>Reply by email</Label>
-                <Input placeholder="Subject" value={replySubject} onChange={(e) => setReplySubject(e.target.value)} />
-                <Textarea
-                  rows={4}
-                  placeholder="Write a short reply to the requester…"
-                  value={reply}
-                  onChange={(e) => setReply(e.target.value)}
-                />
-                <Button disabled={replying || !reply.trim()} onClick={sendReply}>
-                  {replying ? 'Sending…' : 'Send reply'}
-                </Button>
+                <p className="font-medium">Invoice & contract status</p>
+                {(['invoice', 'contract'] as const).map((type) => {
+                  const document = commercialDocuments.find((item) => item.type === type)
+                  return (
+                    <div key={type} className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2">
+                      <span className="capitalize">{type}</span>
+                      <Badge variant="outline" className="capitalize">
+                        {documentsLoading ? 'Loading…' : document?.status.replaceAll('_', ' ') || 'Not issued'}
+                      </Badge>
+                    </div>
+                  )
+                })}
               </div>
             </div>
-            <SheetFooter />
           </>
         ) : null}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+      <AlertDialog open={manualConfirmOpen} onOpenChange={setManualConfirmOpen}>
+        <AlertDialogContent className="z-[80]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Manually confirm this booking?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This confirms the booking without an accepted quotation, signed contract, or required deposit. Any balance stays outstanding, and the action is recorded in the audit log.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={updating}>Back</AlertDialogCancel>
+            <AlertDialogAction disabled={updating} onClick={() => void setStatus('confirmed', true)}>
+              {updating ? 'Confirming…' : 'Confirm booking'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Dialog>
   )
 }

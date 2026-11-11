@@ -11,24 +11,28 @@ import { MessagesTrayProvider } from '@/components/messaging/MessagesTrayContext
 import { MessagesFloatingTray } from '@/components/messaging/MessagesFloatingTray'
 import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
+import { isVenueRole } from '@/lib/roles'
 
 export function Layout() {
   const [searchQuery, setSearchQuery] = useState('')
   const { user } = useAuth()
   const location = useLocation()
   const isUsher = user?.role === 'usher' || location.pathname.startsWith('/dashboard/usher')
-  const isVenue = user?.role === 'venue_admin' || user?.role === 'venue_staff'
+  const isVenue = isVenueRole(user?.role)
 
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen={true}>
       <MessagesTrayProvider>
-        <div className="min-h-screen flex w-full bg-background">
+        <div
+          className={cn('min-h-screen flex w-full', isUsher ? 'dark bg-[#0b1630] text-white' : 'bg-background')}
+          style={isUsher ? { colorScheme: 'dark' } : undefined}
+        >
           <AppSidebar />
-          <div className={cn('flex-1 flex flex-col', isUsher && 'md:pl-0')}>
+          <div className={cn('min-w-0 flex-1 flex flex-col', isUsher && 'md:pl-0')}>
             <div className={cn(isUsher && 'hidden md:block')}>
               <Header onSearch={setSearchQuery} />
             </div>
-            <main className={cn('flex-1', !isUsher && 'p-6', isUsher && 'p-0 md:p-6 pb-24 md:pb-6', isVenue && !isUsher && 'pb-24 md:pb-6')}>
+            <main className={cn('min-w-0 w-full flex-1', !isUsher && 'p-6', isUsher && 'p-0 md:p-6 pb-24 md:pb-6', isVenue && !isUsher && 'pb-24 md:pb-6')}>
               <SuspendedOrganizerGuard>
                 <VenueSetupGuard>
                   <Outlet context={{ searchQuery }} />

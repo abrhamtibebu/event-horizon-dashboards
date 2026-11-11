@@ -103,11 +103,11 @@ export default function SubscriptionPlans() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Choose Your Plan</h1>
-        <p className="text-muted-foreground">
-          Select the perfect plan for your event management needs
+    <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">Plans</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Choose a plan for your events.
         </p>
       </div>
 

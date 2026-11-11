@@ -25,7 +25,7 @@ export function VenueRecentActivityCard({
   className?: string
 }) {
   return (
-    <Card className={cn('rounded-2xl border-border shadow-sm dark:ring-0', className)}>
+    <Card className={cn('min-w-0 rounded-2xl border-border shadow-sm dark:ring-0', className)}>
       <CardHeader>
         <CardTitle>Recent activity</CardTitle>
         <CardDescription>Bookings and blocked dates</CardDescription>

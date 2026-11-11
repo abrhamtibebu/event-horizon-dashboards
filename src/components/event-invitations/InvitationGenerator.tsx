@@ -1,12 +1,12 @@
 import { useMemo, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertCircle,
   CheckCircle2,
@@ -25,7 +25,8 @@ import {
 import { toast } from 'sonner';
 import { useBulkGenerateInvitations, useEventGuestTypes } from '@/lib/api/invitations';
 import { formApi } from '@/lib/api/forms';
-import FormBuilder from '@/components/forms/FormBuilder';
+import FormBuilderDialog from '@/components/forms/FormBuilderDialog';
+import CreateFormDialog from '@/components/forms/CreateFormDialog';
 import { downloadSampleGuestCsv, parseGuestCsv, type ParsedInviteRow } from '@/lib/invitationUtils';
 import type { BulkInvitationResult } from '@/types/invitations';
 
@@ -54,9 +55,9 @@ export function InvitationGenerator({ eventId, isOrganizer, onSent }: Invitation
   const [csvRows, setCsvRows] = useState<ParsedInviteRow[] | null>(null);
   const [csvFileName, setCsvFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const queryClient = useQueryClient();
   const [builderForm, setBuilderForm] = useState<{ id: number; name: string } | null>(null);
-  const [creatingForm, setCreatingForm] = useState(false);
+  const [createFormOpen, setCreateFormOpen] = useState(false);
+  const [qrSingleUse, setQrSingleUse] = useState(false);
 
   const guestTypeNumeric = guestTypeId ? Number(guestTypeId) : 0;
   const formQuery = useQuery({
@@ -69,40 +70,6 @@ export function InvitationGenerator({ eventId, isOrganizer, onSent }: Invitation
     formQuery.isError && isAxiosError(formQuery.error) && formQuery.error.response?.status === 404;
 
   const selectedGuestType = guestTypes.find((g) => String(g.id) === guestTypeId) ?? null;
-
-  const createGuestForm = async () => {
-    if (!selectedGuestType) return;
-    setCreatingForm(true);
-    try {
-      const created = await formApi.createForm(eventId, {
-        event_id: eventId,
-        name: `${selectedGuestType.name} form`,
-        guest_type_id: selectedGuestType.id,
-        status: 'active',
-      });
-      if (created.status !== 'active') {
-        await formApi.activateForm(created.id);
-      }
-      await queryClient.invalidateQueries({ queryKey: ['event-form-by-guest-type', eventId, selectedGuestType.id] });
-      await queryClient.invalidateQueries({ queryKey: ['event-forms', eventId] });
-      setBuilderForm({ id: created.id, name: created.name });
-    } catch (error: unknown) {
-      const message = isAxiosError(error) ? String(error.response?.data?.message || error.response?.data?.error || '') : '';
-      if (message.includes('already exists')) {
-        try {
-          const existing = await formApi.getFormByGuestType(eventId, selectedGuestType.id);
-          setBuilderForm({ id: existing.id, name: existing.name });
-          toast.info('This guest type already has a form. Opening it to edit.');
-          return;
-        } catch {
-          // Fall through to the generic error.
-        }
-      }
-      toast.error(message || 'Could not create the form.');
-    } finally {
-      setCreatingForm(false);
-    }
-  };
 
   const manualValidation = useMemo(() => {
     const seen = new Set<string>();
@@ -176,6 +143,7 @@ export function InvitationGenerator({ eventId, isOrganizer, onSent }: Invitation
         eventId,
         guestTypeId: Number(guestTypeId),
         invitations: payload,
+        qrSingleUse,
       });
       const { sent, failed, queued } = result.summary ?? { sent: 0, failed: 0, queued: 0 };
       if (failed > 0 && sent === 0 && queued === 0) {
@@ -258,10 +226,9 @@ export function InvitationGenerator({ eventId, isOrganizer, onSent }: Invitation
                   variant="link"
                   size="sm"
                   className="h-auto p-0 text-[11px] gap-1"
-                  disabled={creatingForm}
-                  onClick={() => void createGuestForm()}
+                  onClick={() => setCreateFormOpen(true)}
                 >
-                  {creatingForm ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                  <Plus className="w-3 h-3" />
                   Create form
                 </Button>
               )}
@@ -417,6 +384,17 @@ export function InvitationGenerator({ eventId, isOrganizer, onSent }: Invitation
             <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-black flex items-center justify-center">3</span>
             <Label className="text-xs font-semibold text-muted-foreground uppercase">Send</Label>
           </div>
+          <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+            <div className="space-y-0.5">
+              <Label htmlFor="qr-single-use" className="text-xs font-semibold">QR expires after one RSVP confirmation</Label>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                {qrSingleUse
+                  ? 'The printed QR can confirm the RSVP once. It can still be scanned at the gate to check the guest in.'
+                  : 'The QR can be used to confirm the RSVP again. Check-in is unchanged.'}
+              </p>
+            </div>
+            <Switch id="qr-single-use" checked={qrSingleUse} onCheckedChange={setQrSingleUse} />
+          </div>
           <Button onClick={handleSend} disabled={!canSend} className="w-full h-10 rounded-lg font-semibold gap-2">
             {bulkMutation.isPending ? (
               <>
@@ -436,36 +414,25 @@ export function InvitationGenerator({ eventId, isOrganizer, onSent }: Invitation
         </div>
       </div>
 
-      <Dialog modal={false} open={builderForm !== null} onOpenChange={(open) => { if (!open) setBuilderForm(null); }}>
-        <DialogContent
-          className="flex h-[90vh] w-[95vw] max-w-6xl flex-col gap-0 overflow-hidden p-0"
-          onPointerDownOutside={(event) => {
-            const target = event.target as HTMLElement | null;
-            if (target?.closest('[data-radix-popper-content-wrapper]')) event.preventDefault();
-          }}
-          onInteractOutside={(event) => {
-            const target = event.target as HTMLElement | null;
-            if (target?.closest('[data-radix-popper-content-wrapper]')) event.preventDefault();
-          }}
-        >
-          <DialogHeader className="sr-only">
-            <DialogTitle>{builderForm ? `Edit: ${builderForm.name}` : 'Edit form'}</DialogTitle>
-          </DialogHeader>
-          {builderForm && (
-            <FormBuilder
-              formId={builderForm.id}
-              eventId={eventId}
-              onSave={() => {
-                const id = builderForm.id;
-                setBuilderForm(null);
-                void queryClient.invalidateQueries({ queryKey: ['event-form-by-guest-type', eventId, guestTypeNumeric] });
-                void queryClient.invalidateQueries({ queryKey: ['form', id] });
-              }}
-              onCancel={() => setBuilderForm(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <CreateFormDialog
+        open={createFormOpen}
+        onOpenChange={setCreateFormOpen}
+        eventId={eventId}
+        types={guestTypes}
+        defaultTypeId={selectedGuestType?.id ?? null}
+        lockType
+        activate
+        onCreated={(form) => {
+          setCreateFormOpen(false);
+          setBuilderForm({ id: form.id, name: form.name });
+        }}
+        onExisting={(form) => {
+          setCreateFormOpen(false);
+          setBuilderForm({ id: form.id, name: form.name });
+        }}
+      />
+
+      <FormBuilderDialog form={builderForm} eventId={eventId} onClose={() => setBuilderForm(null)} />
     </div>
   );
 }

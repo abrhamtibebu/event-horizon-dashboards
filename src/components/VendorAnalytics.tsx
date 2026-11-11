@@ -57,8 +57,7 @@ import {
   Activity,
   Target,
   Award,
-  Zap,
-} from 'lucide-react';
+  } from 'lucide-react';
 import { analyticsApi, VendorAnalytics, ReportFilters, ExportOptions } from '@/lib/analyticsApi';
 
 interface VendorAnalyticsProps {

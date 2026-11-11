@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Award, BarChart, DollarSign, Users, CheckCircle, TrendingUp, Ticket, Globe } from 'lucide-react';
+import { Award, BarChart, Users, CheckCircle, TrendingUp, Globe } from 'lucide-react';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -14,6 +14,7 @@ import {
   safeGetLocalStorage, 
   safeSetLocalStorage 
 } from '@/utils/reportTransformers';
+import { MetricSparkline } from '@/components/reports/MetricSparkline';
 import { Card, CardContent } from '@/components/ui/card';
 import { ReportsHeader } from '@/components/reports/ReportsHeader';
 import { ReportFilters } from '@/components/reports/ReportFilters';
@@ -29,7 +30,7 @@ import { DemographicsSection } from '@/components/reports/DemographicsSection';
 const REPORT_SECTIONS: ReportSection[] = [
   { id: 'executive', label: 'Executive Summary', icon: Award },
   { id: 'performance', label: 'Event Performance', icon: BarChart },
-  { id: 'financial', label: 'Financial Performance', icon: DollarSign },
+  { id: 'financial', label: 'Financial Performance', icon: TrendingUp },
   { id: 'attendee', label: 'Attendee & Registration', icon: Users },
   { id: 'engagement', label: 'Engagement & Interaction', icon: CheckCircle },
   { id: 'revenue', label: 'Revenue Analytics', icon: TrendingUp },
@@ -247,6 +248,9 @@ export default function Reports() {
   const keyMetrics = useMemo(() => {
     if (!metrics) return null;
 
+    const series = (record?: Record<string, number>) =>
+      Object.values(record || {}).filter((value) => typeof value === 'number');
+
     const cards = [
       {
         id: 'revenue',
@@ -256,52 +260,43 @@ export default function Reports() {
           maximumFractionDigits: 2,
         })}`,
         hint: 'From ticket sales',
-        icon: DollarSign,
+        spark: series(metrics.revenue_timeline),
       },
       {
         id: 'events',
         label: 'Total Events',
         value: (metrics.total_events || 0).toLocaleString(),
         hint: 'Organized events',
-        icon: BarChart,
+        spark: series(metrics.events_by_month),
       },
       {
         id: 'attendees',
         label: 'Total Attendees',
         value: (metrics.total_attendees || 0).toLocaleString(),
         hint: 'Registered participants',
-        icon: Users,
+        spark: series(metrics.registrations_by_month),
       },
       {
         id: 'tickets',
         label: 'Tickets Sold',
         value: (metrics.total_tickets_sold || 0).toLocaleString(),
         hint: 'Across all events',
-        icon: Ticket,
+        spark: Object.values(metrics.tickets_by_type || {}).map((ticket) => ticket?.sold || 0),
       },
     ];
 
   return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {cards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <Card key={card.id} className="border-border/80">
-              <CardContent className="p-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {card.label}
-                  </p>
-                  <div className="rounded-md bg-muted p-2 text-muted-foreground">
-                    <Icon className="h-4 w-4" />
-                  </div>
-                </div>
-                <p className="text-2xl font-semibold tracking-tight text-foreground">{card.value}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{card.hint}</p>
-              </CardContent>
-            </Card>
-          );
-        })}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map((card) => (
+          <div key={card.id} className="flex items-start justify-between gap-3 rounded-xl border border-border bg-card px-4 py-4">
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">{card.label}</p>
+              <p className="mt-1 text-2xl font-semibold tracking-tight">{card.value}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{card.hint}</p>
+            </div>
+            <MetricSparkline values={card.spark} />
+          </div>
+        ))}
       </div>
     );
   }, [metrics]);
@@ -361,13 +356,13 @@ export default function Reports() {
         ) : (
           <div className="space-y-5">
             {keyMetrics}
-            
+
+            {visibleReports.has('revenue') && <RevenueCharts metrics={metrics} />}
             {visibleReports.has('executive') && <ExecutiveSummary metrics={metrics} />}
             {visibleReports.has('performance') && <PerformanceMetrics metrics={metrics} />}
             {visibleReports.has('financial') && <FinancialMetrics metrics={metrics} />}
             {visibleReports.has('attendee') && <AttendeeInsights metrics={metrics} />}
             {visibleReports.has('engagement') && <EngagementReports metrics={metrics} />}
-            {visibleReports.has('revenue') && <RevenueCharts metrics={metrics} />}
             {visibleReports.has('demographics') && (
               <DemographicsSection
                 metrics={metrics}

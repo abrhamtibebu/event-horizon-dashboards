@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { format, formatDistanceToNow } from 'date-fns'
+import { addDays, format, formatDistanceToNow } from 'date-fns'
 import { Inbox } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Spinner } from '@/components/ui/spinner'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { VenueBookingSheet } from '@/components/venue/VenueBookingSheet'
 import { VenueEmptyState } from '@/components/venue/VenueEmptyState'
 import { VenuePageHeader } from '@/components/venue/VenuePageHeader'
-import { bookingSourceLabel, bookingTitle, pendingExpiresSoon } from '@/components/venue/bookingLabels'
+import { bookingDateRange, bookingSourceLabel, bookingTitle, pendingExpiresSoon, PENDING_HOLD_DAYS } from '@/components/venue/bookingLabels'
 import { venueApi, type VenueBooking } from '@/lib/api/venues'
 import { toast } from 'sonner'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export default function VenueInboxPage() {
   const [bookings, setBookings] = useState<VenueBooking[]>([])
@@ -21,7 +21,11 @@ export default function VenueInboxPage() {
   const load = () =>
     venueApi
       .bookings({ status: 'pending' })
-      .then((res) => setBookings(res.data))
+      .then((res) => setBookings([...res.data].sort((a, b) => {
+        const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0
+        const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0
+        return aCreated - bCreated
+      })))
       .catch((err) => toast.error(err.response?.data?.error || 'Could not load requests'))
 
   useEffect(() => {
@@ -38,8 +42,8 @@ export default function VenueInboxPage() {
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         {loading ? (
-          <div className="flex justify-center py-16">
-            <Spinner text="Loading requests..." />
+          <div className="space-y-3 p-4">
+            {[0, 1, 2, 3].map((row) => <div key={row} className="flex items-center gap-4 rounded-xl border border-border p-4"><Skeleton className="h-10 w-10 rounded-xl" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-3 w-2/3" /></div><Skeleton className="h-6 w-24" /></div>)}
           </div>
         ) : bookings.length === 0 ? (
           <VenueEmptyState
@@ -58,19 +62,35 @@ export default function VenueInboxPage() {
             }
           />
         ) : (
+          <>
+          <div className="divide-y divide-border md:hidden">
+            {bookings.map((booking) => {
+              const expiry = booking.created_at ? addDays(new Date(booking.created_at), PENDING_HOLD_DAYS) : null
+              return <button key={booking.id} className="block w-full space-y-3 p-4 text-left" onClick={() => setDetail(booking)}>
+                <div className="flex items-start justify-between gap-3"><div className="font-semibold">{bookingTitle(booking)}<p className="text-xs font-normal text-muted-foreground">{bookingSourceLabel(booking.source)} · {booking.space?.name || 'Space'}</p></div><Badge variant="outline">Pending</Badge></div>
+                <p className="text-sm">{bookingDateRange(booking.starts_at, booking.ends_at)}</p>
+                <p className="text-xs text-muted-foreground">{booking.contact_name || booking.organizer?.name || 'No contact'}{booking.contact_phone ? ` · ${booking.contact_phone}` : ''}</p>
+                <p className="text-xs text-muted-foreground">Quote: {booking.quoted_amount != null ? `${booking.currency || 'ETB'} ${Number(booking.quoted_amount).toLocaleString()}` : 'Not set'} · Balance: {booking.balance_status || 'unquoted'}</p>
+                {expiry && <p className="text-xs font-medium text-amber-700 dark:text-amber-300">7-day hold ends {format(expiry, 'MMM d, yyyy HH:mm')}</p>}
+              </button>
+            })}
+          </div>
+          <div className="hidden md:block">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead>Request</TableHead>
                 <TableHead>Space</TableHead>
-                <TableHead>When</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Age</TableHead>
+                <TableHead>Quote / balance</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {bookings.map((booking) => {
                 const expiring = pendingExpiresSoon(booking.created_at)
+                const expiry = booking.created_at ? addDays(new Date(booking.created_at), PENDING_HOLD_DAYS) : null
                 return (
                   <TableRow
                     key={booking.id}
@@ -83,7 +103,7 @@ export default function VenueInboxPage() {
                     </TableCell>
                     <TableCell>{booking.space?.name || '—'}</TableCell>
                     <TableCell className="whitespace-nowrap text-sm">
-                      {format(new Date(booking.starts_at), 'MMM d, HH:mm')} – {format(new Date(booking.ends_at), 'MMM d, HH:mm')}
+                      {bookingDateRange(booking.starts_at, booking.ends_at)}
                     </TableCell>
                     <TableCell>
                       {booking.contact_name || booking.organizer?.name || '—'}
@@ -100,12 +120,16 @@ export default function VenueInboxPage() {
                           Expiring soon
                         </Badge>
                       ) : null}
+                      {expiry ? <div className="mt-1 text-xs text-muted-foreground">Hold ends {format(expiry, 'MMM d, HH:mm')}</div> : null}
                     </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">{booking.quoted_amount != null ? `${booking.currency || 'ETB'} ${Number(booking.quoted_amount).toLocaleString()}` : '—'}<div className="text-xs capitalize text-muted-foreground">{booking.balance_status || 'unquoted'}</div></TableCell>
                   </TableRow>
                 )
               })}
             </TableBody>
           </Table>
+          </div>
+          </>
         )}
       </div>
 

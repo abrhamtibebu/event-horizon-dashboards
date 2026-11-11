@@ -27,6 +27,11 @@ import { useAuth } from './use-auth'
 // Hook for managing conversations
 export const useConversations = () => {
   const { isAuthenticated } = useAuth()
+  const [deferHeavyFetch, setDeferHeavyFetch] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setDeferHeavyFetch(true), 18000)
+    return () => clearTimeout(timer)
+  }, [])
   const refetchInterval = isAuthenticated ? getPollingInterval(3000) : false
   
   const isDev = import.meta.env.DEV
@@ -47,14 +52,14 @@ export const useConversations = () => {
         throw error
       }
     },
-    enabled: isAuthenticated, // Only run when user is authenticated
+    enabled: isAuthenticated && deferHeavyFetch, // Let events and reports use the API first
     refetchInterval,
     refetchOnWindowFocus: isAuthenticated && !shouldUseWebsocket,
     refetchIntervalInBackground: Boolean(refetchInterval),
     retry: (failureCount, error: any) => {
       // Don't retry on 401 errors
       if (error?.response?.status === 401) return false
-      return failureCount < 3
+      return failureCount < 1
     },
     retryDelay: 1000,
   })
@@ -175,12 +180,17 @@ export const useSearchMessages = (query: string, filters: MessageFilters = {}) =
 // Hook for unread message count
 export const useUnreadCount = () => {
   const { isAuthenticated } = useAuth()
+  const [deferHeavyFetch, setDeferHeavyFetch] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setDeferHeavyFetch(true), 18000)
+    return () => clearTimeout(timer)
+  }, [])
   const refetchInterval = isAuthenticated ? getPollingInterval(3000) : false
   
   return useQuery({
     queryKey: ['unreadCount'],
     queryFn: getUnreadMessageCount,
-    enabled: isAuthenticated, // Only run when user is authenticated
+    enabled: isAuthenticated && deferHeavyFetch, // Let events and reports use the API first
     refetchInterval,
     refetchOnWindowFocus: isAuthenticated && !shouldUseWebsocket,
     refetchIntervalInBackground: Boolean(refetchInterval),

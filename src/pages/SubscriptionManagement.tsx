@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { useNavigate } from 'react-router-dom'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { Calendar, CreditCard, AlertCircle, CheckCircle2, TrendingUp, Zap, Shield, ArrowRight, Sparkles, Clock, History } from 'lucide-react'
+import { Calendar, CreditCard, AlertCircle, CheckCircle2, TrendingUp, Shield, ArrowRight, Clock, History } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { motion } from 'framer-motion'
@@ -50,9 +50,8 @@ export default function SubscriptionManagement() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex justify-center">
-            <Button onClick={() => navigate('/dashboard/subscription/plans')} size="lg" className="gap-2">
-              <Sparkles className="w-4 h-4" />
-              View Plans
+            <Button onClick={() => navigate('/dashboard/subscription/plans')} size="lg">
+              View plans
             </Button>
           </CardContent>
         </Card>
@@ -77,19 +76,13 @@ export default function SubscriptionManagement() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Current Plan Card - Takes 2 columns */}
-        <Card className="lg:col-span-2 border-2 overflow-hidden">
-          <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
-            <Sparkles className="w-24 h-24" />
-          </div>
+        <Card className="lg:col-span-2 border border-border">
           <CardHeader className="pb-4">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-4 mb-2">
-                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner">
-                    <Zap className="w-8 h-8 text-primary" />
-                  </div>
+                <div className="mb-2">
                   <div>
-                    <h2 className="text-3xl font-black tracking-tight uppercase">
+                    <h2 className="text-2xl font-semibold">
                       {subscription.plan?.name || 'Current Plan'}
                     </h2>
                     <SubscriptionStatusBadge subscription={subscription} className="mt-1" />

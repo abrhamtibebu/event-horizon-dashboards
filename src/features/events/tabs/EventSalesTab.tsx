@@ -2,19 +2,11 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart3,
-  CheckCircle,
-  DollarSign,
-  Percent,
-  RefreshCw,
   Share2,
-  TrendingUp,
-  Users,
-  XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Progress } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
 import { SalesOverviewChart } from '@/components/tickets/analytics/SalesOverviewChart'
 import { RevenueTrendChart } from '@/components/tickets/analytics/RevenueTrendChart'
@@ -111,99 +103,41 @@ export function EventSalesTab({
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <Card className="border-primary/30 bg-primary/10 dark:border-primary/20 dark:bg-primary/5">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center text-sm font-medium text-primary">
-              <DollarSign className="mr-2 h-4 w-4" />
-              Total Revenue
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">
-              ETB {analytics.total_revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </div>
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-sm text-primary">
-                Avg. ETB {analytics.average_ticket_price.toFixed(2)}
-              </span>
-              <span className="rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
-                {analytics.total_tickets_sold} tickets
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-blue-500/30 bg-blue-500/10 dark:border-blue-500/20 dark:bg-blue-500/5">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center text-sm font-medium text-blue-600 dark:text-blue-400">
-              <Users className="mr-2 h-4 w-4" />
-              Attendance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-              {analytics.tickets_by_status.used}
-            </div>
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-blue-600 dark:text-blue-400">Attendance Rate</span>
-                <span className="font-semibold text-blue-600 dark:text-blue-400">
-                  {analytics.validation_rate.toFixed(1)}%
-                </span>
-              </div>
-              <Progress value={analytics.validation_rate} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-primary/30 bg-primary/10">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center text-sm font-medium text-primary">
-              <TrendingUp className="mr-2 h-4 w-4" />
-              Sales Performance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">{analytics.total_tickets_sold}</div>
-            <div className="mt-3 flex items-center justify-between">
-              <div className="text-sm">
-                <div className="text-primary">Confirmed</div>
-                <div className="font-semibold text-primary">{analytics.tickets_by_status.confirmed}</div>
-              </div>
-              <div className="text-right text-sm">
-                <div className="text-warning">Pending</div>
-                <div className="font-semibold text-warning">{analytics.tickets_by_status.pending}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <MetricCard
-          label="Refund Rate"
+          label="Total revenue"
+          value={`ETB ${analytics.total_revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          meta={`${analytics.total_tickets_sold} tickets`}
+        />
+        <MetricCard
+          label="Checked in"
+          value={String(analytics.tickets_by_status.used)}
+          meta={`${analytics.validation_rate.toFixed(1)}% attendance`}
+        />
+        <MetricCard
+          label="Tickets sold"
+          value={String(analytics.total_tickets_sold)}
+          meta={`${analytics.tickets_by_status.confirmed} confirmed, ${analytics.tickets_by_status.pending} pending`}
+        />
+        <MetricCard
+          label="Avg. price"
+          value={`ETB ${analytics.average_ticket_price.toFixed(2)}`}
+          meta="Per ticket"
+        />
+        <MetricCard
+          label="Refund rate"
           value={`${analytics.total_tickets_sold > 0 ? ((analytics.tickets_by_status.refunded / analytics.total_tickets_sold) * 100).toFixed(1) : 0}%`}
           meta={`${analytics.tickets_by_status.refunded} refunded`}
-          icon={<RefreshCw className="h-8 w-8 text-warning" />}
         />
         <MetricCard
-          label="Cancellation Rate"
+          label="Cancellation rate"
           value={`${analytics.total_tickets_sold > 0 ? ((analytics.tickets_by_status.cancelled / analytics.total_tickets_sold) * 100).toFixed(1) : 0}%`}
           meta={`${analytics.tickets_by_status.cancelled} cancelled`}
-          icon={<XCircle className="h-8 w-8 text-error" />}
         />
         <MetricCard
-          label="Success Rate"
+          label="Confirmed rate"
           value={`${analytics.total_tickets_sold > 0 ? ((analytics.tickets_by_status.confirmed / analytics.total_tickets_sold) * 100).toFixed(1) : 0}%`}
           meta={`${analytics.tickets_by_status.confirmed} confirmed`}
-          icon={<CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />}
-        />
-        <MetricCard
-          label="Avg. Price"
-          value={`ETB ${analytics.average_ticket_price.toFixed(0)}`}
-          meta="Per ticket sold"
-          icon={<Percent className="h-8 w-8 text-info" />}
         />
       </div>
 
@@ -221,25 +155,16 @@ function MetricCard({
   label,
   value,
   meta,
-  icon,
 }: {
   label: string
   value: string
   meta: string
-  icon: React.ReactNode
 }) {
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="mt-1 text-2xl font-bold">{value}</p>
-          </div>
-          {icon}
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">{meta}</p>
-      </CardContent>
-    </Card>
+    <div className="rounded-xl border border-border bg-card px-4 py-4">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{meta}</p>
+    </div>
   )
 }

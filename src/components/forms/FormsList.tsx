@@ -13,24 +13,7 @@ import {
   Clock,
   AlertCircle,
   Settings,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  ArrowDown,
-  X,
-  Type,
   Mail,
-  Phone,
-  Calendar,
-  List,
-  CheckSquare,
-  Hash,
-  MapPin,
-  Upload,
-  GripVertical,
-  Sparkles,
-  Wand2,
-  PlusCircle,
   Link2,
   Share2,
   ExternalLink,
@@ -58,23 +41,15 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import FormBuilder from './FormBuilder';
+import FormBuilderDialog from './FormBuilderDialog';
+import CreateFormDialog from './CreateFormDialog';
 import FormSubmissionsViewer from './FormSubmissionsViewer';
 
-import { formApi, formFieldApi } from '@/lib/api/forms';
-import type { Form, GuestType, CreateFormFieldRequest, FieldType } from '@/types/forms';
+import { formApi } from '@/lib/api/forms';
+import type { Form, GuestType } from '@/types/forms';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 interface FormsListProps {
   eventId: number;
@@ -88,16 +63,12 @@ export const FormsList: React.FC<FormsListProps> = ({
   onCreateForm
 }) => {
   const [selectedForm, setSelectedForm] = useState<Form | null>(null);
-  const [showFormBuilder, setShowFormBuilder] = useState(false);
+  const [builderForm, setBuilderForm] = useState<Form | null>(null);
   const [showSubmissionsViewer, setShowSubmissionsViewer] = useState(false);
   const [showCreateFormDialog, setShowCreateFormDialog] = useState(false);
   const [formToDelete, setFormToDelete] = useState<Form | null>(null);
   const [formForRegistrationLink, setFormForRegistrationLink] = useState<Form | null>(null);
-  const [selectedGuestTypeId, setSelectedGuestTypeId] = useState<number | null>(null);
-  const [newFormName, setNewFormName] = useState('');
-  const [newFormDescription, setNewFormDescription] = useState('');
-  const [createFormStep, setCreateFormStep] = useState<1 | 2>(1);
-  const [selectedFields, setSelectedFields] = useState<CreateFormFieldRequest[]>([]);
+  const [createTypeId, setCreateTypeId] = useState<number | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -147,95 +118,6 @@ export const FormsList: React.FC<FormsListProps> = ({
     retry: 1,
   });
 
-  // Create form with fields mutation (for two-step wizard)
-  const createFormWithFieldsMutation = useMutation({
-    mutationFn: async (data: {
-      name: string;
-      description?: string;
-      guest_type_id: number;
-      fields: CreateFormFieldRequest[];
-    }) => {
-      try {
-        // First create the form
-        const form = await formApi.createForm(eventId, {
-          event_id: eventId,
-          name: data.name,
-          description: data.description,
-          guest_type_id: data.guest_type_id,
-        });
-
-        // Then create all fields
-        if (data.fields.length > 0) {
-          const fieldPromises = data.fields.map((field, index) => {
-            // Ensure all required fields are properly formatted
-            const fieldData: CreateFormFieldRequest = {
-              field_type: field.field_type,
-              label: field.label,
-              placeholder: field.placeholder || '',
-              is_required: field.is_required || false,
-              order: index + 1,
-              page_number: field.page_number || 1,
-            };
-
-            // Only include options if they exist
-            if (field.options && field.options.length > 0) {
-              fieldData.options = field.options;
-            }
-
-            return formFieldApi.createField(form.id, fieldData);
-          });
-
-          await Promise.all(fieldPromises);
-        }
-
-        // Return the form with fields loaded
-        return formApi.getForm(form.id);
-      } catch (error: any) {
-        // Log detailed error information
-        console.error('Error in createFormWithFieldsMutation:', error);
-        console.error('Error response:', error?.response?.data);
-        console.error('Request data:', data);
-        throw error;
-      }
-    },
-    onSuccess: (newForm) => {
-      queryClient.invalidateQueries({ queryKey: ['event-forms', eventId] });
-      toast.success('Form created successfully with fields!');
-      setShowCreateFormDialog(false);
-      setCreateFormStep(1);
-      setSelectedFields([]);
-      setSelectedForm(newForm);
-      setShowFormBuilder(true);
-      setNewFormName('');
-      setNewFormDescription('');
-      setSelectedGuestTypeId(null);
-    },
-    onError: (error: any) => {
-      console.error('Failed to create form:', error);
-      console.error('Error response:', error?.response?.data);
-      const errorMessage = error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Failed to create form';
-
-      // Handle specific error cases
-      if (errorMessage.includes('already exists') || errorMessage.includes('already exists for this guest type')) {
-        toast.info('This guest type already has a form. Opening it to edit.');
-        if (selectedGuestTypeId) {
-          formApi.getFormByGuestType(eventId, selectedGuestTypeId).then((existing) => {
-            setShowCreateFormDialog(false);
-            setCreateFormStep(1);
-            setSelectedForm(existing);
-            setShowFormBuilder(true);
-          }).catch(() => {
-            toast.error('A form already exists for this guest type. Edit it from the list.');
-          });
-        }
-      } else if (errorMessage.includes('Integrity constraint') || errorMessage.includes('UNIQUE constraint')) {
-        toast.error('A form with these details already exists. Please check for duplicate forms.');
-      } else {
-        toast.error(`Failed to create form: ${errorMessage}`);
-      }
-    }
-  });
-
   // Delete form mutation
   const deleteFormMutation = useMutation({
     mutationFn: (formId: number) => formApi.deleteForm(formId),
@@ -281,8 +163,7 @@ export const FormsList: React.FC<FormsListProps> = ({
   });
 
   const handleEditForm = (form: Form) => {
-    setSelectedForm(form);
-    setShowFormBuilder(true);
+    setBuilderForm(form);
   };
 
   const handleViewSubmissions = (form: Form) => {
@@ -298,134 +179,24 @@ export const FormsList: React.FC<FormsListProps> = ({
     setFormToDelete(form);
   };
 
+  const openCreateDialog = (guestTypeId: number | null = null) => {
+    setCreateTypeId(guestTypeId);
+    setShowCreateFormDialog(true);
+  };
+
+  // Each guest type has one form: open it if it exists, otherwise start a new one.
   const handleCreateFormForGuestType = (guestTypeId: number) => {
     const existingForm = forms?.find(f => f.guest_type_id === guestTypeId);
     if (existingForm) {
-      // If form exists, open it for editing instead
-      setSelectedForm(existingForm);
-      setShowFormBuilder(true);
+      setBuilderForm(existingForm);
     } else {
-      // If no form exists, open create dialog
-      setSelectedGuestTypeId(guestTypeId);
-      const guestType = availableTypes.find(gt => gt.id === guestTypeId);
-      setNewFormName(`${guestType?.name || (isTicketed ? 'Ticket' : 'Guest')} Registration Form`);
-      setShowCreateFormDialog(true);
+      openCreateDialog(guestTypeId);
     }
   };
 
-  const handleCreateForm = () => {
-    if (!selectedGuestTypeId || !newFormName.trim()) {
-      return;
-    }
-
-    const existingForm = forms?.find((f) => f.guest_type_id === selectedGuestTypeId);
-    if (existingForm) {
-      toast.info('This guest type already has a form. Opening it to edit.');
-      setShowCreateFormDialog(false);
-      setCreateFormStep(1);
-      setSelectedForm(existingForm);
-      setShowFormBuilder(true);
-      return;
-    }
-
-    // If we're on step 2, create form with fields
-    if (createFormStep === 2) {
-      createFormWithFieldsMutation.mutate({
-        name: newFormName.trim(),
-        description: newFormDescription.trim() || undefined,
-        guest_type_id: selectedGuestTypeId,
-        fields: selectedFields,
-      });
-    } else {
-      // Step 1: Move to step 2
-      setCreateFormStep(2);
-    }
-  };
-
-  const handleBackToStep1 = () => {
-    setCreateFormStep(1);
-  };
-
-  const handleAddCommonField = (fieldType: FieldType, label: string, placeholder?: string) => {
-    const newField: CreateFormFieldRequest = {
-      field_type: fieldType,
-      label,
-      placeholder: placeholder || '',
-      is_required: false,
-      order: selectedFields.length + 1,
-      page_number: 1,
-      options: fieldType === 'select' || fieldType === 'radio' || fieldType === 'checkbox'
-        ? [{ label: 'Option 1', value: 'option1' }]
-        : undefined,
-    };
-    setSelectedFields([...selectedFields, newField]);
-  };
-
-  const handleAddCustomField = () => {
-    const newField: CreateFormFieldRequest = {
-      field_type: 'text',
-      label: 'New Field',
-      placeholder: '',
-      is_required: false,
-      order: selectedFields.length + 1,
-      page_number: 1,
-    };
-    setSelectedFields([...selectedFields, newField]);
-  };
-
-  const handleUpdateField = (index: number, updates: Partial<CreateFormFieldRequest>) => {
-    const updatedFields = [...selectedFields];
-    updatedFields[index] = { ...updatedFields[index], ...updates };
-    setSelectedFields(updatedFields);
-  };
-
-  const handleAddOption = (fieldIndex: number) => {
-    const updatedFields = [...selectedFields];
-    const currentOptions = updatedFields[fieldIndex].options || [];
-    updatedFields[fieldIndex] = {
-      ...updatedFields[fieldIndex],
-      options: [...currentOptions, { label: `Option ${currentOptions.length + 1}`, value: `option${currentOptions.length + 1}` }]
-    };
-    setSelectedFields(updatedFields);
-  };
-
-  const handleUpdateOption = (fieldIndex: number, optionIndex: number, updates: { label?: string; value?: string }) => {
-    const updatedFields = [...selectedFields];
-    const currentOptions = updatedFields[fieldIndex].options || [];
-    currentOptions[optionIndex] = { ...currentOptions[optionIndex], ...updates };
-    updatedFields[fieldIndex] = {
-      ...updatedFields[fieldIndex],
-      options: currentOptions
-    };
-    setSelectedFields(updatedFields);
-  };
-
-  const handleRemoveOption = (fieldIndex: number, optionIndex: number) => {
-    const updatedFields = [...selectedFields];
-    const currentOptions = updatedFields[fieldIndex].options || [];
-    updatedFields[fieldIndex] = {
-      ...updatedFields[fieldIndex],
-      options: currentOptions.filter((_, i) => i !== optionIndex)
-    };
-    setSelectedFields(updatedFields);
-  };
-
-  const handleRemoveField = (index: number) => {
-    setSelectedFields(selectedFields.filter((_, i) => i !== index));
-  };
-
-  const handleMoveField = (index: number, direction: 'up' | 'down') => {
-    const newFields = [...selectedFields];
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex >= 0 && newIndex < newFields.length) {
-      [newFields[index], newFields[newIndex]] = [newFields[newIndex], newFields[index]];
-      // Update order
-      newFields.forEach((field, i) => {
-        field.order = i + 1;
-      });
-      setSelectedFields(newFields);
-    }
-  };
+  const takenTypeIds = (forms ?? [])
+    .map((form) => form.guest_type_id)
+    .filter((id): id is number => typeof id === 'number');
 
   // Group forms by guest type - only include guest types that have forms
   const formsByGuestType = React.useMemo(() => {
@@ -540,7 +311,7 @@ export const FormsList: React.FC<FormsListProps> = ({
             Retry
           </Button>
           <Button
-            onClick={() => setShowCreateFormDialog(true)}
+            onClick={() => openCreateDialog()}
             disabled={availableTypes.length === 0}
           >
             <Plus className="w-4 h-4 mr-2" />
@@ -571,7 +342,7 @@ export const FormsList: React.FC<FormsListProps> = ({
         </div>
         <Button
           className="flex items-center gap-2"
-          onClick={() => setShowCreateFormDialog(true)}
+          onClick={() => openCreateDialog()}
         >
           <Plus className="w-4 h-4" />
           Create New Form
@@ -745,7 +516,7 @@ export const FormsList: React.FC<FormsListProps> = ({
                 validation rules, and badge field mapping.
               </p>
               <Button
-                onClick={() => setShowCreateFormDialog(true)}
+                onClick={() => openCreateDialog()}
                 className="flex items-center gap-2 mx-auto"
                 disabled={availableTypes.length === 0}
               >
@@ -763,40 +534,7 @@ export const FormsList: React.FC<FormsListProps> = ({
       )}
 
       {/* Form Builder Dialog */}
-      <Dialog modal={false} open={showFormBuilder} onOpenChange={setShowFormBuilder}>
-        <DialogContent
-          className="flex h-[90vh] w-[95vw] max-w-6xl flex-col gap-0 overflow-hidden p-0"
-          onPointerDownOutside={(event) => {
-            const target = event.target as HTMLElement | null;
-            if (target?.closest('[data-radix-popper-content-wrapper]')) event.preventDefault();
-          }}
-          onInteractOutside={(event) => {
-            const target = event.target as HTMLElement | null;
-            if (target?.closest('[data-radix-popper-content-wrapper]')) event.preventDefault();
-          }}
-        >
-          <DialogHeader className="sr-only">
-            <DialogTitle>
-              {selectedForm ? `Edit: ${selectedForm.name}` : 'Create New Form'}
-            </DialogTitle>
-          </DialogHeader>
-          {selectedForm && (
-            <FormBuilder
-              formId={selectedForm.id}
-              eventId={eventId}
-              onSave={() => {
-                setShowFormBuilder(false);
-                setSelectedForm(null);
-                queryClient.invalidateQueries({ queryKey: ['event-forms', eventId] });
-              }}
-              onCancel={() => {
-                setShowFormBuilder(false);
-                setSelectedForm(null);
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <FormBuilderDialog form={builderForm} eventId={eventId} onClose={() => setBuilderForm(null)} />
 
       {/* Submissions Viewer Dialog */}
       <Dialog open={showSubmissionsViewer} onOpenChange={setShowSubmissionsViewer}>
@@ -1174,475 +912,24 @@ export const FormsList: React.FC<FormsListProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Create Form Dialog - Two Step Wizard */}
-      <Dialog open={showCreateFormDialog} onOpenChange={(open) => {
-        if (!open) {
+      {/* Create Form Dialog */}
+      <CreateFormDialog
+        open={showCreateFormDialog}
+        onOpenChange={setShowCreateFormDialog}
+        eventId={eventId}
+        types={availableTypes}
+        typeLabel={isTicketed ? 'Ticket type' : 'Guest type'}
+        takenTypeIds={takenTypeIds}
+        defaultTypeId={createTypeId}
+        onCreated={(form) => {
           setShowCreateFormDialog(false);
-          setCreateFormStep(1);
-          setSelectedFields([]);
-          setSelectedGuestTypeId(null);
-          setNewFormName('');
-          setNewFormDescription('');
-        } else {
-          setShowCreateFormDialog(open);
-        }
-      }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>
-              Create New Registration Form
-            </DialogTitle>
-            <DialogDescription asChild>
-              <div className="flex items-center gap-2 mt-2">
-                <div className={`flex items-center gap-2 ${createFormStep === 1 ? 'text-primary' : 'text-muted-foreground'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${createFormStep === 1 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                    1
-                  </div>
-                  <span className="text-sm font-medium">Form Details</span>
-                </div>
-                <div className="h-px w-8 bg-border" />
-                <div className={`flex items-center gap-2 ${createFormStep === 2 ? 'text-primary' : 'text-muted-foreground'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${createFormStep === 2 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                    2
-                  </div>
-                  <span className="text-sm font-medium">Add Fields</span>
-                </div>
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto">
-            {createFormStep === 1 ? (
-              /* Step 1: Form Details */
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="guest-type">{typeLabel} *</Label>
-                  <Select
-                    value={selectedGuestTypeId?.toString() || ''}
-                    onValueChange={(value) => setSelectedGuestTypeId(parseInt(value))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={`Select a ${typeLabel.toLowerCase()}`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableTypes.map(gt => {
-                        const existingForm = forms?.find(f => f.guest_type_id === gt.id);
-                        return (
-                          <SelectItem key={gt.id} value={gt.id.toString()}>
-                            {gt.name}
-                            {existingForm && (
-                              <span className="text-xs text-muted-foreground ml-2">(Form exists)</span>
-                            )}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  {selectedGuestTypeId && forms?.some(f => f.guest_type_id === selectedGuestTypeId) && (
-                    <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
-                      <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                        ⚠️ A form already exists for this {typeLabel.toLowerCase()}. You can edit the existing form or create a new one (which will require deleting the existing form first).
-                      </p>
-                    </div>
-                  )}
-                  {availableTypes.length === 0 && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      No {typeLabel.toLowerCase()}s found. Please create {typeLabel.toLowerCase()}s for this event first.
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="form-name">Form Name *</Label>
-                  <Input
-                    id="form-name"
-                    value={newFormName}
-                    onChange={(e) => setNewFormName(e.target.value)}
-                    placeholder="e.g., Speaker Registration Form"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="form-description">Description</Label>
-                  <Textarea
-                    id="form-description"
-                    value={newFormDescription}
-                    onChange={(e) => setNewFormDescription(e.target.value)}
-                    placeholder="Optional description for this form"
-                    rows={3}
-                  />
-                </div>
-              </div>
-            ) : (
-              /* Step 2: Add Fields - Modern Redesign */
-              <div className="space-y-6">
-                {/* Header Section */}
-                <div className="border-b pb-4">
-                  <h3 className="text-xl font-semibold mb-2 flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-primary" />
-                    Add Form Fields
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Build your registration form by selecting common fields or creating custom ones
-                  </p>
-                </div>
-
-                {/* Common Fields Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-base font-semibold">Quick Add Fields</Label>
-                    <Badge variant="secondary" className="text-xs">
-                      Click to add
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {[
-                      { type: 'text' as FieldType, label: 'Full Name', icon: Type, placeholder: 'Enter full name', color: 'bg-blue-500' },
-                      { type: 'email' as FieldType, label: 'Email', icon: Mail, placeholder: 'Enter email address', color: 'bg-green-500' },
-                      { type: 'phone' as FieldType, label: 'Phone', icon: Phone, placeholder: 'Enter phone number', color: 'bg-purple-500' },
-                      { type: 'text' as FieldType, label: 'Company', icon: FileText, placeholder: 'Enter company name', color: 'bg-orange-500' },
-                      { type: 'text' as FieldType, label: 'Job Title', icon: FileText, placeholder: 'Enter job title', color: 'bg-pink-500' },
-                      { type: 'date' as FieldType, label: 'Date of Birth', icon: Calendar, placeholder: 'Select date', color: 'bg-indigo-500' },
-                      { type: 'address' as FieldType, label: 'Address', icon: MapPin, placeholder: 'Enter address', color: 'bg-red-500' },
-                      { type: 'textarea' as FieldType, label: 'Bio/Notes', icon: FileText, placeholder: 'Enter bio or notes', color: 'bg-teal-500' },
-                    ].map((field, idx) => {
-                      const IconComponent = field.icon;
-                      const isAdded = selectedFields.some(f => f.label === field.label && f.field_type === field.type);
-                      return (
-                        <Card
-                          key={idx}
-                          className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${isAdded
-                            ? 'border-primary bg-primary/5'
-                            : 'hover:border-primary/50 border-2'
-                            }`}
-                          onClick={() => !isAdded && handleAddCommonField(field.type, field.label, field.placeholder)}
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex flex-col items-center text-center gap-2">
-                              <div className={`w-12 h-12 ${field.color} rounded-xl flex items-center justify-center shadow-sm`}>
-                                <IconComponent className="w-6 h-6 text-white" />
-                              </div>
-                              <div className="flex-1 w-full">
-                                <h4 className="font-medium text-sm mb-1">{field.label}</h4>
-                                <Badge variant="outline" className="text-xs">
-                                  {field.type}
-                                </Badge>
-                              </div>
-                              {isAdded ? (
-                                <div className="flex items-center gap-1 text-primary text-xs mt-1">
-                                  <CheckCircle className="w-3 h-3" />
-                                  <span>Added</span>
-                                </div>
-                              ) : (
-                                <Plus className="w-4 h-4 text-muted-foreground mt-1" />
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Selected Fields List */}
-                {selectedFields.length > 0 ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-base font-semibold flex items-center gap-2">
-                        Form Fields
-                        <Badge variant="secondary" className="ml-2">
-                          {selectedFields.length}
-                        </Badge>
-                      </Label>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleAddCustomField}
-                          className="flex items-center gap-2"
-                        >
-                          <PlusCircle className="w-4 h-4" />
-                          Add Custom Field
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                      {selectedFields.map((field, index) => (
-                        <Card
-                          key={index}
-                          className="group hover:shadow-md transition-all duration-200 border-2 hover:border-primary/30"
-                        >
-                          <CardContent className="p-5">
-                            <div className="flex items-start gap-4">
-                              {/* Drag Handle */}
-                              <div className="flex flex-col items-center gap-1 pt-1">
-                                <GripVertical className="w-5 h-5 text-muted-foreground cursor-move opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <Badge variant="outline" className="text-xs font-mono">
-                                  {index + 1}
-                                </Badge>
-                              </div>
-
-                              {/* Field Content */}
-                              <div className="flex-1 space-y-3">
-                                {/* Label and Type Row */}
-                                <div className="flex items-center gap-3">
-                                  <div className="flex-1">
-                                    <Label className="text-xs text-muted-foreground mb-1 block">Field Label</Label>
-                                    <Input
-                                      value={field.label}
-                                      onChange={(e) => handleUpdateField(index, { label: e.target.value })}
-                                      placeholder="Enter field label"
-                                      className="font-medium"
-                                    />
-                                  </div>
-                                  <div className="w-32">
-                                    <Label className="text-xs text-muted-foreground mb-1 block">Type</Label>
-                                    <Select
-                                      value={field.field_type}
-                                      onValueChange={(value) => {
-                                        const updates: Partial<CreateFormFieldRequest> = { field_type: value as FieldType };
-                                        // Initialize options if changing to select/radio/checkbox
-                                        if ((value === 'select' || value === 'radio' || value === 'checkbox') && !field.options) {
-                                          updates.options = [{ label: 'Option 1', value: 'option1' }];
-                                        }
-                                        // Remove options if changing away from select/radio/checkbox
-                                        if (!['select', 'radio', 'checkbox'].includes(value) && field.options) {
-                                          updates.options = undefined;
-                                        }
-                                        handleUpdateField(index, updates);
-                                      }}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="text">Text</SelectItem>
-                                        <SelectItem value="textarea">Textarea</SelectItem>
-                                        <SelectItem value="email">Email</SelectItem>
-                                        <SelectItem value="phone">Phone</SelectItem>
-                                        <SelectItem value="date">Date</SelectItem>
-                                        <SelectItem value="select">Dropdown</SelectItem>
-                                        <SelectItem value="radio">Radio</SelectItem>
-                                        <SelectItem value="checkbox">Checkbox</SelectItem>
-                                        <SelectItem value="number">Number</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                </div>
-
-                                {/* Placeholder Row */}
-                                <div>
-                                  <Label className="text-xs text-muted-foreground mb-1 block">Placeholder Text</Label>
-                                  <Input
-                                    value={field.placeholder || ''}
-                                    onChange={(e) => handleUpdateField(index, { placeholder: e.target.value })}
-                                    placeholder="Enter placeholder text (optional)"
-                                    className="text-sm"
-                                  />
-                                </div>
-
-                                {/* Options for Select/Dropdown/Radio/Checkbox */}
-                                {(field.field_type === 'select' || field.field_type === 'radio' || field.field_type === 'checkbox') && (
-                                  <div className="space-y-2 pt-2 border-t">
-                                    <div className="flex items-center justify-between">
-                                      <Label className="text-xs text-muted-foreground">Options</Label>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleAddOption(index)}
-                                        className="h-7 text-xs"
-                                      >
-                                        <Plus className="w-3 h-3 mr-1" />
-                                        Add Option
-                                      </Button>
-                                    </div>
-                                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                                      {(field.options || []).map((option, optIndex) => (
-                                        <div key={optIndex} className="flex items-center gap-2">
-                                          <Input
-                                            value={option.label}
-                                            onChange={(e) => handleUpdateOption(index, optIndex, { label: e.target.value })}
-                                            placeholder="Option label"
-                                            className="flex-1 text-sm"
-                                          />
-                                          <Input
-                                            value={option.value}
-                                            onChange={(e) => handleUpdateOption(index, optIndex, { value: e.target.value })}
-                                            placeholder="Option value"
-                                            className="flex-1 text-sm"
-                                          />
-                                          <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleRemoveOption(index, optIndex)}
-                                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                            disabled={(field.options || []).length <= 1}
-                                          >
-                                            <X className="w-4 h-4" />
-                                          </Button>
-                                        </div>
-                                      ))}
-                                      {(!field.options || field.options.length === 0) && (
-                                        <p className="text-xs text-muted-foreground text-center py-2">
-                                          No options added. Click "Add Option" to add choices.
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Options Row */}
-                                <div className="flex items-center justify-between pt-2 border-t">
-                                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={field.is_required || false}
-                                      onChange={(e) => handleUpdateField(index, { is_required: e.target.checked })}
-                                      className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                    />
-                                    <span className="font-medium">Required field</span>
-                                  </label>
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleMoveField(index, 'up')}
-                                      disabled={index === 0}
-                                      className="h-8 w-8 p-0"
-                                      title="Move up"
-                                    >
-                                      <ArrowUp className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleMoveField(index, 'down')}
-                                      disabled={index === selectedFields.length - 1}
-                                      className="h-8 w-8 p-0"
-                                      title="Move down"
-                                    >
-                                      <ArrowDown className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleRemoveField(index)}
-                                      className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                      title="Remove field"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-
-                    {/* Add Custom Field Button at Bottom */}
-                    <div className="pt-2">
-                      <Button
-                        variant="outline"
-                        onClick={handleAddCustomField}
-                        className="w-full flex items-center justify-center gap-2"
-                      >
-                        <PlusCircle className="w-4 h-4" />
-                        Add Another Custom Field
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <Card className="border-2 border-dashed">
-                    <CardContent className="p-12">
-                      <div className="text-center">
-                        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                          <FileText className="w-8 h-8 text-muted-foreground" />
-                        </div>
-                        <h4 className="font-semibold mb-2">No fields added yet</h4>
-                        <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">
-                          Start building your form by selecting quick-add fields above or create a custom field
-                        </p>
-                        <Button
-                          variant="outline"
-                          onClick={handleAddCustomField}
-                          className="flex items-center gap-2 mx-auto"
-                        >
-                          <Wand2 className="w-4 h-4" />
-                          Create Custom Field
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Footer Actions */}
-          <div className="flex justify-between items-center pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (createFormStep === 1) {
-                  setShowCreateFormDialog(false);
-                  setCreateFormStep(1);
-                  setSelectedFields([]);
-                  setSelectedGuestTypeId(null);
-                  setNewFormName('');
-                  setNewFormDescription('');
-                } else {
-                  handleBackToStep1();
-                }
-              }}
-            >
-              {createFormStep === 1 ? 'Cancel' : (
-                <>
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back
-                </>
-              )}
-            </Button>
-            <div className="flex gap-2">
-              {createFormStep === 2 && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    // Skip fields and create form with no fields
-                    createFormWithFieldsMutation.mutate({
-                      name: newFormName.trim(),
-                      description: newFormDescription.trim() || undefined,
-                      guest_type_id: selectedGuestTypeId!,
-                      fields: [],
-                    });
-                  }}
-                  disabled={!selectedGuestTypeId || !newFormName.trim() || createFormWithFieldsMutation.isPending}
-                >
-                  Skip & Create Empty Form
-                </Button>
-              )}
-              <Button
-                onClick={handleCreateForm}
-                disabled={
-                  !selectedGuestTypeId ||
-                  !newFormName.trim() ||
-                  (createFormStep === 2 && createFormWithFieldsMutation.isPending)
-                }
-              >
-                {createFormStep === 1 ? (
-                  <>
-                    Next
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </>
-                ) : (
-                  createFormWithFieldsMutation.isPending ? 'Creating...' : 'Create Form'
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          setBuilderForm(form);
+        }}
+        onExisting={(form) => {
+          setShowCreateFormDialog(false);
+          setBuilderForm(form);
+        }}
+      />
 
     </div>
   );

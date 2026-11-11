@@ -144,8 +144,13 @@ function SignInForm() {
         const { data } = await api.post('/two-factor/verify', {
           code: otp,
           challenge: twoFactor.challenge,
+          remember: rememberMe,
         })
-        completeLogin(data.token, data.user)
+        if (!data.token) {
+          setError({ message: 'Sign-in did not return a session. Try again.' })
+          return
+        }
+        completeLogin(data.token, data.user, data.expires_in)
         return
       }
 
@@ -350,7 +355,6 @@ function SignUpForm() {
       const parts = formData.name.trim().split(/\s+/)
       const first_name = parts[0]
       const last_name = parts.slice(1).join(' ') || parts[0]
-      const role = formData.accountType === 'venue' ? 'venue_admin' : 'organizer_admin'
       const res = await api.post('/register', {
         first_name,
         last_name,
@@ -358,7 +362,7 @@ function SignUpForm() {
         phone: formData.phone || undefined,
         password: formData.password,
         password_confirmation: formData.confirmPassword,
-        role,
+        account_type: formData.accountType,
       })
       persistAuthToken(res.data.token, true, res.data.expires_in)
       setUser(res.data.user)

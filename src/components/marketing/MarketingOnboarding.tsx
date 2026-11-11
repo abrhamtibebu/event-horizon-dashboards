@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, CheckCircle, ChevronRight, ChevronLeft, Sparkles, Mail, BarChart3, BookOpen } from 'lucide-react'
+import { X, CheckCircle, ChevronRight, ChevronLeft, Mail, BarChart3, BookOpen } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,7 +23,7 @@ const TOUR_STEPS = [
     id: 2,
     title: 'Choose a Template',
     description: 'Pick a pre-made template to save time. We have Welcome, Reminder, Promo, and more!',
-    icon: Sparkles,
+    icon: Mail,
     highlight: 'library-view',
   },
   {
@@ -146,7 +146,6 @@ export function MarketingOnboarding({ onClose, onSkip }: MarketingOnboardingProp
 
           <div className="flex flex-col gap-3">
             <Button onClick={handleStartTour} size="lg" className="w-full">
-              <Sparkles className="w-4 h-4 mr-2" />
               Take 2-Minute Tour
             </Button>
             <Button onClick={handleSkip} variant="outline" size="lg" className="w-full">

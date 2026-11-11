@@ -16,7 +16,7 @@ import {
   shouldRefreshToken,
 } from '@/lib/authSession'
 
-export type Role = 'superadmin' | 'admin' | 'organizer_admin' | 'organizer' | 'usher' | 'attendee' | 'venue_admin' | 'venue_staff'
+export type Role = 'superadmin' | 'admin' | 'organizer_admin' | 'organizer' | 'usher' | 'attendee' | 'venue_admin' | 'venue_staff' | 'venue_manager' | 'booking_officer' | 'venue_event_manager' | 'finance_officer' | 'operations_staff' | 'security' | 'venue_client'
 
 interface Organizer {
   id: number

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { fetchPublicInvitation } from '@/lib/api/invitations';
-import { guestFirstName, type PublicInvitation } from '@/types/invitations';
+import { guestFirstName, resolveRsvpAccent, rsvpAccentForeground, type PublicInvitation } from '@/types/invitations';
 import type { SubmissionResult } from '@/types/forms';
 import DynamicFormRenderer from '@/components/public/DynamicFormRenderer';
 import { RsvpLanding } from '@/components/public/RsvpLanding';
@@ -49,11 +49,11 @@ function successUrl(params: {
 
 export default function EventRsvp() {
   const { code = '' } = useParams<{ code: string }>();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const [declined, setDeclined] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const [noCustomForm, setNoCustomForm] = useState(false);
   const trackedRef = useRef(false);
@@ -78,6 +78,7 @@ export default function EventRsvp() {
     try {
       const inv = await fetchPublicInvitation(code);
       setDeclined(inv.rsvp_status === 'declined');
+      setShowForm(inv.rsvp_status === 'accepted' && !inv.attendee && inv.event?.event_type !== 'ticketed');
       setState({ kind: 'ready', invitation: inv });
     } catch (err: unknown) {
       const response = (err as { response?: { status?: number; data?: { reason?: string; data?: { event?: { name?: string } } } } })?.response;
@@ -133,13 +134,6 @@ export default function EventRsvp() {
     }
   }, [invitation, event, navigate]);
 
-  // Ticketed events use the purchase flow.
-  useEffect(() => {
-    if (event?.event_type === 'ticketed') {
-      navigate(`/tickets/purchase/${event.id}?inv=${encodeURIComponent(code)}`, { replace: true });
-    }
-  }, [event, code, navigate]);
-
   const postRsvp = useCallback(
     async (status: 'accepted' | 'declined') => {
       if (!invitation) return;
@@ -147,6 +141,7 @@ export default function EventRsvp() {
       try {
         await api.post('/invitations/rsvp', { invitation_code: invitation.invitation_code, status });
         setDeclined(status === 'declined');
+        if (status === 'declined') setShowForm(false);
         if (status === 'declined') toast.info('Thanks for letting us know.');
       } catch {
         toast.error('Could not save your response. Please try again.');
@@ -157,15 +152,14 @@ export default function EventRsvp() {
     [invitation],
   );
 
-  // ?decline=1 from the email: record the decline immediately.
-  const declineParamHandled = useRef(false);
-  useEffect(() => {
-    if (!invitation || declineParamHandled.current) return;
-    if (searchParams.get('decline') === '1' && !invitation.already_registered && invitation.rsvp_status !== 'declined') {
-      declineParamHandled.current = true;
-      void postRsvp('declined');
+  const acceptInvitation = useCallback(() => {
+    if (!event) return;
+    if (event.event_type === 'ticketed') {
+      navigate(`/tickets/purchase/${event.id}?inv=${encodeURIComponent(code)}`);
+      return;
     }
-  }, [invitation, searchParams, postRsvp]);
+    setShowForm(true);
+  }, [event, code, navigate]);
 
   // No active custom form for this guest type: fall back to the standard form.
   useEffect(() => {
@@ -202,26 +196,28 @@ export default function EventRsvp() {
 
   if (state.kind === 'loading') {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="rsvp-light flex min-h-screen items-center justify-center bg-[#f5f4f0] text-[#1c1917]">
         <div className="text-center">
           <SpinnerInline className="mx-auto" />
-          <p className="mt-4 text-muted-foreground">Opening your invitation…</p>
+          <p className="mt-4 text-[#766e66]">Opening your invitation…</p>
         </div>
       </div>
     );
   }
 
   if (state.kind === 'unavailable') {
-    return <RegistrationUnavailable variant={state.variant} eventName={state.eventName} message={state.message} />;
+    return <div className="rsvp-light"><RegistrationUnavailable forceLight variant={state.variant} eventName={state.eventName} message={state.message} /></div>;
   }
 
   if (!invitation || !event) {
-    return <RegistrationUnavailable variant="not-found" />;
+    return <div className="rsvp-light"><RegistrationUnavailable forceLight variant="not-found" /></div>;
   }
 
-  if ((invitation.rsvp_status === 'accepted' && invitation.attendee) || event.event_type === 'ticketed' || noCustomForm) {
+  const confirmationUsed = Boolean(invitation.qr_single_use && invitation.qr_used_at);
+
+  if ((invitation.rsvp_status === 'accepted' && invitation.attendee) || (confirmationUsed && invitation.attendee) || noCustomForm) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="rsvp-light flex min-h-screen items-center justify-center bg-[#f5f4f0]">
         <SpinnerInline />
       </div>
     );
@@ -231,13 +227,15 @@ export default function EventRsvp() {
   const now = new Date();
   const eventEnd = event.end_date ? new Date(event.end_date) : null;
   if (eventEnd && !Number.isNaN(eventEnd.getTime()) && eventEnd < now) {
-    return <RegistrationUnavailable variant="event-passed" eventName={event.name} eventStartDate={event.start_date} />;
+    return <div className="rsvp-light"><RegistrationUnavailable forceLight variant="event-passed" eventName={event.name} eventStartDate={event.start_date} /></div>;
   }
   if (event.status && event.status !== 'active') {
-    return <RegistrationUnavailable variant="inactive" eventName={event.name} />;
+    return <div className="rsvp-light"><RegistrationUnavailable forceLight variant="inactive" eventName={event.name} /></div>;
   }
 
   const guestTypeName = invitation.guest_type?.name || invitation.invitation_type;
+  const accentColor = resolveRsvpAccent(event.rsvp_page?.accent_color);
+  const accentForeground = rsvpAccentForeground(event.rsvp_page?.accent_color);
 
   return (
     <RsvpLanding
@@ -252,30 +250,42 @@ export default function EventRsvp() {
       guestTypeName={guestTypeName}
       guestFirstName={guestFirstName(invitation.recipient_name)}
       settings={event.rsvp_page}
-      declined={declined}
+      declined={confirmationUsed ? false : declined}
+      accepted={confirmationUsed || showForm}
       rsvpBusy={rsvpBusy}
-      onDecline={() => postRsvp('declined')}
-      onUndecline={() => postRsvp('accepted')}
+      onAccept={acceptInvitation}
+      onBack={confirmationUsed ? undefined : () => setShowForm(false)}
+      onDecline={confirmationUsed ? undefined : () => postRsvp('declined')}
+      onUndecline={confirmationUsed ? undefined : () => postRsvp('accepted')}
     >
-      <div className="bg-slate-50 dark:bg-slate-800/50 rounded-[1.5rem] sm:rounded-[2.5rem] p-6 sm:p-12 border border-slate-100 dark:border-slate-800 shadow-inner">
-        {invitation.guest_type_id ? (
-          <DynamicFormRenderer
-            eventId={event.id}
-            guestTypeId={invitation.guest_type_id}
-            invitationCode={invitation.invitation_code}
-            prefill={{
-              name: invitation.recipient_name,
-              email: invitation.recipient_email,
-              phone: invitation.recipient_phone,
-              company: invitation.guest_details?.company,
-              jobTitle: invitation.guest_details?.job_title,
-              location: invitation.guest_details?.location,
-            }}
-            submitLabel="Confirm RSVP"
-            onSuccess={handleSuccess}
-            onError={(msg) => toast.error(msg)}
-            onFallback={() => setNoCustomForm(true)}
-          />
+      <div className="space-y-5">
+        {confirmationUsed ? (
+          <p className="py-4 text-center text-sm leading-6 text-slate-600">
+            This invitation QR has already been used to confirm the RSVP. It can still be scanned at the gate for check-in.
+          </p>
+        ) : invitation.guest_type_id ? (
+          <>
+            <DynamicFormRenderer
+              eventId={event.id}
+              guestTypeId={invitation.guest_type_id}
+              invitationCode={invitation.invitation_code}
+              prefill={{
+                name: invitation.recipient_name,
+                email: invitation.recipient_email,
+                phone: invitation.recipient_phone,
+                company: invitation.guest_details?.company,
+                jobTitle: invitation.guest_details?.job_title,
+                location: invitation.guest_details?.location,
+              }}
+              submitLabel="Complete RSVP"
+              appearance="invitation"
+              accentColor={accentColor}
+              accentForeground={accentForeground}
+              onSuccess={handleSuccess}
+              onError={(msg) => toast.error(msg)}
+              onFallback={() => setNoCustomForm(true)}
+            />
+          </>
         ) : (
           <LegacyFallback onReady={() => setNoCustomForm(true)} />
         )}

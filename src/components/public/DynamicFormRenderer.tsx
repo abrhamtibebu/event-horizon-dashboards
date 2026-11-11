@@ -22,6 +22,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { evaluateFieldCondition } from '@/lib/conditionalLogic';
+import { ETHIOPIAN_PHONE_MESSAGE, isEthiopianMobilePhone } from '@/lib/ethiopianPhone';
 import { validateFormFieldValue, validatePublicEmail } from '@/lib/inputQuality';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -55,6 +57,11 @@ interface DynamicFormRendererProps {
   };
   /** Label for the final submit button. */
   submitLabel?: string;
+  /** Minimal fields and controls used inside the public RSVP invitation card. */
+  appearance?: 'default' | 'invitation';
+  /** RSVP accent used by navigation and submit actions in invitation appearance. */
+  accentColor?: string;
+  accentForeground?: string;
   onSuccess?: (result: SubmissionResult) => void;
   onError?: (error: string) => void;
   onFallback?: () => void; // Called when no custom form is available
@@ -123,6 +130,9 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   initialValues,
   prefill,
   submitLabel,
+  appearance = 'default',
+  accentColor,
+  accentForeground,
   onSuccess,
   onError,
   onFallback
@@ -253,25 +263,24 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   const validateCurrentPage = (): boolean => {
     if (!formPreview?.fields) return true;
 
-    const currentPageFields = formPreview.fields.filter(field => field.page_number === currentPage);
+    const currentPageFields = formPreview.form.is_multi_page
+      ? formPreview.fields.filter(field => (field.page_number || 1) === currentPage)
+      : formPreview.fields;
     const newErrors: Record<string, string> = {};
 
     currentPageFields.forEach(field => {
       const fieldKey = field.field_key;
       const value = formValues[fieldKey];
 
-      // Check required fields
+      if (field.conditional_logic && !evaluateFieldCondition(field.conditional_logic, formValues, formPreview.fields)) {
+        return;
+      }
+
       if (field.is_required) {
         if (!value || (Array.isArray(value) && value.length === 0) || value === '') {
           newErrors[fieldKey] = `${field.label} is required`;
           return;
         }
-      }
-
-      // Check conditional logic - skip validation if field is hidden
-      if (field.conditional_logic) {
-        const shouldShow = evaluateConditionalLogic(field.conditional_logic, formValues);
-        if (!shouldShow) return; // Skip validation for hidden fields
       }
 
       // Type-specific validation
@@ -304,9 +313,8 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
             break;
 
           case 'phone': {
-            const phoneRegex = /^[\+]?[\d\s\-\(\)]{10,}$/;
-            if (!phoneRegex.test(String(value))) {
-              newErrors[fieldKey] = 'Please enter a valid phone number';
+            if (!isEthiopianMobilePhone(String(value))) {
+              newErrors[fieldKey] = ETHIOPIAN_PHONE_MESSAGE;
             }
             break;
           }
@@ -318,34 +326,13 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const evaluateConditionalLogic = (logic: any, formData: Record<string, any>): boolean => {
-    if (!logic || (typeof logic === 'object' && Object.keys(logic).length === 0)) return true;
-
-    // Supports both 'field_id' and 'field_key' as the identifier
-    const identifier = logic.field_id || logic.field_key;
-    if (!identifier) return true;
-
-    const fieldValue = formData[identifier];
-    if (fieldValue === undefined || fieldValue === null) return false;
-
-    switch (logic.operator) {
-      case 'equals':
-        return fieldValue === logic.value;
-      case 'not_equals':
-        return fieldValue !== logic.value;
-      case 'contains':
-        return String(fieldValue).toLowerCase().includes(String(logic.value).toLowerCase());
-      case 'greater_than':
-        return Number(fieldValue) > Number(logic.value);
-      case 'less_than':
-        return Number(fieldValue) < Number(logic.value);
-      case 'is_empty':
-        return !fieldValue || fieldValue === '';
-      case 'is_not_empty':
-        return fieldValue && fieldValue !== '';
-      default:
-        return true;
-    }
+  const visibleSubmissionValues = () => {
+    const fields = formPreview?.fields ?? [];
+    return Object.fromEntries(Object.entries(formValues).filter(([key]) => {
+      const field = fields.find((item) => item.field_key === key);
+      if (!field?.conditional_logic) return true;
+      return evaluateFieldCondition(field.conditional_logic, formValues, fields);
+    }));
   };
 
   const handleNextPage = () => {
@@ -370,7 +357,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
         // For forms with payment fields, redirect to payment flow
         // This would integrate with the existing payment system
         const submissionData: FormSubmissionRequest = {
-          submission_data: formValues,
+          submission_data: visibleSubmissionValues(),
           invitation_code: invitationCode || undefined
         };
 
@@ -398,7 +385,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
           const formData = new FormData();
           if (invitationCode) formData.append('invitation_code', invitationCode);
           
-          Object.entries(formValues).forEach(([key, value]) => {
+          Object.entries(visibleSubmissionValues()).forEach(([key, value]) => {
             if (value instanceof File) {
               formData.append(`submission_data[${key}]`, value);
             } else if (value !== null && value !== undefined) {
@@ -408,7 +395,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
           submissionData = formData;
         } else {
           submissionData = {
-            submission_data: formValues,
+            submission_data: visibleSubmissionValues(),
             invitation_code: invitationCode || undefined
           };
         }
@@ -442,11 +429,8 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
     const isRequired = field.is_required;
 
     // Check conditional logic
-    if (field.conditional_logic) {
-      const shouldShow = evaluateConditionalLogic(field.conditional_logic, formValues);
-      if (!shouldShow) {
-        return null; // Don't render this field
-      }
+    if (field.conditional_logic && !evaluateFieldCondition(field.conditional_logic, formValues, formPreview?.fields ?? [])) {
+      return null;
     }
 
     const getFieldIcon = (type: string) => {
@@ -459,9 +443,9 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
     };
 
     return (
-      <div key={field.id} className="space-y-2">
-        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-          {getFieldIcon(field.field_type)}
+      <div key={field.id} className="space-y-1.5">
+        <Label className={appearance === 'invitation' ? 'text-xs font-normal text-[#766e66] flex items-center gap-1' : 'text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2'}>
+          {appearance === 'default' && getFieldIcon(field.field_type)}
           {field.label}
           {isRequired && <span className="text-primary">*</span>}
         </Label>
@@ -476,7 +460,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   };
 
   const renderFieldInput = (field: FormField, value: any, fieldKey: string) => {
-    const commonClasses = `h-12 rounded-2xl bg-white dark:bg-slate-900 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all ${errors[fieldKey] ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''
+    const commonClasses = `${appearance === 'invitation' ? 'h-10 rounded-none border-0 border-b border-[#ded6cd] bg-transparent px-0 text-sm text-[#302820] shadow-none placeholder:text-[#aaa198] focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-[#a99b8c]' : 'h-12 rounded-2xl bg-white dark:bg-slate-900 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10'} transition-all ${errors[fieldKey] ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''
       }`;
 
     switch (field.field_type) {
@@ -513,7 +497,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
             value={value || ''}
             onChange={(e) => handleInputChange(fieldKey, e.target.value)}
             placeholder={field.placeholder}
-            className={`rounded-2xl bg-white dark:bg-slate-900 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all min-h-[100px] ${errors[fieldKey] ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''
+            className={`${appearance === 'invitation' ? 'rounded-none border-0 border-b border-[#ded6cd] bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 focus-visible:border-[#a99b8c]' : 'rounded-2xl bg-white dark:bg-slate-900 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10'} transition-all min-h-[100px] ${errors[fieldKey] ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''
               }`}
             required={field.is_required}
           />
@@ -528,9 +512,9 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
             <SelectTrigger className={commonClasses}>
               <SelectValue placeholder={field.placeholder || 'Select an option'} />
             </SelectTrigger>
-            <SelectContent className="rounded-2xl">
+            <SelectContent className={appearance === 'invitation' ? 'rounded-xl border border-[#e7e1d8] bg-white text-[#302820]' : 'rounded-2xl'}>
               {(field.fieldOptions || (field as any).field_options || []).map((option: any) => (
-                <SelectItem key={option.id} value={option.option_value} className="rounded-xl">
+                <SelectItem key={option.id} value={option.option_value} className={appearance === 'invitation' ? 'rounded-lg text-[#302820] focus:bg-[#f5f4f0] focus:text-[#302820]' : 'rounded-xl'}>
                   {option.option_label}
                 </SelectItem>
               ))}
@@ -540,11 +524,13 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
 
       case 'radio':
         return (
-          <div className="grid grid-cols-1 gap-3">
+          <div className={appearance === 'invitation' ? 'grid grid-cols-1' : 'grid grid-cols-1 gap-3'}>
             {(field.fieldOptions || (field as any).field_options || []).map((option: any) => (
               <label
                 key={option.id}
-                className={`flex items-center gap-3 p-4 rounded-3xl border-2 transition-all cursor-pointer ${value === option.option_value
+                className={appearance === 'invitation'
+                  ? `flex cursor-pointer items-center gap-3 border-b border-[#ded6cd] py-2.5 text-sm text-[#302820] ${value === option.option_value ? 'font-medium' : ''}`
+                  : `flex items-center gap-3 p-4 rounded-3xl border-2 transition-all cursor-pointer ${value === option.option_value
                   ? 'border-primary bg-primary/5 text-primary shadow-lg shadow-primary/5 scale-[1.01]'
                   : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 hover:border-primary/30'
                   }`}
@@ -555,9 +541,9 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                   value={option.option_value}
                   checked={value === option.option_value}
                   onChange={(e) => handleInputChange(fieldKey, e.target.value)}
-                  className="w-5 h-5 text-primary accent-primary"
+                  className={appearance === 'invitation' ? 'h-4 w-4 accent-[#302820]' : 'w-5 h-5 text-primary accent-primary'}
                 />
-                <span className="text-sm font-bold">{option.option_label}</span>
+                <span className={appearance === 'invitation' ? '' : 'text-sm font-bold'}>{option.option_label}</span>
               </label>
             ))}
           </div>
@@ -565,11 +551,13 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
 
       case 'checkbox':
         return (
-          <div className="grid grid-cols-1 gap-3">
+          <div className={appearance === 'invitation' ? 'grid grid-cols-1' : 'grid grid-cols-1 gap-3'}>
             {(field.fieldOptions || (field as any).field_options || []).map((option: any) => (
               <label
                 key={option.id}
-                className={`flex items-center gap-3 p-4 rounded-3xl border-2 transition-all cursor-pointer ${(value || []).includes(option.option_value)
+                className={appearance === 'invitation'
+                  ? 'flex cursor-pointer items-center gap-3 border-b border-[#ded6cd] py-2.5 text-sm text-[#302820]'
+                  : `flex items-center gap-3 p-4 rounded-3xl border-2 transition-all cursor-pointer ${(value || []).includes(option.option_value)
                   ? 'border-primary bg-primary/5 text-primary shadow-lg shadow-primary/5 scale-[1.01]'
                   : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 hover:border-primary/30'
                   }`}
@@ -580,7 +568,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                   onCheckedChange={(checked) => handleCheckboxChange(fieldKey, option.option_value, !!checked)}
                   className="w-5 h-5"
                 />
-                <span className="text-sm font-bold">{option.option_label}</span>
+                <span className={appearance === 'invitation' ? '' : 'text-sm font-bold'}>{option.option_label}</span>
               </label>
             ))}
           </div>
@@ -609,7 +597,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
             value={value || ''}
             onChange={(e) => handleInputChange(fieldKey, e.target.value)}
             placeholder={field.placeholder || 'Enter full address'}
-            className={`rounded-2xl bg-white dark:bg-slate-900 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10 transition-all min-h-[80px] ${errors[fieldKey] ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''
+            className={`${appearance === 'invitation' ? 'rounded-none border-0 border-b border-[#ded6cd] bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 focus-visible:border-[#a99b8c]' : 'rounded-2xl bg-white dark:bg-slate-900 border-transparent focus:bg-white dark:focus:bg-slate-700 focus:ring-4 focus:ring-primary/10'} transition-all min-h-[80px] ${errors[fieldKey] ? 'ring-2 ring-red-500/20 bg-red-50/30' : ''
               }`}
             required={field.is_required}
           />
@@ -648,8 +636,8 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   // Error state
   if (formsError) {
     return (
-      <div className="p-8 rounded-3xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800">
-        <div className="flex items-center gap-4 text-red-600 dark:text-red-400">
+      <div className={appearance === 'invitation' ? 'rounded-2xl border border-red-100 bg-red-50 p-6' : 'p-8 rounded-3xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800'}>
+        <div className={appearance === 'invitation' ? 'flex items-center gap-4 text-red-600' : 'flex items-center gap-4 text-red-600 dark:text-red-400'}>
           <AlertCircle className="w-6 h-6" />
           <div>
             <p className="font-bold text-sm uppercase tracking-tight">Form Error</p>
@@ -680,8 +668,8 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   // Preview error
   if (previewError) {
     return (
-      <div className="p-8 rounded-3xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800">
-        <div className="flex items-center gap-4 text-red-600 dark:text-red-400">
+      <div className={appearance === 'invitation' ? 'rounded-2xl border border-red-100 bg-red-50 p-6' : 'p-8 rounded-3xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800'}>
+        <div className={appearance === 'invitation' ? 'flex items-center gap-4 text-red-600' : 'flex items-center gap-4 text-red-600 dark:text-red-400'}>
           <AlertCircle className="w-6 h-6" />
           <div>
             <p className="font-bold text-sm uppercase tracking-tight">Configuration Error</p>
@@ -706,7 +694,8 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   const progress = (currentPage / totalPages) * 100;
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className={`animate-fade-in ${appearance === 'invitation' ? 'space-y-6' : 'space-y-8'}`}>
+      {appearance === 'default' && <>
       <div>
         <div className="flex items-center justify-between mb-2">
           <div>
@@ -736,36 +725,46 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
           </p>
         </div>
       )}
+      </>}
+
+      {appearance === 'invitation' && formPreview.form.is_multi_page && totalPages > 1 && (
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs text-[#766e66]"><span>Registration details</span><span>Step {currentPage} of {totalPages}</span></div>
+          <Progress value={progress} className="h-1 bg-[#eee8e1]" />
+        </div>
+      )}
 
       {errors.general && (
-        <Alert variant="destructive" className="rounded-2xl bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800">
+        <Alert variant="destructive" className={appearance === 'invitation' ? 'rounded-2xl border-red-100 bg-red-50 text-[#302820]' : 'rounded-2xl bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800'}>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription className="font-bold text-xs uppercase tracking-tight">{errors.general}</AlertDescription>
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 gap-6">
+      <div className={`grid grid-cols-1 ${appearance === 'invitation' ? 'gap-5' : 'gap-6'}`}>
         {currentPageFields.map(field => renderField(field))}
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-6 border-t border-slate-100 dark:border-slate-800">
+      <div className={`flex flex-col gap-4 ${appearance === 'invitation' ? 'pt-1' : 'sm:flex-row sm:items-center justify-between pt-6 border-t border-slate-100 dark:border-slate-800'}`}>
         <Button
           type="button"
           variant="ghost"
           onClick={handlePrevPage}
           disabled={currentPage === 1}
-          className="rounded-xl h-12 px-6 font-bold text-slate-500 hover:text-primary transition-all disabled:opacity-0 w-full sm:w-auto order-2 sm:order-1"
+          className={`${appearance === 'invitation' ? (currentPage === 1 ? 'hidden' : 'h-12 rounded-full border px-6') : 'rounded-xl h-12 px-6 font-bold text-slate-500 hover:text-primary transition-all disabled:opacity-0 w-full sm:w-auto order-2 sm:order-1'}`}
+          style={appearance === 'invitation' ? { color: accentColor || 'hsl(var(--color-primary))', borderColor: accentColor || 'hsl(var(--color-primary))' } : undefined}
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
 
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto order-1 sm:order-2">
+        <div className={`flex gap-3 w-full ${appearance === 'default' ? 'flex-col sm:flex-row sm:w-auto order-1 sm:order-2' : 'flex-col sm:flex-row'}`}>
           {currentPage < totalPages ? (
             <Button
               type="button"
               onClick={handleNextPage}
-              className="h-12 px-8 rounded-2xl bg-primary hover:bg-primary-hover text-white font-bold shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98] w-full"
+              className={`${appearance === 'invitation' ? 'h-12 rounded-full px-8 font-medium' : 'h-12 px-8 rounded-2xl bg-primary hover:bg-primary-hover text-white font-bold shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]'} w-full`}
+              style={appearance === 'invitation' ? { backgroundColor: accentColor || 'hsl(var(--color-primary))', color: accentForeground || '#16120e' } : undefined}
             >
               Next Step
               <ArrowRight className="w-4 h-4 ml-2" />
@@ -775,7 +774,8 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
               type="button"
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="h-12 px-10 rounded-2xl bg-primary hover:bg-primary-hover text-white font-extrabold shadow-2xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 w-full"
+              className={`${appearance === 'invitation' ? 'h-12 rounded-full px-8 font-medium' : 'h-12 px-10 rounded-2xl bg-primary hover:bg-primary-hover text-white font-extrabold shadow-2xl shadow-primary/30 transition-all hover:scale-[1.02] active:scale-[0.98]'} disabled:opacity-70 w-full`}
+              style={appearance === 'invitation' ? { backgroundColor: accentColor || 'hsl(var(--color-primary))', color: accentForeground || '#16120e' } : undefined}
             >
               {isSubmitting ? (
                 <div className="flex items-center gap-2">

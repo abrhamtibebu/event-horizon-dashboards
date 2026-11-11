@@ -56,7 +56,7 @@ import { useUnreadCount } from '@/hooks/use-messages'
 
 export default function OrganizerDashboard() {
   const [dashboardData, setDashboardData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { searchQuery } = useOutletContext<{ searchQuery: string }>()
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
@@ -195,7 +195,8 @@ export default function OrganizerDashboard() {
     }
   }
   useEffect(() => {
-    fetchDashboardData()
+    const timer = setTimeout(fetchDashboardData, 6000)
+    return () => clearTimeout(timer)
   }, [])
 
 
@@ -272,9 +273,9 @@ export default function OrganizerDashboard() {
   };
 
   useEffect(() => {
-    if (user) {
-      fetchRecentActivities();
-    }
+    if (!user) return
+    const timer = setTimeout(fetchRecentActivities, 18000)
+    return () => clearTimeout(timer)
   }, [user]);
 
 
@@ -289,15 +290,17 @@ export default function OrganizerDashboard() {
     const start = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1)
     const end = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0)
 
-    // Always use real data
+    const timer = setTimeout(() => {
     api.get('/organizer/events', {
         params: {
           start_date: start.toISOString().slice(0, 10),
           end_date: end.toISOString().slice(0, 10),
         },
       })
-      .then((res) => setMonthEvents(res.data))
+      .then((res) => setMonthEvents(Array.isArray(res.data) ? res.data : []))
       .catch(() => setMonthEvents([]))
+    }, 18000)
+    return () => clearTimeout(timer)
   }, [calendarMonth])
 
   // Fetch events for selected date
@@ -380,11 +383,17 @@ export default function OrganizerDashboard() {
     try {
       // Always use real data
       const res = await api.get('/events');
-        console.log('[Dashboard] Fetched events:', res.data.length)
+        const payload = res.data
+        const eventList = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : []
+        console.log('[Dashboard] Fetched events:', eventList.length)
         console.log('[Dashboard] User organizer_id:', user?.organizer_id)
 
         // Filter events to only show those belonging to current organizer
-        const filteredEvents = res.data.filter((event: any) => {
+        const filteredEvents = eventList.filter((event: any) => {
           // If user has organizer_id, only show events from their organization
           if (user?.organizer_id) {
             const matches = event.organizer_id === user.organizer_id
@@ -498,10 +507,7 @@ export default function OrganizerDashboard() {
     const fetchAnalytics = async () => {
       try {
         // Always use real data
-        const [summaryRes, eventsRes] = await Promise.all([
-          api.get('/reports/summary'),
-          api.get('/events'),
-        ]);
+        const summaryRes = await api.get('/reports/summary');
 
           if (!isMounted) return;
 
@@ -518,13 +524,8 @@ export default function OrganizerDashboard() {
           }
 
           // Event popularity (top events by attendance) using transformer
-          if (metrics.top_events_by_attendance && Array.isArray(eventsRes.data)) {
-            const eventIdToName: Record<string, string> = {};
-            eventsRes.data.forEach((event: any) => {
-              eventIdToName[String(event.id)] = event.name;
-            });
-            const topEvents = transformTopEvents(metrics.top_events_by_attendance, eventIdToName);
-            setEventPopularity(topEvents.map(e => ({ name: e.name, attendees: e.attendees })));
+          if (metrics.top_events_by_attendance) {
+            setEventPopularity(transformTopEvents(metrics.top_events_by_attendance, {}).map(e => ({ name: e.name, attendees: e.attendees })));
           } else {
             setEventPopularity([]);
           }
@@ -545,7 +546,7 @@ export default function OrganizerDashboard() {
   }, [showError]);
 
   // Loading skeletons
-  if (loading) {
+  if (eventsLoading && allEvents.length === 0 && !dashboardData) {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="h-10 w-1/3 bg-muted rounded mb-4" />
@@ -559,10 +560,9 @@ export default function OrganizerDashboard() {
       </div>
     )
   }
-  if (error) return <div className="text-destructive">{error}</div>
-  if (!dashboardData) return <div className="text-muted-foreground">No dashboard data available.</div>
+  if (error && !dashboardData && allEvents.length === 0) return <div className="text-destructive">{error}</div>
 
-  const { keyMetrics, eventPerformance, myEvents, recentMessages, upcomingTasks, events, ushers } = dashboardData
+  const { keyMetrics, eventPerformance = [], myEvents = [], recentMessages = [], upcomingTasks = [], events = [], ushers = [] } = dashboardData || {}
 
   // Helper function to get chart data based on zoom level
   const getChartDataByZoomLevel = (data: any[], level: '3months' | '6months' | '1year') => {

@@ -12,7 +12,7 @@ import {
 import { TimelineDataPoint } from '@/types/reports';
 import { getChartStyles, getChartColors, formatChartDate, formatCurrency } from '@/utils/reportTransformers';
 import { ChartEmptyState } from './ChartEmptyState';
-import { DollarSign } from 'lucide-react';
+import { BarChart3 } from 'lucide-react';
 
 interface RevenueLineChartProps {
   data: TimelineDataPoint[];
@@ -37,9 +37,9 @@ export const RevenueLineChart: React.FC<RevenueLineChartProps> = ({
   if (!data || data.length === 0) {
     return (
       <ChartEmptyState
-        icon={DollarSign}
-        message="No revenue data available"
-        description="Revenue data will appear here once available"
+        icon={BarChart3}
+        message={dataKey === 'revenue' ? 'No revenue data available' : 'No data available'}
+        description="This chart fills in when the report has a series"
       />
     );
   }

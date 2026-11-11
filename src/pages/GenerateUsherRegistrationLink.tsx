@@ -20,8 +20,6 @@ import {
   Copy,
   CheckCircle2,
   ExternalLink,
-  Sparkles,
-  Zap,
   Settings,
   MessageSquare,
   CalendarDays,
@@ -366,9 +364,8 @@ export default function GenerateUsherRegistrationLink() {
 
           {/* Quick Templates */}
           <div className="flex flex-wrap gap-2 mt-4">
-            <span className="text-sm text-muted-foreground flex items-center gap-2">
-              <Zap className="w-4 h-4" />
-              Quick Templates:
+            <span className="text-sm text-muted-foreground">
+              Quick templates
             </span>
             {FORM_TEMPLATES.map((template) => (
               <Button

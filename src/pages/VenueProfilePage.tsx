@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ImageIcon, MapPin, Save, Sparkles, Trash2 } from 'lucide-react'
+import { ImageIcon, MapPin, Save, Trash2, Copy, ExternalLink, Code2, Download, Wifi, CarFront, Presentation, MicVocal, Utensils, Snowflake, Trees, Accessibility, Check } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,8 +16,18 @@ import { toast } from 'sonner'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
+import { getSharePreviewBaseURL, getVenuePublicSiteURL } from '@/config/env'
 
 const AMENITY_OPTIONS = ['Wi‑Fi', 'Parking', 'AV / projector', 'Stage', 'Catering', 'Air conditioning', 'Outdoor space', 'Accessibility']
+const AMENITY_ICONS = [Wifi, CarFront, Presentation, MicVocal, Utensils, Snowflake, Trees, Accessibility]
+const LISTING_SECTIONS = [
+  { key: 'identity', label: 'Identity', hint: 'Venue details' },
+  { key: 'location', label: 'Location', hint: 'Where to find you' },
+  { key: 'hours', label: 'Hours', hint: 'Availability' },
+  { key: 'amenities', label: 'Amenities', hint: 'What you offer' },
+  { key: 'photos', label: 'Photos', hint: 'Show your space' },
+  { key: 'visibility', label: 'Visibility', hint: 'Publish your listing' },
+] as const
 
 const DAYS = [
   { key: 'monday', label: 'Monday' },
@@ -38,6 +49,7 @@ export default function VenueProfilePage() {
   const isAdmin = user?.role === 'venue_admin' || user?.role === 'admin' || user?.role === 'superadmin'
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [activeSection, setActiveSection] = useState<(typeof LISTING_SECTIONS)[number]['key']>('identity')
   const [venue, setVenue] = useState<Venue | null>(null)
   const [form, setForm] = useState({
     name: '',
@@ -118,6 +130,11 @@ export default function VenueProfilePage() {
       toast.error('Only venue admins can edit the profile')
       return
     }
+    if (!form.name.trim()) {
+      setActiveSection('identity')
+      toast.error('Add a venue name before saving')
+      return
+    }
     setSaving(true)
     try {
       const data = new FormData()
@@ -158,6 +175,18 @@ export default function VenueProfilePage() {
   const cover = bannerPreview || venue?.banner_url
   const mark = logoPreview || venue?.logo_url
   const spaceCount = venue?.spaces_count ?? venue?.spaces?.length ?? 0
+  const publicBase = getVenuePublicSiteURL()
+  const reservationUrl = venue ? `${publicBase}/venues/${venue.id}?utm_source=direct_link&utm_medium=share#venue-request-form` : ''
+  const embedUrl = venue ? `${publicBase}/embed/venues/${venue.id}?utm_source=website_embed&utm_medium=iframe` : ''
+  const socialUrl = venue ? `${getSharePreviewBaseURL()}/share/venues/${venue.id}?utm_source=social&utm_medium=share` : ''
+  const copyShareValue = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      toast.success(`${label} copied`)
+    } catch {
+      toast.error('Could not access clipboard. Copy the link manually.')
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -180,15 +209,46 @@ export default function VenueProfilePage() {
         }
       />
 
+      <div className="rounded-2xl border border-border bg-background p-3 shadow-sm sm:p-4">
+        <div className="mb-3 flex items-center justify-between gap-3 px-1">
+          <div>
+            <p className="text-sm font-semibold">Listing setup</p>
+            <p className="text-xs text-muted-foreground">A few details make it easier for organizers to choose your venue.</p>
+          </div>
+          <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">{LISTING_SECTIONS.findIndex((section) => section.key === activeSection) + 1} of {LISTING_SECTIONS.length}</span>
+        </div>
+        <div className="mb-3 h-1 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${((LISTING_SECTIONS.findIndex((section) => section.key === activeSection) + 1) / LISTING_SECTIONS.length) * 100}%` }} />
+        </div>
+        <nav aria-label="Listing sections" className="flex gap-2 overflow-x-auto pb-1">
+          {LISTING_SECTIONS.map((section, index) => {
+            const selected = activeSection === section.key
+            const visited = index < LISTING_SECTIONS.findIndex((item) => item.key === activeSection)
+            return (
+              <button
+                key={section.key}
+                type="button"
+                aria-current={selected ? 'step' : undefined}
+                onClick={() => setActiveSection(section.key)}
+                className={cn('flex min-w-[148px] shrink-0 items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors sm:min-w-0 sm:flex-1', selected ? 'border-primary/30 bg-primary/[0.07] text-foreground' : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/50')}
+              >
+                <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold', selected ? 'bg-primary text-primary-foreground' : visited ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>{index + 1}</span>
+                <span className="min-w-0"><span className={cn('block text-sm font-medium', selected && 'text-primary')}>{section.label}</span><span className="hidden truncate text-[11px] sm:block">{section.hint}</span></span>
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <form id="venue-profile-form" onSubmit={save} className="space-y-6">
           <fieldset disabled={!isAdmin} className="space-y-6 disabled:opacity-80">
-            <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-semibold tracking-tight">Identity</h2>
+            <section id="listing-identity" hidden={activeSection !== 'identity'} className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+              <div className="mb-6 border-b border-border pb-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Section 01</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Tell organizers about your venue</h2><p className="mt-1 text-sm text-muted-foreground">Start with the details people will use to recognize and contact you.</p></div>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Name</Label>
-                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
@@ -211,8 +271,8 @@ export default function VenueProfilePage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-semibold tracking-tight">Location</h2>
+            <section id="listing-location" hidden={activeSection !== 'location'} className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+              <div className="mb-6 border-b border-border pb-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Section 02</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Where can guests find you?</h2><p className="mt-1 text-sm text-muted-foreground">A precise location helps organizers plan transport and timing.</p></div>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Address</Label>
@@ -237,8 +297,8 @@ export default function VenueProfilePage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-semibold tracking-tight">Hours</h2>
+            <section id="listing-hours" hidden={activeSection !== 'hours'} className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+              <div className="mb-6 border-b border-border pb-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Section 03</p><h2 className="mt-1 text-2xl font-semibold tracking-tight">Set your opening hours</h2><p className="mt-1 text-sm text-muted-foreground">Let organizers know when they can visit or get in touch.</p></div>
               <div className="space-y-3">
                 {DAYS.map((day) => {
                   const row = openingHours[day.key] || { open: '09:00', close: '18:00', closed: false }
@@ -276,42 +336,71 @@ export default function VenueProfilePage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <h2 className="text-lg font-semibold tracking-tight">Amenities</h2>
+            <section id="listing-amenities" hidden={activeSection !== 'amenities'} className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+              <div className="border-b border-border bg-gradient-to-br from-primary/[0.07] via-card to-card px-6 py-5 sm:px-7">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-xl border border-primary/15 bg-background p-2.5 text-primary shadow-sm"><ImageIcon className="h-5 w-5" /></div>
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-primary">Your listing</p>
+                      <h2 className="text-xl font-semibold tracking-tight">Amenities</h2>
+                      <p className="mt-1 max-w-lg text-sm text-muted-foreground">Help organizers find the right fit by highlighting what your venue offers.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 self-center">
+                    <Badge variant="secondary" className="rounded-full px-3 py-1 tabular-nums">{amenities.length} selected</Badge>
+                    {amenities.length > 0 && isAdmin ? (
+                      <button type="button" onClick={() => setAmenities([])} className="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Clear all</button>
+                    ) : null}
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {AMENITY_OPTIONS.map((item) => {
-                  const checked = amenities.includes(item)
-                  return (
-                    <label
-                      key={item}
-                      className={cn(
-                        'flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition-colors',
-                        checked
-                          ? 'border-primary/40 bg-primary/10 font-medium text-foreground'
-                          : 'border-border bg-muted/20 text-muted-foreground',
-                        isAdmin && 'cursor-pointer hover:border-primary/30',
-                      )}
-                    >
-                      <Checkbox
-                        checked={checked}
-                        onCheckedChange={(value) => {
-                          setAmenities((prev) => (value ? [...prev, item] : prev.filter((a) => a !== item)))
-                        }}
-                      />
-                      {item}
-                    </label>
-                  )
-                })}
+              <div className="p-5 sm:p-7">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {AMENITY_OPTIONS.map((item, index) => {
+                    const checked = amenities.includes(item)
+                    const AmenityIcon = AMENITY_ICONS[index]
+                    return (
+                      <label
+                        key={item}
+                        className={cn(
+                          'group relative flex min-h-[86px] items-center gap-3 rounded-xl border p-4 transition-all',
+                          checked
+                            ? 'border-primary/40 bg-primary/[0.07] shadow-sm shadow-primary/5'
+                            : 'border-border bg-background hover:border-primary/30 hover:bg-muted/30',
+                          isAdmin && 'cursor-pointer',
+                        )}
+                      >
+                        <span className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors', checked ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground group-hover:text-foreground')}>
+                          <AmenityIcon className="h-5 w-5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium text-foreground">{item}</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">{checked ? 'Included in your listing' : 'Add to your listing'}</span>
+                        </span>
+                        <Checkbox
+                          checked={checked}
+                          aria-label={item}
+                          className="sr-only"
+                          onCheckedChange={(value) => {
+                            setAmenities((prev) => (value ? [...prev, item] : prev.filter((a) => a !== item)))
+                          }}
+                        />
+                        <span aria-hidden="true" className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors', checked ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background')}>
+                          {checked ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+                <p className="mt-4 text-xs text-muted-foreground">Only select amenities that are available to guests at your venue.</p>
               </div>
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <section id="listing-photos" hidden={activeSection !== 'photos'} className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
               <div className="mb-4 flex items-center gap-2">
                 <ImageIcon className="h-4 w-4 text-primary" />
-                <h2 className="text-lg font-semibold tracking-tight">Media</h2>
+                  <h2 className="text-lg font-semibold tracking-tight">Photos</h2>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -349,12 +438,22 @@ export default function VenueProfilePage() {
                 ) : (
                   <p className="text-sm text-muted-foreground">No gallery photos yet.</p>
                 )}
-                <Input type="file" accept="image/*" multiple onChange={(e) => setPhotos(e.target.files)} />
+                <label
+                  className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    if (e.dataTransfer.files?.length) setPhotos(e.dataTransfer.files)
+                  }}
+                >
+                  Drop gallery photos here, or click to choose
+                  <input className="sr-only" type="file" accept="image/*" multiple onChange={(e) => setPhotos(e.target.files)} />
+                </label>
                 <AttachedImagePreview files={photos} />
               </div>
             </section>
 
-            <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <section id="listing-visibility" hidden={activeSection !== 'visibility'} className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-semibold tracking-tight">Visibility</h2>
@@ -364,6 +463,15 @@ export default function VenueProfilePage() {
               </div>
             </section>
           </fieldset>
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card/80 p-3 sm:p-4">
+            <Button type="button" variant="outline" disabled={activeSection === LISTING_SECTIONS[0].key} onClick={() => setActiveSection(LISTING_SECTIONS[Math.max(0, LISTING_SECTIONS.findIndex((section) => section.key === activeSection) - 1)].key)}>Previous</Button>
+            <p className="hidden text-xs text-muted-foreground sm:block">Your changes are saved when you click Save listing.</p>
+            {activeSection === LISTING_SECTIONS[LISTING_SECTIONS.length - 1].key ? (
+              isAdmin ? <Button type="submit" disabled={saving} className="bg-brand-gradient bg-brand-gradient-hover text-foreground shadow-lg"><Save className="mr-2 h-4 w-4" />{saving ? 'Saving…' : 'Save listing'}</Button> : <span className="text-sm text-muted-foreground">Listing setup complete</span>
+            ) : (
+              <Button type="button" onClick={() => setActiveSection(LISTING_SECTIONS[LISTING_SECTIONS.findIndex((section) => section.key === activeSection) + 1].key)}>Continue</Button>
+            )}
+          </div>
         </form>
 
         <aside className="xl:sticky xl:top-6">
@@ -404,6 +512,24 @@ export default function VenueProfilePage() {
           </div>
         </aside>
       </div>
+
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <div className="mb-5 flex items-start gap-3">
+          <div className="rounded-xl bg-primary/10 p-2.5 text-primary"><Code2 className="h-5 w-5" /></div>
+          <div><h2 className="text-lg font-semibold">Share & embed</h2><p className="text-sm text-muted-foreground">Send clients to your reservation request or add it to your website.</p></div>
+        </div>
+        {!isListed ? <p className="mb-4 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-800">Publish your listing before sharing it with clients.</p> : null}
+        <div className="grid gap-6 lg:grid-cols-[1fr_auto]">
+          <div className="space-y-4">
+            <div className="space-y-2"><Label>Reservation link</Label><div className="flex gap-2"><Input readOnly value={reservationUrl} /><Button type="button" variant="outline" onClick={() => void copyShareValue(reservationUrl, 'Reservation link')}><Copy className="mr-2 h-4 w-4"/>Copy</Button><a href={reservationUrl} target="_blank" rel="noreferrer" aria-label="Open reservation link" className="inline-flex h-10 items-center rounded-md border px-3"><ExternalLink className="h-4 w-4"/></a></div></div>
+            <div className="space-y-2"><Label>Social preview link</Label><div className="flex gap-2"><Input readOnly value={socialUrl} /><Button type="button" variant="outline" onClick={() => void copyShareValue(socialUrl, 'Social link')}><Copy className="mr-2 h-4 w-4"/>Copy</Button><a href={`https://wa.me/?text=${encodeURIComponent(`${form.name || venue?.name} — Request a venue space: ${reservationUrl}`)}`} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center rounded-md border px-3 text-sm">WhatsApp</a></div></div>
+            <div className="space-y-2"><Label>Website embed code</Label><Textarea readOnly rows={3} value={`<iframe src="${embedUrl}" title="${form.name || venue?.name} reservation form" width="100%" height="760" loading="lazy" style="border:0;border-radius:16px" referrerpolicy="strict-origin-when-cross-origin"></iframe>`}/><Button type="button" variant="outline" onClick={() => void copyShareValue(`<iframe src="${embedUrl}" title="${form.name || venue?.name} reservation form" width="100%" height="760" loading="lazy" style="border:0;border-radius:16px" referrerpolicy="strict-origin-when-cross-origin"></iframe>`, 'Embed code')}><Copy className="mr-2 h-4 w-4"/>Copy embed code</Button></div>
+            <p className="text-xs text-muted-foreground">The embed shows a request form. The venue confirms availability and booking separately.</p>
+          </div>
+          <div className="flex flex-col items-center gap-3 rounded-xl border p-4"><QRCodeSVG id="venue-reservation-qr" value={reservationUrl || publicBase} size={172} title="Venue reservation QR code"/><span className="text-sm font-medium">Scan to request</span><Button type="button" size="sm" variant="outline" onClick={() => { const svg=document.getElementById('venue-reservation-qr'); if (!svg) return; const blob=new Blob([new XMLSerializer().serializeToString(svg)],{type:'image/svg+xml;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='venue-reservation-qr.svg'; a.click(); URL.revokeObjectURL(url) }}><Download className="mr-2 h-4 w-4"/>Download QR</Button></div>
+        </div>
+      </section>
+
     </div>
   )
 }

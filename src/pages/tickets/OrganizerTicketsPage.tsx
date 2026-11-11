@@ -26,7 +26,7 @@ import { TicketFormModal } from './components/TicketFormModal';
 import { TicketActionsMenu } from './components/TicketActionsMenu';
 import { getTicketSales, getOrganizerSalesSummary } from '@/lib/api/tickets';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
-import { Plus, Search, DollarSign, Ticket, TrendingUp, AlertCircle, Edit, Sparkles, Trash2, Download, Users } from 'lucide-react';
+import { Plus, Search, DollarSign, Ticket, TrendingUp, AlertCircle, Edit, Trash2, Download, Users } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
@@ -377,8 +377,8 @@ export default function OrganizerTicketsPage() {
                                 <Button variant="ghost" size="icon" onClick={() => handleEditTicket(ticketType)}>
                                   <Edit className="w-4 h-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleSavePreset(ticketType)} title="Save as Preset">
-                                  <Sparkles className="w-4 h-4 text-amber-500" />
+                                <Button variant="ghost" size="sm" onClick={() => handleSavePreset(ticketType)}>
+                                  Save preset
                                 </Button>
                                 <TicketActionsMenu
                                   ticketType={ticketType}
@@ -541,8 +541,7 @@ export default function OrganizerTicketsPage() {
                   <div className="space-y-4 pt-2">
                     {salesSummary?.total_revenue > 0 ? (
                       <>
-                        <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 flex items-start gap-4">
-                          <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                        <div className="rounded-xl border border-border bg-muted/40 p-4">
                           <div>
                             <p className="font-bold text-sm text-primary">High Performing</p>
                             <p className="text-xs text-muted-foreground mt-1">Global ecosystem revenue is reaching new peaks today.</p>

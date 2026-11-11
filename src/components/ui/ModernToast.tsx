@@ -6,8 +6,6 @@ import {
   AlertTriangle, 
   Info, 
   X,
-  Sparkles,
-  Zap,
   Shield,
   Heart,
   MessageCircle,
@@ -38,17 +36,11 @@ const getToastIcon = (variant: string) => {
   switch (variant) {
     case 'success':
       return (
-        <div className="relative">
-          <CheckCircle className="h-5 w-5 text-success animate-pulse" />
-          <Sparkles className="h-3 w-3 text-success absolute -top-1 -right-1 animate-bounce" />
-        </div>
+        <CheckCircle className="h-5 w-5 text-success" />
       );
     case 'error':
       return (
-        <div className="relative">
-          <XCircle className="h-5 w-5 text-error animate-pulse" />
-          <Zap className="h-3 w-3 text-error absolute -top-1 -right-1 animate-bounce" />
-        </div>
+        <XCircle className="h-5 w-5 text-error" />
       );
     case 'warning':
       return (
@@ -66,18 +58,12 @@ const getToastIcon = (variant: string) => {
         );
     case 'message':
       return (
-        <div className="relative">
-          <MessageCircle className="h-5 w-5 text-info animate-pulse" />
-          <Sparkles className="h-3 w-3 text-info absolute -top-1 -right-1 animate-bounce" />
-        </div>
+        <MessageCircle className="h-5 w-5 text-info" />
       );
     case 'info':
     default:
       return (
-        <div className="relative">
-          <Info className="h-5 w-5 text-info animate-pulse" />
-          <Sparkles className="h-3 w-3 text-info absolute -top-1 -right-1 animate-bounce" />
-        </div>
+        <Info className="h-5 w-5 text-info" />
       );
   }
 };

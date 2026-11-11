@@ -161,6 +161,11 @@ export default function UsherEventManagement() {
   // QR Scanner state
   const [qrScannerOpen, setQrScannerOpen] = useState(false);
   const [qrScanning, setQrScanning] = useState(false);
+  const [declinedCheckIn, setDeclinedCheckIn] = useState<{
+    identifier: string;
+    message: string;
+    guest?: { name?: string | null; email?: string | null; phone?: string | null; guest_type?: string | null };
+  } | null>(null);
 
   const requiredHeaders = [
     'name',
@@ -743,6 +748,16 @@ export default function UsherEventManagement() {
     try {
       // Call the check-in API with the UUID from QR code
       const response = await checkInByQR(Number(eventId), uuid.trim());
+
+      if (response.data?.requires_confirmation || response.data?.validation_status === 'rsvp_declined') {
+        setDeclinedCheckIn({
+          identifier: uuid.trim(),
+          message: response.data.message || 'RSVP declined',
+          guest: response.data.guest,
+        });
+        setQrScannerOpen(false);
+        return;
+      }
       
       if (response.data) {
         const attendee = response.data.attendee;
@@ -1221,6 +1236,46 @@ export default function UsherEventManagement() {
               {addAttendeeLoading ? 'Processing...' : 'Complete Registration'}
             </Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={declinedCheckIn !== null} onOpenChange={(open) => { if (!open) setDeclinedCheckIn(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>RSVP declined</DialogTitle>
+            <DialogDescription>
+              {declinedCheckIn?.message || 'This guest declined the RSVP.'} Check them in only if the person in front of you matches this invitation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1 text-sm">
+            <p className="font-semibold">{declinedCheckIn?.guest?.name || 'Invited guest'}</p>
+            {declinedCheckIn?.guest?.email && <p className="text-muted-foreground">{declinedCheckIn.guest.email}</p>}
+            {declinedCheckIn?.guest?.phone && <p className="text-muted-foreground">{declinedCheckIn.guest.phone}</p>}
+            {declinedCheckIn?.guest?.guest_type && <p className="text-xs uppercase tracking-widest text-muted-foreground">{declinedCheckIn.guest.guest_type}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeclinedCheckIn(null)}>Not this guest</Button>
+            <Button
+              disabled={qrScanning || !declinedCheckIn}
+              onClick={async () => {
+                if (!declinedCheckIn || !eventId) return;
+                setQrScanning(true);
+                try {
+                  const response = await checkInByQR(Number(eventId), declinedCheckIn.identifier, true);
+                  const attendee = response.data?.attendee;
+                  showSuccess('Check-in Successful', `${attendee?.guest?.name || declinedCheckIn.guest?.name || 'Guest'} has been checked in successfully!`);
+                  setDeclinedCheckIn(null);
+                  await fetchAttendeesWithFilters();
+                } catch (err: any) {
+                  showError('Check-in Failed', err.response?.data?.message || err.response?.data?.error || 'Failed to check in attendee.');
+                } finally {
+                  setQrScanning(false);
+                }
+              }}
+            >
+              Check in anyway
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

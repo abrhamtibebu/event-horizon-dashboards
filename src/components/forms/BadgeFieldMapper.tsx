@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Plus,
   Trash2,
-  Zap,
   Link as LinkIcon,
   Unlink,
   RefreshCw,
@@ -233,10 +232,8 @@ export const BadgeFieldMapper: React.FC<BadgeFieldMapperProps> = ({
             variant="outline"
             onClick={handleAutoSuggest}
             disabled={suggestMappingsMutation.isPending}
-            className="flex items-center gap-2"
           >
-            <Zap className="w-4 h-4" />
-            {suggestMappingsMutation.isPending ? 'Suggesting...' : 'Auto Suggest'}
+            {suggestMappingsMutation.isPending ? 'Suggesting...' : 'Auto suggest'}
           </Button>
           {onClose && (
             <Button variant="outline" onClick={onClose}>
@@ -250,7 +247,7 @@ export const BadgeFieldMapper: React.FC<BadgeFieldMapperProps> = ({
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Badge placeholders (like {{name}}, {{company}}) will be replaced with form data when generating badges.
+          Badge placeholders (like {'{{name}}'}, {'{{company}}'}) will be replaced with form data when generating badges.
           Map your form fields to create personalized badges automatically.
         </AlertDescription>
       </Alert>

@@ -14,6 +14,8 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+import { evaluateFieldCondition } from '@/lib/conditionalLogic';
+import { ETHIOPIAN_PHONE_MESSAGE, isEthiopianMobilePhone } from '@/lib/ethiopianPhone';
 import type { Form, FormField, TestSubmissionResult } from '@/types/forms';
 import { formPreviewApi } from '@/lib/api/forms';
 
@@ -241,31 +243,8 @@ export const FormPreview: React.FC<FormPreviewProps> = ({
     }
   };
 
-  const evaluateConditionalLogic = (logic: any, formData: Record<string, any>): boolean => {
-    if (!logic) return true;
-
-    const fieldValue = formData[logic.field_id];
-    if (fieldValue === undefined || fieldValue === null) return false;
-
-    switch (logic.operator) {
-      case 'equals':
-        return fieldValue === logic.value;
-      case 'not_equals':
-        return fieldValue !== logic.value;
-      case 'contains':
-        return String(fieldValue).toLowerCase().includes(String(logic.value).toLowerCase());
-      case 'greater_than':
-        return Number(fieldValue) > Number(logic.value);
-      case 'less_than':
-        return Number(fieldValue) < Number(logic.value);
-      case 'is_empty':
-        return !fieldValue || fieldValue === '';
-      case 'is_not_empty':
-        return fieldValue && fieldValue !== '';
-      default:
-        return true;
-    }
-  };
+  const evaluateConditionalLogic = (logic: any, formData: Record<string, any>): boolean =>
+    evaluateFieldCondition(logic, formData, fields);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -274,18 +253,15 @@ export const FormPreview: React.FC<FormPreviewProps> = ({
       const fieldKey = field.field_key;
       const value = formValues[fieldKey];
 
-      // Check required fields
+      if (field.conditional_logic && !evaluateConditionalLogic(field.conditional_logic, formValues)) {
+        return;
+      }
+
       if (field.is_required) {
         if (!value || (Array.isArray(value) && value.length === 0) || value === '') {
           newErrors[fieldKey] = `${field.label} is required`;
           return;
         }
-      }
-
-      // Check conditional logic - skip validation if field is hidden
-      if (field.conditional_logic) {
-        const shouldShow = evaluateConditionalLogic(field.conditional_logic, formValues);
-        if (!shouldShow) return; // Skip validation for hidden fields
       }
 
       // Type-specific validation
@@ -305,10 +281,8 @@ export const FormPreview: React.FC<FormPreviewProps> = ({
             break;
 
           case 'phone':
-            // Basic phone validation - adjust as needed
-            const phoneRegex = /^[\+]?[\d\s\-\(\)]{10,}$/;
-            if (!phoneRegex.test(value)) {
-              newErrors[fieldKey] = 'Please enter a valid phone number';
+            if (!isEthiopianMobilePhone(String(value))) {
+              newErrors[fieldKey] = ETHIOPIAN_PHONE_MESSAGE;
             }
             break;
         }
@@ -363,7 +337,7 @@ export const FormPreview: React.FC<FormPreviewProps> = ({
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onClose}>
             <ArrowLeft className="w-4 h-4 mr-1" />
-            Back to Builder
+            Back to fields
           </Button>
           <Separator orientation="vertical" className="h-6" />
           <div>

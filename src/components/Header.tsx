@@ -14,13 +14,15 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { useAuth } from '@/hooks/use-auth'
+import { isVenueRole } from '@/lib/roles'
 import { useSubscription } from '@/hooks/useSubscription'
 import { SubscriptionStatusBadge } from '@/components/subscription/SubscriptionStatusBadge'
 import { useMessagesTray } from '@/components/messaging/MessagesTrayContext'
 import { useConversations } from '@/hooks/use-messages'
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import api from '@/lib/api'
+import { venueApi } from '@/lib/api/venues'
 
 interface SearchResult {
   type: 'event' | 'user' | 'message'
@@ -32,6 +34,8 @@ interface SearchResult {
 
 export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
   const { user, logout } = useAuth()
+  const location = useLocation()
+  const lockUsherTheme = user?.role === 'usher' || location.pathname.startsWith('/dashboard/usher')
   const { subscription } = useSubscription()
   const { expand } = useMessagesTray()
   const { data: conversationsData = [] } = useConversations()
@@ -41,6 +45,13 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
   const [showSearchResults, setShowSearchResults] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+  const isVenueUser = isVenueRole(user?.role)
+  const [venueSummary, setVenueSummary] = useState<{ name?: string; pending?: number }>({})
+
+  useEffect(() => {
+    if (!isVenueUser) return
+    venueApi.dashboard().then(({ data }) => setVenueSummary({ name: data.venue?.name, pending: data.keyMetrics?.pendingRequests ?? 0 })).catch(() => undefined)
+  }, [isVenueUser])
 
   const conversations = Array.isArray(conversationsData)
     ? conversationsData
@@ -157,7 +168,7 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
     <header className="h-16 border-b bg-background/60 backdrop-blur-xl flex items-center px-6 justify-between sticky top-0 z-50 border-border/50 transition-all duration-300">
       <div className="flex items-center gap-4">
         {/* Enhanced Search with Dropdown */}
-        <div className="relative" ref={searchRef}>
+        {!isVenueUser && <div className="relative" ref={searchRef}>
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             placeholder="Quick search..."
@@ -213,11 +224,18 @@ export function Header({ onSearch }: { onSearch?: (query: string) => void }) {
               <p className="text-sm text-muted-foreground">No results found for "{searchValue}"</p>
             </div>
           )}
-        </div>
+        </div>}
       </div>
       <div className="flex items-center gap-4">
-        {/* Theme Toggle */}
-        <ThemeToggle />
+        {isVenueUser && (
+          <div className="hidden items-center gap-3 sm:flex">
+            <Link to="/dashboard/venue" className="max-w-48 truncate text-sm font-semibold text-foreground">{venueSummary.name || 'Your venue'}</Link>
+            <Link to="/dashboard/venue/inbox" className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              {venueSummary.pending ?? 0} pending
+            </Link>
+          </div>
+        )}
+        {!lockUsherTheme && <ThemeToggle />}
 
         {/* Messages tray trigger */}
         <Button

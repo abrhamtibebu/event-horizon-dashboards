@@ -1021,132 +1021,112 @@ export default function OrganizerProfile() {
         open={editOrganizerDialogOpen}
         onOpenChange={setEditOrganizerDialogOpen}
       >
-        <DialogContent className="max-w-lg w-full">
-          <DialogHeader>
-            <DialogTitle>Edit Organizer</DialogTitle>
+        <DialogContent className="flex max-h-[90vh] w-full max-w-lg flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12">
+            <DialogTitle className="text-base font-semibold">Edit Organizer</DialogTitle>
           </DialogHeader>
           {editOrganizerForm && (
-            <form onSubmit={handleEditOrganizerSubmit} className="space-y-4">
-              <Input
-                placeholder="Organizer Name"
-                value={editOrganizerForm.name}
-                onChange={(e) =>
-                  handleEditOrganizerInput('name', e.target.value)
-                }
-                required
-              />
-              <Input
-                placeholder="Email"
-                value={editOrganizerForm.email}
-                onChange={(e) =>
-                  handleEditOrganizerInput('email', e.target.value)
-                }
-                required
-              />
-              <Input
-                placeholder="Phone"
-                value={editOrganizerForm.phone_number}
-                onChange={(e) =>
-                  handleEditOrganizerInput('phone_number', e.target.value)
-                }
-              />
-              <Input
-                placeholder="Location"
-                value={editOrganizerForm.location}
-                onChange={(e) =>
-                  handleEditOrganizerInput('location', e.target.value)
-                }
-              />
-              <Input
-                placeholder="TIN Number"
-                value={editOrganizerForm.tin_number}
-                onChange={(e) =>
-                  handleEditOrganizerInput('tin_number', e.target.value)
-                }
-              />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Logo</Label>
-                  <Input 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        setSetupLogo(file)
-                        const reader = new FileReader()
-                        reader.onloadend = () => setSetupLogoPreview(reader.result as string)
-                        reader.readAsDataURL(file)
-                      }
-                    }} 
-                  />
-                  {setupLogoPreview && <img src={setupLogoPreview} className="h-16 w-16 object-cover rounded mt-2 shadow-sm border border-border" />}
+            <form onSubmit={handleEditOrganizerSubmit} className="flex min-h-0 flex-col">
+              <div className="max-h-[min(70vh,640px)] space-y-4 overflow-y-auto px-5 py-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Company name</Label>
+                    <Input value={editOrganizerForm.name} onChange={(e) => handleEditOrganizerInput('name', e.target.value)} required />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Email</Label>
+                    <Input type="email" value={editOrganizerForm.email} onChange={(e) => handleEditOrganizerInput('email', e.target.value)} required />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Phone</Label>
+                    <Input value={editOrganizerForm.phone_number} onChange={(e) => handleEditOrganizerInput('phone_number', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>TIN number</Label>
+                    <Input value={editOrganizerForm.tin_number} onChange={(e) => handleEditOrganizerInput('tin_number', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label>Business address</Label>
+                    <Input value={editOrganizerForm.location} onChange={(e) => handleEditOrganizerInput('location', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Logo</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          setSetupLogo(file)
+                          const reader = new FileReader()
+                          reader.onloadend = () => setSetupLogoPreview(reader.result as string)
+                          reader.readAsDataURL(file)
+                        }
+                      }}
+                    />
+                    {setupLogoPreview && <img src={setupLogoPreview} alt="" className="mt-2 h-12 w-12 rounded border border-border object-cover" />}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Banner</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          setSetupBanner(file)
+                          const reader = new FileReader()
+                          reader.onloadend = () => setSetupBannerPreview(reader.result as string)
+                          reader.readAsDataURL(file)
+                        }
+                      }}
+                    />
+                    {setupBannerPreview && <img src={setupBannerPreview} alt="" className="mt-2 h-12 w-24 rounded border border-border object-cover" />}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Banner</Label>
-                  <Input 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        setSetupBanner(file)
-                        const reader = new FileReader()
-                        reader.onloadend = () => setSetupBannerPreview(reader.result as string)
-                        reader.readAsDataURL(file)
-                      }
-                    }} 
-                  />
-                  {setupBannerPreview && <img src={setupBannerPreview} className="h-16 w-32 object-cover rounded mt-2 shadow-sm border border-border" />}
+                <div className="space-y-4 border-t border-border pt-4">
+                  <p className="text-sm font-medium">Details</p>
+                  <div className="space-y-1.5">
+                    <Label>Tagline</Label>
+                    <Input value={editOrganizerForm.tagline || ''} onChange={(e) => handleEditOrganizerInput('tagline', e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Description</Label>
+                    <Textarea value={editOrganizerForm.description || ''} onChange={(e) => handleEditOrganizerInput('description', e.target.value)} rows={3} className="resize-none" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Website</Label>
+                    <Input value={editOrganizerForm.website || ''} onChange={(e) => handleEditOrganizerInput('website', e.target.value)} />
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-4 pt-4 border-t border-border">
-                <h3 className="text-sm font-semibold">Additional Details</h3>
-                <Input
-                  placeholder="Tagline"
-                  value={editOrganizerForm.tagline || ''}
-                  onChange={(e) => handleEditOrganizerInput('tagline', e.target.value)}
-                />
-                <Textarea
-                  placeholder="Description"
-                  value={editOrganizerForm.description || ''}
-                  onChange={(e) => handleEditOrganizerInput('description', e.target.value)}
-                  rows={4}
-                />
-                <Input
-                  placeholder="Website URL"
-                  value={editOrganizerForm.website || ''}
-                  onChange={(e) => handleEditOrganizerInput('website', e.target.value)}
-                />
-              </div>
-              <div className="space-y-4 pt-4 border-t border-border">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest text-[10px]">Social Media</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Input
-                        placeholder="Facebook URL"
-                        value={editOrganizerForm.facebook || ''}
-                        onChange={(e) => handleEditOrganizerInput('facebook', e.target.value)}
-                    />
-                    <Input
-                        placeholder="Twitter URL"
-                        value={editOrganizerForm.twitter || ''}
-                        onChange={(e) => handleEditOrganizerInput('twitter', e.target.value)}
-                    />
-                    <Input
-                        placeholder="Instagram URL"
-                        value={editOrganizerForm.instagram || ''}
-                        onChange={(e) => handleEditOrganizerInput('instagram', e.target.value)}
-                    />
-                    <Input
-                        placeholder="LinkedIn URL"
-                        value={editOrganizerForm.linkedin || ''}
-                        onChange={(e) => handleEditOrganizerInput('linkedin', e.target.value)}
-                    />
+                <div className="space-y-4 border-t border-border pt-4">
+                  <p className="text-sm font-medium">Social links</p>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label>Facebook</Label>
+                      <Input value={editOrganizerForm.facebook || ''} onChange={(e) => handleEditOrganizerInput('facebook', e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Twitter</Label>
+                      <Input value={editOrganizerForm.twitter || ''} onChange={(e) => handleEditOrganizerInput('twitter', e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Instagram</Label>
+                      <Input value={editOrganizerForm.instagram || ''} onChange={(e) => handleEditOrganizerInput('instagram', e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>LinkedIn</Label>
+                      <Input value={editOrganizerForm.linkedin || ''} onChange={(e) => handleEditOrganizerInput('linkedin', e.target.value)} />
+                    </div>
+                  </div>
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="shrink-0 border-t border-border px-5 py-3">
+                <Button type="button" variant="outline" onClick={() => setEditOrganizerDialogOpen(false)} disabled={editOrganizerLoading}>
+                  Cancel
+                </Button>
                 <Button type="submit" disabled={editOrganizerLoading}>
-                  {editOrganizerLoading ? 'Saving...' : 'Save Changes'}
+                  {editOrganizerLoading ? 'Saving...' : 'Save changes'}
                 </Button>
               </DialogFooter>
             </form>

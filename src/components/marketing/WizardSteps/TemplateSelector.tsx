@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Mail, MessageSquare, Sparkles, Check, ArrowRight, Layout, Star } from 'lucide-react'
+import { Mail, MessageSquare, Check, ArrowRight, Layout, Star } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -25,7 +25,7 @@ interface TemplateSelectorProps {
 }
 
 const TEMPLATE_CATEGORIES = [
-  { id: 'welcome', name: 'Welcome', icon: Sparkles, color: 'purple' },
+  { id: 'welcome', name: 'Welcome', icon: Mail, color: 'purple' },
   { id: 'reminder', name: 'Reminder', icon: Mail, color: 'orange' },
   { id: 'promotional', name: 'Promotional', icon: Star, color: 'pink' },
   { id: 'thank_you', name: 'Thank You', icon: Check, color: 'green' },
@@ -72,7 +72,7 @@ export function TemplateSelector({ selectedTemplate, onSelectTemplate, onNext }:
   const getTypeIcon = (type: string) => {
     if (type === 'email') return <Mail className="w-4 h-4" />
     if (type === 'sms') return <MessageSquare className="w-4 h-4" />
-    return <Sparkles className="w-4 h-4" />
+    return null
   }
 
   const getCategoryColor = (category: string) => {

@@ -8,10 +8,10 @@ const statusClass: Record<string, string> = {
   completed: 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/20',
 }
 
-export function VenueStatusBadge({ status }: { status: string }) {
+export function VenueStatusBadge({ status, label }: { status: string; label?: string }) {
   return (
     <Badge variant="outline" className={cn('capitalize', statusClass[status])}>
-      {status}
+      {label || status}
     </Badge>
   )
 }

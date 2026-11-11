@@ -272,6 +272,7 @@ export default function EventDetails() {
   const [isCommunicationDialogOpen, setIsCommunicationDialogOpen] =
     useState(false)
   const [activeTab, setActiveTab] = useState('details')
+  const [showAllGuestTypes, setShowAllGuestTypes] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editForm, setEditForm] = useState<any>(null)
   const [editLoading, setEditLoading] = useState(false)
@@ -2918,63 +2919,25 @@ export default function EventDetails() {
                         )}
                       </div>
                     )}
-                    {/* Simple Overview Cards - Responsive Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                      {/* Event Type Card */}
-                      <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm group hover:border-primary/20 transition-all">
-                        <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-                          <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl bg-primary/10 text-primary shrink-0`}>
-                            {eventData?.event_type === 'ticketed' ? <Ticket className="w-5 h-5 sm:w-6 sm:h-6" /> : <PartyPopper className="w-5 h-5 sm:w-6 sm:h-6" />}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Architecture</p>
-                            <p className={`text-base sm:text-lg font-bold text-foreground truncate`}>
-                              {eventData?.event_type === 'ticketed' ? 'Ticketed' : 'Free'}
-                            </p>
-                          </div>
-                        </div>
-                        <p className="text-xs font-medium text-muted-foreground">
-                          {eventData?.event_type === 'ticketed' ? `${ticketTypes.length} Tiers` : `${guestTypes.length} Categories`}
+                    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                      <div className="rounded-xl border border-border bg-card px-4 py-4">
+                        <p className="text-xs text-muted-foreground">Type</p>
+                        <p className="mt-1 text-lg font-semibold capitalize">{eventData?.event_type === 'ticketed' ? 'Ticketed' : 'Free'}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {eventData?.event_type === 'ticketed' ? `${ticketTypes.length} ticket types` : `${guestTypes.length} guest types`}
                         </p>
                       </div>
-
-                      {/* Status Card */}
-                      <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm group hover:border-primary/20 transition-all">
-                        <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-                          <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl shrink-0 ${eventData?.status === 'active' ? 'bg-emerald-500/10 text-emerald-500' :
-                            eventData?.status === 'draft' ? 'bg-amber-500/10 text-amber-500' :
-                              'bg-destructive/10 text-destructive'
-                            }`}>
-                            {eventData?.status === 'active' ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" /> :
-                              eventData?.status === 'draft' ? <FileEdit className="w-5 h-5 sm:w-6 sm:h-6" /> :
-                                <XCircle className="w-5 h-5 sm:w-6 sm:h-6" />}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Lifecycle</p>
-                            <p className="text-base sm:text-lg font-bold text-foreground capitalize truncate">{eventData?.status || 'Active'}</p>
-                          </div>
-                        </div>
-                        <p className="text-xs font-medium text-muted-foreground">
-                          {eventData?.status === 'active' ? 'Public' : 'Internal'}
-                        </p>
+                      <div className="rounded-xl border border-border bg-card px-4 py-4">
+                        <p className="text-xs text-muted-foreground">Status</p>
+                        <p className="mt-1 text-lg font-semibold capitalize">{eventData?.status || 'Active'}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{eventData?.visibility === 'private' ? 'Private' : 'Public'}</p>
                       </div>
-
-                      {/* Registration Card */}
-                      <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm group hover:border-primary/20 transition-all">
-                        <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-                          <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl bg-primary/10 text-primary shrink-0`}>
-                            <Users className="w-5 h-5 sm:w-6 sm:h-6" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Engagements</p>
-                            <p className="text-base sm:text-lg font-bold text-foreground">
-                              {eventData?.attendee_count ?? eventData?.attendees ?? attendees.length} Registered
-                            </p>
-                          </div>
-                        </div>
-                        <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
+                      <div className="rounded-xl border border-border bg-card px-4 py-4">
+                        <p className="text-xs text-muted-foreground">Registered</p>
+                        <p className="mt-1 text-lg font-semibold">{eventData?.attendee_count ?? eventData?.attendees ?? attendees.length}</p>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                           <div
-                            className="bg-primary h-full transition-all duration-500"
+                            className="h-full bg-primary"
                             style={{
                               width: eventData?.max_guests
                                 ? `${Math.min((((eventData?.attendee_count ?? eventData?.attendees ?? attendees.length) as number) / eventData.max_guests) * 100, 100)}%`
@@ -2983,24 +2946,13 @@ export default function EventDetails() {
                           />
                         </div>
                       </div>
-
-                      {/* Capacity Card */}
-                      <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm group hover:border-primary/20 transition-all">
-                        <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-                          <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl bg-primary/10 text-primary shrink-0`}>
-                            <Layers className="w-5 h-5 sm:w-6 sm:h-6" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Capacity</p>
-                            <p className="text-base sm:text-lg font-bold text-foreground">
-                              {eventData?.max_guests ? `${eventData.max_guests}` : 'Unlimited'}
-                            </p>
-                          </div>
-                        </div>
-                        <p className="text-xs font-medium text-muted-foreground">
+                      <div className="rounded-xl border border-border bg-card px-4 py-4">
+                        <p className="text-xs text-muted-foreground">Capacity</p>
+                        <p className="mt-1 text-lg font-semibold">{eventData?.max_guests ? eventData.max_guests : 'Unlimited'}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
                           {eventData?.max_guests
-                            ? `${Math.max(eventData.max_guests - ((eventData?.attendee_count ?? eventData?.attendees ?? attendees.length) as number), 0)} Left`
-                            : 'Stable'}
+                            ? `${Math.max(eventData.max_guests - ((eventData?.attendee_count ?? eventData?.attendees ?? attendees.length) as number), 0)} remaining`
+                            : 'No guest limit'}
                         </p>
                       </div>
                     </div>
@@ -3010,13 +2962,8 @@ export default function EventDetails() {
                       {/* Main Event Information */}
                       <div className="lg:col-span-2 space-y-4 sm:space-y-6">
                         {/* Event Description */}
-                        <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
-                          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                              <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-                            </div>
-                            <h3 className="text-lg sm:text-xl font-bold text-foreground">Event Description</h3>
-                          </div>
+                        <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+                          <h3 className="mb-4 text-base font-semibold text-foreground">Description</h3>
                           <div className="prose prose-gray max-w-none">
                             {eventData?.description ? (
                               <EventDescription
@@ -3031,54 +2978,32 @@ export default function EventDetails() {
 
                         {/* Event Requirements */}
                         {eventData?.requirements && (
-                          <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
-                            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-                              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-error/10 text-error flex items-center justify-center shrink-0">
-                                <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
-                              </div>
-                              <h3 className="text-lg sm:text-xl font-bold text-foreground">Requirements & Prerequisites</h3>
-                            </div>
-                            <div className="bg-error/5 rounded-xl p-4 sm:p-5 border border-error/10">
-                              <p className="text-foreground leading-relaxed whitespace-pre-line text-sm sm:text-base">
-                                {eventData.requirements}
-                              </p>
-                            </div>
+                          <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+                            <h3 className="mb-3 text-base font-semibold text-foreground">Requirements</h3>
+                            <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">
+                              {eventData.requirements}
+                            </p>
                           </div>
                         )}
 
                         {/* Event Agenda */}
                         {eventData?.agenda && (
-                          <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
-                            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-                              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-info/10 text-info flex items-center justify-center shrink-0">
-                                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />
-                              </div>
-                              <h3 className="text-lg sm:text-xl font-bold text-foreground">Event Agenda</h3>
-                            </div>
-                            <div className="relative pl-6 sm:pl-8 border-l-2 border-info/30 space-y-4 ml-2">
+                          <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+                            <h3 className="mb-3 text-base font-semibold text-foreground">Agenda</h3>
+                            <div className="space-y-2 border-l border-border pl-4">
                               {eventData.agenda.split('\n').filter(Boolean).map((line: string, i: number) => (
-                                <div key={i} className="relative">
-                                  <div className="absolute -left-[31px] sm:-left-[39px] top-1.5 w-3 h-3 rounded-full bg-info border-2 border-background shadow-sm" />
-                                  <p className="text-foreground leading-relaxed text-sm sm:text-base">{line}</p>
-                                </div>
+                                <p key={i} className="text-sm leading-relaxed text-foreground">{line}</p>
                               ))}
                             </div>
                           </div>
                         )}
 
                         {isTicketedEvent && (
-                          <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
-                            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-                              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                                <QrCode className="w-4 h-4 sm:w-5 sm:h-5" />
-                              </div>
-                              <div>
-                                <h3 className="text-lg sm:text-xl font-bold text-foreground">Purchase Links</h3>
-                                <p className="text-xs sm:text-sm text-muted-foreground">
-                                  Share direct ticket purchase links for pre-registration and onsite sales.
-                                </p>
-                              </div>
-                            </div>
+                          <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
+                            <h3 className="text-base font-semibold text-foreground">Purchase links</h3>
+                            <p className="mb-4 mt-1 text-sm text-muted-foreground">
+                              Share direct ticket purchase links for pre-registration and onsite sales.
+                            </p>
 
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                               {[
@@ -3145,278 +3070,101 @@ export default function EventDetails() {
                           </div>
                         )}
 
-                        {/* Event Type Details */}
-                        <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
-                          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary/20 text-primary dark:text-primary flex items-center justify-center shrink-0 text-lg sm:text-xl">
-                              {eventData?.event_type === 'ticketed' ? '🎫' : '🎉'}
-                            </div>
-                            <h3 className="text-lg sm:text-xl font-bold text-foreground">
-                              {eventData?.event_type === 'ticketed' ? 'Ticket Information' : 'Guest Type Information'}
-                            </h3>
-                          </div>
-
+                        <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
                           {eventData?.event_type === 'ticketed' ? (
-                            <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
-                              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                <div>
-                                  <h4 className="text-base font-semibold text-foreground">
-                                    {ticketTypes.length} ticket type{ticketTypes.length === 1 ? '' : 's'} configured
-                                  </h4>
-                                  <p className="mt-1 text-sm text-muted-foreground">
-                                    Manage pricing, inventory, and ticket availability from the Tickets tab.
-                                  </p>
-                                </div>
-                                <Button
-                                  type="button"
-                                  onClick={() => setActiveTab('tickets')}
-                                  disabled={!canManageEvent}
-                                  className="shrink-0"
-                                >
-                                  Manage ticket types
-                                </Button>
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <h3 className="text-base font-semibold text-foreground">Tickets</h3>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  {ticketTypes.length} ticket type{ticketTypes.length === 1 ? '' : 's'}. Pricing and inventory live on the Tickets tab.
+                                </p>
                               </div>
+                              <Button
+                                type="button"
+                                onClick={() => setActiveTab('tickets')}
+                                disabled={!canManageEvent}
+                                className="shrink-0"
+                              >
+                                Manage ticket types
+                              </Button>
                             </div>
                           ) : (
-                            <div className="space-y-4">
+                            <div>
+                              <div className="flex items-center justify-between gap-3">
+                                <h3 className="text-base font-semibold text-foreground">Guest types</h3>
+                                <span className="text-xs text-muted-foreground">{guestTypes.length}</span>
+                              </div>
                               {guestTypes.length > 0 ? (
-                                guestTypes.map((gt: any, index: number) => {
-                                  let guestTypeName = '';
-                                  let guestTypePrice = '';
-                                  let guestTypeDescription = '';
-
-                                  if (typeof gt === 'object' && gt !== null) {
-                                    guestTypeName = gt.name || gt.id || String(gt.id) || 'Unknown';
-                                    guestTypePrice = gt.price ? parseFloat(gt.price).toLocaleString() : '0';
-                                    guestTypeDescription = gt.description || '';
-                                  } else {
-                                    guestTypeName = String(gt);
-                                    guestTypePrice = '0';
-                                  }
-
-                                  return (
-                                    <div key={index} className="bg-primary/5 border border-primary/10 rounded-lg sm:rounded-xl p-4 sm:p-6">
-                                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0 mb-3">
-                                        <div className="flex-1 min-w-0">
-                                          <h4 className="font-bold text-primary text-lg sm:text-xl break-words">{guestTypeName}</h4>
-                                          {guestTypeDescription && (
-                                            <p className="text-muted-foreground text-xs sm:text-sm mt-1 font-medium break-words">{guestTypeDescription}</p>
-                                          )}
-                                        </div>
-                                        <div className="text-left sm:text-right shrink-0">
-                                          <div className="text-xl sm:text-2xl font-bold text-primary">
-                                            {guestTypePrice === '0' ? 'Free' : `ETB ${guestTypePrice}`}
-                                          </div>
-                                          <div className="text-[10px] font-bold uppercase tracking-wider text-primary/60">Guest Type</div>
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-primary/60">
-                                        <Users className="w-3.5 h-3.5" />
-                                        <span>Guest Type</span>
-                                      </div>
-                                    </div>
-                                  );
-                                })
+                                <>
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {(showAllGuestTypes ? guestTypes : guestTypes.slice(0, 8)).map((gt: any, index: number) => {
+                                      const name = typeof gt === 'object' && gt !== null ? (gt.name || 'Guest type') : String(gt)
+                                      const priceValue = typeof gt === 'object' && gt !== null && gt.price ? parseFloat(gt.price) : 0
+                                      const price = !priceValue ? 'Free' : `ETB ${priceValue.toLocaleString()}`
+                                      return (
+                                        <span key={index} className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-sm">
+                                          <span className="font-medium text-foreground">{name}</span>
+                                          <span className="text-muted-foreground">{price}</span>
+                                        </span>
+                                      )
+                                    })}
+                                  </div>
+                                  {guestTypes.length > 8 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="mt-2 h-8 px-2 text-xs"
+                                      onClick={() => setShowAllGuestTypes((open) => !open)}
+                                    >
+                                      {showAllGuestTypes ? 'Show less' : `Show all ${guestTypes.length}`}
+                                    </Button>
+                                  )}
+                                </>
                               ) : (
-                                <div className="text-center py-8 text-muted-foreground">
-                                  <div className="text-4xl mb-2">👥</div>
-                                  <p>No guest types defined for this event</p>
-                                </div>
+                                <p className="mt-3 text-sm text-muted-foreground">No guest types for this event.</p>
                               )}
                             </div>
                           )}
                         </div>
                       </div>
 
-                      {/* Sidebar Information */}
-                      <div className="space-y-4 sm:space-y-6">
-                        {/* Event Details */}
-                        <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 h-fit">
-                          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                              <CalendarDays className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <div className="rounded-xl border border-border bg-card p-4 sm:p-6 h-fit">
+                        <h3 className="text-base font-semibold text-foreground">Schedule</h3>
+                        <dl className="mt-4 space-y-3 text-sm">
+                          {[
+                            ['Starts', eventData?.start_date],
+                            ['Ends', eventData?.end_date],
+                            ['Registration opens', eventData?.registration_start_date],
+                            ['Registration closes', eventData?.registration_end_date],
+                          ].map(([label, value]) => (
+                            <div key={label} className="flex items-start justify-between gap-3">
+                              <dt className="text-muted-foreground">{label}</dt>
+                              <dd className="text-right font-medium text-foreground">
+                                {value ? format(parseISO(value), 'MMM d, yyyy h:mm a') : 'Not set'}
+                              </dd>
                             </div>
-                            <h3 className="text-base sm:text-lg font-bold text-foreground">Event Details</h3>
+                          ))}
+                          <div className="flex items-start justify-between gap-3 border-t border-border pt-3">
+                            <dt className="text-muted-foreground">Location</dt>
+                            <dd className="text-right font-medium text-foreground">{eventData?.location || 'Not set'}</dd>
                           </div>
-
-                          <div className="space-y-3 sm:space-y-4">
-                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Start Date</p>
-                                <p className="text-xs sm:text-sm font-semibold text-foreground">
-                                  {eventData?.start_date && format(parseISO(eventData.start_date), 'MMM d, yyyy')}
-                                </p>
-                                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
-                                  {eventData?.start_date && format(parseISO(eventData.start_date), 'h:mm a')}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">End Date</p>
-                                <p className="text-xs sm:text-sm font-semibold text-foreground">
-                                  {eventData?.end_date && format(parseISO(eventData.end_date), 'MMM d, yyyy')}
-                                </p>
-                                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
-                                  {eventData?.end_date && format(parseISO(eventData.end_date), 'h:mm a')}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Location</p>
-                                <p className="text-xs sm:text-sm font-semibold text-foreground break-words">{eventData?.location}</p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Organizer</p>
-                                <p className="text-xs sm:text-sm font-semibold text-foreground break-words">
-                                  {user?.organizer?.name || eventData?.organizer?.name}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Tag className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Category</p>
-                                <p className="text-xs sm:text-sm font-semibold text-foreground capitalize break-words">
-                                  {eventData?.eventCategory?.name || 'Not specified'}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Tag className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Type Category</p>
-                                <p className="text-xs sm:text-sm font-semibold text-foreground capitalize break-words">
-                                  {eventData?.eventType?.name || 'Not specified'}
-                                </p>
-                              </div>
-                            </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <dt className="text-muted-foreground">Organizer</dt>
+                            <dd className="text-right font-medium text-foreground">{user?.organizer?.name || eventData?.organizer?.name || 'Not set'}</dd>
                           </div>
-                        </div>
-
-                        {/* Registration Period */}
-                        <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6">
-                          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-success/20 text-success dark:text-success flex items-center justify-center shrink-0 text-base sm:text-lg">
-                              ⏰
-                            </div>
-                            <h3 className="text-base sm:text-lg font-bold text-foreground">Registration Period</h3>
+                          <div className="flex items-start justify-between gap-3">
+                            <dt className="text-muted-foreground">Category</dt>
+                            <dd className="text-right font-medium capitalize text-foreground">{eventData?.eventCategory?.name || 'Not specified'}</dd>
                           </div>
-
-                          <div className="space-y-3 sm:space-y-4">
-                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Opens</p>
-                                <p className="text-xs sm:text-sm font-semibold text-foreground">
-                                  {eventData?.registration_start_date && format(parseISO(eventData.registration_start_date), 'MMM d, yyyy')}
-                                </p>
-                                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
-                                  {eventData?.registration_start_date && format(parseISO(eventData.registration_start_date), 'h:mm a')}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-primary/5 rounded-lg border border-primary/10 transition-colors">
-                              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Closes</p>
-                                <p className="text-xs sm:text-sm font-semibold text-foreground">
-                                  {eventData?.registration_end_date && format(parseISO(eventData.registration_end_date), 'MMM d, yyyy')}
-                                </p>
-                                <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
-                                  {eventData?.registration_end_date && format(parseISO(eventData.registration_end_date), 'h:mm a')}
-                                </p>
-                              </div>
-                            </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <dt className="text-muted-foreground">Type</dt>
+                            <dd className="text-right font-medium capitalize text-foreground">{eventData?.eventType?.name || 'Not specified'}</dd>
                           </div>
-                        </div>
+                        </dl>
                       </div>
                     </div>
 
-                    {/* Event & Registration Dates Section */}
-                    {/* <div className="bg-white rounded-xl shadow p-6 mb-8">
-                    <h3 className="text-lg font-bold mb-4 text-gray-800 flex items-center gap-2">
-                      <Calendar className="w-5 h-5 text-purple-500" />
-                      Event & Registration Dates
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <h4 className="font-semibold text-gray-700 mb-2">Event Period</h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-blue-500" />
-                            <span className="font-medium">Start:</span>
-                            <span>{eventData?.start_date && format(parseISO(eventData.start_date), 'MMM d, yyyy, h:mm a')}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-red-500" />
-                            <span className="font-medium">End:</span>
-                            <span>{eventData?.end_date && format(parseISO(eventData.end_date), 'MMM d, yyyy, h:mm a')}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-700 mb-2">Registration Period</h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-green-500" />
-                            <span className="font-medium">Opens:</span>
-                            <span>{eventData?.registration_start_date && format(parseISO(eventData.registration_start_date), 'MMM d, yyyy, h:mm a')}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-orange-500" />
-                            <span className="font-medium">Closes:</span>
-                            <span>{eventData?.registration_end_date && format(parseISO(eventData.registration_end_date), 'MMM d, yyyy, h:mm a')}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div> */}
-
-                    {/* Additional Event Details Section */}
-                    {(eventData?.requirements || eventData?.agenda) && (
-                      <div className="bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 lg:p-8">
-                        <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                            <Info className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </div>
-                          <h3 className="text-lg sm:text-xl font-bold text-foreground">Additional Information</h3>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
-                          {eventData?.requirements && (
-                            <div className="bg-gradient-to-br from-warning/10 to-primary/10 border border-warning/30 rounded-lg sm:rounded-xl p-4 sm:p-6">
-                              <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-                                <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-warning dark:text-warning shrink-0" />
-                                <h4 className="font-bold text-foreground text-sm sm:text-base">Requirements</h4>
-                              </div>
-                              <p className="text-sm sm:text-base text-foreground leading-relaxed whitespace-pre-line break-words">{eventData.requirements}</p>
-                            </div>
-                          )}
-                          {eventData?.agenda && (
-                            <div className="bg-gradient-to-br from-info/10 to-primary/10 border border-info/30 rounded-lg sm:rounded-xl p-4 sm:p-6">
-                              <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-                                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-info dark:text-info shrink-0" />
-                                <h4 className="font-bold text-foreground text-sm sm:text-base">Agenda</h4>
-                              </div>
-                              <p className="text-sm sm:text-base text-foreground leading-relaxed whitespace-pre-line break-words">{eventData.agenda}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </TabsContent>
                 <TabsContent value={ticketHoldersTabValue} className="w-full">
@@ -3982,19 +3730,9 @@ export default function EventDetails() {
                 {!isTicketedEvent && (
                 <TabsContent value="analytics">
                   <div className="min-h-screen bg-background p-6">
-                    {/* Header Section */}
-                    <div className="mb-8">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                          <BarChart3 className="w-6 h-6 text-primary" />
-                        </div>
-                        <div>
-                          <h1 className="text-3xl font-bold text-foreground">
-                            Event Analytics
-                          </h1>
-                          <p className="text-muted-foreground">Comprehensive insights and performance metrics</p>
-                        </div>
-                      </div>
+                    <div className="mb-6">
+                      <h1 className="text-2xl font-semibold text-foreground">Event analytics</h1>
+                      <p className="text-sm text-muted-foreground">Registrations, check-ins, and attendance.</p>
                     </div>
 
                     {analyticsLoading ? (
@@ -4021,59 +3759,28 @@ export default function EventDetails() {
                     ) : analytics ? (
                       <div className="space-y-8">
                         {/* Key Metrics Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                          <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:border-primary/20 transition-all duration-300">
-                            <div className="relative">
-                              <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 bg-info/20 rounded-xl flex items-center justify-center">
-                                  <Users className="w-5 h-5 text-info" />
-                                </div>
-                                <div className="text-sm font-medium text-muted-foreground">Total Registered</div>
-                              </div>
-                              <div className="text-3xl font-bold text-foreground mb-1">{analytics.total_registered}</div>
-                              <div className="text-xs text-muted-foreground">Event attendees</div>
-                            </div>
+                        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                          <div className="rounded-xl border border-border bg-card px-4 py-4">
+                            <p className="text-xs text-muted-foreground">Registered</p>
+                            <p className="mt-1 text-2xl font-semibold tracking-tight">{analytics.total_registered}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">Event attendees</p>
                           </div>
-
-                          <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:border-primary/20 transition-all duration-300">
-                            <div className="relative">
-                              <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 bg-success/20 rounded-xl flex items-center justify-center">
-                                  <CheckCircle className="w-5 h-5 text-success" />
-                                </div>
-                                <div className="text-sm font-medium text-muted-foreground">Checked In</div>
-                              </div>
-                              <div className="text-3xl font-bold text-foreground mb-1">{analytics.total_checked_in}</div>
-                              <div className="text-xs text-muted-foreground">Present attendees</div>
-                            </div>
+                          <div className="rounded-xl border border-border bg-card px-4 py-4">
+                            <p className="text-xs text-muted-foreground">Checked in</p>
+                            <p className="mt-1 text-2xl font-semibold tracking-tight">{analytics.total_checked_in}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">Present attendees</p>
                           </div>
-
-                          <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:border-primary/20 transition-all duration-300">
-                            <div className="relative">
-                              <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
-                                  <TrendingUp className="w-5 h-5 text-primary" />
-                                </div>
-                                <div className="text-sm font-medium text-muted-foreground">Check-in Rate</div>
-                              </div>
-                              <div className="text-3xl font-bold text-foreground mb-1">
-                                {analytics.total_registered ? Math.round((analytics.total_checked_in / analytics.total_registered) * 100) : 0}%
-                              </div>
-                              <div className="text-xs text-muted-foreground">Attendance rate</div>
-                            </div>
+                          <div className="rounded-xl border border-border bg-card px-4 py-4">
+                            <p className="text-xs text-muted-foreground">Check-in rate</p>
+                            <p className="mt-1 text-2xl font-semibold tracking-tight">
+                              {analytics.total_registered ? Math.round((analytics.total_checked_in / analytics.total_registered) * 100) : 0}%
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">Attendance rate</p>
                           </div>
-
-                          <div className="group relative overflow-hidden bg-card rounded-2xl shadow-sm border border-border p-6 hover:border-primary/20 transition-all duration-300">
-                            <div className="relative">
-                              <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center">
-                                  <Clock className="w-5 h-5 text-muted-foreground" />
-                                </div>
-                                <div className="text-sm font-medium text-muted-foreground">Not Checked In</div>
-                              </div>
-                              <div className="text-3xl font-bold text-foreground mb-1">{analytics.total_registered - analytics.total_checked_in}</div>
-                              <div className="text-xs text-muted-foreground">Absent attendees</div>
-                            </div>
+                          <div className="rounded-xl border border-border bg-card px-4 py-4">
+                            <p className="text-xs text-muted-foreground">Not checked in</p>
+                            <p className="mt-1 text-2xl font-semibold tracking-tight">{analytics.total_registered - analytics.total_checked_in}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">Still expected</p>
                           </div>
                         </div>
                         {/* Charts Section */}

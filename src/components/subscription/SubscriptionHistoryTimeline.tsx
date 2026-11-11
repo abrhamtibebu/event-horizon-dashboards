@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { type SubscriptionHistory } from '@/lib/api/subscriptions'
 import { format } from 'date-fns'
-import { Clock, User, Shield, Zap } from 'lucide-react'
+import { ArrowUp, Clock, User, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface SubscriptionHistoryTimelineProps {
@@ -48,7 +48,7 @@ export function SubscriptionHistoryTimeline({ history, className }: Subscription
   }
 
   const getActionIcon = (action: string) => {
-    if (action.includes('upgrade')) return <Zap className="w-4 h-4" />
+    if (action.includes('upgrade')) return <ArrowUp className="w-4 h-4" />
     if (action.includes('trial')) return <Clock className="w-4 h-4" />
     if (action.includes('admin') || action.includes('approved')) return <Shield className="w-4 h-4" />
     return <User className="w-4 h-4" />

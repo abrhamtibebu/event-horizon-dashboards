@@ -27,10 +27,6 @@ class SoundManager {
     // Create audio elements for common sounds
     const soundFiles = [
       { name: 'message-received', url: '/sounds/message-received.mp3' },
-      { name: 'message-sent', url: '/sounds/message-sent.mp3' },
-      { name: 'notification', url: '/sounds/notification.mp3' },
-      { name: 'error', url: '/sounds/error.mp3' },
-      { name: 'success', url: '/sounds/success.mp3' },
     ]
 
     soundFiles.forEach(({ name, url }) => {
@@ -41,14 +37,6 @@ class SoundManager {
     })
   }
 
-  private createAudioElement(url: string, options: SoundOptions = {}): HTMLAudioElement {
-    const audio = new Audio(url)
-    audio.volume = (options.volume || 1) * this.masterVolume
-    audio.loop = options.loop || false
-    audio.preload = options.preload ? 'auto' : 'none'
-    return audio
-  }
-
   async playSound(soundName: string, options: SoundOptions = {}): Promise<void> {
     if (!this.isEnabled) return
 
@@ -56,10 +44,8 @@ class SoundManager {
       let audio = this.sounds.get(soundName)
       
       if (!audio) {
-        // Create audio element if not preloaded
-        const url = `/sounds/${soundName}.mp3`
-        audio = this.createAudioElement(url, options)
-        this.sounds.set(soundName, audio)
+        // Skip unavailable sounds instead of requesting the SPA HTML fallback as audio.
+        return
       }
 
       // Reset audio to beginning

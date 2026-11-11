@@ -30,7 +30,7 @@ export function VenueStatusTrendChart({
   const total = data.reduce((sum, d) => sum + d.pending + d.confirmed + d.cancelled, 0)
 
   return (
-    <Card className={cn('rounded-2xl border-border shadow-sm md:col-span-2 dark:ring-0', className)}>
+    <Card className={cn('min-w-0 rounded-2xl border-border shadow-sm dark:ring-0', className)}>
       <CardHeader>
         <CardTitle>Booking status trend</CardTitle>
         <CardDescription>Requests created per day by status, last 10 days</CardDescription>

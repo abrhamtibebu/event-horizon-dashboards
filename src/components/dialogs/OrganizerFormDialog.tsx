@@ -1,21 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import {
-  Building2,
-  Mail,
-  Phone,
-  MapPin,
-  Hash,
-  Save,
-  X,
-  Upload,
-  Globe,
-  Facebook,
-  Twitter,
-  Instagram,
-  Linkedin,
-  Type,
-  AlignLeft,
-} from 'lucide-react'
+import { Save, X, Upload } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
@@ -28,7 +12,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
 import api from '@/lib/api'
 import { getOrganizerBannerUrl, getOrganizerLogoUrl } from '@/lib/utils'
@@ -227,15 +210,17 @@ export function OrganizerFormDialog({
     else onOpenChange(next)
   }
 
+  const fieldClass = 'bg-background'
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col border-border bg-card p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-          <DialogTitle className="text-xl font-semibold text-foreground" style={{ fontFamily: 'Mosk, sans-serif' }}>
+      <DialogContent className="flex max-h-[90vh] w-full max-w-lg flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12">
+          <DialogTitle className="text-base font-semibold">
             {isEdit ? 'Edit Organizer' : 'Add New Organizer'}
           </DialogTitle>
-          <DialogDescription className="sr-only">
-            {isEdit ? 'Update organizer company information.' : 'Create a new organizer profile.'}
+          <DialogDescription className="text-sm text-muted-foreground">
+            {isEdit ? 'Update company details.' : 'Create an organizer profile.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -244,213 +229,109 @@ export function OrganizerFormDialog({
             <Spinner text="Loading organizer..." />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
-            <ScrollArea className="flex-1 max-h-[60vh] px-6">
-              <div className="space-y-6 py-2">
-                <div>
-                  <h3 className="font-medium text-foreground mb-3 flex items-center gap-2">
-                    <Building2 className="w-4 h-4" /> Company Information
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-foreground">Company Name *</Label>
-                      <Input
-                        value={formData.name}
-                        onChange={(e) => handleInputChange('name', e.target.value)}
-                        placeholder="Company name"
-                        required
-                        className="bg-background border-border"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-foreground">Email *</Label>
-                      <Input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => handleInputChange('email', e.target.value)}
-                        placeholder="company@example.com"
-                        required
-                        className="bg-background border-border"
-                      />
-                    </div>
-                    <div className="sm:col-span-2 space-y-2">
-                      <Label className="text-foreground">Business Address</Label>
-                      <Input
-                        value={formData.location}
-                        onChange={(e) => handleInputChange('location', e.target.value)}
-                        placeholder="Business address"
-                        className="bg-background border-border"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-foreground">TIN Number</Label>
-                      <Input
-                        value={formData.tin_number}
-                        onChange={(e) => handleInputChange('tin_number', e.target.value)}
-                        placeholder="TIN number"
-                        className="bg-background border-border"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-foreground">Phone</Label>
-                      <Input
-                        value={formData.phone_number}
-                        onChange={(e) => handleInputChange('phone_number', e.target.value)}
-                        placeholder="+1 (555) 123-4567"
-                        className="bg-background border-border"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-foreground">Logo (optional)</Label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="file"
-                          ref={logoInputRef}
-                          accept="image/*"
-                          onChange={handleLogoUpload}
-                          className="hidden"
-                        />
-                        <Button type="button" variant="outline" size="sm" className="border-border" onClick={() => logoInputRef.current?.click()}>
-                          <Upload className="w-4 h-4 mr-2" /> Choose logo
-                        </Button>
-                        {formData.logo && <span className="text-sm text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{formData.logo.name}</span>}
-                        {logoPreview && (
-                          <div className="relative inline-block">
-                            <img src={logoPreview} alt="Logo Preview" className="h-12 rounded border border-border" />
-                            <Button type="button" variant="ghost" size="icon" className="absolute -top-1 -right-1 h-5 w-5 rounded-full" onClick={handleRemoveLogo}>
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
+          <form onSubmit={handleSubmit} className="flex min-h-0 flex-col">
+            <div className="max-h-[min(70vh,640px)] space-y-5 overflow-y-auto px-5 py-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Company name</Label>
+                  <Input value={formData.name} onChange={(e) => handleInputChange('name', e.target.value)} required className={fieldClass} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Email</Label>
+                  <Input type="email" value={formData.email} onChange={(e) => handleInputChange('email', e.target.value)} required className={fieldClass} />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Business address</Label>
+                  <Input value={formData.location} onChange={(e) => handleInputChange('location', e.target.value)} className={fieldClass} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>TIN number</Label>
+                  <Input value={formData.tin_number} onChange={(e) => handleInputChange('tin_number', e.target.value)} className={fieldClass} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Phone</Label>
+                  <Input value={formData.phone_number} onChange={(e) => handleInputChange('phone_number', e.target.value)} className={fieldClass} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Logo</Label>
+                  <input type="file" ref={logoInputRef} accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                  <div className="flex items-center gap-3">
+                    <Button type="button" variant="outline" size="sm" onClick={() => logoInputRef.current?.click()}>
+                      <Upload className="mr-2 h-4 w-4" /> Choose
+                    </Button>
+                    {logoPreview && (
+                      <div className="relative">
+                        <img src={logoPreview} alt="" className="h-10 rounded border border-border" />
+                        <button type="button" className="absolute -right-1 -top-1 rounded-full border border-border bg-background p-0.5" onClick={handleRemoveLogo}>
+                          <X className="h-3 w-3" />
+                        </button>
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-foreground">Banner (optional)</Label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="file"
-                          id="banner-upload"
-                          accept="image/*"
-                          onChange={handleBannerUpload}
-                          className="hidden"
-                        />
-                        <Button type="button" variant="outline" size="sm" className="border-border" onClick={() => document.getElementById('banner-upload')?.click()}>
-                          <Upload className="w-4 h-4 mr-2" /> Choose banner
-                        </Button>
-                        {formData.banner && <span className="text-sm text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">{formData.banner.name}</span>}
-                        {bannerPreview && (
-                          <div className="relative inline-block">
-                            <img src={bannerPreview} alt="Banner Preview" className="h-12 rounded border border-border" />
-                            <Button type="button" variant="ghost" size="icon" className="absolute -top-1 -right-1 h-5 w-5 rounded-full" onClick={handleRemoveBanner}>
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
-
-                {/* Additional Info Section */}
-                <div className="space-y-4 pt-4 border-t border-border">
-                  <h3 className="font-medium text-foreground mb-3 flex items-center gap-2">
-                    <AlignLeft className="w-4 h-4" /> Additional Details
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-foreground">Tagline</Label>
-                      <Input
-                        value={formData.tagline}
-                        onChange={(e) => handleInputChange('tagline', e.target.value)}
-                        placeholder="Company tagline"
-                        className="bg-background border-border"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-foreground">Description</Label>
-                      <Textarea
-                        value={formData.description}
-                        onChange={(e) => handleInputChange('description', e.target.value)}
-                        placeholder="Tell us about the company..."
-                        rows={4}
-                        className="bg-background border-border resize-none"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-foreground flex items-center gap-2">
-                        <Globe className="w-3.5 h-3.5" /> Website URL
-                      </Label>
-                      <Input
-                        value={formData.website}
-                        onChange={(e) => handleInputChange('website', e.target.value)}
-                        placeholder="https://example.com"
-                        className="bg-background border-border"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Social Media Section */}
-                <div className="space-y-4 pt-4 border-t border-border">
-                  <h3 className="font-medium text-foreground mb-3 flex items-center gap-2">
-                    <Hash className="w-4 h-4" /> Social Media
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-foreground flex items-center gap-2">
-                        <Facebook className="w-3.5 h-3.5" /> Facebook
-                      </Label>
-                      <Input
-                        value={formData.facebook}
-                        onChange={(e) => handleInputChange('facebook', e.target.value)}
-                        placeholder="https://facebook.com/..."
-                        className="bg-background border-border"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-foreground flex items-center gap-2">
-                        <Twitter className="w-3.5 h-3.5" /> Twitter
-                      </Label>
-                      <Input
-                        value={formData.twitter}
-                        onChange={(e) => handleInputChange('twitter', e.target.value)}
-                        placeholder="https://twitter.com/..."
-                        className="bg-background border-border"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-foreground flex items-center gap-2">
-                        <Instagram className="w-3.5 h-3.5" /> Instagram
-                      </Label>
-                      <Input
-                        value={formData.instagram}
-                        onChange={(e) => handleInputChange('instagram', e.target.value)}
-                        placeholder="https://instagram.com/..."
-                        className="bg-background border-border"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-foreground flex items-center gap-2">
-                        <Linkedin className="w-3.5 h-3.5" /> LinkedIn
-                      </Label>
-                      <Input
-                        value={formData.linkedin}
-                        onChange={(e) => handleInputChange('linkedin', e.target.value)}
-                        placeholder="https://linkedin.com/..."
-                        className="bg-background border-border"
-                      />
-                    </div>
+                <div className="space-y-1.5">
+                  <Label>Banner</Label>
+                  <input type="file" id="banner-upload" accept="image/*" onChange={handleBannerUpload} className="hidden" />
+                  <div className="flex items-center gap-3">
+                    <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('banner-upload')?.click()}>
+                      <Upload className="mr-2 h-4 w-4" /> Choose
+                    </Button>
+                    {bannerPreview && (
+                      <div className="relative">
+                        <img src={bannerPreview} alt="" className="h-10 rounded border border-border" />
+                        <button type="button" className="absolute -right-1 -top-1 rounded-full border border-border bg-background p-0.5" onClick={handleRemoveBanner}>
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            </ScrollArea>
-            <DialogFooter className="px-6 py-4 border-t border-border shrink-0">
-              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting} className="border-border">
+
+              <div className="space-y-4 border-t border-border pt-4">
+                <p className="text-sm font-medium">Details</p>
+                <div className="space-y-1.5">
+                  <Label>Tagline</Label>
+                  <Input value={formData.tagline} onChange={(e) => handleInputChange('tagline', e.target.value)} className={fieldClass} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Description</Label>
+                  <Textarea value={formData.description} onChange={(e) => handleInputChange('description', e.target.value)} rows={3} className="resize-none bg-background" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Website</Label>
+                  <Input value={formData.website} onChange={(e) => handleInputChange('website', e.target.value)} placeholder="https://" className={fieldClass} />
+                </div>
+              </div>
+
+              <div className="space-y-4 border-t border-border pt-4">
+                <p className="text-sm font-medium">Social links</p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Facebook</Label>
+                    <Input value={formData.facebook} onChange={(e) => handleInputChange('facebook', e.target.value)} className={fieldClass} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Twitter</Label>
+                    <Input value={formData.twitter} onChange={(e) => handleInputChange('twitter', e.target.value)} className={fieldClass} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Instagram</Label>
+                    <Input value={formData.instagram} onChange={(e) => handleInputChange('instagram', e.target.value)} className={fieldClass} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>LinkedIn</Label>
+                    <Input value={formData.linkedin} onChange={(e) => handleInputChange('linkedin', e.target.value)} className={fieldClass} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter className="shrink-0 border-t border-border px-5 py-3">
+              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="bg-primary text-primary-foreground">
-                <Save className="w-4 h-4 mr-2" />
+              <Button type="submit" disabled={isSubmitting}>
+                <Save className="mr-2 h-4 w-4" />
                 {isSubmitting ? (isEdit ? 'Updating...' : 'Creating...') : isEdit ? 'Update Organizer' : 'Add Organizer'}
               </Button>
             </DialogFooter>

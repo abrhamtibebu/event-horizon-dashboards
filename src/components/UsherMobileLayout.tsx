@@ -8,7 +8,7 @@ interface UsherMobileLayoutProps {
 
 export function UsherMobileLayout({ children, title = 'Usher App' }: UsherMobileLayoutProps) {
   return (
-    <div className="flex flex-col h-screen bg-[#0b1630] text-white font-sans selection:bg-primary/30 overflow-hidden">
+    <div className="dark flex h-[100dvh] flex-col overflow-hidden bg-[#0b1630] font-sans text-white selection:bg-primary/30" style={{ colorScheme: 'dark' }}>
       {/* Fixed Top Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#0b1630] border-b border-white/5 px-4 h-14 flex items-center justify-between md:hidden">
         <div className="flex items-center gap-3">

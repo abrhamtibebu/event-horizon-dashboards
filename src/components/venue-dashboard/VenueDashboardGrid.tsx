@@ -6,11 +6,11 @@ import { VenueRecentActivityCard } from './VenueRecentActivityCard'
 
 export function VenueDashboardGrid({ data }: { data: VenueDashboardData }) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <VenueBookingVolumeChart data={data.bookingVolume} />
-      <VenueSourceBreakdownChart data={data.sourceBreakdown} />
-      <VenueStatusTrendChart data={data.statusTrend} />
-      <VenueRecentActivityCard items={data.recentActivity} className="md:col-span-2 lg:col-span-4" />
+    <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-3">
+      <VenueBookingVolumeChart data={data.bookingVolume} className="min-w-0 xl:col-span-2" />
+      <VenueSourceBreakdownChart data={data.sourceBreakdown} className="min-w-0" />
+      <VenueStatusTrendChart data={data.statusTrend} className="min-w-0 xl:col-span-1" />
+      <VenueRecentActivityCard items={data.recentActivity} className="min-w-0 xl:col-span-2" />
     </div>
   )
 }

@@ -22,6 +22,8 @@ export interface Invitation {
   guest_type: InvitationGuestType | null;
   status: 'active' | 'expired' | 'revoked';
   rsvp_status: InvitationRsvpStatus;
+  qr_single_use?: boolean;
+  qr_used_at?: string | null;
   recipient_name: string | null;
   recipient_email: string | null;
   recipient_phone: string | null;
@@ -81,19 +83,53 @@ export interface BulkInvitationResult {
 export interface RsvpPageSettings {
   headline: string;
   message: string;
+  email_message: string;
   accent_color: string;
   show_banner: boolean;
   show_details: boolean;
   show_description: boolean;
+  confirmation_attachments: RsvpConfirmationAttachment[];
+}
+
+export interface RsvpConfirmationAttachment {
+  id: string;
+  name: string;
+  size: number;
+  /** Empty means every guest type receives this PDF. */
+  guest_type_ids: number[];
+}
+
+/** Evella brand orange used when an organizer has not chosen a custom RSVP accent. */
+export const PLATFORM_RSVP_ACCENT_COLOR = '#ff610d';
+export const PLATFORM_RSVP_ACCENT_CSS = 'hsl(var(--color-primary))';
+const LEGACY_PLATFORM_RSVP_ACCENTS = new Set(['#f97316', PLATFORM_RSVP_ACCENT_COLOR]);
+
+export function isPlatformRsvpAccent(color?: string | null): boolean {
+  const value = color?.trim().toLowerCase();
+  return !value || LEGACY_PLATFORM_RSVP_ACCENTS.has(value) || !/^#[0-9a-f]{6}$/.test(value);
+}
+
+export function resolveRsvpAccent(color?: string | null): string {
+  return isPlatformRsvpAccent(color) ? PLATFORM_RSVP_ACCENT_CSS : (color as string);
+}
+
+export function rsvpAccentForeground(color?: string | null): string {
+  if (isPlatformRsvpAccent(color)) return '#16120e';
+  const value = (color as string).replace('#', '');
+  if (!/^[0-9a-f]{6}$/i.test(value)) return '#ffffff';
+  const rgb = [0, 2, 4].map((offset) => parseInt(value.slice(offset, offset + 2), 16) / 255).map((c) => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) > 0.45 ? '#172033' : '#ffffff';
 }
 
 export const DEFAULT_RSVP_PAGE: RsvpPageSettings = {
   headline: 'Hi {name}, confirm your RSVP',
-  message: 'Complete the short form below. Your e-badge with a check-in QR code will be emailed to you right away.',
-  accent_color: '#f97316',
+  message: 'Choose Accept to open the registration form. Your e-badge with a check-in QR code will be emailed after you register.',
+  email_message: 'You’re invited to {event} as a {guest_type}.\n\nReview the event details and choose Accept or Regret on your RSVP page. If you accept, complete the short form to receive your e-badge.',
+  accent_color: PLATFORM_RSVP_ACCENT_COLOR,
   show_banner: true,
   show_details: true,
   show_description: true,
+  confirmation_attachments: [],
 };
 
 export function guestFirstName(name?: string | null): string {
@@ -118,6 +154,8 @@ export interface PublicInvitation {
   guest_details?: GuestDetails | null;
   rsvp_status: InvitationRsvpStatus;
   rsvp_at: string | null;
+  qr_single_use?: boolean;
+  qr_used_at?: string | null;
   is_rsvp_completed: boolean;
   expires_at: string | null;
   already_registered: boolean;

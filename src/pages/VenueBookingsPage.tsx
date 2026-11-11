@@ -18,7 +18,7 @@ import { VenueEmptyState } from '@/components/venue/VenueEmptyState'
 import { VenueLogBookingDialog } from '@/components/venue/VenueLogBookingDialog'
 import { VenuePageHeader } from '@/components/venue/VenuePageHeader'
 import { VenueStatusBadge } from '@/components/venue/VenueStatusBadge'
-import { bookingSourceLabel, bookingTitle } from '@/components/venue/bookingLabels'
+import { bookingDateRange, bookingSourceLabel, bookingTitle } from '@/components/venue/bookingLabels'
 import { venueApi, type VenueBooking, type VenueSpace } from '@/lib/api/venues'
 import { toast } from 'sonner'
 
@@ -130,7 +130,7 @@ export default function VenueBookingsPage() {
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead>Title</TableHead>
                 <TableHead>Space</TableHead>
-                <TableHead>When</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -146,7 +146,7 @@ export default function VenueBookingsPage() {
                   </TableCell>
                   <TableCell>{b.space?.name}</TableCell>
                   <TableCell className="whitespace-nowrap text-sm">
-                    {format(new Date(b.starts_at), 'MMM d, HH:mm')} – {format(new Date(b.ends_at), 'HH:mm')}
+                    {bookingDateRange(b.starts_at, b.ends_at)}
                   </TableCell>
                   <TableCell>
                     <VenueStatusBadge status={b.status} />

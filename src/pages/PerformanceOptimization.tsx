@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import {
-  Zap,
   Database,
   Server,
   Cpu,
@@ -486,9 +485,7 @@ export default function PerformanceOptimization() {
                         size="sm"
                         onClick={() => handleOptimize(suggestion.action!)}
                         disabled={optimizing}
-                        className="gap-2"
                       >
-                        <Zap className="w-4 h-4" />
                         Apply
                       </Button>
                     )}

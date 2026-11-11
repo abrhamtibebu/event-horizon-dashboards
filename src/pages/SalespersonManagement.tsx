@@ -3,6 +3,10 @@ import { useAuth } from '../hooks/use-auth';
 import api from '../lib/api';
 import { useSearchParams } from 'react-router-dom';
 import Breadcrumbs from '@/components/Breadcrumbs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { 
   Plus, 
   Users, 
@@ -1922,144 +1926,102 @@ const SalespersonManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Invitation Modal */}
-      {showEditInvitationForm && editingInvitationData && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xl flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Edit Invitation</h3>
-              <button
-                onClick={() => {
-                  setShowEditInvitationForm(false);
-                  setEditingInvitationData(null);
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <XCircle className="h-6 w-6" />
-              </button>
-            </div>
-
-            <form onSubmit={handleUpdateInvitation} className="space-y-6">
-              {/* Invitation Code (Read-only) */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Invitation Code</label>
-                <input
-                  type="text"
-                  value={editingInvitationData.code}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">Invitation code cannot be changed</p>
-              </div>
-
-              {/* Job Information (Read-only) */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Job</label>
-                <input
-                  type="text"
-                  value={editingInvitationData.job?.title || 'Unknown Job'}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">Job cannot be changed</p>
-              </div>
-
-              {/* Expiration Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Expiration Date</label>
-                <input
-                  type="datetime-local"
-                  value={editingInvitationData.expires_at ? new Date(editingInvitationData.expires_at).toISOString().slice(0, 16) : ''}
-                  onChange={(e) => setEditingInvitationData({
-                    ...editingInvitationData,
-                    expires_at: e.target.value ? new Date(e.target.value).toISOString() : null
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">Leave empty for no expiration</p>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                <select
-                  value={editingInvitationData.status}
-                  onChange={(e) => setEditingInvitationData({
-                    ...editingInvitationData,
-                    status: e.target.value as 'active' | 'inactive' | 'expired'
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="expired">Expired</option>
-                </select>
-              </div>
-
-              {/* Current Link (Read-only) */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Registration Link</label>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={editingInvitationData.link}
-                    disabled
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+      <Dialog
+        open={showEditInvitationForm && !!editingInvitationData}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowEditInvitationForm(false);
+            setEditingInvitationData(null);
+          }
+        }}
+      >
+        {editingInvitationData && (
+          <DialogContent className="flex max-h-[90vh] w-full max-w-lg flex-col gap-0 overflow-hidden p-0">
+            <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12">
+              <DialogTitle className="text-base font-semibold">Edit Invitation</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleUpdateInvitation} className="flex min-h-0 flex-col">
+              <div className="max-h-[min(70vh,640px)] space-y-4 overflow-y-auto px-5 py-4">
+                <div className="space-y-1.5">
+                  <Label>Invitation code</Label>
+                  <Input value={editingInvitationData.code} disabled />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Job</Label>
+                  <Input value={editingInvitationData.job?.title || 'Unknown job'} disabled />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Expiration</Label>
+                  <Input
+                    type="datetime-local"
+                    value={editingInvitationData.expires_at ? new Date(editingInvitationData.expires_at).toISOString().slice(0, 16) : ''}
+                    onChange={(e) => setEditingInvitationData({
+                      ...editingInvitationData,
+                      expires_at: e.target.value ? new Date(e.target.value).toISOString() : null
+                    })}
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(editingInvitationData.link);
-                      setSuccess('Link copied to clipboard');
-                    }}
-                    className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                  <p className="text-xs text-muted-foreground">Leave empty for no expiration.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Status</Label>
+                  <select
+                    value={editingInvitationData.status}
+                    onChange={(e) => setEditingInvitationData({
+                      ...editingInvitationData,
+                      status: e.target.value as 'active' | 'inactive' | 'expired'
+                    })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   >
-                    <Copy className="h-4 w-4" />
-                  </button>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="expired">Expired</option>
+                  </select>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Registration link (read-only)</p>
-              </div>
-
-              {/* Statistics */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">Invitation Statistics</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="space-y-1.5">
+                  <Label>Registration link</Label>
+                  <div className="flex gap-2">
+                    <Input value={editingInvitationData.link} disabled className="flex-1" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        navigator.clipboard.writeText(editingInvitationData.link);
+                        setSuccess('Link copied to clipboard');
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 rounded-md border border-border px-3 py-3 text-sm">
                   <div>
-                    <span className="text-gray-600">Max Registrations:</span>
-                    <span className="ml-2 font-semibold">{editingInvitationData.max_registrations}</span>
+                    <p className="text-muted-foreground">Max registrations</p>
+                    <p className="font-medium">{editingInvitationData.max_registrations}</p>
                   </div>
                   <div>
-                    <span className="text-gray-600">Created:</span>
-                    <span className="ml-2 font-semibold">
-                      {new Date(editingInvitationData.created_at).toLocaleDateString()}
-                    </span>
+                    <p className="text-muted-foreground">Created</p>
+                    <p className="font-medium">{new Date(editingInvitationData.created_at).toLocaleDateString()}</p>
                   </div>
                 </div>
               </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end space-x-3 pt-4">
-                <button
+              <div className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-3">
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => {
                     setShowEditInvitationForm(false);
                     setEditingInvitationData(null);
                   }}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
                 >
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                >
-                  Update Invitation
-                </button>
+                </Button>
+                <Button type="submit">Update invitation</Button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+          </DialogContent>
+        )}
+      </Dialog>
 
       {/* Job Form Modal */}
       {showJobForm && (

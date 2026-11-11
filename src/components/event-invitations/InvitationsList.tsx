@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -16,10 +16,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Copy,
   Download,
   Eye,
+  Filter,
   Loader2,
   Mail,
   MinusCircle,
@@ -32,6 +35,7 @@ import {
 import { toast } from 'sonner';
 import { ModernConfirmationDialog } from '@/components/ui/ModernConfirmationDialog';
 import { format, parseISO } from 'date-fns';
+import QRCode from 'qrcode';
 import { downloadInvitationsCsv, fetchInvitationResponse, useEventGuestTypes, useInvitations, useResendInvitationEmail, useRevokeInvitation, type InvitationResponse } from '@/lib/api/invitations';
 import type { Invitation, InvitationEmailStatus, InvitationRsvpStatus } from '@/types/invitations';
 
@@ -56,6 +60,8 @@ const RSVP_FILTERS: Array<{ value: 'all' | InvitationRsvpStatus; label: string }
   { value: 'pending', label: 'Pending' },
   { value: 'declined', label: 'Rejected' },
 ];
+
+const PAGE_SIZE = 20;
 
 function fmtDate(value: string | null | undefined, pattern = 'MMM d, HH:mm'): string {
   if (!value) return '';
@@ -149,10 +155,13 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
   const [emailFilter, setEmailFilter] = useState<'all' | InvitationEmailStatus>('all');
   const [rsvpFilter, setRsvpFilter] = useState<'all' | InvitationRsvpStatus>('all');
   const [exporting, setExporting] = useState(false);
+  const [exportingQrs, setExportingQrs] = useState(false);
   const [responseFor, setResponseFor] = useState<Invitation | null>(null);
   const [response, setResponse] = useState<InvitationResponse | null>(null);
   const [responseLoading, setResponseLoading] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<Invitation | null>(null);
+  const [page, setPage] = useState(1);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const openResponse = async (inv: Invitation) => {
     setResponseFor(inv);
@@ -176,6 +185,53 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
       toast.error('Could not export the guest list.');
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleExportQrs = async () => {
+    const guests = filtered.filter((inv) => inv.status === 'active' && inv.recipient_name?.trim() && inv.invitation_url);
+    if (!guests.length) {
+      toast.error('No active named invitations match the current filters.');
+      return;
+    }
+
+    setExportingQrs(true);
+    try {
+      const { default: JSZip } = await import('jszip');
+      const zip = new JSZip();
+      const nameCounts = new Map<string, number>();
+      for (const inv of guests) {
+        const guestName = (inv.recipient_name || 'Guest')
+          .normalize('NFKD')
+          .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim() || 'Guest';
+        const count = (nameCounts.get(guestName.toLocaleLowerCase()) ?? 0) + 1;
+        nameCounts.set(guestName.toLocaleLowerCase(), count);
+        const filename = `${guestName}${count > 1 ? ` (${count})` : ''}.png`;
+        const dataUrl = await QRCode.toDataURL(inv.invitation_url, {
+          width: 2048,
+          margin: 4,
+          errorCorrectionLevel: 'H',
+          type: 'image/png',
+        });
+        zip.file(filename, dataUrl.split(',')[1], { base64: true });
+      }
+
+      const archive = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+      const objectUrl = URL.createObjectURL(archive);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = 'invitation-qrs.zip';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+      toast.success(`Exported ${guests.length} high-resolution guest QR${guests.length === 1 ? '' : 's'}.`);
+    } catch {
+      toast.error('Could not create the QR image archive.');
+    } finally {
+      setExportingQrs(false);
     }
   };
 
@@ -247,6 +303,11 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
     });
   }, [invitations, searchTerm, guestTypeFilter, emailFilter, rsvpFilter]);
 
+  useEffect(() => { setPage(1); }, [searchTerm, guestTypeFilter, emailFilter, rsvpFilter]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  useEffect(() => { setPage((current) => Math.min(current, pageCount)); }, [pageCount]);
+  const visibleInvitations = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const failedCount = (invitations ?? []).filter((i) => i.email_status === 'failed' && i.status === 'active').length;
 
   if (isLoading) {
@@ -266,6 +327,10 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
             {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
             Export CSV
           </Button>
+          <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={handleExportQrs} disabled={exportingQrs || !filtered.some((inv) => inv.status === 'active' && inv.recipient_name?.trim())}>
+            {exportingQrs ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <QrCode className="w-3.5 h-3.5" />}
+            {exportingQrs ? 'Preparing QRs…' : 'Export guest QRs'}
+          </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {isOrganizer && failedCount > 0 && (
@@ -273,6 +338,15 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
               <RefreshCw className={`w-3.5 h-3.5 ${resendMutation.isPending ? 'animate-spin' : ''}`} /> Retry {failedCount} failed
             </Button>
           )}
+          <div className="relative w-48">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input placeholder="Search guests" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 h-9 text-xs rounded-lg" />
+          </div>
+          <Button size="sm" variant="outline" className="h-9 gap-2" onClick={() => setFiltersOpen((open) => !open)}><Filter className="h-3.5 w-3.5" />Filters{(guestTypeFilter !== 'all' || emailFilter !== 'all' || rsvpFilter !== 'all') && <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1">{[guestTypeFilter !== 'all', emailFilter !== 'all', rsvpFilter !== 'all'].filter(Boolean).length}</Badge>}</Button>
+        </div>
+      </div>
+
+      {filtersOpen && <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/20 p-3">
           <Select value={guestTypeFilter} onValueChange={setGuestTypeFilter}>
             <SelectTrigger className="h-8 w-[150px] text-xs rounded-lg">
               <SelectValue placeholder="Guest type" />
@@ -310,17 +384,7 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
               ))}
             </SelectContent>
           </Select>
-          <div className="relative w-44">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-            <Input
-              placeholder="Search…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 h-8 text-xs rounded-lg bg-muted/50 border-none focus-visible:ring-1"
-            />
-          </div>
-        </div>
-      </div>
+        </div>}
 
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <Table>
@@ -334,7 +398,7 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((inv) => (
+            {visibleInvitations.map((inv) => (
               <TableRow key={inv.id} className={`group transition-colors ${inv.status !== 'active' ? 'opacity-50' : ''}`}>
                 <TableCell className="py-3">
                   <p className="text-sm font-medium">{inv.recipient_name || 'Public link'}</p>
@@ -347,6 +411,7 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
                     {inv.recipient_phone ? `${inv.recipient_phone} · ` : ''}
                     {inv.invitation_code}
                     {inv.status !== 'active' ? ` · ${inv.status}` : ''}
+                    {inv.qr_single_use ? (inv.qr_used_at ? ' · RSVP QR used' : ' · RSVP QR one-time') : ''}
                   </p>
                 </TableCell>
                 <TableCell className="py-3">
@@ -424,6 +489,15 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
           </div>
         )}
       </div>
+
+      {filtered.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+        <p className="text-xs text-muted-foreground">Showing <span className="font-semibold text-foreground">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)}</span> of <span className="font-semibold text-foreground">{filtered.length}</span> guests</p>
+        <div className="flex items-center gap-2">
+          <span className="mr-1 text-xs text-muted-foreground">Page {page} of {pageCount}</span>
+          <Button size="sm" variant="outline" className="h-8" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1}><ChevronLeft className="mr-1 h-4 w-4" />Previous</Button>
+          <Button size="sm" variant="outline" className="h-8" onClick={() => setPage((current) => Math.min(pageCount, current + 1))} disabled={page === pageCount}>Next<ChevronRight className="ml-1 h-4 w-4" /></Button>
+        </div>
+      </div>}
 
       <ModernConfirmationDialog
         isOpen={!!revokeTarget}

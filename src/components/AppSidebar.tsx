@@ -23,8 +23,8 @@ import {
   Settings,
   UserCircle,
   MessageCircle,
+  Building2,
   LayoutDashboard,
-  LayoutGrid,
   Inbox,
   Fingerprint,
   CheckSquare,
@@ -37,8 +37,6 @@ import {
   Key,
   Shield,
   Plug,
-  Zap,
-  FileText,
   Workflow,
   FileCheck,
   Mail,
@@ -47,6 +45,7 @@ import {
   Clock,
   History,
   Megaphone,
+  type LucideIcon,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -79,10 +78,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
+import { isVenueRole } from '@/lib/roles'
 import { useUnreadCount } from '@/hooks/use-messages'
 import { useOrganizerPermissions } from '@/hooks/use-organizer-permissions'
 import { usePermissionCheck } from '@/hooks/use-permission-check'
 import api from '@/lib/api'
+import { venueApi } from '@/lib/api/venues'
 
 // Helper function to get user initials
 const getInitials = (name?: string) => {
@@ -103,8 +104,21 @@ const ADMIN_SIDEBAR_HIDDEN_TITLES = [
   'Payouts',
 ]
 
+type NavigationItem = {
+  title: string
+  url: string
+  icon: LucideIcon
+  roles: string[]
+  permission?: string
+  accessibleToAll?: boolean
+  disabled?: boolean
+  disabledLabel?: string
+}
+
+type NavigationCategory = { label: string; items: NavigationItem[] }
+
 // Organized navigation items by category
-const navigationCategories = [
+const navigationCategories: NavigationCategory[] = [
   {
     label: 'Overview',
     items: [
@@ -118,86 +132,95 @@ const navigationCategories = [
     ],
   },
   {
-    label: 'Venue',
+    label: 'Venue operations',
     items: [
       {
-        title: 'Inbox',
-        url: '/dashboard/venue/inbox',
-        icon: Inbox,
-        roles: ['venue_admin', 'venue_staff'],
+        title: 'Venues',
+        url: '/dashboard/venue/profile',
+        icon: Building2,
+        roles: ['venue_admin', 'venue_manager'],
       },
       {
-        title: 'Calendar',
+        title: 'Spaces',
+        url: '/dashboard/venue',
+        icon: LayoutDashboard,
+        roles: ['venue_admin', 'venue_manager'],
+      },
+      {
+        title: 'Availability Calendar',
         url: '/dashboard/venue/calendar',
         icon: CalendarDays,
-        roles: ['venue_admin', 'venue_staff'],
+        roles: ['venue_admin', 'venue_manager', 'booking_officer'],
       },
       {
         title: 'Bookings',
         url: '/dashboard/venue/bookings',
-        icon: CalendarDays,
-        roles: ['venue_admin', 'venue_staff'],
+        icon: Inbox,
+        roles: ['venue_admin', 'venue_manager', 'booking_officer'],
       },
-      {
-        title: 'Revenue',
-        url: '/dashboard/venue/revenue',
-        icon: Banknote,
-        roles: ['venue_admin', 'venue_staff'],
-      },
-      {
-        title: 'Spaces',
-        url: '/dashboard/venue/spaces',
-        icon: LayoutGrid,
-        roles: ['venue_admin', 'venue_staff'],
-      },
-      {
-        title: 'Listing',
-        url: '/dashboard/venue/profile',
-        icon: MapPin,
-        roles: ['venue_admin', 'venue_staff'],
-      },
-      {
-        title: 'Team',
-        url: '/dashboard/venue/staff',
-        icon: Users,
-        roles: ['venue_admin'],
-      },
-    ],
-  },
-  {
-    label: 'Events & Tickets',
-    items: [
       {
         title: 'Events',
-        url: '/dashboard/events',
+        url: '/dashboard/venue/events',
         icon: CalendarDays,
-        roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'event_manager'],
-        permission: 'events.view',
-      },
-      {
-        title: 'Create Event',
-        url: '/dashboard/events/create',
-        icon: ClipboardCheck,
-        roles: ['superadmin', 'organizer', 'organizer_admin', 'event_manager'],
-        permission: 'events.create',
-      },
-      {
-        title: 'Ticket Sales',
-        url: '/dashboard/ticket-management',
-        icon: Ticket,
-        roles: ['organizer', 'organizer_admin', 'event_manager'],
-        permission: 'tickets.manage',
-      },
-      {
-        title: 'My Tickets',
-        url: '/dashboard/tickets',
-        icon: Ticket,
-        roles: ['attendee'],
+        roles: ['venue_admin', 'venue_manager', 'venue_event_manager', 'operations_staff', 'security'],
       },
     ],
   },
   {
     label: 'Management',
+    items: [
+      { title: 'Clients', url: '/dashboard/venue/clients', icon: Users2, roles: ['venue_admin', 'venue_manager', 'booking_officer'] },
+      { title: 'Staff & Teams', url: '/dashboard/venue/staff', icon: Users, roles: ['venue_admin'] },
+    ],
+  },
+  {
+    label: 'Events & Tickets',
+    items: [
+      { title: 'Events', url: '/dashboard/events', icon: CalendarDays, roles: ['superadmin', 'admin', 'organizer', 'organizer_admin', 'event_manager'], permission: 'events.view' },
+      { title: 'Create Event', url: '/dashboard/events/create', icon: ClipboardCheck, roles: ['superadmin', 'organizer', 'organizer_admin', 'event_manager'], permission: 'events.create' },
+      { title: 'Ticket Sales', url: '/dashboard/ticket-management', icon: Ticket, roles: ['organizer', 'organizer_admin', 'event_manager'], permission: 'tickets.manage' },
+      { title: 'My Tickets', url: '/dashboard/tickets', icon: Ticket, roles: ['attendee'] },
+    ],
+  },
+  {
+    label: 'Finance',
+    items: [
+      { title: 'Quotations', url: '/dashboard/venue/quotes', icon: FileCheck, roles: ['venue_admin', 'venue_manager', 'booking_officer'] },
+      { title: 'Contracts', url: '/dashboard/venue/contracts', icon: FileCheck, roles: ['venue_admin', 'venue_manager', 'booking_officer', 'finance_officer'] },
+      { title: 'Payments', url: '/dashboard/venue/revenue', icon: Banknote, roles: ['venue_admin', 'venue_manager', 'finance_officer'] },
+      { title: 'Expenses', url: '/dashboard/venue/expenses', icon: DollarSign, roles: ['venue_admin', 'venue_manager', 'finance_officer'] },
+      { title: 'Invoices', url: '/dashboard/venue/invoices', icon: FileCheck, roles: ['venue_admin', 'venue_manager', 'finance_officer'] },
+    ],
+  },
+  {
+    label: 'Event operations',
+    items: [
+      { title: 'Resources & Equipment', url: '/dashboard/venue/resources', icon: Package, roles: ['venue_admin', 'venue_manager', 'venue_event_manager', 'operations_staff'] },
+      { title: 'Tasks & Checklists', url: '/dashboard/venue/tasks', icon: CheckSquare, roles: ['venue_admin', 'venue_manager', 'venue_event_manager', 'operations_staff', 'security'] },
+      { title: 'Event Schedule', url: '/dashboard/venue/event-schedule', icon: CalendarDays, roles: ['venue_admin', 'venue_manager', 'venue_event_manager', 'operations_staff'] },
+      { title: 'Guest Management', url: '/dashboard/venue/guests', icon: Users2, roles: ['venue_admin', 'venue_manager', 'venue_event_manager', 'operations_staff', 'security'], disabled: true, disabledLabel: 'Phase 4' },
+      { title: 'VIP & Parking', url: '/dashboard/venue/vip-parking', icon: MapPin, roles: ['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security'], disabled: true, disabledLabel: 'Phase 4' },
+      { title: 'Incident Reports', url: '/dashboard/venue/incidents', icon: Flag, roles: ['venue_admin', 'venue_manager', 'security'], disabled: true, disabledLabel: 'Phase 4' },
+    ],
+  },
+  {
+    label: 'Insights',
+    items: [
+      { title: 'Reports', url: '/dashboard/venue/reports', icon: BarChart3, roles: ['venue_admin', 'venue_manager', 'finance_officer'] },
+      { title: 'Analytics', url: '/dashboard/venue/analytics', icon: Activity, roles: ['venue_admin', 'venue_manager', 'finance_officer'], disabled: true, disabledLabel: 'Phase 5' },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { title: 'Notifications', url: '/dashboard/venue/notifications', icon: Mail, roles: ['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security'], disabled: true, disabledLabel: 'Phase 5' },
+      { title: 'Users & Permissions', url: '/dashboard/venue/users', icon: ShieldCheck, roles: ['venue_admin'] },
+      { title: 'Settings', url: '/dashboard/settings', icon: Settings, roles: ['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security'] },
+      { title: 'Messages', url: '/dashboard/messages', icon: MessageCircleMore, roles: ['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security'], accessibleToAll: true, permission: 'messages.manage' },
+    ],
+  },
+  {
+    label: 'Organizers & Administration',
     items: [
       {
         title: 'Tasks',
@@ -223,7 +246,7 @@ const navigationCategories = [
         title: 'Venues',
         url: '/dashboard/admin/venues',
         icon: MapPin,
-        roles: ['superadmin', 'admin'],
+        roles: ['venue_admin', 'venue_manager'],
       },
       {
         title: 'Guests',
@@ -370,6 +393,17 @@ const navigationCategories = [
     ],
   },
   {
+    label: 'Account',
+    items: [
+      {
+        title: 'Settings',
+        url: '/dashboard/settings',
+        icon: Settings,
+        roles: ['venue_admin', 'venue_staff', 'venue_manager', 'booking_officer', 'venue_event_manager', 'finance_officer', 'operations_staff', 'security'],
+      },
+    ],
+  },
+  {
     label: 'Connect',
     items: [
       {
@@ -409,6 +443,7 @@ export function AppSidebar() {
   const { hasRole, hasPermission: hasRolePermission } = usePermissionCheck()
   const isCollapsed = state === 'collapsed'
   const [trashCount, setTrashCount] = useState(0)
+  const [pendingVenueCount, setPendingVenueCount] = useState(0)
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -418,13 +453,13 @@ export function AppSidebar() {
 
   // Simplified navigation for organizers
   const isOrganizer = user?.role === 'organizer' || user?.role === 'organizer_admin'
-  const isVenueUser = user?.role === 'venue_admin' || user?.role === 'venue_staff'
+  const isVenueUser = isVenueRole(user?.role)
 
   // Filter categories and items based on user role and permissions
   const filteredCategories = navigationCategories
     .filter((category) => {
       if (!isVenueUser) return true
-      return category.label === 'Overview' || category.label === 'Venue' || category.label === 'Connect'
+      return ['Overview', 'Venue operations', 'Management', 'Finance', 'Event operations', 'Insights', 'System'].includes(category.label)
     })
     .map((category) => ({
       ...category,
@@ -436,9 +471,6 @@ export function AppSidebar() {
               user?.role === 'usher' && category.label === 'Connect' ? 'Communicate' :
                 category.label,
       items: category.items.map((item) => {
-        if (isVenueUser && item.url === '/dashboard') {
-          return { ...item, title: 'Today' }
-        }
         return item
       }).filter((item) => {
         if (!user) return false
@@ -520,8 +552,14 @@ export function AppSidebar() {
           }
         }
       }
-      fetchTrashCount()
+      const timer = setTimeout(fetchTrashCount, 18000)
+      return () => clearTimeout(timer)
     }
+  }, [user?.role])
+
+  useEffect(() => {
+    if (!isVenueRole(user?.role)) return
+    venueApi.dashboard().then(({ data }) => setPendingVenueCount(data.keyMetrics?.pendingRequests ?? 0)).catch(() => undefined)
   }, [user?.role])
 
   return (
@@ -581,15 +619,36 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu className="space-y-0.5">
                 {category.items.map((item) => {
-                  const isActive =
-                    location.pathname === item.url ||
-                    (item.url !== '/dashboard' &&
-                      location.pathname.startsWith(item.url))
+                  const isSpacesPage = item.title === 'Spaces' && (location.pathname === '/dashboard/venue' || location.pathname.startsWith('/dashboard/venue/spaces'))
+                  const isVenueProfile = item.title === 'Venues' && (location.pathname === '/dashboard/venue/profile' || location.pathname === '/dashboard/venue/setup')
+                  const isBookingList = item.title === 'Bookings' && location.pathname === '/dashboard/venue/calendar' && location.search.includes('view=list')
+                  const isActive = isSpacesPage || isVenueProfile || location.pathname === item.url ||
+                      (item.url !== '/dashboard' && location.pathname.startsWith(item.url)) ||
+                      isBookingList
 
                   const showBadge =
                     !isCollapsed &&
                     ((item.title === 'Trash' && trashCount > 0) ||
-                      (item.title === 'Messages' && unreadCount > 0))
+                      (item.title === 'Messages' && unreadCount > 0) ||
+                      (item.title === 'Bookings' && pendingVenueCount > 0))
+
+                  if (item.disabled) {
+                    return (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton
+                          disabled
+                          tooltip={`${item.title} · ${item.disabledLabel || 'Phase 3'}`}
+                          className={cn('w-full rounded-md text-muted-foreground/50', isCollapsed ? 'justify-center p-2 h-9 w-9 mx-auto' : 'px-3 py-2 h-9')}
+                        >
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <item.icon className="h-[18px] w-[18px] shrink-0" />
+                            {!isCollapsed && <span className="truncate text-sm font-medium">{item.title}</span>}
+                          </div>
+                          {!isCollapsed && <span className="ml-auto text-[10px] font-medium">{item.disabledLabel || 'Phase 3'}</span>}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )
+                  }
 
                   return (
                     <SidebarMenuItem key={item.title}>
@@ -640,7 +699,7 @@ export function AppSidebar() {
                                     : "bg-muted text-muted-foreground"
                               )}
                             >
-                              {item.title === 'Trash' ? trashCount : unreadCount}
+                              {item.title === 'Trash' ? trashCount : item.title === 'Inbox' ? pendingVenueCount : unreadCount}
                             </Badge>
                           )}
                         </NavLink>
@@ -712,15 +771,15 @@ export function AppSidebar() {
                 )}
               </DropdownMenuItem>
 
-              <DropdownMenuItem onClick={() => navigate('/dashboard/events')} className="cursor-pointer">
+              {!isVenueUser && <DropdownMenuItem onClick={() => navigate('/dashboard/events')} className="cursor-pointer">
                 <CalendarDays className="mr-2 h-4 w-4 text-primary" />
                 <span style={{ fontFamily: 'Mosk, sans-serif' }}>My Events</span>
-              </DropdownMenuItem>
+              </DropdownMenuItem>}
 
-              <DropdownMenuItem onClick={() => navigate('/dashboard/reports')} className="cursor-pointer">
+              {!isVenueUser && <DropdownMenuItem onClick={() => navigate('/dashboard/reports')} className="cursor-pointer">
                 <BarChart3 className="mr-2 h-4 w-4 text-primary" />
                 <span style={{ fontFamily: 'Mosk, sans-serif' }}>Reports</span>
-              </DropdownMenuItem>
+              </DropdownMenuItem>}
 
               {user?.role === 'organizer' && (
                 <>

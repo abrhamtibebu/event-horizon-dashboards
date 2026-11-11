@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Spinner } from '@/components/ui/spinner'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '@/hooks/use-toast'
-import { CreditCard, Phone, Zap, CheckCircle2, Clock } from 'lucide-react'
+import { CreditCard, Phone, CheckCircle2, Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
@@ -256,7 +256,6 @@ export default function SubscriptionPayment() {
                   </>
                 ) : (
                   <>
-                    <Zap className="h-5 w-5 mr-2" />
                     {paymentMethod === 'chapa' ? 'Pay with Chapa' : 'Initiate Payment'}
                   </>
                 )}

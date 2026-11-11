@@ -73,6 +73,15 @@ export function getPublicSiteURL(): string {
   return ''
 }
 
+/** Public discovery site used for venue reservation and embed links. */
+export function getVenuePublicSiteURL(): string {
+  const configured = import.meta.env.VITE_VENUE_PUBLIC_URL
+  if (configured && typeof configured === 'string' && configured.trim()) {
+    return configured.trim().replace(/\/$/, '')
+  }
+  return 'https://evella.et'
+}
+
 /**
  * Optional backend origin serving OG/share bridge routes (trimmed, no trailing slash).
  * Set VITE_REGISTRATION_SHARE_BRIDGE_ORIGIN when previews should use a dedicated host.

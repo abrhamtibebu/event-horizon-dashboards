@@ -33,7 +33,6 @@ import {
   Clock,
   Settings,
   Info,
-  Sparkles,
   TrendingUp,
   Link2,
   Copy,
@@ -243,9 +242,8 @@ export function CreateReferralCampaignDialog({
           <div className="space-y-6">
             <Card className="border-green-200 bg-green-50">
               <CardHeader>
-                <CardTitle className="text-green-800 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5" />
-                  Campaign Created Successfully!
+                <CardTitle className="text-green-800">
+                  Campaign created
                 </CardTitle>
                 <CardDescription className="text-green-700">
                   Your referral campaign is now active and ready to use.

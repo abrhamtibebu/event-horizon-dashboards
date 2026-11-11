@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   TrendingUp,
   TrendingDown,
-  DollarSign,
   Calendar,
   ArrowLeft,
   BarChart3,
@@ -197,10 +196,9 @@ export default function OrganizerRevenueAnalytics() {
         <Card className="bg-card/40 backdrop-blur-xl border-white/10 shadow-2xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${data.totalRevenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">ETB {data.totalRevenue.toLocaleString()}</div>
             <div className="flex items-center text-xs text-muted-foreground mt-1">
               <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
               +{data.growthRate}% from last month
@@ -214,7 +212,7 @@ export default function OrganizerRevenueAnalytics() {
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${data.averageEventRevenue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">ETB {data.averageEventRevenue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground mt-1">Per event average</p>
           </CardContent>
         </Card>
@@ -330,7 +328,7 @@ export default function OrganizerRevenueAnalytics() {
                       <p className="text-xs text-muted-foreground">{event.date}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold">${event.revenue.toLocaleString()}</p>
+                      <p className="font-bold">ETB {event.revenue.toLocaleString()}</p>
                       <p className="text-xs text-muted-foreground">{event.tickets} tickets</p>
                     </div>
                   </div>
@@ -391,7 +389,7 @@ export default function OrganizerRevenueAnalytics() {
                       <span className="font-medium">{type.type}</span>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold">${type.revenue.toLocaleString()}</p>
+                      <p className="font-bold">ETB {type.revenue.toLocaleString()}</p>
                       <p className="text-xs text-muted-foreground">{type.percentage}%</p>
                     </div>
                   </div>

@@ -77,7 +77,6 @@ import {
   QrCode,
   RefreshCw,
   Target,
-  Zap,
   Award,
   Activity,
   Globe,

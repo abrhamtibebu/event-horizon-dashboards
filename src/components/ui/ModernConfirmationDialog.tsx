@@ -16,8 +16,6 @@ import {
   Info, 
   AlertCircle,
   Loader2,
-  Sparkles,
-  Zap,
   Shield,
   Heart
 } from 'lucide-react';

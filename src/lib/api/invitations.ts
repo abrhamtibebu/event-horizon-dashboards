@@ -84,10 +84,12 @@ export const useBulkGenerateInvitations = () => {
       eventId: number;
       guestTypeId: number | null;
       invitations: BulkInvitationRow[];
+      qrSingleUse?: boolean;
     }) => {
       const response = await api.post(`/events/${data.eventId}/invitations/bulk-generate`, {
         guest_type_id: data.guestTypeId ?? undefined,
         invitations: data.invitations,
+        qr_single_use: Boolean(data.qrSingleUse),
       });
       return response.data as BulkInvitationResult;
     },
@@ -281,8 +283,30 @@ export const useRsvpPage = (eventId: number) => {
 export const useUpdateRsvpPage = (eventId: number) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (settings: RsvpPageSettings) => {
-      const response = await api.put(`/events/${eventId}/rsvp-page`, settings);
+    mutationFn: async (settings: RsvpPageSettings & { new_attachments?: { file: File; guestTypeIds: number[] }[] }) => {
+      const payload = new FormData();
+      Object.entries(settings).forEach(([key, value]) => {
+        if (key === 'confirmation_attachments' || key === 'new_attachments') return;
+        payload.append(key, typeof value === 'boolean' ? (value ? '1' : '0') : String(value));
+      });
+      const keptAudiences: Record<string, number[]> = {};
+      settings.confirmation_attachments.forEach((file) => {
+        payload.append('keep_attachments[]', file.id);
+        keptAudiences[file.id] = file.guest_type_ids ?? [];
+      });
+      payload.append('attachment_guest_types', JSON.stringify(keptAudiences));
+      const newAudiences: number[][] = [];
+      settings.new_attachments?.forEach((item) => {
+        payload.append('attachments[]', item.file);
+        newAudiences.push(item.guestTypeIds ?? []);
+      });
+      payload.append('new_attachment_guest_types', JSON.stringify(newAudiences));
+      // Keep multipart parsing on POST (PHP reliably populates uploaded files),
+      // while routing through Laravel's existing PUT endpoint in production.
+      payload.append('_method', 'PUT');
+      const response = await api.post(`/events/${eventId}/rsvp-page`, payload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       return response.data?.data as RsvpPageSettings;
     },
     onSuccess: (data) => {

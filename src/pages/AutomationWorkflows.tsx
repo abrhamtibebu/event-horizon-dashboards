@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Zap,
   AlertCircle,
   RefreshCw,
 } from 'lucide-react'

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Layout, Plus, Eye, Edit, Trash2, Copy, Mail, MessageSquare, Send, Sparkles } from 'lucide-react';
+import { Layout, Plus, Eye, Edit, Trash2, Copy, Mail, MessageSquare, Send } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -63,7 +63,7 @@ export function TemplatesList() {
   const getTypeIcon = (type: string) => {
     if (type === 'email') return <Mail className="w-4 h-4" />;
     if (type === 'sms') return <MessageSquare className="w-4 h-4" />;
-    if (type === 'both') return <Sparkles className="w-4 h-4" />;
+    if (type === 'both') return null;
     return <Send className="w-4 h-4" />;
   };
 
@@ -216,7 +216,6 @@ export function TemplatesList() {
                         </div>
                         {template.is_system_template && (
                           <Badge variant="outline" className="text-xs">
-                            <Sparkles className="w-3 h-3 mr-1" />
                             System
                           </Badge>
                         )}

@@ -1,4 +1,4 @@
-import { Calendar, Clock, AlertTriangle, ArrowUpRight, Sparkles, CalendarX } from 'lucide-react'
+import { Calendar, Clock, AlertTriangle, ArrowUpRight, CalendarX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const EVELLA_URL = 'https://evella.et'
@@ -18,6 +18,13 @@ interface RegistrationUnavailableProps {
   eventStartDate?: string | null
   /** Custom message override. If not provided, a sensible default is used. */
   message?: string
+  /** RSVP pages stay light even when the rest of the app is in dark mode. */
+  forceLight?: boolean
+}
+
+function withoutDark(classes: string, forceLight?: boolean) {
+  if (!forceLight) return classes
+  return classes.replace(/(?:^|\s)dark:[^\s]+/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 interface VariantContent {
@@ -103,6 +110,7 @@ export function RegistrationUnavailable({
   registrationStartDate,
   eventStartDate,
   message,
+  forceLight = false,
 }: RegistrationUnavailableProps) {
   const content = VARIANT_CONTENT[variant]
   const Icon = content.icon
@@ -121,7 +129,7 @@ export function RegistrationUnavailable({
       : null
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex flex-col">
+    <div className={withoutDark('min-h-screen w-full bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex flex-col', forceLight)}>
       {/* Logo header */}
       <header className="w-full pt-8 pb-2 flex items-center justify-center">
         <a
@@ -142,11 +150,11 @@ export function RegistrationUnavailable({
       {/* Main card */}
       <main className="flex-1 flex items-center justify-center px-4 py-8 sm:py-12">
         <div className="w-full max-w-md">
-          <div className="bg-white dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-border/60 shadow-xl shadow-slate-900/[0.04] dark:shadow-black/40 p-6 sm:p-8 text-center">
+          <div className={withoutDark('bg-white dark:bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-border/60 shadow-xl shadow-slate-900/[0.04] dark:shadow-black/40 p-6 sm:p-8 text-center', forceLight)}>
             <div
-              className={`mx-auto h-16 w-16 sm:h-20 sm:w-20 rounded-2xl ${content.iconBg} ring-8 ${content.ringColor} flex items-center justify-center mb-5 sm:mb-6`}
+              className={`mx-auto h-16 w-16 sm:h-20 sm:w-20 rounded-2xl ${withoutDark(content.iconBg, forceLight)} ring-8 ${withoutDark(content.ringColor, forceLight)} flex items-center justify-center mb-5 sm:mb-6`}
             >
-              <Icon className={`h-8 w-8 sm:h-10 sm:w-10 ${content.iconColor}`} strokeWidth={1.75} />
+              <Icon className={`h-8 w-8 sm:h-10 sm:w-10 ${withoutDark(content.iconColor, forceLight)}`} strokeWidth={1.75} />
             </div>
 
             <h1 className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight mb-2">
@@ -177,7 +185,6 @@ export function RegistrationUnavailable({
                 className="w-full h-11 font-semibold rounded-xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/95 hover:to-primary/85 shadow-md shadow-primary/20"
               >
                 <a href={EVELLA_URL} target="_blank" rel="noopener noreferrer">
-                  <Sparkles className="w-4 h-4 mr-2" />
                   Browse events on Evella
                   <ArrowUpRight className="w-4 h-4 ml-2" />
                 </a>

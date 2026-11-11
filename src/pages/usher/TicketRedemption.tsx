@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { QrCode, Search, UserCheck, History, Info, AlertCircle, CheckCircle, Smartphone, Camera, X } from 'lucide-react';
+import { QrCode, History, Info, AlertCircle, CheckCircle, Smartphone, Camera, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
 import { validateTicket, bulkCheckInTickets, checkInPurchasePassOne, checkInPurchasePassAll } from '@/lib/api/tickets';
@@ -25,7 +24,7 @@ export default function TicketRedemption() {
     const [selectedSessionId, setSelectedSessionId] = useState<string>('default');
     const [isScanning, setIsScanning] = useState(false);
     const [activeTab, setActiveTab] = useState('scanner');
-    const [scanFeedback, setScanFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const [scanFeedback, setScanFeedback] = useState<{ type: 'success' | 'error' | 'warning'; message: string } | null>(null);
 
     const queryClient = useQueryClient();
 
@@ -43,15 +42,22 @@ export default function TicketRedemption() {
     const currentSession = currentEvent?.sessions?.find((s: any) => String(s.id) === selectedSessionId);
 
     const validateMutation = useMutation({
-        mutationFn: (id: string) => validateTicket({
-            ticket_identifier: id,
-            event_id: selectedEventId || undefined,
-            session_id: selectedSessionId !== 'default' ? Number(selectedSessionId) : undefined
-        }),
+        mutationFn: (input: string | { id: string; confirmDeclined?: boolean }) => {
+            const id = typeof input === 'string' ? input : input.id;
+            const confirmDeclined = typeof input === 'string' ? false : Boolean(input.confirmDeclined);
+            return validateTicket({
+                ticket_identifier: id,
+                event_id: selectedEventId || undefined,
+                session_id: selectedSessionId !== 'default' ? Number(selectedSessionId) : undefined,
+                confirm_declined: confirmDeclined || undefined,
+            });
+        },
         onSuccess: (data) => {
             setLastResult(data);
             setHistory(prev => [data, ...prev].slice(0, 10));
-            if (data.validation_type === 'purchase_pass') {
+            if (data.validation_status === 'rsvp_declined') {
+                setScanFeedback({ type: 'warning', message: data.message || 'RSVP declined' });
+            } else if (data.validation_type === 'purchase_pass') {
                 if (data.validation_status === 'pass_valid') {
                     setScanFeedback({
                         type: 'success',
@@ -70,12 +76,12 @@ export default function TicketRedemption() {
                 setScanFeedback({ type: 'error', message: data.message || 'Validation failed' });
             }
             setTicketNumber('');
-            setTimeout(() => setScanFeedback(null), 2000);
+            setTimeout(() => setScanFeedback(null), 4000);
         },
         onError: (error: any) => {
             const message = error.response?.data?.message || 'Error validating ticket';
             setScanFeedback({ type: 'error', message });
-            setTimeout(() => setScanFeedback(null), 2000);
+            setTimeout(() => setScanFeedback(null), 4000);
         }
     });
 
@@ -104,7 +110,7 @@ export default function TicketRedemption() {
             setHistory(prev => [data, ...prev].slice(0, 10));
             toast.success(data.message || 'Checked in 1 ticket');
             setScanFeedback({ type: 'success', message: data.message || 'Checked in 1' });
-            setTimeout(() => setScanFeedback(null), 2000);
+            setTimeout(() => setScanFeedback(null), 4000);
             queryClient.invalidateQueries({ queryKey: ['usher-stats', selectedEventId] });
         },
         onError: (error: any) => {
@@ -122,7 +128,7 @@ export default function TicketRedemption() {
             setHistory(prev => [data, ...prev].slice(0, 10));
             toast.success(data.message || 'All tickets checked in');
             setScanFeedback({ type: 'success', message: data.message || 'All checked in' });
-            setTimeout(() => setScanFeedback(null), 2000);
+            setTimeout(() => setScanFeedback(null), 4000);
             queryClient.invalidateQueries({ queryKey: ['usher-stats', selectedEventId] });
         },
         onError: (error: any) => {
@@ -178,7 +184,7 @@ export default function TicketRedemption() {
                         <div className="space-y-1">
                             <h2 className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary/80">Mission Control</h2>
                             <h1 className="text-2xl font-bold text-white leading-tight">Pick Your Deployment</h1>
-                            <p className="text-xs text-gray-500 font-medium">Select the event and area to begin validation.</p>
+                            <p className="text-sm text-white/80">Choose the event and entrance, then start scanning.</p>
                         </div>
 
                         <div className="grid grid-cols-1 gap-3 pb-32">
@@ -210,7 +216,7 @@ export default function TicketRedemption() {
                                                     </div>
                                                     <div>
                                                         <h3 className="font-bold text-base text-white leading-tight">{event.name}</h3>
-                                                        <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wider">{event.location}</p>
+                                                        <p className="text-sm text-white/75">{event.location}</p>
                                                     </div>
                                                 </div>
                                                 {selectedEventId === event.id && (
@@ -274,7 +280,7 @@ export default function TicketRedemption() {
                                     <AlertCircle className="w-12 h-12 mx-auto text-gray-700" />
                                     <div className="space-y-1">
                                         <h3 className="text-lg font-bold text-white">No Assignments</h3>
-                                        <p className="text-xs text-gray-500 px-8">You aren't assigned to any deployments.</p>
+                                        <p className="px-8 text-sm text-white/80">You are not assigned to an event yet.</p>
                                     </div>
                                 </div>
                             )}
@@ -306,8 +312,8 @@ export default function TicketRedemption() {
                         <div className="flex items-center gap-3">
                             <Smartphone className="w-4 h-4 text-primary" />
                             <div>
-                                <span className="block text-[8px] font-bold uppercase text-gray-500 tracking-wider">Active Deployment</span>
-                                <span className="block text-xs font-bold text-white truncate max-w-[150px]">
+                                <span className="block text-xs text-white/70">Scanning for</span>
+                                <span className="block max-w-[180px] truncate text-sm font-semibold text-white sm:max-w-xs">
                                     {currentEvent?.name} • {selectedSessionId === 'default' ? 'Main' : currentSession?.name}
                                 </span>
                             </div>
@@ -316,7 +322,7 @@ export default function TicketRedemption() {
                             variant="ghost" 
                             size="sm" 
                             onClick={() => setStep('selection')}
-                            className="h-8 rounded-lg px-3 text-[10px] font-bold uppercase text-gray-400 hover:text-white"
+                            className="h-10 rounded-lg px-3 text-sm font-semibold text-white hover:bg-white/10"
                         >
                             Change
                         </Button>
@@ -324,98 +330,91 @@ export default function TicketRedemption() {
 
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                         <TabsList className="grid grid-cols-3 h-12 bg-white/5 p-1 border-white/10 rounded-xl">
-                            <TabsTrigger value="scanner" className="h-full font-bold text-[10px] uppercase tracking-wider rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white transition-all">
-                                Scanner
+                            <TabsTrigger value="scanner" className="h-full rounded-lg text-sm font-semibold text-white/70 data-[state=active]:bg-primary data-[state=active]:text-white">
+                                Scan
                             </TabsTrigger>
-                            <TabsTrigger value="manual" className="h-full font-bold text-[10px] uppercase tracking-wider rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white transition-all">
-                                Manual
+                            <TabsTrigger value="manual" className="h-full rounded-lg text-sm font-semibold text-white/70 data-[state=active]:bg-primary data-[state=active]:text-white">
+                                Type
                             </TabsTrigger>
-                            <TabsTrigger value="history" className="h-full font-bold text-[10px] uppercase tracking-wider rounded-lg data-[state=active]:bg-primary data-[state=active]:text-white transition-all">
-                                Activity
+                            <TabsTrigger value="history" className="h-full rounded-lg text-sm font-semibold text-white/70 data-[state=active]:bg-primary data-[state=active]:text-white">
+                                Recent
                             </TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="scanner" className="mt-4">
-                            <Card className="border-white/10 bg-white/5 rounded-3xl overflow-hidden">
-                                <CardContent className="p-0">
-                                    {!isScanning ? (
-                                        <div className="py-12 flex flex-col items-center justify-center space-y-6">
-                                            <div className="w-20 h-20 bg-primary/10 rounded-[2rem] border-2 border-primary/20 flex items-center justify-center">
-                                                <QrCode className="w-10 h-10 text-primary" />
-                                            </div>
-                                            <div className="text-center space-y-1 px-8">
-                                                <h3 className="text-xl font-bold text-white">Ready to Scan</h3>
-                                                <p className="text-xs text-gray-500 font-medium">Tap below to open camera and scan QR codes.</p>
-                                            </div>
-                                            <Button
-                                                onClick={() => setIsScanning(true)}
-                                                className="px-8 h-12 rounded-xl font-bold uppercase tracking-widest bg-primary hover:bg-primary/90"
-                                            >
-                                                <Camera className="w-4 h-4 mr-2" />
-                                                Open Camera
-                                            </Button>
+                        <TabsContent value="scanner" className="mt-3">
+                            <div className="relative overflow-hidden rounded-2xl bg-black" style={{ height: 'min(62dvh, 560px)' }}>
+                                {!isScanning ? (
+                                    <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
+                                        <QrCode className="h-12 w-12 text-white" />
+                                        <div className="space-y-1">
+                                            <h3 className="text-xl font-semibold text-white">Ready to scan</h3>
+                                            <p className="text-sm text-white/80">Hold the guest code inside the frame.</p>
                                         </div>
-                                    ) : (
-                                        <div className="relative">
-                                            <QrScanner
-                                                onScan={(decodedText) => {
-                                                    if (!validateMutation.isPending) {
-                                                        validateMutation.mutate(decodedText);
-                                                    }
-                                                }}
-                                                onError={(err) => {
-                                                    console.error('Scanner error:', err);
-                                                }}
-                                                onClose={() => setIsScanning(false)}
-                                            />
-                                            {/* Scan feedback overlay — flashes on top of camera */}
-                                            {scanFeedback && (
-                                                <div className={cn(
-                                                    "absolute inset-x-0 bottom-0 z-40 p-4 flex items-center gap-3 animate-in slide-in-from-bottom duration-200",
-                                                    scanFeedback.type === 'success' ? 'bg-green-600/90' : 'bg-red-600/90'
-                                                )}>
-                                                    {scanFeedback.type === 'success' ? (
-                                                        <CheckCircle className="w-6 h-6 text-white flex-shrink-0" />
-                                                    ) : (
-                                                        <AlertCircle className="w-6 h-6 text-white flex-shrink-0" />
-                                                    )}
-                                                    <div className="flex-1 min-w-0">
-                                                        <span className="block text-[9px] font-bold uppercase tracking-widest text-white/70">
-                                                            {scanFeedback.type === 'success' ? 'Checked In' : 'Failed'}
-                                                        </span>
-                                                        <span className="block text-sm font-bold text-white truncate">
-                                                            {scanFeedback.message}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {/* Validating spinner */}
-                                            {validateMutation.isPending && !scanFeedback && (
-                                                <div className="absolute inset-x-0 bottom-0 z-40 p-4 bg-black/70 flex items-center justify-center gap-3">
-                                                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                                    <span className="text-xs font-bold uppercase tracking-widest text-white">
-                                                        Validating...
+                                        <Button
+                                            onClick={() => setIsScanning(true)}
+                                            className="h-12 w-full max-w-xs bg-primary text-base font-semibold text-white"
+                                        >
+                                            <Camera className="mr-2 h-4 w-4" />
+                                            Open camera
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="relative h-full">
+                                        <QrScanner
+                                            paused={validateMutation.isPending}
+                                            onScan={(decodedText) => {
+                                                if (!validateMutation.isPending) {
+                                                    validateMutation.mutate(decodedText);
+                                                }
+                                            }}
+                                            onError={(err) => {
+                                                console.error('Scanner error:', err);
+                                            }}
+                                            onClose={() => setIsScanning(false)}
+                                        />
+                                        {scanFeedback && (
+                                            <div className={cn(
+                                                'absolute inset-x-0 bottom-0 z-40 flex items-center gap-3 p-4',
+                                                scanFeedback.type === 'success' ? 'bg-emerald-700' : scanFeedback.type === 'warning' ? 'bg-amber-700' : 'bg-red-700'
+                                            )}>
+                                                {scanFeedback.type === 'success' ? (
+                                                    <CheckCircle className="h-7 w-7 shrink-0 text-white" />
+                                                ) : (
+                                                    <AlertCircle className="h-7 w-7 shrink-0 text-white" />
+                                                )}
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="block text-sm font-medium text-white/90">
+                                                        {scanFeedback.type === 'success' ? 'Checked in' : scanFeedback.type === 'warning' ? 'RSVP declined' : 'Not admitted'}
+                                                    </span>
+                                                    <span className="block text-lg font-semibold leading-tight text-white">
+                                                        {scanFeedback.message}
                                                     </span>
                                                 </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                                            </div>
+                                        )}
+                                        {validateMutation.isPending && !scanFeedback && (
+                                            <div className="absolute inset-x-0 bottom-0 z-40 flex items-center justify-center gap-3 bg-black/80 p-4">
+                                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                                <span className="text-base font-semibold text-white">Checking ticket</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </TabsContent>
 
                         <TabsContent value="manual" className="mt-4">
                             <Card className="border-white/10 bg-white/5 rounded-3xl p-5">
                                 <form onSubmit={handleManualSubmit} className="space-y-4">
-                                    <div className="text-center space-y-1">
-                                        <h3 className="text-lg font-bold text-white uppercase tracking-tight">Manual Entry</h3>
-                                        <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Enter numeric ID or code</p>
+                                    <div className="space-y-1 text-center">
+                                        <h3 className="text-lg font-semibold text-white">Enter a code</h3>
+                                        <p className="text-sm text-white/80">Type the ticket number if the camera cannot read it.</p>
                                     </div>
                                     <Input
                                         value={ticketNumber}
                                         onChange={(e) => setTicketNumber(e.target.value)}
                                         placeholder="TKT-1234567"
-                                        className="h-14 text-xl font-mono text-center tracking-widest uppercase bg-white/5 border-white/10 rounded-xl text-white"
+                                        className="h-14 rounded-xl border-white/20 bg-black/30 text-center font-mono text-lg uppercase tracking-widest text-white placeholder:text-white/50"
                                     />
                                     <Button
                                         type="submit"
@@ -440,17 +439,17 @@ export default function TicketRedemption() {
                                                         <X className="w-4 h-4 text-red-400" />
                                                     }
                                                     <div className="flex flex-col">
-                                                        <span className="font-mono font-bold text-xs text-white">{res.ticket?.ticket_number || 'TKT-?'}</span>
-                                                        <span className="text-[8px] uppercase font-bold text-gray-500">{res.message}</span>
+                                                        <span className="font-mono text-sm font-semibold text-white">{res.ticket?.ticket_number || 'Ticket'}</span>
+                                                        <span className="text-sm text-white/80">{res.message}</span>
                                                     </div>
                                                 </div>
-                                                <span className="text-[8px] font-bold text-gray-600 uppercase">Now</span>
+                                                <span className="text-xs text-white/70">Now</span>
                                             </div>
                                         ))
                                     ) : (
-                                        <div className="py-12 text-center opacity-20">
-                                            <History className="w-8 h-8 mx-auto text-white" />
-                                            <p className="font-bold uppercase text-[9px] tracking-widest mt-2 text-white">No activity</p>
+                                        <div className="py-12 text-center">
+                                            <History className="mx-auto h-8 w-8 text-white/70" />
+                                            <p className="mt-2 text-sm font-medium text-white">No scans yet</p>
                                         </div>
                                     )}
                                 </div>
@@ -461,28 +460,23 @@ export default function TicketRedemption() {
                     {lastResult && (
                         <div className="animate-in fade-in duration-300">
                             <div className="flex justify-between items-center mb-2 px-1">
-                                <h3 className="font-bold text-[9px] uppercase tracking-wider text-gray-500">Live Result</h3>
-                                <Button variant="ghost" size="sm" className="h-6 text-[8px] font-bold uppercase" onClick={() => setLastResult(null)}>Dismiss</Button>
+                                <h3 className="text-sm font-semibold text-white">Latest result</h3>
+                                <Button variant="ghost" size="sm" className="h-8 text-sm text-white" onClick={() => setLastResult(null)}>Dismiss</Button>
                             </div>
                             <ValidationResultCard
                                 result={lastResult}
                                 onBulkCheckIn={handleBulkCheckIn}
                                 onCheckInOne={handleCheckInOne}
                                 onCheckInAll={handleCheckInAll}
+                                onCheckInDeclined={(identifier) => validateMutation.mutate({ id: identifier, confirmDeclined: true })}
                                 isCheckInOnePending={checkInOneMutation.isPending}
                                 isCheckInAllPending={checkInAllMutation.isPending}
+                                isCheckInDeclinedPending={validateMutation.isPending}
                             />
                         </div>
                     )}
                 </div>
 
-                <div className="pb-24 pt-4 text-center">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full">
-                        <span className="text-[8px] font-bold uppercase tracking-wider text-gray-600">
-                            Protocol 2.4 Active
-                        </span>
-                    </div>
-                </div>
             </div>
         </UsherMobileLayout>
     );

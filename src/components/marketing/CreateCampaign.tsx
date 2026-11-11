@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Mail, MessageSquare, Users, Layout, Calendar, Sparkles, Loader2, AlertCircle } from 'lucide-react';
+import { X, Mail, MessageSquare, Users, Layout, Calendar, Loader2, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -281,7 +281,6 @@ export function CreateCampaign({ open, onClose }: CreateCampaignProps) {
             </SelectItem>
             <SelectItem value="both">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
                 Email + SMS
               </div>
             </SelectItem>

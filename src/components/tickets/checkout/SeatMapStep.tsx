@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type {
@@ -603,10 +603,8 @@ export function SeatMapStep({
             disabled={isBestAvailableLoading}
             onClick={() => void onBestAvailable()}
           >
-            {isBestAvailableLoading ? (
+            {isBestAvailableLoading && (
               <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="mr-1 h-3.5 w-3.5" />
             )}
             Best available
           </Button>

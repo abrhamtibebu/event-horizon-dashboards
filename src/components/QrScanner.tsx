@@ -45,12 +45,15 @@ export default function QrScanner({ onScan, onError, onClose, paused }: QrScanne
         )
         const cameraId = backCamera?.id || cameras[cameras.length - 1].id
 
+        const frame = containerRef.current?.clientWidth || window.innerWidth
+        const box = Math.max(180, Math.min(280, Math.floor(frame * 0.68)))
+
         await scanner.start(
           cameraId,
           {
             fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
+            qrbox: { width: box, height: box },
+            aspectRatio: 1,
           },
           (decodedText) => {
             // Debounce: ignore the same code within 3 seconds
@@ -135,12 +138,12 @@ export default function QrScanner({ onScan, onError, onClose, paused }: QrScanne
   }, [paused])
 
   return (
-    <div className="relative w-full aspect-square bg-black rounded-2xl overflow-hidden">
+    <div className="relative h-full min-h-[280px] w-full overflow-hidden rounded-2xl bg-black">
       {/* Camera feed renders here */}
       <div
         id="qr-scanner-region"
         ref={containerRef}
-        className="w-full h-full"
+        className="h-full w-full [&_video]:!h-full [&_video]:!w-full [&_video]:!object-cover"
         style={{ minHeight: 280 }}
       />
 
@@ -148,9 +151,7 @@ export default function QrScanner({ onScan, onError, onClose, paused }: QrScanne
       {isStarting && !cameraError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-20 gap-3">
           <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-bold uppercase tracking-widest text-gray-400">
-            Opening Camera...
-          </span>
+          <span className="text-sm font-semibold text-white">Opening camera</span>
         </div>
       )}
 
@@ -162,7 +163,7 @@ export default function QrScanner({ onScan, onError, onClose, paused }: QrScanne
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <p className="text-sm text-gray-300 font-medium max-w-[260px]">{cameraError}</p>
+          <p className="max-w-[280px] text-base font-medium text-white">{cameraError}</p>
           <button
             onClick={onClose}
             className="px-6 py-2 bg-white/10 rounded-xl text-xs font-bold uppercase tracking-wider text-white hover:bg-white/20 transition-colors"
@@ -176,7 +177,7 @@ export default function QrScanner({ onScan, onError, onClose, paused }: QrScanne
       {!isStarting && !cameraError && (
         <div className="absolute inset-0 z-10 pointer-events-none">
           {/* Corner brackets */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[250px] h-[250px]">
+          <div className="absolute left-1/2 top-1/2 h-[68%] max-h-[280px] w-[68%] max-w-[280px] -translate-x-1/2 -translate-y-1/2">
             <div className="absolute top-0 left-0 w-8 h-8 border-t-3 border-l-3 border-primary rounded-tl-lg" />
             <div className="absolute top-0 right-0 w-8 h-8 border-t-3 border-r-3 border-primary rounded-tr-lg" />
             <div className="absolute bottom-0 left-0 w-8 h-8 border-b-3 border-l-3 border-primary rounded-bl-lg" />

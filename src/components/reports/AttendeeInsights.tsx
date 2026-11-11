@@ -1,5 +1,4 @@
 import React from 'react';
-import { Users, RefreshCw, CheckCircle } from 'lucide-react';
 import { ReportMetrics } from '@/types/reports';
 import { formatPercentage } from '@/utils/reportTransformers';
 import { RevenueLineChart } from './RevenueLineChart';
@@ -17,108 +16,60 @@ export const AttendeeInsights: React.FC<AttendeeInsightsProps> = ({ metrics }) =
     metrics.registrations_by_month || {},
     'registrations'
   );
-  // Get theme-aware colors dynamically - PieChartComponent will use its own colors, but this ensures data consistency
   const ageColors = getChartColorPalette('age');
   const ageGroupData = transformToPieChart(
     metrics.age_group_breakdown || {},
     ageColors
   );
 
+  const items = [
+    { label: 'New', value: (metrics.new_attendees || 0).toLocaleString(), hint: 'First-time attendees' },
+    { label: 'Returning', value: (metrics.returning_attendees || 0).toLocaleString(), hint: `${formatPercentage(metrics.returning_attendees_percentage || 0)} return rate` },
+    { label: 'Conversion', value: formatPercentage(metrics.conversion_rate || 0), hint: 'Ticket to attendance' },
+    { label: 'Unique', value: (metrics.unique_attendees || 0).toLocaleString(), hint: 'Unique email addresses' },
+  ];
+
   return (
-    <>
-      <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 rounded-2xl shadow-sm border border-purple-100 dark:border-purple-800/50 p-6 mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-bold text-purple-900 dark:text-purple-300 flex items-center">
-              <Users className="w-6 h-6 mr-2" />
-              Attendee & Registration Insights
-            </h2>
-            <p className="text-sm text-purple-700 dark:text-purple-400 mt-1">
-              Demographics, registration patterns, and conversion metrics
-            </p>
+    <div className="space-y-4">
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h2 className="text-base font-semibold text-foreground">Attendees and registrations</h2>
+        <p className="mt-1 text-sm text-muted-foreground">New, returning, and conversion.</p>
+        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+          {items.map((item) => (
+            <div key={item.label} className="rounded-lg border border-border px-3 py-3">
+              <p className="text-xs text-muted-foreground">{item.label}</p>
+              <p className="mt-1 text-xl font-semibold tracking-tight">{item.value}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{item.hint}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-base font-semibold text-foreground">Monthly registrations</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Registrations per month</p>
+          <div className="mt-4">
+            <RevenueLineChart
+              data={monthlyRegistrations}
+              dataKey="registrations"
+              gradientId="monthlyRegGradient"
+            />
           </div>
         </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-card rounded-xl shadow-sm border border-border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <Users className="w-8 h-8 text-green-500" />
-              <span className="text-xs font-medium text-muted-foreground">NEW</span>
-            </div>
-            <div className="text-2xl font-bold text-green-600">
-              {(metrics.new_attendees || 0).toLocaleString()}
-            </div>
-            <div className="text-xs text-muted-foreground/70 mt-1">First-time attendees</div>
-          </div>
-
-          <div className="bg-card rounded-xl shadow-sm border border-border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <RefreshCw className="w-8 h-8 text-blue-500" />
-              <span className="text-xs font-medium text-muted-foreground">RETURNING</span>
-            </div>
-            <div className="text-2xl font-bold text-blue-600">
-              {(metrics.returning_attendees || 0).toLocaleString()}
-            </div>
-            <div className="text-xs text-muted-foreground/70 mt-1">
-              {formatPercentage(metrics.returning_attendees_percentage || 0)} return rate
-            </div>
-          </div>
-
-          <div className="bg-card rounded-xl shadow-sm border border-border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <CheckCircle className="w-8 h-8 text-purple-500" />
-              <span className="text-xs font-medium text-muted-foreground">CONVERSION</span>
-            </div>
-            <div className="text-2xl font-bold text-purple-600">
-              {formatPercentage(metrics.conversion_rate || 0)}
-            </div>
-            <div className="text-xs text-muted-foreground/70 mt-1">Ticket to attendance</div>
-          </div>
-
-          <div className="bg-card rounded-xl shadow-sm border border-border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <Users className="w-8 h-8 text-orange-500" />
-              <span className="text-xs font-medium text-muted-foreground">UNIQUE</span>
-            </div>
-            <div className="text-2xl font-bold text-orange-600">
-              {(metrics.unique_attendees || 0).toLocaleString()}
-            </div>
-            <div className="text-xs text-muted-foreground/70 mt-1">Unique email addresses</div>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-base font-semibold text-foreground">Age groups</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Attendee age breakdown</p>
+          <div className="mt-4">
+            <PieChartComponent
+              data={ageGroupData}
+              height={300}
+              colorPalette="age"
+              emptyMessage="No age data available"
+            />
           </div>
         </div>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">Monthly Registration Trend</h3>
-              <p className="text-sm text-muted-foreground">Registrations per month</p>
-            </div>
-          </div>
-          <RevenueLineChart
-            data={monthlyRegistrations}
-            dataKey="registrations"
-            gradientId="monthlyRegGradient"
-          />
-        </div>
-
-        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">Age Group Distribution</h3>
-              <p className="text-sm text-muted-foreground">Attendee demographics by age</p>
-            </div>
-          </div>
-          <PieChartComponent
-            data={ageGroupData}
-            height={300}
-            colorPalette="age"
-            emptyMessage="No age data available"
-          />
-        </div>
-      </div>
-    </>
+    </div>
   );
 };
-

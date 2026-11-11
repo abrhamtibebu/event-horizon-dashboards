@@ -6,7 +6,6 @@ import {
   Pencil,
   Trash2,
   RefreshCw,
-  Sparkles,
   ImageIcon,
   Link2,
   ChevronDown,
@@ -466,8 +465,7 @@ export default function AdminAdvertisingPage() {
         <TabsContent value="creatives" className="space-y-8">
           <Card className="border-primary/20 bg-primary/5">
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Sparkles className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">
                 Quick banner (3 steps)
               </CardTitle>
               <CardDescription>

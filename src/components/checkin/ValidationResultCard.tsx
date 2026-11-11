@@ -10,8 +10,10 @@ interface ValidationResultCardProps {
   onBulkCheckIn?: (ticketIds: number[]) => void;
   onCheckInOne?: (orderId: string) => void;
   onCheckInAll?: (orderId: string) => void;
+  onCheckInDeclined?: (identifier: string) => void;
   isCheckInOnePending?: boolean;
   isCheckInAllPending?: boolean;
+  isCheckInDeclinedPending?: boolean;
 }
 
 export function ValidationResultCard({
@@ -19,12 +21,14 @@ export function ValidationResultCard({
   onBulkCheckIn,
   onCheckInOne,
   onCheckInAll,
+  onCheckInDeclined,
   isCheckInOnePending,
   isCheckInAllPending,
+  isCheckInDeclinedPending,
 }: ValidationResultCardProps) {
   const isPurchasePass = result.validation_type === 'purchase_pass';
   const isValid = result.validation_status === 'valid' || result.validation_status === 'pass_valid';
-  const isWarning = ['already_used', 'too_early', 'pending', 'not_event_checked_in', 'pass_fully_used'].includes(result.validation_status);
+  const isWarning = ['already_used', 'too_early', 'pending', 'not_event_checked_in', 'pass_fully_used', 'rsvp_declined'].includes(result.validation_status);
   const isError = ['invalid', 'expired', 'refunded', 'cancelled', 'pass_invalid', 'tampered'].includes(result.validation_status);
 
   const handleGroupCheckIn = () => {
@@ -46,17 +50,14 @@ export function ValidationResultCard({
   };
 
   const getStatusColor = () => {
-    if (isValid) return 'bg-green-50 border-green-200';
-    if (isWarning) return 'bg-yellow-50 border-yellow-200';
-    if (isError) return 'bg-red-50 border-red-200';
-    return 'bg-blue-50 border-blue-200';
+    if (isValid) return 'border-emerald-400 bg-emerald-800 text-white';
+    if (isWarning) return 'border-amber-300 bg-amber-800 text-white';
+    if (isError) return 'border-red-300 bg-red-800 text-white';
+    return 'border-sky-300 bg-sky-900 text-white';
   };
 
   const getStatusBadgeColor = () => {
-    if (isValid) return 'bg-green-100 text-green-800 border-green-200';
-    if (isWarning) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    if (isError) return 'bg-red-100 text-red-800 border-red-200';
-    return 'bg-blue-100 text-blue-800 border-blue-200';
+    return 'border-white/30 bg-white/15 text-white';
   };
 
   const remaining = result.purchase_pass?.ticket_count.remaining ?? 0;
@@ -73,7 +74,7 @@ export function ValidationResultCard({
               <Badge className={getStatusBadgeColor()}>
                 {result.validation_status.replace(/_/g, ' ').toUpperCase()}
               </Badge>
-              <p className="text-xl font-black">{result.message}</p>
+              <p className="text-xl font-semibold text-white">{result.message}</p>
             </div>
           </div>
 
@@ -84,11 +85,11 @@ export function ValidationResultCard({
                   <Users className="w-4 h-4 text-primary" />
                   <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Purchase Pass</span>
                 </div>
-                <p className="text-2xl font-black">
+                <p className="text-xl font-semibold text-white sm:text-2xl">
                   {total} ticket{total === 1 ? '' : 's'} · {checkedIn} checked in · {remaining} remaining
                 </p>
                 {result.purchase_pass.guest_name && (
-                  <p className="mt-2 text-sm font-bold flex items-center justify-center gap-1">
+                  <p className="mt-2 flex items-center justify-center gap-1 text-sm font-semibold text-white">
                     <User className="w-3.5 h-3.5" />
                     {result.purchase_pass.guest_name}
                   </p>
@@ -100,11 +101,11 @@ export function ValidationResultCard({
                   {result.tickets.map((t) => (
                     <div
                       key={t.id}
-                      className="flex items-center justify-between p-2 bg-white/50 dark:bg-black/20 rounded-lg border border-border/50 text-xs"
+                      className="flex items-center justify-between rounded-lg border border-white/20 bg-black/25 p-2 text-xs text-white"
                     >
                       <div className="flex flex-col">
                         <span className="font-bold">{t.attendee_name || 'Guest'}</span>
-                        <span className="font-mono text-[10px] text-muted-foreground">{t.ticket_number}</span>
+                        <span className="font-mono text-[11px] text-white/80">{t.ticket_number}</span>
                       </div>
                       <Badge
                         variant={t.checked_in ? 'secondary' : 'default'}
@@ -152,35 +153,57 @@ export function ValidationResultCard({
             </div>
           )}
 
+          {result.validation_status === 'rsvp_declined' && (
+            <div className="space-y-4 border-t border-white/20 pt-4">
+              <div className="space-y-1 text-center text-sm text-white">
+                <p className="text-lg font-semibold">{result.guest?.name || 'Invited guest'}</p>
+                {result.guest?.email && <p className="text-white/80">{result.guest.email}</p>}
+                {result.guest?.phone && <p className="text-white/80">{result.guest.phone}</p>}
+                {result.guest?.guest_type && (
+                  <p className="text-xs font-semibold uppercase tracking-widest text-white/70">{result.guest.guest_type}</p>
+                )}
+              </div>
+              {onCheckInDeclined && result.ticket_identifier && (
+                <Button
+                  onClick={() => onCheckInDeclined(result.ticket_identifier!)}
+                  disabled={isCheckInDeclinedPending}
+                  className="h-12 w-full text-sm font-semibold"
+                >
+                  {isCheckInDeclinedPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Check in anyway'}
+                </Button>
+              )}
+            </div>
+          )}
+
           {!isPurchasePass && result.ticket && (
             <div className="space-y-3 pt-4 border-t">
-              <h4 className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Individual Details</h4>
+              <h4 className="text-xs font-semibold uppercase tracking-widest text-white/80">Ticket</h4>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="space-y-1">
-                  <div className="flex items-center text-muted-foreground">
+                  <div className="flex items-center text-white/80">
                     <Hash className="w-3 h-3 mr-1" />
-                    <span className="text-[10px] font-bold uppercase">Ticket #</span>
+                    <span className="text-xs font-semibold uppercase">Ticket number</span>
                   </div>
-                  <p className="font-mono font-bold text-lg">{result.ticket.ticket_number}</p>
+                  <p className="font-mono text-lg font-semibold text-white">{result.ticket.ticket_number}</p>
                 </div>
                 {result.ticket.ticket_type && (
                   <div className="space-y-1">
-                    <div className="flex items-center text-muted-foreground">
-                      <span className="text-[10px] font-bold uppercase">Variant</span>
+                    <div className="flex items-center text-white/80">
+                      <span className="text-xs font-semibold uppercase">Type</span>
                     </div>
-                    <Badge variant="outline" className="font-black border-primary/20 text-primary">
+                    <Badge variant="outline" className="border-white/30 font-semibold text-white">
                       {result.ticket.ticket_type.name}
                     </Badge>
                   </div>
                 )}
                 {result.ticket.attendee && (
                   <div className="space-y-1 col-span-2">
-                    <div className="flex items-center text-muted-foreground">
+                    <div className="flex items-center text-white/80">
                       <User className="w-3 h-3 mr-1" />
-                      <span className="text-[10px] font-bold uppercase">Purchaser / Attendee</span>
+                      <span className="text-xs font-semibold uppercase">Guest</span>
                     </div>
-                    <p className="font-black text-base">{result.ticket.attendee.guest?.name || 'N/A'}</p>
-                    <p className="text-xs text-muted-foreground opacity-70">{result.ticket.attendee.guest?.email}</p>
+                    <p className="text-base font-semibold text-white">{result.ticket.attendee.guest?.name || 'N/A'}</p>
+                    <p className="text-sm text-white/80">{result.ticket.attendee.guest?.email}</p>
                   </div>
                 )}
               </div>
@@ -190,17 +213,17 @@ export function ValidationResultCard({
           {!isPurchasePass && result.related_tickets && result.related_tickets.length > 0 && (
             <div className="space-y-4 pt-4 border-t">
               <div className="flex items-center justify-between">
-                <h4 className="font-bold text-xs uppercase tracking-widest text-amber-600">Group Bundle Contents</h4>
-                <Badge variant="outline" className="text-[10px] font-black border-amber-200 bg-amber-50">
+                <h4 className="text-xs font-semibold uppercase tracking-widest text-white">Group tickets</h4>
+                <Badge variant="outline" className="border-white/30 bg-white/10 text-xs font-semibold text-white">
                   {result.related_tickets.length + 1} Tickets
                 </Badge>
               </div>
               <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
                 {result.related_tickets.map((t: any) => (
-                  <div key={t.id} className="flex items-center justify-between p-2 bg-white/50 dark:bg-black/20 rounded-lg border border-border/50 text-xs">
+                  <div key={t.id} className="flex items-center justify-between rounded-lg border border-white/20 bg-black/25 p-2 text-xs text-white">
                     <div className="flex flex-col">
-                      <span className="font-mono font-bold">{t.ticket_number}</span>
-                      <span className="text-[10px] text-muted-foreground">{t.ticket_type?.name}</span>
+                      <span className="font-mono font-semibold">{t.ticket_number}</span>
+                      <span className="text-xs text-white/80">{t.ticket_type?.name}</span>
                     </div>
                     <Badge
                       variant={t.checked_in ? 'secondary' : 'default'}
@@ -225,29 +248,29 @@ export function ValidationResultCard({
 
           <div className="pt-2">
             {isValid && !isPurchasePass && (
-              <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center shrink-0">
+              <div className="flex items-center gap-3 rounded-xl border border-white/20 bg-black/25 p-4">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500">
                   <CheckCircle className="w-5 h-5 text-white" />
                 </div>
-                <p className="text-sm font-bold text-green-700 dark:text-green-400">Access Granted: Allow entry now.</p>
+                <p className="text-sm font-semibold text-white">Allow entry.</p>
               </div>
             )}
             {isPurchasePass && isValid && (
-              <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center shrink-0">
+              <div className="flex items-center gap-3 rounded-xl border border-white/20 bg-black/25 p-4">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500">
                   <CheckCircle className="w-5 h-5 text-white" />
                 </div>
-                <p className="text-sm font-bold text-green-700 dark:text-green-400">
-                  Pass valid — use Check in 1 or Check in all to admit guests.
+                <p className="text-sm font-semibold text-white">
+                  Pass is valid. Check in one guest or the whole group.
                 </p>
               </div>
             )}
             {isWarning && (
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex items-center gap-3">
+              <div className="flex items-center gap-3 rounded-xl border border-white/20 bg-black/25 p-4">
                 <div className="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center shrink-0">
                   <AlertTriangle className="w-5 h-5 text-white" />
                 </div>
-                <p className="text-sm font-bold text-yellow-700 dark:text-yellow-400">
+                <p className="text-sm font-semibold text-white">
                   {result.validation_status === 'pass_fully_used'
                     ? 'All tickets on this pass have been checked in.'
                     : 'Supervisor needed: Verification required.'}
@@ -255,11 +278,11 @@ export function ValidationResultCard({
               </div>
             )}
             {isError && (
-              <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 flex items-center gap-3">
+              <div className="flex items-center gap-3 rounded-xl border border-white/20 bg-black/25 p-4">
                 <div className="w-8 h-8 rounded-full bg-destructive flex items-center justify-center shrink-0">
                   <Ban className="w-5 h-5 text-white" />
                 </div>
-                <p className="text-sm font-bold text-destructive">Entry Rejected: Ticket is unusable.</p>
+                <p className="text-sm font-semibold text-white">Do not admit this guest.</p>
               </div>
             )}
           </div>

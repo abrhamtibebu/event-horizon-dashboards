@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { venueApi, type VenueBlackout, type VenueSpace } from '@/lib/api/venues'
+import { dateBoundaryIso, toDateInputValue } from '@/lib/venue/dateOnly'
 import { toast } from 'sonner'
 
 const empty = { space_id: 'all', starts_at: '', ends_at: '', reason: '' }
@@ -44,8 +44,8 @@ export function VenueBlackoutDialog({
     if (editing) {
       setForm({
         space_id: editing.space_id ? String(editing.space_id) : 'all',
-        starts_at: format(new Date(editing.starts_at), "yyyy-MM-dd'T'HH:mm"),
-        ends_at: format(new Date(editing.ends_at), "yyyy-MM-dd'T'HH:mm"),
+        starts_at: toDateInputValue(editing.starts_at),
+        ends_at: toDateInputValue(editing.ends_at),
         reason: editing.reason || '',
       })
     } else {
@@ -55,15 +55,15 @@ export function VenueBlackoutDialog({
 
   const save = async (force = false) => {
     if (!form.starts_at || !form.ends_at) {
-      toast.error('Start and end times are required')
+      toast.error('Start and end dates are required')
       return
     }
     setSaving(true)
     try {
       const payload = {
         space_id: form.space_id === 'all' ? null : Number(form.space_id),
-        starts_at: form.starts_at,
-        ends_at: form.ends_at,
+        starts_at: dateBoundaryIso(form.starts_at),
+        ends_at: dateBoundaryIso(form.ends_at, true),
         reason: form.reason || null,
       }
       if (editing) {
@@ -112,24 +112,28 @@ export function VenueBlackoutDialog({
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label>Starts</Label>
+              <Label htmlFor="blackout-start">Start date</Label>
               <Input
-                type="datetime-local"
+                id="blackout-start"
+                type="date"
                 value={form.starts_at}
                 onChange={(e) => setForm({ ...form, starts_at: e.target.value })}
               />
             </div>
             <div className="space-y-1">
-              <Label>Ends</Label>
+              <Label htmlFor="blackout-end">End date</Label>
               <Input
-                type="datetime-local"
+                id="blackout-end"
+                type="date"
+                min={form.starts_at || undefined}
                 value={form.ends_at}
                 onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
               />
             </div>
           </div>
+          <p className="text-xs text-muted-foreground">Blocked dates apply for the full day.</p>
           <div className="space-y-1">
             <Label>Reason</Label>
             <Textarea value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
