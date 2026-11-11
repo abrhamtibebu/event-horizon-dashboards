@@ -4,8 +4,16 @@ type FieldOption = { option_value?: string; option_label?: string };
 
 function optionsOf(field?: FormField | null): FieldOption[] {
   if (!field) return [];
-  const options = field.fieldOptions || (field as FormField & { field_options?: FieldOption[] }).field_options;
-  return Array.isArray(options) ? options : [];
+  const raw = field as FormField & {
+    field_options?: Array<{ option_value?: string; option_label?: string; value?: string; label?: string }>;
+    options?: Array<{ option_value?: string; option_label?: string; value?: string; label?: string }>;
+  };
+  const options = field.fieldOptions || raw.field_options || raw.options;
+  if (!Array.isArray(options)) return [];
+  return options.map((option) => ({
+    option_value: option.option_value ?? option.value ?? '',
+    option_label: option.option_label ?? option.label ?? '',
+  }));
 }
 
 function answerMatches(parent: FormField | undefined, actual: unknown, expected: unknown): boolean {
@@ -31,6 +39,13 @@ function hasAnswer(value: unknown): boolean {
 
 /** True when a follow-up field should be shown for the current answers. */
 export function evaluateFieldCondition(logic: unknown, formData: Record<string, unknown>, fields: FormField[]): boolean {
+  if (typeof logic === 'string') {
+    try {
+      logic = JSON.parse(logic) as unknown;
+    } catch {
+      return true;
+    }
+  }
   if (!logic || typeof logic !== 'object' || Object.keys(logic as object).length === 0) return true;
   const rule = logic as { field_id?: number | string; field_key?: string; operator?: string; value?: unknown };
   const parent = fields.find((field) =>

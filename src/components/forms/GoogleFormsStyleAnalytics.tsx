@@ -58,6 +58,7 @@ import {
 } from 'recharts';
 
 import { formSubmissionApi, formApi } from '@/lib/api/forms';
+import { readableAnswer } from '@/lib/formAnswers';
 import type { FormSubmission, Form, FormField } from '@/types/forms';
 import { toast } from 'sonner';
 
@@ -221,10 +222,9 @@ export const GoogleFormsStyleAnalytics: React.FC<GoogleFormsStyleAnalyticsProps>
     // Handle different field types
     switch (field?.field_type) {
       case 'checkbox':
-        if (Array.isArray(value)) {
-          return value.join(', ');
-        }
-        return value;
+      case 'radio':
+      case 'select':
+        return readableAnswer(field, value);
       case 'date':
         return new Date(value).toLocaleDateString();
       case 'datetime':
@@ -765,6 +765,12 @@ export const GoogleFormsStyleAnalytics: React.FC<GoogleFormsStyleAnalyticsProps>
 
                       return form.formFields
                         .sort((a, b) => a.order - b.order)
+                        .filter((field) => {
+                          const stored = selectedSubmission.submission_data?.[field.field_key];
+                          const answered = stored !== undefined && stored !== null && stored !== '' && !(Array.isArray(stored) && stored.length === 0);
+                          const followUp = field.conditional_logic && Object.keys(field.conditional_logic).length > 0;
+                          return answered || !followUp;
+                        })
                         .map((field) => {
                           const fieldValue = getFieldValue(field.field_key, selectedSubmission.submission_data);
                           const formattedValue = formatFieldValue(fieldValue, field);

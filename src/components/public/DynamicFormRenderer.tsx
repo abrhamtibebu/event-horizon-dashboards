@@ -513,7 +513,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
               <SelectValue placeholder={field.placeholder || 'Select an option'} />
             </SelectTrigger>
             <SelectContent className={appearance === 'invitation' ? 'rounded-xl border border-[#e7e1d8] bg-white text-[#302820]' : 'rounded-2xl'}>
-              {(field.fieldOptions || (field as any).field_options || []).map((option: any) => (
+              {(field.fieldOptions || (field as any).field_options || (field as any).options || []).map((option: any) => (
                 <SelectItem key={option.id} value={option.option_value} className={appearance === 'invitation' ? 'rounded-lg text-[#302820] focus:bg-[#f5f4f0] focus:text-[#302820]' : 'rounded-xl'}>
                   {option.option_label}
                 </SelectItem>
@@ -525,7 +525,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
       case 'radio':
         return (
           <div className={appearance === 'invitation' ? 'grid grid-cols-1' : 'grid grid-cols-1 gap-3'}>
-            {(field.fieldOptions || (field as any).field_options || []).map((option: any) => (
+            {(field.fieldOptions || (field as any).field_options || (field as any).options || []).map((option: any) => (
               <label
                 key={option.id}
                 className={appearance === 'invitation'
@@ -552,7 +552,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
       case 'checkbox':
         return (
           <div className={appearance === 'invitation' ? 'grid grid-cols-1' : 'grid grid-cols-1 gap-3'}>
-            {(field.fieldOptions || (field as any).field_options || []).map((option: any) => (
+            {(field.fieldOptions || (field as any).field_options || (field as any).options || []).map((option: any) => (
               <label
                 key={option.id}
                 className={appearance === 'invitation'

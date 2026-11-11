@@ -34,6 +34,7 @@ export interface Invitation {
   created_at: string;
   expires_at: string | null;
   rsvp_at: string | null;
+  rsvp_reminder_sent_at?: string | null;
   is_rsvp_completed: boolean;
   registrations_count?: number;
   stats?: {
@@ -84,6 +85,8 @@ export interface RsvpPageSettings {
   headline: string;
   message: string;
   email_message: string;
+  rsvp_reminder_message: string;
+  event_reminder_message: string;
   accent_color: string;
   show_banner: boolean;
   show_details: boolean;
@@ -125,6 +128,8 @@ export const DEFAULT_RSVP_PAGE: RsvpPageSettings = {
   headline: 'Hi {name}, confirm your RSVP',
   message: 'Choose Accept to open the registration form. Your e-badge with a check-in QR code will be emailed after you register.',
   email_message: 'You’re invited to {event} as a {guest_type}.\n\nReview the event details and choose Accept or Regret on your RSVP page. If you accept, complete the short form to receive your e-badge.',
+  rsvp_reminder_message: 'This is a reminder to respond to your invitation to {event}.\n\nOpen your RSVP page and choose Accept or Regret. If you accept, complete the short form to receive your e-badge.',
+  event_reminder_message: '{event} is one week away.\n\nJoin us on {date} at {location}. We look forward to seeing you.',
   accent_color: PLATFORM_RSVP_ACCENT_COLOR,
   show_banner: true,
   show_details: true,

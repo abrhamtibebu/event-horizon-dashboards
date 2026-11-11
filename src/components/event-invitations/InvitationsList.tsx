@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,7 @@ import {
   Loader2,
   Mail,
   MinusCircle,
+  Trash2,
   MoreVertical,
   QrCode,
   RefreshCw,
@@ -36,7 +38,7 @@ import { toast } from 'sonner';
 import { ModernConfirmationDialog } from '@/components/ui/ModernConfirmationDialog';
 import { format, parseISO } from 'date-fns';
 import QRCode from 'qrcode';
-import { downloadInvitationsCsv, fetchInvitationResponse, useEventGuestTypes, useInvitations, useResendInvitationEmail, useRevokeInvitation, type InvitationResponse } from '@/lib/api/invitations';
+import { downloadInvitationsCsv, fetchInvitationResponse, useDeleteInvitations, useEventGuestTypes, useInvitations, useRemindPendingInvitations, useResendInvitationEmail, useRevokeInvitation, type InvitationResponse } from '@/lib/api/invitations';
 import type { Invitation, InvitationEmailStatus, InvitationRsvpStatus } from '@/types/invitations';
 
 interface InvitationsListProps {
@@ -146,6 +148,8 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
   const { data: invitations, isLoading } = useInvitations(eventId, { userId });
   const { data: guestTypes = [] } = useEventGuestTypes(eventId);
   const revokeMutation = useRevokeInvitation();
+  const deleteMutation = useDeleteInvitations();
+  const remindMutation = useRemindPendingInvitations(eventId);
   const resendMutation = useResendInvitationEmail();
 
   const [resendingId, setResendingId] = useState<number | null>(null);
@@ -160,6 +164,9 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
   const [response, setResponse] = useState<InvitationResponse | null>(null);
   const [responseLoading, setResponseLoading] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<Invitation | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [deleteIds, setDeleteIds] = useState<number[] | null>(null);
+  const [remindOpen, setRemindOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -251,6 +258,34 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
     }
   };
 
+  const handleDelete = async () => {
+    if (!deleteIds || deleteIds.length === 0) return;
+    try {
+      const result = await deleteMutation.mutateAsync({ eventId, ids: deleteIds });
+      const removed = result?.deleted ?? deleteIds.length;
+      toast.success(removed === 1 ? 'Invitation deleted' : `${removed} invitations deleted`);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        deleteIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      setDeleteIds(null);
+    } catch {
+      toast.error('Failed to delete invitations');
+    }
+  };
+
+  const handleRemindPending = async () => {
+    try {
+      const result = await remindMutation.mutateAsync();
+      if ((result?.queued ?? 0) > 0) toast.success(result.message);
+      else toast.info(result?.message || 'No guests are waiting to confirm.');
+      setRemindOpen(false);
+    } catch {
+      toast.error('Failed to send reminders');
+    }
+  };
+
   const handleResendEmail = async (inv: Invitation) => {
     if (!inv.recipient_email?.trim()) {
       toast.error('This invitation has no recipient email.');
@@ -309,6 +344,9 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
   const visibleInvitations = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const failedCount = (invitations ?? []).filter((i) => i.email_status === 'failed' && i.status === 'active').length;
+  const pendingRemindable = (invitations ?? []).filter((i) => i.status === 'active' && i.rsvp_status === 'pending' && i.recipient_email).length;
+  const pageIds = visibleInvitations.map((inv) => inv.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
 
   if (isLoading) {
     return (
@@ -333,6 +371,16 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
           </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {isOrganizer && selectedIds.size > 0 && (
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5 border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => setDeleteIds(Array.from(selectedIds))} disabled={deleteMutation.isPending}>
+              <Trash2 className="w-3.5 h-3.5" /> Delete selected ({selectedIds.size})
+            </Button>
+          )}
+          {isOrganizer && pendingRemindable > 0 && (
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={() => setRemindOpen(true)} disabled={remindMutation.isPending}>
+              <Mail className="w-3.5 h-3.5" /> Remind guests who have not responded ({pendingRemindable})
+            </Button>
+          )}
           {isOrganizer && failedCount > 0 && (
             <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5 border-rose-200 text-rose-700 hover:bg-rose-50" onClick={handleRetryAllFailed} disabled={resendMutation.isPending}>
               <RefreshCw className={`w-3.5 h-3.5 ${resendMutation.isPending ? 'animate-spin' : ''}`} /> Retry {failedCount} failed
@@ -390,6 +438,21 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
         <Table>
           <TableHeader className="bg-muted/30">
             <TableRow>
+              {isOrganizer && (
+                <TableHead className="w-10 py-2">
+                  <Checkbox
+                    checked={allPageSelected}
+                    onCheckedChange={(checked) => {
+                      setSelectedIds((prev) => {
+                        const next = new Set(prev);
+                        pageIds.forEach((id) => { if (checked) next.add(id); else next.delete(id); });
+                        return next;
+                      });
+                    }}
+                    aria-label="Select guests on this page"
+                  />
+                </TableHead>
+              )}
               <TableHead className="text-[11px] font-bold py-2">Guest</TableHead>
               <TableHead className="text-[11px] font-bold py-2">Guest type</TableHead>
               <TableHead className="text-[11px] font-bold py-2">Email delivery</TableHead>
@@ -400,6 +463,21 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
           <TableBody>
             {visibleInvitations.map((inv) => (
               <TableRow key={inv.id} className={`group transition-colors ${inv.status !== 'active' ? 'opacity-50' : ''}`}>
+                {isOrganizer && (
+                  <TableCell className="py-3">
+                    <Checkbox
+                      checked={selectedIds.has(inv.id)}
+                      onCheckedChange={(checked) => {
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (checked) next.add(inv.id); else next.delete(inv.id);
+                          return next;
+                        });
+                      }}
+                      aria-label={`Select ${inv.recipient_name || 'guest'}`}
+                    />
+                  </TableCell>
+                )}
                 <TableCell className="py-3">
                   <p className="text-sm font-medium">{inv.recipient_name || 'Public link'}</p>
                   {inv.recipient_email && (
@@ -424,6 +502,9 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
                 </TableCell>
                 <TableCell className="py-3 whitespace-nowrap">
                   <RsvpStatusBadge status={inv.rsvp_status} at={inv.rsvp_at} />
+                  {inv.rsvp_reminder_sent_at && (
+                    <p className="mt-1 text-[10px] text-muted-foreground">Reminded {fmtDate(inv.rsvp_reminder_sent_at)}</p>
+                  )}
                 </TableCell>
                 <TableCell className="py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
@@ -467,11 +548,16 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
                             {resendingId === inv.id ? 'Sending…' : 'Resend email'}
                           </DropdownMenuItem>
                         )}
-                        {isOrganizer && inv.status === 'active' && (
+                        {isOrganizer && (
                           <>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => setRevokeTarget(inv)} className="text-rose-600">
-                              <XCircle className="w-3.5 h-3.5 mr-2" /> Revoke
+                            {inv.status === 'active' && (
+                              <DropdownMenuItem onClick={() => setRevokeTarget(inv)} className="text-rose-600">
+                                <XCircle className="w-3.5 h-3.5 mr-2" /> Revoke
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={() => setDeleteIds([inv.id])} className="text-rose-600">
+                              <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
                             </DropdownMenuItem>
                           </>
                         )}
@@ -515,6 +601,34 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
         isLoading={revokeMutation.isPending}
       />
 
+      <ModernConfirmationDialog
+        isOpen={!!deleteIds}
+        onClose={() => {
+          if (!deleteMutation.isPending) setDeleteIds(null);
+        }}
+        onConfirm={() => { void handleDelete(); }}
+        title={deleteIds && deleteIds.length > 1 ? `Delete ${deleteIds.length} invitations` : 'Delete invitation'}
+        description="Their RSVP link will stop working. Guests who already registered stay on the attendees list."
+        confirmText="Delete"
+        cancelText="Keep"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
+      />
+
+      <ModernConfirmationDialog
+        isOpen={remindOpen}
+        onClose={() => {
+          if (!remindMutation.isPending) setRemindOpen(false);
+        }}
+        onConfirm={() => { void handleRemindPending(); }}
+        title="Remind guests who have not responded"
+        description={`Send the RSVP reminder to ${pendingRemindable} ${pendingRemindable === 1 ? 'guest' : 'guests'} who have not confirmed.`}
+        confirmText="Send reminder"
+        cancelText="Cancel"
+        variant="info"
+        isLoading={remindMutation.isPending}
+      />
+
       <Dialog open={!!responseFor} onOpenChange={(open) => { if (!open) { setResponseFor(null); setResponse(null); } }}>
         <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto rounded-xl">
           <DialogHeader>
@@ -538,8 +652,11 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
               </div>
               {response.answers.length > 0 ? (
                 <dl className="divide-y divide-border rounded-lg border border-border">
-                  {response.answers.map((answer) => (
-                    <div key={answer.label} className="grid grid-cols-[140px_1fr] gap-3 px-3 py-2">
+                  {response.answers.map((answer, index) => (
+                    <div
+                      key={`${answer.label}-${index}`}
+                      className={`grid grid-cols-[140px_1fr] gap-3 px-3 py-2 ${answer.follow_up ? 'bg-muted/40' : ''}`}
+                    >
                       <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{answer.label}</dt>
                       <dd className="text-sm break-words">{answer.value || '—'}</dd>
                     </div>

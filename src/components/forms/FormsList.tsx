@@ -468,7 +468,13 @@ export const FormsList: React.FC<FormsListProps> = ({
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEditForm(form)}>
+                              <DropdownMenuItem
+                                onSelect={() => {
+                                  // Open after the menu has released focus, otherwise the
+                                  // editor treats that focus return as a click away and closes.
+                                  window.setTimeout(() => handleEditForm(form), 0);
+                                }}
+                              >
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit Form
                               </DropdownMenuItem>

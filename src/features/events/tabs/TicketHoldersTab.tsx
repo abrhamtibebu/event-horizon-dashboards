@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react'
-import { FileSpreadsheet, FileText, Plus, Printer, RefreshCw, Search, Star, Ticket, Upload, UserCheck, Users, Clock } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { FileSpreadsheet, FileText, Mail, Plus, Printer, RefreshCw, Search, Star, Ticket, Upload, UserCheck, Users, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ModernConfirmationDialog } from '@/components/ui/ModernConfirmationDialog'
 
 interface FilterOption {
   id: number | string
@@ -27,6 +28,9 @@ interface TicketHoldersTabProps {
   onImport: () => void
   onAdd: () => void
   onPrintSelected: () => void
+  onSendReminder?: () => Promise<void> | void
+  reminderSending?: boolean
+  eventReminderSentAt?: string | null
   searchPlaceholder?: string
   children: ReactNode
 }
@@ -49,10 +53,15 @@ export function TicketHoldersTab({
   onImport,
   onAdd,
   onPrintSelected,
+  onSendReminder,
+  reminderSending = false,
+  eventReminderSentAt,
   searchPlaceholder = 'Search by name, email, phone, company or job title...',
   children,
 }: TicketHoldersTabProps) {
+  const [reminderOpen, setReminderOpen] = useState(false)
   const filterOptions = isTicketed ? ticketTypes : guestTypes
+  const alreadySent = Boolean(eventReminderSentAt)
 
   return (
     <div className="flex w-full max-w-full flex-col gap-4 sm:gap-6">
@@ -158,6 +167,19 @@ export function TicketHoldersTab({
               />
             </div>
             <div className="flex gap-2 sm:gap-3">
+              {onSendReminder && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setReminderOpen(true)}
+                  disabled={reminderSending}
+                  className="h-9 flex-1 border-border bg-background px-3 text-xs hover:bg-accent sm:h-10 sm:flex-initial sm:px-4 sm:text-sm"
+                >
+                  <Mail className="h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">{reminderSending ? 'Sending…' : 'Send event reminder'}</span>
+                  <span className="sm:hidden">Remind</span>
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -184,6 +206,24 @@ export function TicketHoldersTab({
       </div>
 
       {children}
+
+      <ModernConfirmationDialog
+        isOpen={reminderOpen}
+        onClose={() => {
+          if (!reminderSending) setReminderOpen(false)
+        }}
+        onConfirm={() => {
+          void Promise.resolve(onSendReminder?.()).finally(() => setReminderOpen(false))
+        }}
+        title="Send event reminder"
+        description={alreadySent
+          ? 'A reminder was already sent. Sending again emails current attendees and replaces the automatic reminder for this event.'
+          : 'Email every registered attendee who has an address. If you have not sent one yet, the automatic reminder one week before the event will be skipped.'}
+        confirmText="Send reminder"
+        cancelText="Cancel"
+        variant="info"
+        isLoading={reminderSending}
+      />
     </div>
   )
 }

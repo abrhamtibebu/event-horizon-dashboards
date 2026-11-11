@@ -167,6 +167,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { getDefaultEventTab, getEventTabs } from '@/features/events/config/eventTabs'
 import { TicketHoldersTab } from '@/features/events/tabs/TicketHoldersTab'
+import { useSendEventReminder } from '@/lib/api/invitations'
 import {
   areAllTicketHolderIdsSelected,
   getPurchasedDate,
@@ -333,6 +334,7 @@ export default function EventDetails() {
   const [attendees, setAttendees] = useState<any[]>([])
   const [attendeesLoading, setAttendeesLoading] = useState(true)
   const [attendeesError, setAttendeesError] = useState<string | null>(null)
+  const lastAttendeesQuery = useRef('')
   const [guestTypes, setGuestTypes] = useState<any[]>([])
   const [ticketTypes, setTicketTypes] = useState<any[]>([])
 
@@ -355,6 +357,19 @@ export default function EventDetails() {
 
   // Check if user has management permissions
   const canManageEvent = hasPermission('events.manage')
+  const eventReminder = useSendEventReminder(Number(eventId) || 0)
+  const sendEventReminder = async () => {
+    try {
+      const result = await eventReminder.mutateAsync()
+      if (result.sent_at) {
+        setEventData((current) => current ? { ...current, event_reminder_sent_at: result.sent_at } : current)
+      }
+      if (result.queued > 0) toast.success(result.message)
+      else toast.info(result.message)
+    } catch {
+      toast.error('Failed to send the event reminder')
+    }
+  }
   const canDeleteEvent = hasPermission('events.manage') // Or more specific if needed
   const isAdminOrOrganizer = canManageEvent
   const [isUsherAssigned, setIsUsherAssigned] = useState(false)
@@ -489,85 +504,97 @@ export default function EventDetails() {
       .finally(() => setEventLoading(false))
   }, [eventId])
 
-  // Fetch attendees
+  // Fetch attendees, and keep the open tab current the same way the invitation list does.
   useEffect(() => {
     if (!eventId) return
-    setAttendeesLoading(true)
-    setAttendeesError(null)
+    let active = true
+    const queryKey = `${eventId}|${currentPage}|${perPage}|${searchTerm}|${guestTypeFilter}|${checkedInFilter}|${isAdminOrOrganizer}`
+    const background = lastAttendeesQuery.current === queryKey
+    lastAttendeesQuery.current = queryKey
+    const holdersTab = eventData?.event_type === 'ticketed' ? 'ticket-holders' : 'attendees'
 
-    // Build query parameters for filtering
-    const params = new URLSearchParams();
+    const loadAttendees = (silent: boolean) => {
+      if (!silent) {
+        setAttendeesLoading(true)
+        setAttendeesError(null)
+      }
 
-    // Only add pagination params for admin and organizer
-    if (isAdminOrOrganizer) {
-      params.append('page', currentPage.toString());
-      params.append('per_page', perPage.toString());
-    }
+      const params = new URLSearchParams();
 
-    if (searchTerm) {
-      params.append('search', searchTerm);
-    }
+      // Only add pagination params for admin and organizer
+      if (isAdminOrOrganizer) {
+        params.append('page', currentPage.toString());
+        params.append('per_page', perPage.toString());
+      }
 
-    if (guestTypeFilter !== 'all') {
-      params.append('guest_type', guestTypeFilter);
-    }
+      if (searchTerm) {
+        params.append('search', searchTerm);
+      }
 
-    if (checkedInFilter !== 'all') {
-      params.append('checked_in', checkedInFilter === 'checked-in' ? 'true' : 'false');
-    }
+      if (guestTypeFilter !== 'all') {
+        params.append('guest_type', guestTypeFilter);
+      }
 
-    api
-      .get(`/events/${Number(eventId)}/attendees?${params.toString()}`)
-      .then((res) => {
-        console.log('Attendees response:', res.data)
+      if (checkedInFilter !== 'all') {
+        params.append('checked_in', checkedInFilter === 'checked-in' ? 'true' : 'false');
+      }
 
-        let attendeesData: any[] = []
+      api
+        .get(`/events/${Number(eventId)}/attendees?${params.toString()}`)
+        .then((res) => {
+          if (!active) return
 
-        // Handle paginated response structure
-        if (res.data && res.data.data && Array.isArray(res.data.data)) {
-          attendeesData = res.data.data
-          if (isAdminOrOrganizer) {
-            setTotalPages(res.data.last_page || 1)
-            setTotalRecords(res.data.total || 0)
-          } else {
+          let attendeesData: any[] = []
+
+          // Handle paginated response structure
+          if (res.data && res.data.data && Array.isArray(res.data.data)) {
+            attendeesData = res.data.data
+            if (isAdminOrOrganizer) {
+              setTotalPages(res.data.last_page || 1)
+              setTotalRecords(res.data.total || 0)
+            } else {
+              setTotalPages(1)
+              setTotalRecords(res.data.data.length || 0)
+            }
+          } else if (Array.isArray(res.data)) {
+            attendeesData = res.data
             setTotalPages(1)
-            setTotalRecords(res.data.data.length || 0)
+            setTotalRecords(res.data.length || 0)
+          } else {
+            attendeesData = []
+            setTotalPages(1)
+            setTotalRecords(0)
           }
-        } else if (Array.isArray(res.data)) {
-          // Handle flat array response
-          attendeesData = res.data
-          setTotalPages(1)
-          setTotalRecords(res.data.length || 0)
-        } else {
-          // Unexpected structure
-          console.warn('Unexpected attendees response structure:', res.data)
-          attendeesData = []
+
+          setAttendees(attendeesData)
+          if (silent) setAttendeesError(null)
+        })
+        .catch((err) => {
+          if (!active || silent) return
+          console.error('Failed to fetch attendees:', err)
+          setAttendeesError('Failed to fetch attendees.')
+          setAttendees([])
           setTotalPages(1)
           setTotalRecords(0)
-        }
+        })
+        .finally(() => {
+          if (active && !silent) setAttendeesLoading(false)
+        })
+    }
 
-        setAttendees(attendeesData)
+    loadAttendees(background)
+    if (activeTab !== holdersTab) {
+      return () => {
+        active = false
+      }
+    }
 
-        // Log first attendee structure for debugging
-        if (attendeesData.length > 0) {
-          console.log('First attendee structure:', {
-            id: attendeesData[0].id,
-            guest_type_id: attendeesData[0].guest_type_id,
-            guestType: attendeesData[0].guestType,
-            guest_type: attendeesData[0].guest_type,
-            guest: attendeesData[0].guest
-          })
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to fetch attendees:', err)
-        setAttendeesError('Failed to fetch attendees.')
-        setAttendees([])
-        setTotalPages(1)
-        setTotalRecords(0)
-      })
-      .finally(() => setAttendeesLoading(false))
-  }, [eventId, currentPage, perPage, searchTerm, guestTypeFilter, checkedInFilter, isAdminOrOrganizer])
+    const timer = window.setInterval(() => loadAttendees(true), 10000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [eventId, currentPage, perPage, searchTerm, guestTypeFilter, checkedInFilter, isAdminOrOrganizer, activeTab, eventData?.event_type])
 
   // Set guest types and ticket types from event data
   useEffect(() => {
@@ -2530,11 +2557,11 @@ export default function EventDetails() {
             {/* Fancy Hero Banner */}
             {/* Fancy Hero Banner */}
             {/* Simplified Hero Header */}
-            <div className="relative w-full h-[300px] rounded-3xl overflow-hidden mb-8 shadow-lg border border-border">
+            <div className="relative mb-8 w-full overflow-hidden rounded-3xl border border-border bg-muted shadow-lg">
               <img
                 src={getEventBannerUrl(eventData.image_url, eventData.event_image, eventData.image)}
                 alt={eventData.name}
-                className="object-cover w-full h-full transition-transform duration-700"
+                className="block h-auto max-h-[32rem] w-full object-contain object-center"
                 onError={(e) => applyEventBannerFallback(e.currentTarget)}
               />
 
@@ -3186,6 +3213,9 @@ export default function EventDetails() {
                     onImport={handleImportClick}
                     onAdd={() => setAddAttendeeDialogOpen(true)}
                     onPrintSelected={() => startBatchPrintFlow(new Set(selectedAttendees))}
+                    onSendReminder={canManageEvent ? sendEventReminder : undefined}
+                    reminderSending={eventReminder.isPending}
+                    eventReminderSentAt={eventData?.event_reminder_sent_at ?? null}
                     searchPlaceholder={
                       isTicketedEvent
                         ? 'Search by name, email, phone, or ticket number...'

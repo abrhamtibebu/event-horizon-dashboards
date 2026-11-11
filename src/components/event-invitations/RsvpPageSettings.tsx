@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ExternalLink, FileText, Loader2, Mail, MonitorSmartphone, Palette, Save, Trash2, Upload } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { ChevronDown, ExternalLink, FileText, Loader2, Mail, MonitorSmartphone, Palette, Save, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { RsvpLanding } from '@/components/public/RsvpLanding';
 import { useEventGuestTypes, useInvitations, useRsvpPage, useUpdateRsvpPage } from '@/lib/api/invitations';
 import { DEFAULT_RSVP_PAGE, guestFirstName, isPlatformRsvpAccent, rsvpAccentForeground, type InvitationGuestType, type RsvpPageSettings } from '@/types/invitations';
@@ -31,8 +32,28 @@ interface RsvpPageSettingsCardProps {
   isOrganizer: boolean;
 }
 
+type MailPane = 'invite' | 'rsvp' | 'event' | 'pdfs';
+
+function MailSection({ title, hint, open, onToggle, children }: { title: string; hint: string; open: boolean; onToggle: () => void; children: ReactNode }) {
+  return (
+    <Collapsible open={open} onOpenChange={onToggle} className={`rounded-xl border bg-card ${open ? 'border-primary/40' : 'border-border'}`}>
+      <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold">{title}</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">{hint}</span>
+        </span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-3 border-t border-border px-4 py-4">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 function samePage(a: RsvpPageSettings, b: RsvpPageSettings): boolean {
   return a.headline === b.headline && a.message === b.message && a.email_message === b.email_message &&
+    a.rsvp_reminder_message === b.rsvp_reminder_message && a.event_reminder_message === b.event_reminder_message &&
     a.accent_color.toLowerCase() === b.accent_color.toLowerCase() && a.show_banner === b.show_banner &&
     a.show_details === b.show_details && a.show_description === b.show_description;
 }
@@ -97,6 +118,12 @@ export function RsvpPageSettingsCard({ eventId, event, isOrganizer }: RsvpPageSe
   const { data: invitations } = useInvitations(eventId);
   const { data: guestTypes = [], isLoading: guestTypesLoading } = useEventGuestTypes(eventId);
   const [draft, setDraft] = useState<RsvpPageSettings>(DEFAULT_RSVP_PAGE);
+  const [openMail, setOpenMail] = useState<MailPane | null>('invite');
+  const [previewMail, setPreviewMail] = useState<MailPane>('invite');
+  const toggleMail = (pane: MailPane) => {
+    setPreviewMail(pane);
+    setOpenMail((current) => current === pane ? null : pane);
+  };
   const [view, setView] = useState('landing');
   const [newAttachments, setNewAttachments] = useState<PendingPdf[]>([]);
 
@@ -123,11 +150,25 @@ export function RsvpPageSettingsCard({ eventId, event, isOrganizer }: RsvpPageSe
     }
   };
 
-  const emailPreview = draft.email_message
+  const fillPreview = (message: string) => message
     .replaceAll('{name}', 'Alex')
     .replaceAll('{event}', event.name || 'Your event')
     .replaceAll('{organizer}', event.organizerName || 'Your organizer')
-    .replaceAll('{guest_type}', 'Guest');
+    .replaceAll('{guest_type}', 'Guest')
+    .replaceAll('{date}', 'Saturday, June 14, 2026')
+    .replaceAll('{location}', event.location || 'The venue');
+  const emailPreview = fillPreview(draft.email_message);
+  const previewWhen = (() => {
+    if (!event.startDate) return 'Saturday, June 14, 2026';
+    const date = new Date(event.startDate);
+    return Number.isNaN(date.getTime()) ? 'Saturday, June 14, 2026' : date.toLocaleString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  })();
+  const previewCopy = {
+    invite: { title: 'Invitation email', subject: `You're invited: ${event.name || 'Your event'}`, heading: 'You\'re invited, Alex', body: emailPreview, action: true },
+    rsvp: { title: 'RSVP reminder', subject: `Reminder: please respond to ${event.name || 'Your event'}`, heading: 'Please respond, Alex', body: fillPreview(draft.rsvp_reminder_message), action: true },
+    event: { title: 'Event reminder', subject: `${event.name || 'Your event'} is one week away`, heading: 'See you soon, Alex', body: fillPreview(draft.event_reminder_message), action: false },
+    pdfs: { title: 'Confirmation PDFs', subject: '', heading: '', body: '', action: false },
+  }[previewMail];
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -179,13 +220,26 @@ export function RsvpPageSettingsCard({ eventId, event, isOrganizer }: RsvpPageSe
           </TabsContent>
 
           <TabsContent value="email" className="mt-0">
-            <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
-              <div className="space-y-4">
-                <div><h3 className="font-semibold">Initial RSVP email</h3><p className="mt-1 text-sm text-muted-foreground">This message is sent when you invite a guest and when you resend their invitation.</p></div>
-                <div className="space-y-2"><Label htmlFor="rsvp-email-message">Email body message</Label><Textarea id="rsvp-email-message" value={draft.email_message} onChange={(e) => set('email_message', e.target.value)} maxLength={1000} rows={8} disabled={!isOrganizer} className="leading-6" /><div className="flex justify-between text-xs text-muted-foreground"><span>Plain text is supported. Line breaks are preserved.</span><span>{draft.email_message.length}/1000</span></div></div>
-                <div className="rounded-xl bg-muted/40 p-4"><p className="text-xs font-semibold">Personalization fields</p><p className="mt-1 text-xs leading-5 text-muted-foreground"><code>{'{name}'}</code> guest name · <code>{'{event}'}</code> event title · <code>{'{organizer}'}</code> organizer · <code>{'{guest_type}'}</code> guest category</p></div>
-                <div className="space-y-3 rounded-xl border border-border p-4">
-                  <div><Label>Confirmation email PDFs</Label><p className="mt-1 text-xs text-muted-foreground">These PDFs are attached after an invited guest completes registration. Choose which guest types receive each file. Leave every type unchecked to send it to all guests. The original file name is kept in the email. Up to 5 files, 10 MB each.</p></div>
+            <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.85fr)]">
+              <div className="space-y-3">
+              <p className="text-xs leading-5 text-muted-foreground">Open a section to edit it. The preview on the right follows that section. Use <code>{'{name}'}</code>, <code>{'{event}'}</code>, <code>{'{organizer}'}</code>, <code>{'{guest_type}'}</code>, <code>{'{date}'}</code>, and <code>{'{location}'}</code>.</p>
+              <MailSection title="Invitation email" hint="Sent when you invite a guest and when you resend." open={openMail === 'invite'} onToggle={() => toggleMail('invite')}>
+                <Label htmlFor="rsvp-email-message">Message</Label>
+                <Textarea id="rsvp-email-message" value={draft.email_message} onChange={(e) => set('email_message', e.target.value)} maxLength={1000} rows={6} disabled={!isOrganizer} className="leading-6" />
+                <div className="flex justify-between text-xs text-muted-foreground"><span>Plain text. Line breaks are kept.</span><span>{draft.email_message.length}/1000</span></div>
+              </MailSection>
+              <MailSection title="RSVP reminder" hint="Sent to guests who have not confirmed." open={openMail === 'rsvp'} onToggle={() => toggleMail('rsvp')}>
+                <Label htmlFor="rsvp-reminder-message">Message</Label>
+                <Textarea id="rsvp-reminder-message" value={draft.rsvp_reminder_message} onChange={(e) => set('rsvp_reminder_message', e.target.value)} maxLength={1000} rows={5} disabled={!isOrganizer} className="leading-6" />
+                <div className="flex justify-end text-xs text-muted-foreground">{draft.rsvp_reminder_message.length}/1000</div>
+              </MailSection>
+              <MailSection title="Event reminder" hint="Sent to registered attendees a week before, or when you send it yourself." open={openMail === 'event'} onToggle={() => toggleMail('event')}>
+                <Label htmlFor="event-reminder-message">Message</Label>
+                <Textarea id="event-reminder-message" value={draft.event_reminder_message} onChange={(e) => set('event_reminder_message', e.target.value)} maxLength={1000} rows={5} disabled={!isOrganizer} className="leading-6" />
+                <div className="flex justify-end text-xs text-muted-foreground">{draft.event_reminder_message.length}/1000</div>
+              </MailSection>
+              <MailSection title="Confirmation PDFs" hint={`${draft.confirmation_attachments.length + newAttachments.length} attached. Sent after a guest registers.`} open={openMail === 'pdfs'} onToggle={() => toggleMail('pdfs')}>
+                <p className="text-xs text-muted-foreground">Choose which guest types receive each file. Leave every type unchecked to send it to all guests. The original file name is kept. Up to 5 files, 10 MB each.</p>
                   <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border px-3 py-3 text-sm font-medium hover:bg-muted/40">
                     <Upload className="h-4 w-4" /> Add PDF files
                     <input type="file" accept="application/pdf,.pdf" multiple className="sr-only" disabled={!isOrganizer} onChange={(e) => {
@@ -216,14 +270,56 @@ export function RsvpPageSettingsCard({ eventId, event, isOrganizer }: RsvpPageSe
                       <PdfAudience guestTypes={guestTypes} selected={item.guestTypeIds} disabled={!isOrganizer} loading={guestTypesLoading} onChange={(ids) => setNewAttachments((files) => files.map((entry, i) => i === index ? { ...entry, guestTypeIds: ids } : entry))} />
                     </div>
                   ))}
-                </div>
+              </MailSection>
               </div>
-              <div className="rounded-2xl border border-border bg-white p-5 shadow-sm">
+              <div className="rounded-2xl border border-border bg-white p-5 shadow-sm xl:sticky xl:top-4">
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Email preview</p>
-                <div className="mt-3 flex items-center gap-3 border-b border-slate-100 pb-4"><span className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: `${draft.accent_color}18`, color: draft.accent_color }}><Mail className="h-4 w-4" /></span><div><p className="text-xs text-slate-400">Subject</p><p className="text-sm font-semibold text-slate-800">You&apos;re invited: {event.name || 'Your event'}</p></div></div>
-                <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-600">{emailPreview}</p>
-                <div className="mt-5 rounded-xl px-4 py-3 text-center text-sm font-semibold" style={{ backgroundColor: draft.accent_color, color: '#fff' }}>Respond to RSVP</div>
-                <p className="mt-3 text-center text-[11px] text-slate-400">The email also includes event details and organizer branding.</p>
+                <p className="mt-1 text-xs text-muted-foreground">{previewCopy.title}</p>
+                {previewMail === 'pdfs' ? (
+                  <div className="mt-4 space-y-2">
+                    {draft.confirmation_attachments.length + newAttachments.length === 0 ? (
+                      <p className="text-sm text-slate-500">No PDFs yet. Files you add are attached to the confirmation email after a guest registers.</p>
+                    ) : (
+                      <>
+                        {draft.confirmation_attachments.map((file) => (
+                          <div key={file.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            <FileText className="h-4 w-4 shrink-0 text-slate-400" />
+                            <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                          </div>
+                        ))}
+                        {newAttachments.map((item, index) => (
+                          <div key={`${item.file.name}-${index}`} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            <FileText className="h-4 w-4 shrink-0 text-slate-400" />
+                            <span className="min-w-0 flex-1 truncate">{item.file.name}</span>
+                          </div>
+                        ))}
+                        <p className="pt-2 text-[11px] text-slate-400">Attached after registration, with the original file name.</p>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-3 flex items-center gap-3 border-b border-slate-100 pb-4">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: `${draft.accent_color}18`, color: draft.accent_color }}><Mail className="h-4 w-4" /></span>
+                      <div>
+                        <p className="text-xs text-slate-400">Subject</p>
+                        <p className="text-sm font-semibold text-slate-800">{previewCopy.subject}</p>
+                      </div>
+                    </div>
+                    <p className="mt-4 text-base font-semibold text-slate-900">{previewCopy.heading}</p>
+                    <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">{previewCopy.body}</p>
+                    <div className="mt-4 space-y-2 rounded-xl border border-slate-100 px-4 py-3 text-sm">
+                      <div className="flex justify-between gap-3"><span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">When</span><span className="text-right font-medium text-slate-800">{previewWhen}</span></div>
+                      <div className="flex justify-between gap-3"><span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Where</span><span className="text-right font-medium text-slate-800">{event.location || event.venueName || 'The venue'}</span></div>
+                    </div>
+                    {previewCopy.action && (
+                      <div className="mt-5 rounded-xl px-4 py-3 text-center text-sm font-semibold" style={{ backgroundColor: draft.accent_color, color: '#fff' }}>Respond to RSVP</div>
+                    )}
+                    <p className="mt-3 text-center text-[11px] text-slate-400">
+                      {previewMail === 'event' ? `This reminder was sent by ${event.organizerName || 'your organizer'} through Evella.` : 'The email also includes the event banner and organizer branding.'}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </TabsContent>

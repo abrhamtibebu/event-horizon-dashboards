@@ -10,10 +10,11 @@ interface FormBuilderDialogProps {
   onClose: () => void;
 }
 
-// Menus and toasts render outside the dialog; clicking them must not close it.
-const keepOpen = (event: { target: EventTarget | null; preventDefault: () => void }) => {
-  const target = event.target as HTMLElement | null;
-  if (target?.closest('[data-radix-popper-content-wrapper], [data-sonner-toaster]')) event.preventDefault();
+// The editor must stay open while a field, menu, or confirmation inside it is used.
+// Those controls render outside the dialog, and the non-modal dialog treats that as a
+// click away and closes. Closing is explicit: Done, the X button, or Escape.
+const keepOpen = (event: { preventDefault: () => void }) => {
+  event.preventDefault();
 };
 
 /** The form editor, shared by the Forms tab and the Invitations tab. */
@@ -36,8 +37,19 @@ export const FormBuilderDialog: React.FC<FormBuilderDialogProps> = ({ form, even
       }}
     >
       <DialogContent
-        className="flex h-[90vh] w-[95vw] max-w-6xl flex-col gap-0 overflow-hidden p-0"
+        className="z-[80] flex h-[90vh] w-[95vw] max-w-6xl flex-col gap-0 overflow-hidden p-0"
+        onOpenAutoFocus={(event) => {
+          // Take focus only after the control that opened the editor has finished,
+          // so its focus return is not treated as leaving the dialog.
+          event.preventDefault();
+          const content = event.currentTarget as HTMLElement | null;
+          window.setTimeout(() => {
+            if (!content?.isConnected) return;
+            content.querySelector<HTMLElement>('button, a[href], input, select, textarea')?.focus();
+          }, 0);
+        }}
         onPointerDownOutside={keepOpen}
+        onFocusOutside={keepOpen}
         onInteractOutside={keepOpen}
       >
         <DialogHeader className="sr-only">

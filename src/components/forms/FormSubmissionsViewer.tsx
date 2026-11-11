@@ -40,7 +40,8 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 
-import { formSubmissionApi } from '@/lib/api/forms';
+import { formApi, formSubmissionApi } from '@/lib/api/forms';
+import { displayedAnswers } from '@/lib/formAnswers';
 import type { FormSubmission, ExportOptions } from '@/types/forms';
 import { toast } from 'sonner';
 
@@ -60,6 +61,11 @@ export const FormSubmissionsViewer: React.FC<FormSubmissionsViewerProps> = ({
   const [participantTypeFilter, setParticipantTypeFilter] = useState<string>('all');
   const [selectedSubmission, setSelectedSubmission] = useState<FormSubmission | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+
+  const { data: form } = useQuery({
+    queryKey: ['form', formId],
+    queryFn: () => formApi.getForm(formId),
+  });
 
   // Fetch submissions
   const {
@@ -489,13 +495,21 @@ export const FormSubmissionsViewer: React.FC<FormSubmissionsViewerProps> = ({
                                 Form Responses
                               </h4>
                               <div className="space-y-3 max-h-96 overflow-y-auto">
-                                {Object.entries(selectedSubmission.submission_data).map(([key, value]) => (
-                                  <div key={key} className="flex justify-between items-start p-3 bg-muted/50 rounded">
-                                    <span className="font-medium text-sm capitalize">
-                                      {key.replace(/_/g, ' ')}:
+                                {(form?.formFields
+                                  ? displayedAnswers(form.formFields, selectedSubmission.submission_data)
+                                  : Object.entries(selectedSubmission.submission_data).map(([key, value]) => ({
+                                    key,
+                                    label: key.replace(/_/g, ' '),
+                                    value: formatSubmissionData(value),
+                                    followUp: false,
+                                  }))
+                                ).map((answer) => (
+                                  <div key={answer.key} className={`flex justify-between items-start gap-3 p-3 rounded ${answer.followUp ? 'bg-muted/70 ml-4' : 'bg-muted/50'}`}>
+                                    <span className="font-medium text-sm">
+                                      {answer.label}
                                     </span>
                                     <span className="text-sm text-right max-w-xs break-words">
-                                      {formatSubmissionData(value)}
+                                      {answer.value || '—'}
                                     </span>
                                   </div>
                                 ))}

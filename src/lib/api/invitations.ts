@@ -164,7 +164,7 @@ export interface InvitationResponse {
   rsvp_label: string;
   rsvp_at: string | null;
   submitted_at: string | null;
-  answers: Array<{ label: string; value: string }>;
+  answers: Array<{ label: string; value: string; follow_up?: boolean }>;
 }
 
 export const fetchInvitationResponse = async (eventId: number, invitationId: number): Promise<InvitationResponse> => {
@@ -255,6 +255,43 @@ export const useRevokeInvitation = () => {
 /**
  * Resend / retry the invitation email.
  */
+export const useDeleteInvitations = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { eventId: number; ids: number[] }) => {
+      if (params.ids.length === 1) {
+        const response = await api.delete(`/invitations/${params.ids[0]}`);
+        return response.data as { success: boolean; deleted: number };
+      }
+      const response = await api.post(`/events/${params.eventId}/invitations/bulk-delete`, { ids: params.ids });
+      return response.data as { success: boolean; deleted: number };
+    },
+    onSuccess: () => invalidateInvitationQueries(queryClient),
+  });
+};
+
+export const useRemindPendingInvitations = (eventId: number) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await api.post(`/events/${eventId}/invitations/remind-pending`);
+      return response.data as { success: boolean; queued: number; message: string };
+    },
+    onSuccess: () => invalidateInvitationQueries(queryClient),
+  });
+};
+
+export const useSendEventReminder = (eventId: number) => {
+  return useMutation({
+    mutationFn: async () => {
+      const response = await api.post(`/events/${eventId}/remind-attendees`);
+      return response.data as { success: boolean; queued: number; sent_at: string | null; message: string };
+    },
+  });
+};
+
 export const useResendInvitationEmail = () => {
   const queryClient = useQueryClient();
 
