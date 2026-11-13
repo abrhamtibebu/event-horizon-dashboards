@@ -282,6 +282,7 @@ export default function EventDetails() {
   const [editLocationMeta, setEditLocationMeta] = useState({
     venue_name: '' as string,
     formatted_address: '' as string,
+    maps_url: '' as string,
     latitude: null as number | null,
     longitude: null as number | null,
     city: '' as string,
@@ -1381,6 +1382,7 @@ export default function EventDetails() {
       venue_name: eventData.venue_name || eventData.geolocation?.venue_name || '',
       formatted_address:
         eventData.formatted_address || eventData.geolocation?.formatted_address || '',
+      maps_url: eventData.maps_url || eventData.geolocation?.maps_url || '',
       latitude: eventData.latitude ?? eventData.geolocation?.latitude ?? null,
       longitude: eventData.longitude ?? eventData.geolocation?.longitude ?? null,
       city: eventData.city || '',
@@ -1441,6 +1443,7 @@ export default function EventDetails() {
       requirements: form.requirements || '',
       venue_name: locationMeta.venue_name || null,
       formatted_address: locationMeta.formatted_address || null,
+      maps_url: locationMeta.maps_url?.trim() || null,
       latitude: locationMeta.latitude,
       longitude: locationMeta.longitude,
       venue_id: form.venue_id ?? editListedVenue.venueId ?? null,
@@ -4585,7 +4588,7 @@ export default function EventDetails() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="edit_location">Location</Label>
+                            <Label htmlFor="edit_location">Venue</Label>
                             <ListedVenuePicker
                               value={editListedVenue}
                               onChange={(next) => {
@@ -4593,15 +4596,32 @@ export default function EventDetails() {
                                 handleEditInput('location', next.formattedAddress || next.venueName)
                                 handleEditInput('venue_id', next.venueId)
                                 handleEditInput('space_id', next.spaceId)
-                                setEditLocationMeta({
+                                setEditLocationMeta((prev) => ({
+                                  ...prev,
                                   venue_name: next.venueName,
                                   formatted_address: next.formattedAddress,
                                   latitude: next.latitude,
                                   longitude: next.longitude,
                                   city: next.city,
-                                })
+                                }))
                               }}
                             />
+                          </div>
+                          <div className="space-y-2 sm:col-span-2">
+                            <Label htmlFor="edit_maps_url">Google Maps link</Label>
+                            <Input
+                              id="edit_maps_url"
+                              type="url"
+                              value={editLocationMeta.maps_url}
+                              onChange={(e) =>
+                                setEditLocationMeta((prev) => ({ ...prev, maps_url: e.target.value }))
+                              }
+                              placeholder="https://maps.app.goo.gl/..."
+                              className="rounded-xl shadow-sm border-muted-foreground/20 focus-visible:ring-primary"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Paste a Google Maps share link. Invitation and RSVP emails use it for directions.
+                            </p>
                           </div>
                           <div className="space-y-2 sm:col-span-2">
                             <Label htmlFor="edit_description">Description</Label>

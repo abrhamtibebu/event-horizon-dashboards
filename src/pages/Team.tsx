@@ -503,8 +503,8 @@ export default function Team() {
 
         {/* Add Member Dialog - Redesigned Clean Minimalist Version */}
         <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) resetForm(); }}>
-          <DialogContent className="sm:max-w-xl p-0 overflow-hidden border-none shadow-2xl bg-white dark:bg-[#0a0a0a] rounded-[2rem]">
-            <div className="p-8 sm:p-10 space-y-8">
+          <DialogContent className="flex max-h-[min(92dvh,880px)] w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-none bg-white p-0 shadow-2xl dark:bg-[#0a0a0a] sm:max-w-xl rounded-[2rem]">
+            <div className="min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain p-8 pb-6 sm:p-10 sm:pb-6">
               <div className="space-y-1">
                 <DialogTitle className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
                   Add Member
@@ -537,6 +537,7 @@ export default function Team() {
                     <label className="text-[13px] font-semibold text-gray-500 dark:text-gray-400 ml-1">Email</label>
                     <Input
                       type="email"
+                      autoComplete="off"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="h-12 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus-visible:ring-1 focus-visible:ring-gray-200 dark:focus-visible:ring-gray-800 transition-all font-medium px-4"
@@ -579,6 +580,7 @@ export default function Team() {
                     <label className="text-[13px] font-semibold text-gray-500 dark:text-gray-400 ml-1">Password</label>
                     <Input
                       type="password"
+                      autoComplete="new-password"
                       value={formData.password}
                       onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                       className="h-12 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus-visible:ring-1 focus-visible:ring-gray-200 dark:focus-visible:ring-gray-800 font-medium"
@@ -588,6 +590,7 @@ export default function Team() {
                     <label className="text-[13px] font-semibold text-gray-500 dark:text-gray-400 ml-1">Verify</label>
                     <Input
                       type="password"
+                      autoComplete="new-password"
                       value={formData.password_confirmation}
                       onChange={(e) => setFormData({ ...formData, password_confirmation: e.target.value })}
                       className="h-12 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus-visible:ring-1 focus-visible:ring-gray-200 dark:focus-visible:ring-gray-800 font-medium"
@@ -597,7 +600,7 @@ export default function Team() {
               </div>
             </div>
 
-            <div className="p-8 pt-0 flex items-center justify-end gap-3">
+            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-gray-100 bg-white p-6 dark:border-gray-800 dark:bg-[#0a0a0a] sm:px-10">
               <Button
                 variant="ghost"
                 onClick={() => { setAddDialogOpen(false); resetForm(); }}
@@ -619,8 +622,8 @@ export default function Team() {
 
         {/* Edit Member Dialog - Consistent Minimalist Design */}
         <Dialog open={editDialogOpen} onOpenChange={(open) => { setEditDialogOpen(open); if (!open) { setSelectedMember(null); resetForm(); } }}>
-          <DialogContent className="sm:max-w-xl p-0 overflow-hidden border-none shadow-2xl bg-white dark:bg-[#0a0a0a] rounded-[2rem]">
-            <div className="p-8 sm:p-10 space-y-8">
+          <DialogContent className="flex max-h-[min(92dvh,880px)] w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden border-none bg-white p-0 shadow-2xl dark:bg-[#0a0a0a] sm:max-w-xl rounded-[2rem]">
+            <div className="min-h-0 flex-1 space-y-8 overflow-y-auto overscroll-contain p-8 pb-6 sm:p-10 sm:pb-6">
               <div className="space-y-1">
                 <DialogTitle className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
                   Edit Member
@@ -691,7 +694,7 @@ export default function Team() {
               </div>
             </div>
 
-            <div className="p-8 pt-0 flex items-center justify-end gap-3">
+            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-gray-100 bg-white p-6 dark:border-gray-800 dark:bg-[#0a0a0a] sm:px-10">
               <Button
                 variant="ghost"
                 onClick={() => { setEditDialogOpen(false); setSelectedMember(null); resetForm(); }}
@@ -765,6 +768,7 @@ export default function Team() {
                   <label className="text-[13px] font-semibold text-gray-500 dark:text-gray-400 ml-1">New Password</label>
                   <Input
                     type="password"
+                    autoComplete="new-password"
                     value={resetPasswordData.new_password}
                     onChange={(e) => setResetPasswordData({ ...resetPasswordData, new_password: e.target.value })}
                     className="h-12 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus-visible:ring-1 focus-visible:ring-gray-200 dark:focus-visible:ring-gray-800 font-medium"
@@ -774,6 +778,7 @@ export default function Team() {
                   <label className="text-[13px] font-semibold text-gray-500 dark:text-gray-400 ml-1">Verify Password</label>
                   <Input
                     type="password"
+                    autoComplete="new-password"
                     value={resetPasswordData.new_password_confirmation}
                     onChange={(e) => setResetPasswordData({ ...resetPasswordData, new_password_confirmation: e.target.value })}
                     className="h-12 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus-visible:ring-1 focus-visible:ring-gray-200 dark:focus-visible:ring-gray-800 font-medium"

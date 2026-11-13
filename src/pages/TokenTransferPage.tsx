@@ -34,7 +34,7 @@ export default function TokenTransferPage() {
         const { data } = await api.post('/auth/handoff/consume', { code })
         if (cancelled) return
 
-        persistAuthToken(data.token, true, data.expires_in)
+        persistAuthToken(data.token, true, data.expires_in, data.session_expires_at)
         window.history.replaceState({}, document.title, window.location.pathname)
         setUser(data.user)
         navigate('/dashboard', { replace: true })

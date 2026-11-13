@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -43,6 +43,7 @@ import type { Invitation, InvitationEmailStatus, InvitationRsvpStatus } from '@/
 
 interface InvitationsListProps {
   eventId: number;
+  eventName?: string;
   userId?: number;
   isOrganizer: boolean;
   title?: string;
@@ -63,7 +64,11 @@ const RSVP_FILTERS: Array<{ value: 'all' | InvitationRsvpStatus; label: string }
   { value: 'declined', label: 'Rejected' },
 ];
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 15;
+
+function addressRejected(error?: string | null): boolean {
+  return /5\.1\.[01]|user unknown|unknown user|no such user|recipient address rejected|mailbox (not found|unavailable|does not exist)|address not found|invalid recipient|invalid address|no valid recipient|unrouteable|email account that you tried to reach does not exist|address rejected/i.test(error || '');
+}
 
 function fmtDate(value: string | null | undefined, pattern = 'MMM d, HH:mm'): string {
   if (!value) return '';
@@ -74,48 +79,81 @@ function fmtDate(value: string | null | undefined, pattern = 'MMM d, HH:mm'): st
   }
 }
 
+function StatusTip({ label, detail, children }: { label: string; detail: string; children: ReactNode }) {
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex cursor-help">{children}</span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-xs break-words">
+          <span className="font-semibold">{label}.</span> {detail}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export function EmailStatusBadge({ inv }: { inv: Invitation }) {
   const status = inv.email_status ?? 'not_sent';
   if (!inv.recipient_email) {
     return (
-      <Badge variant="outline" className="text-slate-400 border-slate-200 bg-slate-50 gap-1 font-medium">
-        <MinusCircle className="w-3 h-3" /> No email
-      </Badge>
+      <StatusTip label="No email" detail="This guest has no email address, so nothing can be sent.">
+        <Badge variant="outline" className="text-slate-400 border-slate-200 bg-slate-50 gap-1 font-medium">
+          <MinusCircle className="w-3 h-3" /> No email
+        </Badge>
+      </StatusTip>
     );
   }
   switch (status) {
     case 'sent':
       return (
-        <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50 gap-1 font-medium" title={inv.email_sent_at ? `Sent ${fmtDate(inv.email_sent_at, 'PPpp')}` : undefined}>
-          <CheckCircle2 className="w-3 h-3" /> Sent{inv.email_sent_at ? ` · ${fmtDate(inv.email_sent_at)}` : ''}
-        </Badge>
+        <StatusTip
+          label="Accepted by Gmail"
+          detail={inv.email_sent_at
+            ? `Gmail accepted this message ${fmtDate(inv.email_sent_at, 'PPpp')}. The guest's mail system can still filter it.`
+            : "Gmail accepted this message. The guest's mail system can still filter it."}
+        >
+          <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50 gap-1 font-medium">
+            <CheckCircle2 className="w-3 h-3" /> Sent{inv.email_sent_at ? ` · ${fmtDate(inv.email_sent_at)}` : ''}
+          </Badge>
+        </StatusTip>
       );
     case 'queued':
       return (
-        <Badge variant="outline" className="text-blue-700 border-blue-200 bg-blue-50 gap-1 font-medium">
-          <Loader2 className="w-3 h-3 animate-spin" /> Sending…
-        </Badge>
+        <StatusTip label="Sending" detail="Waiting for Gmail to accept this message.">
+          <Badge variant="outline" className="text-blue-700 border-blue-200 bg-blue-50 gap-1 font-medium">
+            <Loader2 className="w-3 h-3 animate-spin" /> Sending…
+          </Badge>
+        </StatusTip>
       );
     case 'failed':
+      if (addressRejected(inv.email_error)) {
+        return (
+          <StatusTip
+            label="Address not found"
+            detail={`This message was not sent. The address is incorrect, or the mail server says that mailbox does not exist.${inv.email_error ? ` ${inv.email_error}` : ''}`}
+          >
+            <Badge variant="outline" className="text-rose-700 border-rose-200 bg-rose-50 gap-1 font-medium">
+              <AlertTriangle className="w-3 h-3" /> Address not found
+            </Badge>
+          </StatusTip>
+        );
+      }
       return (
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge variant="outline" className="text-rose-700 border-rose-200 bg-rose-50 gap-1 font-medium cursor-help">
-                <AlertTriangle className="w-3 h-3" /> Failed{inv.email_attempts > 1 ? ` (${inv.email_attempts}×)` : ''}
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs text-xs break-words">
-              {inv.email_error || 'Email provider rejected the message.'}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <StatusTip label="Failed" detail={inv.email_error || 'The mail provider rejected the message.'}>
+          <Badge variant="outline" className="text-rose-700 border-rose-200 bg-rose-50 gap-1 font-medium">
+            <AlertTriangle className="w-3 h-3" /> Failed{inv.email_attempts > 1 ? ` (${inv.email_attempts}×)` : ''}
+          </Badge>
+        </StatusTip>
       );
     default:
       return (
-        <Badge variant="outline" className="text-slate-500 border-slate-200 bg-slate-50 gap-1 font-medium">
-          <Mail className="w-3 h-3" /> Not sent
-        </Badge>
+        <StatusTip label="Not sent" detail="This invitation has not been handed to Gmail yet.">
+          <Badge variant="outline" className="text-slate-500 border-slate-200 bg-slate-50 gap-1 font-medium">
+            <Mail className="w-3 h-3" /> Not sent
+          </Badge>
+        </StatusTip>
       );
   }
 }
@@ -144,7 +182,7 @@ export function RsvpStatusBadge({ status, at }: { status: InvitationRsvpStatus; 
   }
 }
 
-export function InvitationsList({ eventId, userId, isOrganizer, title }: InvitationsListProps) {
+export function InvitationsList({ eventId, eventName, userId, isOrganizer, title }: InvitationsListProps) {
   const { data: invitations, isLoading } = useInvitations(eventId, { userId });
   const { data: guestTypes = [] } = useEventGuestTypes(eventId);
   const revokeMutation = useRevokeInvitation();
@@ -187,7 +225,7 @@ export function InvitationsList({ eventId, userId, isOrganizer, title }: Invitat
   const handleExport = async () => {
     setExporting(true);
     try {
-      await downloadInvitationsCsv(eventId);
+      await downloadInvitationsCsv(eventId, eventName);
     } catch {
       toast.error('Could not export the guest list.');
     } finally {

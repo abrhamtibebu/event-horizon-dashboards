@@ -931,6 +931,7 @@ export default function TicketPurchasePage() {
               venueName={event?.venue_name}
               location={event?.location}
               formattedAddress={event?.formatted_address}
+              mapsUrl={event?.maps_url}
             />
           </div>
         )}

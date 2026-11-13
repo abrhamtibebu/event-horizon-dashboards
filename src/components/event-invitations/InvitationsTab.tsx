@@ -56,7 +56,7 @@ export function InvitationsTab({ eventId, eventUuid, eventName, isOrganizer, eve
           </div>
         </TabsContent>
 
-        <TabsContent value="guests" className="mt-5"><InvitationsList eventId={eventId} isOrganizer={isOrganizer} title="Invited guests" /></TabsContent>
+        <TabsContent value="guests" className="mt-5"><InvitationsList eventId={eventId} eventName={eventName} isOrganizer={isOrganizer} title="Invited guests" /></TabsContent>
 
         <TabsContent value="experience" className="mt-5">
           <RsvpPageSettingsCard eventId={eventId} isOrganizer={isOrganizer} event={eventPreview ?? { name: eventName }} />

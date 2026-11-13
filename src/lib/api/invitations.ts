@@ -172,12 +172,23 @@ export const fetchInvitationResponse = async (eventId: number, invitationId: num
   return response.data?.data as InvitationResponse;
 };
 
-export const downloadInvitationsCsv = async (eventId: number): Promise<void> => {
+function rsvpExportFilename(eventName?: string): string {
+  const clean = (eventName || '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return `${(clean || 'Event').slice(0, 80)} RSVP.xlsx`;
+}
+
+export const downloadInvitationsCsv = async (eventId: number, eventName?: string): Promise<void> => {
   const response = await api.get(`/events/${eventId}/invitations/export`, { responseType: 'blob' });
+  const header = String(response.headers?.['content-disposition'] || '');
+  const named = /filename\*=UTF-8''([^;]+)|filename="([^"]+)"|filename=([^;]+)/i.exec(header);
+  const fromHeader = decodeURIComponent((named?.[1] || named?.[2] || named?.[3] || '').trim());
   const url = URL.createObjectURL(response.data);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `rsvp-guests-${eventId}.csv`;
+  a.download = fromHeader || rsvpExportFilename(eventName);
   document.body.appendChild(a);
   a.click();
   a.remove();

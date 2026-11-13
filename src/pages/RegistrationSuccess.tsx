@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -11,9 +11,12 @@ import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import api from '@/lib/api';
+import { fetchPublicInvitation } from '@/lib/api/invitations';
 import { downloadPublicAttendeeBadgeWithToast } from '@/lib/publicBadgeDownload';
 import { SpinnerInline } from '@/components/ui/spinner';
 import { GuestShareBannerPanel } from '@/components/share/GuestShareBannerPanel'
+import { RsvpLanding } from '@/components/public/RsvpLanding';
+import { guestFirstName, resolveRsvpAccent, rsvpAccentForeground, type PublicInvitation } from '@/types/invitations';
 
 type PublicEventHydration = {
   id: number;
@@ -42,12 +45,15 @@ export default function RegistrationSuccess() {
   const eventNameParam = searchParams.get('eventName');
   const guestUuid = searchParams.get('guestUuid')?.trim() ?? '';
   const guestEmail = searchParams.get('guestEmail')?.trim() ?? '';
+  const guestName = decodeQueryParam(searchParams.get('guestName')) ?? '';
   const invitationCode = searchParams.get('inv')?.trim() ?? '';
   const isRsvp = invitationCode.length > 0;
   const qrValue = guestUuid.slice(0, 8);
 
   const displayNameRaw = decodeQueryParam(eventNameParam) ?? '';
   const [hydratedEvent, setHydratedEvent] = useState<PublicEventHydration | null>(null);
+  const [invitation, setInvitation] = useState<PublicInvitation | null>(null);
+  const [invitationReady, setInvitationReady] = useState(false);
 
   useEffect(() => {
     if (!attendeeId || !eventIdParam || !eventNameParam) {
@@ -62,7 +68,7 @@ export default function RegistrationSuccess() {
 
   useEffect(() => {
     const id = eventNumericId;
-    if (!id) return;
+    if (!id || isRsvp) return;
 
     const ac = new AbortController();
     (async () => {
@@ -79,7 +85,26 @@ export default function RegistrationSuccess() {
     })();
 
     return () => ac.abort();
-  }, [eventNumericId]);
+  }, [eventNumericId, isRsvp]);
+
+  useEffect(() => {
+    if (!isRsvp) return;
+    let cancelled = false;
+    setInvitationReady(false);
+    fetchPublicInvitation(invitationCode)
+      .then((data) => {
+        if (!cancelled) setInvitation(data);
+      })
+      .catch(() => {
+        if (!cancelled) setInvitation(null);
+      })
+      .finally(() => {
+        if (!cancelled) setInvitationReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [invitationCode, isRsvp]);
 
   const displayName = hydratedEvent?.title?.trim() || displayNameRaw;
 
@@ -109,6 +134,81 @@ export default function RegistrationSuccess() {
     }, 0)
   }, [])
 
+  if (isRsvp) {
+    if (!invitationReady) {
+      return (
+        <div className="rsvp-light flex min-h-screen items-center justify-center bg-[#f5f4f0] text-[#1c1917]">
+          <SpinnerInline size="md" />
+        </div>
+      );
+    }
+
+    const rsvpEvent = invitation?.event;
+    const rsvpName = rsvpEvent?.name?.trim() || displayNameRaw;
+    const accent = resolveRsvpAccent(rsvpEvent?.rsvp_page?.accent_color);
+    const accentText = rsvpAccentForeground(rsvpEvent?.rsvp_page?.accent_color);
+    const emailedTo = guestEmail || invitation?.attendee?.guest_email || invitation?.recipient_email || '';
+
+    return (
+      <RsvpLanding
+        confirmed
+        eventName={rsvpName || 'Your event'}
+        description={rsvpEvent?.description}
+        startDate={rsvpEvent?.start_date}
+        venueName={rsvpEvent?.venue_name}
+        location={rsvpEvent?.location}
+        imageUrl={rsvpEvent?.image_url}
+        organizerName={rsvpEvent?.organizer?.name}
+        organizerLogo={rsvpEvent?.organizer?.logo || rsvpEvent?.organizer_logo}
+        guestTypeName={invitation?.guest_type?.name || 'Guest'}
+        guestFirstName={guestFirstName(guestName || invitation?.attendee?.guest_name || invitation?.recipient_name)}
+        settings={rsvpEvent?.rsvp_page}
+      >
+        <div className="space-y-2">
+          <h2 className="font-serif text-[1.6rem] leading-tight text-[#1c1917]">RSVP Confirmed</h2>
+          <p className="text-sm leading-6 text-[#766e66]">
+            You&apos;re confirmed for &ldquo;{rsvpName || eventNameParam}&rdquo;. Your e-badge has been emailed
+            {emailedTo ? <> to <span className="font-medium text-[#1c1917]">{emailedTo}</span></> : null}.
+            Download it below, or screenshot the QR code for check-in.
+          </p>
+        </div>
+
+        {guestUuid.length > 0 ? (
+          <div className="flex flex-col items-center px-2">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#766e66]">
+              Your check-in QR — screenshot this
+            </p>
+            <div className="rounded-2xl border border-[#e7e1d8] bg-white p-4">
+              <QRCodeSVG value={qrValue} size={176} level="M" includeMargin />
+            </div>
+            <p className="mb-1 mt-6 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#766e66]">
+              Guest code
+            </p>
+            <p className="font-mono text-lg font-semibold tracking-wider text-[#1c1917]">{qrValue}</p>
+          </div>
+        ) : null}
+
+        <Button
+          type="button"
+          onClick={handleDownloadBadge}
+          disabled={downloading}
+          className="h-12 w-full rounded-full text-sm font-medium shadow-none"
+          style={{ backgroundColor: accent, color: accentText }}
+        >
+          {downloading ? <SpinnerInline size="sm" /> : (
+            <span className="flex items-center justify-center">
+              <Download className="mr-2 h-4 w-4" />
+              Download E-Badge
+            </span>
+          )}
+        </Button>
+        <p className="text-center text-xs text-[#766e66]">
+          Present your digital badge at the entrance for quick access.
+        </p>
+      </RsvpLanding>
+    );
+  }
+
   return (
     <div className="min-h-screen overflow-x-hidden bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 sm:p-6 font-['Outfit'] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <motion.div
@@ -126,28 +226,19 @@ export default function RegistrationSuccess() {
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-black mb-4 tracking-tight text-slate-900 dark:text-white">
-              {isRsvp ? 'RSVP Confirmed' : 'Success!'}
+              Success!
             </h1>
 
-            {isRsvp ? (
-              <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mb-8 leading-relaxed font-medium px-1 sm:px-2 break-words">
-                You&apos;re confirmed for{' '}
-                <span className="text-[#f97316] font-bold">&ldquo;{displayName || eventNameParam}&rdquo;</span>. Your
-                e-badge has been emailed{guestEmail ? <> to <span className="font-semibold text-slate-700 dark:text-slate-200">{guestEmail}</span></> : null}.
-                Download it below, or screenshot the QR code for check-in.
-              </p>
-            ) : (
-              <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mb-8 leading-relaxed font-medium px-1 sm:px-2 break-words">
-                You&apos;ve successfully registered for{' '}
-                <span className="text-[#f97316] font-bold">&ldquo;{displayName || eventNameParam}&rdquo;</span>. A
-                confirmation email with your details has been sent to your inbox.
-              </p>
-            )}
+            <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mb-8 leading-relaxed font-medium px-1 sm:px-2 break-words">
+              You&apos;ve successfully registered for{' '}
+              <span className="text-[#f97316] font-bold">&ldquo;{displayName || eventNameParam}&rdquo;</span>. A
+              confirmation email with your details has been sent to your inbox.
+            </p>
 
             {guestUuid.length > 0 ? (
               <div className="flex flex-col items-center mb-10 px-2">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                  {isRsvp ? 'Your check-in QR — screenshot this' : 'Guest check-in QR'}
+                  Guest check-in QR
                 </p>
                 <div className="bg-white dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-inner">
                   <QRCodeSVG value={qrValue} size={176} level="M" includeMargin />

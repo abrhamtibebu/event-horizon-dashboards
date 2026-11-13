@@ -124,10 +124,12 @@ export default function CreateTicketedEvent() {
     latitude: number | null
     longitude: number | null
     formattedAddress: string
+    mapsUrl: string
   }>({
     latitude: null,
     longitude: null,
     formattedAddress: '',
+    mapsUrl: '',
   })
   const [listedVenue, setListedVenue] = useState<ListedVenueSelection>({
     mode: 'custom',
@@ -322,6 +324,11 @@ export default function CreateTicketedEvent() {
         ...(locationMeta.formattedAddress
           ? {
               formatted_address: locationMeta.formattedAddress,
+            }
+          : {}),
+        ...(locationMeta.mapsUrl.trim()
+          ? {
+              maps_url: locationMeta.mapsUrl.trim(),
             }
           : {}),
         max_guests: parseInt(formData.max_guests, 10),
@@ -926,11 +933,12 @@ export default function CreateTicketedEvent() {
                   value={formData.city}
                   onValueChange={(value) => {
                     handleInputChange('city', value)
-                    setLocationMeta({
+                    setLocationMeta((prev) => ({
+                      ...prev,
                       latitude: null,
                       longitude: null,
                       formattedAddress: '',
-                    })
+                    }))
                   }}
                   required
                 >
@@ -958,13 +966,31 @@ export default function CreateTicketedEvent() {
                     if (next.city && ETHIOPIAN_CITIES.includes(next.city)) {
                       handleInputChange('city', next.city)
                     }
-                    setLocationMeta({
+                    setLocationMeta((prev) => ({
+                      ...prev,
                       latitude: next.latitude,
                       longitude: next.longitude,
                       formattedAddress: next.formattedAddress,
-                    })
+                    }))
                   }}
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="maps_url" className="flex items-center gap-2 text-foreground font-medium">
+                  <MapPin className="w-4 h-4 text-blue-500" /> Google Maps link
+                </Label>
+                <Input
+                  id="maps_url"
+                  type="url"
+                  value={locationMeta.mapsUrl}
+                  onChange={(e) => setLocationMeta((prev) => ({ ...prev, mapsUrl: e.target.value }))}
+                  placeholder="https://maps.app.goo.gl/..."
+                  className="mt-2 h-12 border-border focus:border-primary focus:ring-primary/20 rounded-xl"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Paste a Google Maps share link. Invitation and RSVP emails use it for directions.
+                </p>
               </div>
 
               <div>

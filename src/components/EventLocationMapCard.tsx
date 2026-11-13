@@ -6,6 +6,7 @@ interface EventLocationMapCardProps {
   venueName?: string | null
   location?: string | null
   formattedAddress?: string | null
+  mapsUrl?: string | null
 }
 
 export default function EventLocationMapCard({
@@ -14,15 +15,19 @@ export default function EventLocationMapCard({
   venueName,
   location,
   formattedAddress,
+  mapsUrl,
 }: EventLocationMapCardProps) {
   const hasCoordinates = typeof latitude === 'number' && typeof longitude === 'number'
   const fallbackAddress = [venueName, formattedAddress, location].filter(Boolean).join(', ')
   const query = hasCoordinates ? `${latitude},${longitude}` : fallbackAddress
+  const openInMapsUrl = (mapsUrl && /^https?:\/\//i.test(mapsUrl.trim()) ? mapsUrl.trim() : null)
+    || (query ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}` : null)
 
-  if (!query) return null
+  if (!openInMapsUrl) return null
 
-  const embedSrc = `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=15&output=embed`
-  const openInMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+  const embedSrc = query
+    ? `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=15&output=embed`
+    : null
 
   return (
     <div className="max-w-full min-w-0 rounded-2xl border border-border/70 bg-card p-4 sm:p-5">
@@ -45,17 +50,19 @@ export default function EventLocationMapCard({
         {venueName || location || 'Venue'}{formattedAddress ? ` - ${formattedAddress}` : ''}
       </p>
 
-      <div className="overflow-hidden rounded-xl border border-border/70 max-w-full">
-        <div className="relative w-full aspect-[4/3] min-h-[200px] max-h-[min(260px,45vh)] sm:max-h-[280px]">
-          <iframe
-            title="Event map location"
-            src={embedSrc}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            className="absolute inset-0 block h-full w-full max-w-full border-0"
-          />
+      {embedSrc ? (
+        <div className="overflow-hidden rounded-xl border border-border/70 max-w-full">
+          <div className="relative w-full aspect-[4/3] min-h-[200px] max-h-[min(260px,45vh)] sm:max-h-[280px]">
+            <iframe
+              title="Event map location"
+              src={embedSrc}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              className="absolute inset-0 block h-full w-full max-w-full border-0"
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { Suspense, useEffect } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Spinner } from '@/components/ui/spinner'
 import { Toaster } from '@/components/ui/toaster'
@@ -34,9 +34,17 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 
 const UnauthenticatedRoute = ({ children }: { children: JSX.Element }) => {
   const { isAuthenticated, isLoading } = useAuth()
+  const location = useLocation()
 
   if (isLoading) return <PageFallback />
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />
+
+  const params = new URLSearchParams(location.search)
+  const finishingTwoFactor =
+    params.get('2fa') === '1' ||
+    params.get('2fa_setup') === '1' ||
+    sessionStorage.getItem('auth_2fa_pending') === '1'
+
+  if (isAuthenticated && !finishingTwoFactor) return <Navigate to="/dashboard" replace />
   return children
 }
 
@@ -130,31 +138,31 @@ const AppWithRealtime = () => {
           <Route
             path="/"
             element={
-              <PublicRoute>
+              <UnauthenticatedRoute>
                 <Lazy>
                   <P.SignInPage />
                 </Lazy>
-              </PublicRoute>
+              </UnauthenticatedRoute>
             }
           />
           <Route
             path="/signin"
             element={
-              <PublicRoute>
+              <UnauthenticatedRoute>
                 <Lazy>
                   <P.SignInPage />
                 </Lazy>
-              </PublicRoute>
+              </UnauthenticatedRoute>
             }
           />
           <Route
             path="/register"
             element={
-              <PublicRoute>
+              <UnauthenticatedRoute>
                 <Lazy>
                   <P.RegisterPage />
                 </Lazy>
-              </PublicRoute>
+              </UnauthenticatedRoute>
             }
           />
           <Route

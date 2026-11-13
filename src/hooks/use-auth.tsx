@@ -118,19 +118,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return
         }
 
-        if (shouldRefreshToken(token)) {
-          try {
-            await refreshAccessToken()
-            token = getStoredToken()
-          } catch (error) {
-            console.error('[Auth] Token refresh on init failed:', error)
-            clearAuthSession()
-            setUser(null)
-            setIsLoading(false)
-            return
-          }
-        }
-
         try {
           console.log('[Auth] Making API call to /me...')
           const { data } = await api.get('/me')
@@ -143,8 +130,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }, 60 * 1000)
         } catch (error) {
           console.error('[Auth] Session expired or invalid:', error)
-          clearAuthSession()
-          setUser(null)
+          const status = (error as { response?: { status?: number } })?.response?.status
+          if (status === 401 || status === 403) {
+            if (getStoredToken()) clearAuthSession()
+            setUser(null)
+          } else {
+            setUser(null)
+          }
         }
       } else {
         if (isDev) console.log('[Auth] No token found, user not authenticated')
@@ -157,7 +149,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     checkLoggedIn()
 
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== 'jwt') return
+
+      if (event.oldValue && !event.newValue) {
+        setUser(null)
+        if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
+          window.location.href = '/'
+        }
+        return
+      }
+
+      if (!event.oldValue && event.newValue) {
+        window.location.reload()
+      }
+    }
+
+    window.addEventListener('storage', onStorage)
+
     return () => {
+      window.removeEventListener('storage', onStorage)
       if (checkIntervalRef.current) {
         clearInterval(checkIntervalRef.current)
       }
@@ -181,7 +192,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw error
       }
 
-      persistAuthToken(token, remember, expires_in)
+      if (res.data.requires_2fa_setup) {
+        sessionStorage.setItem('auth_2fa_pending', '1')
+      } else {
+        sessionStorage.removeItem('auth_2fa_pending')
+      }
+
+      persistAuthToken(token, remember, expires_in, res.data.session_expires_at)
       localStorage.removeItem('mock_auth')
       setUser(user)
 

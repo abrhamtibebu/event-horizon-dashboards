@@ -13,11 +13,14 @@ const JWT_KEY = 'jwt'
 const TOKEN_EXPIRES_KEY = 'token_expires_at'
 const TOKEN_CREATED_KEY = 'token_created_at'
 
-/** Absolute session when Remember me is off. */
+/** Absolute session when Remember me is off. Shared across tabs on this device. */
 export const SESSION_DURATION_MS = 6 * 60 * 60 * 1000
 
-/** Absolute session when Remember me is on (standard ~30 days). */
-export const REMEMBER_ME_DURATION_MS = 30 * 24 * 60 * 60 * 1000
+/** Absolute session when Remember me is on. */
+export const REMEMBER_ME_DURATION_MS = 7 * 24 * 60 * 60 * 1000
+
+const SESSION_EXPIRES_KEY = 'auth_session_expires_at'
+const REFRESH_LOCK_KEY = 'auth_refresh_lock'
 
 const AUTH_KEYS = [
   JWT_KEY,
@@ -30,40 +33,63 @@ const AUTH_KEYS = [
 ] as const
 
 export function isRememberMeEnabled(): boolean {
-  if (localStorage.getItem(REMEMBER_ME_KEY) === 'true') {
-    return true
-  }
-
-  // Legacy sessions: token was stored in localStorage before the remember flag existed.
-  if (localStorage.getItem(JWT_KEY) && !sessionStorage.getItem(JWT_KEY)) {
-    return true
-  }
-
-  return false
+  return localStorage.getItem(REMEMBER_ME_KEY) === 'true'
 }
 
 export function setRememberMePreference(enabled: boolean): void {
-  const storage = enabled ? localStorage : sessionStorage
   const startedAt = Date.now().toString()
+  const expiresAt = (
+    Date.now() + (enabled ? REMEMBER_ME_DURATION_MS : SESSION_DURATION_MS)
+  ).toString()
+
+  localStorage.setItem(SESSION_STARTED_KEY, startedAt)
+  localStorage.setItem(SESSION_EXPIRES_KEY, expiresAt)
+  sessionStorage.removeItem(SESSION_STARTED_KEY)
 
   if (enabled) {
     localStorage.setItem(REMEMBER_ME_KEY, 'true')
-    localStorage.setItem(SESSION_STARTED_KEY, startedAt)
-    sessionStorage.removeItem(SESSION_STARTED_KEY)
     return
   }
 
   localStorage.removeItem(REMEMBER_ME_KEY)
-  localStorage.removeItem(SESSION_STARTED_KEY)
-  storage.setItem(SESSION_STARTED_KEY, startedAt)
 }
 
 export function getAuthStorage(): Storage {
-  return isRememberMeEnabled() ? localStorage : sessionStorage
+  return localStorage
+}
+
+/**
+ * Older sign-ins kept the token in sessionStorage, which is not shared
+ * with other tabs. Move that session into localStorage once so a second
+ * tab on this device stays signed in.
+ */
+function promoteTabSessionToDevice(): void {
+  if (localStorage.getItem(JWT_KEY) || !sessionStorage.getItem(JWT_KEY)) {
+    return
+  }
+
+  for (const key of AUTH_KEYS) {
+    const value = sessionStorage.getItem(key)
+    if (value) localStorage.setItem(key, value)
+    sessionStorage.removeItem(key)
+  }
+
+  const started = sessionStorage.getItem(SESSION_STARTED_KEY)
+  if (started) {
+    localStorage.setItem(SESSION_STARTED_KEY, started)
+    sessionStorage.removeItem(SESSION_STARTED_KEY)
+  }
+
+  if (!localStorage.getItem(SESSION_EXPIRES_KEY)) {
+    const start = started ? parseInt(started, 10) : Date.now()
+    const base = Number.isNaN(start) ? Date.now() : start
+    localStorage.setItem(SESSION_EXPIRES_KEY, String(base + SESSION_DURATION_MS))
+  }
 }
 
 export function getStoredToken(): string | null {
-  return localStorage.getItem(JWT_KEY) || sessionStorage.getItem(JWT_KEY)
+  promoteTabSessionToDevice()
+  return localStorage.getItem(JWT_KEY)
 }
 
 export function clearAuthTokens(): void {
@@ -77,7 +103,11 @@ export function clearAuthSession(): void {
   clearAuthTokens()
   localStorage.removeItem(REMEMBER_ME_KEY)
   localStorage.removeItem(SESSION_STARTED_KEY)
+  localStorage.removeItem(SESSION_EXPIRES_KEY)
   sessionStorage.removeItem(SESSION_STARTED_KEY)
+  sessionStorage.removeItem(SESSION_EXPIRES_KEY)
+  localStorage.removeItem(REFRESH_LOCK_KEY)
+  sessionStorage.removeItem('auth_2fa_pending')
 }
 
 function getSessionStartedAt(): number | null {
@@ -101,9 +131,17 @@ function getSessionStartedAt(): number | null {
 }
 
 /**
- * Absolute session expiry: 30 days when remembered, otherwise 6 hours.
+ * Absolute session expiry: 7 days when remembered, otherwise 6 hours.
  */
 export function isSessionExpired(): boolean {
+  const raw = localStorage.getItem(SESSION_EXPIRES_KEY)
+  if (raw) {
+    const expiresAt = parseInt(raw, 10)
+    if (!Number.isNaN(expiresAt)) {
+      return Date.now() >= expiresAt
+    }
+  }
+
   const started = getSessionStartedAt()
   if (started === null) {
     return false
@@ -125,22 +163,29 @@ export function persistAuthToken(
   token: string,
   remember: boolean,
   expiresInSeconds?: number,
+  sessionExpiresAtSeconds?: number,
 ): Storage {
   clearAuthTokens()
   setRememberMePreference(remember)
 
-  const storage = getAuthStorage()
-  storage.setItem(JWT_KEY, token)
-  storage.setItem(TOKEN_CREATED_KEY, Date.now().toString())
+  if (sessionExpiresAtSeconds) {
+    localStorage.setItem(
+      SESSION_EXPIRES_KEY,
+      String(sessionExpiresAtSeconds * 1000),
+    )
+  }
+
+  localStorage.setItem(JWT_KEY, token)
+  localStorage.setItem(TOKEN_CREATED_KEY, Date.now().toString())
 
   if (expiresInSeconds) {
-    storage.setItem(
+    localStorage.setItem(
       TOKEN_EXPIRES_KEY,
       (Date.now() + expiresInSeconds * 1000).toString(),
     )
   }
 
-  return storage
+  return localStorage
 }
 
 export function storeRefreshedToken(
@@ -163,9 +208,26 @@ export function shouldRefreshToken(token: string | null): boolean {
   return isTokenExpired(token) || isTokenExpiringSoon(token, 5)
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** Wait until another tab finishes refreshing and writes a new token. */
+async function waitForRefreshedToken(previous: string, timeoutMs: number): Promise<string | null> {
+  const started = Date.now()
+  while (Date.now() - started < timeoutMs) {
+    await sleep(150)
+    const current = localStorage.getItem(JWT_KEY)
+    if (current && current !== previous) return current
+  }
+  const current = localStorage.getItem(JWT_KEY)
+  return current && current !== previous ? current : null
+}
+
 /**
  * Refresh the JWT using the current stored token.
  * Uses the API base URL directly to avoid interceptor recursion.
+ * One tab refreshes at a time so the others keep the new token.
  */
 export async function refreshAccessToken(): Promise<string | null> {
   const token = getStoredToken()
@@ -177,21 +239,45 @@ export async function refreshAccessToken(): Promise<string | null> {
     throw new Error('Session expired')
   }
 
-  const response = await axios.post(
-    `${getApiBaseURL()}/refresh`,
-    {},
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  )
+  const lockId = `${Date.now()}:${Math.random().toString(36).slice(2)}`
+  const existing = localStorage.getItem(REFRESH_LOCK_KEY)
+  const existingAt = existing ? parseInt(existing.split(':')[0], 10) : NaN
+  const lockIsFresh = !Number.isNaN(existingAt) && Date.now() - existingAt < 15000
 
-  const { token: newToken, expires_in: expiresIn } = response.data
-  if (!newToken) {
-    throw new Error('Refresh response missing token')
+  if (lockIsFresh) {
+    const waited = await waitForRefreshedToken(token, 15000)
+    if (waited) return waited
   }
 
-  storeRefreshedToken(newToken, expiresIn)
-  return newToken
+  localStorage.setItem(REFRESH_LOCK_KEY, lockId)
+  await sleep(40)
+  if (localStorage.getItem(REFRESH_LOCK_KEY) !== lockId) {
+    const waited = await waitForRefreshedToken(token, 15000)
+    if (waited) return waited
+    throw new Error('Token refresh failed')
+  }
+
+  try {
+    const response = await axios.post(
+      `${getApiBaseURL()}/refresh`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    )
+
+    const { token: newToken, expires_in: expiresIn } = response.data
+    if (!newToken) {
+      throw new Error('Refresh response missing token')
+    }
+
+    storeRefreshedToken(newToken, expiresIn)
+    return newToken
+  } finally {
+    if (localStorage.getItem(REFRESH_LOCK_KEY) === lockId) {
+      localStorage.removeItem(REFRESH_LOCK_KEY)
+    }
+  }
 }

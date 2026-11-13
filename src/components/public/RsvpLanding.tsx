@@ -20,6 +20,7 @@ export interface RsvpLandingProps {
   settings?: RsvpPageSettings | null;
   declined?: boolean;
   accepted?: boolean;
+  confirmed?: boolean;
   rsvpBusy?: boolean;
   onAccept?: () => void;
   onDecline?: () => void;
@@ -43,6 +44,7 @@ export function RsvpLanding({
   settings,
   declined = false,
   accepted = false,
+  confirmed = false,
   rsvpBusy = false,
   onAccept,
   onDecline,
@@ -97,7 +99,7 @@ export function RsvpLanding({
 
           {!preview && <div className="border-t border-[#e7e1d8]" />}
 
-          {declined ? <div className="space-y-3 py-1">
+          {confirmed ? <div className="space-y-4">{children}</div> : declined ? <div className="space-y-3 py-1">
             <h2 className="font-serif text-2xl text-[#1c1917]">Your response is saved</h2>
             <p className="text-sm leading-6 text-[#766e66]">Thank you for letting {host} know. We hope to welcome you another time.</p>
             {onUndecline && <Button variant="outline" onClick={onUndecline} disabled={rsvpBusy} className="mt-1 rounded-full px-6" style={{ color: accent, borderColor: accent }}>{rsvpBusy ? <SpinnerInline size="sm" /> : 'I can attend after all'}</Button>}

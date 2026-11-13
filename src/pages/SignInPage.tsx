@@ -128,8 +128,8 @@ function SignInForm() {
     }
   }, [location.search])
 
-  const completeLogin = (token: string, user: any, expiresIn?: number) => {
-    persistAuthToken(token, rememberMe, expiresIn)
+  const completeLogin = (token: string, user: any, expiresIn?: number, sessionExpiresAt?: number) => {
+    persistAuthToken(token, rememberMe, expiresIn, sessionExpiresAt)
     localStorage.removeItem('mock_auth')
     setUser(user)
     navigate('/dashboard')
@@ -150,7 +150,7 @@ function SignInForm() {
           setError({ message: 'Sign-in did not return a session. Try again.' })
           return
         }
-        completeLogin(data.token, data.user, data.expires_in)
+        completeLogin(data.token, data.user, data.expires_in, data.session_expires_at)
         return
       }
 
@@ -160,6 +160,7 @@ function SignInForm() {
           secret: twoFactor.secret,
           recovery_codes: twoFactor.recoveryCodes,
         })
+        sessionStorage.removeItem('auth_2fa_pending')
         navigate('/dashboard')
         return
       }
@@ -364,7 +365,7 @@ function SignUpForm() {
         password_confirmation: formData.confirmPassword,
         account_type: formData.accountType,
       })
-      persistAuthToken(res.data.token, true, res.data.expires_in)
+      persistAuthToken(res.data.token, false, res.data.expires_in, res.data.session_expires_at)
       setUser(res.data.user)
       navigate('/dashboard')
     } catch (err: any) {

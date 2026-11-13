@@ -58,6 +58,7 @@ export function InvitationGenerator({ eventId, isOrganizer, onSent }: Invitation
   const [builderForm, setBuilderForm] = useState<{ id: number; name: string } | null>(null);
   const [createFormOpen, setCreateFormOpen] = useState(false);
   const [qrSingleUse, setQrSingleUse] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ batch: number; batches: number; sent: number; failed: number } | null>(null);
 
   const guestTypeNumeric = guestTypeId ? Number(guestTypeId) : 0;
   const formQuery = useQuery({
@@ -100,6 +101,7 @@ export function InvitationGenerator({ eventId, isOrganizer, onSent }: Invitation
     Boolean(guestTypeId) &&
     readyCount > 0 &&
     !bulkMutation.isPending &&
+    !batchProgress &&
     (mode === 'csv' || !manualHasErrors);
 
   const updateRow = (id: number, patch: Partial<ManualRow>) =>
@@ -138,29 +140,55 @@ export function InvitationGenerator({ eventId, isOrganizer, onSent }: Invitation
             location: r.location || undefined,
           }));
 
+    const batches: typeof payload[] = [];
+    for (let i = 0; i < payload.length; i += 20) batches.push(payload.slice(i, i + 20));
+    const sentEmails = new Set<string>();
+    let sent = 0;
+    let failed = 0;
+    let queued = 0;
+    let lastResult: BulkInvitationResult | null = null;
+
     try {
-      const result = await bulkMutation.mutateAsync({
-        eventId,
-        guestTypeId: Number(guestTypeId),
-        invitations: payload,
-        qrSingleUse,
-      });
-      const { sent, failed, queued } = result.summary ?? { sent: 0, failed: 0, queued: 0 };
+      for (let i = 0; i < batches.length; i++) {
+        setBatchProgress({ batch: i + 1, batches: batches.length, sent, failed });
+        const result = await bulkMutation.mutateAsync({
+          eventId,
+          guestTypeId: Number(guestTypeId),
+          invitations: batches[i],
+          qrSingleUse,
+        });
+        sent += result.summary?.sent ?? 0;
+        failed += result.summary?.failed ?? 0;
+        queued += result.summary?.queued ?? 0;
+        batches[i].forEach((row) => sentEmails.add(row.email.toLowerCase()));
+        lastResult = result;
+        setBatchProgress({ batch: i + 1, batches: batches.length, sent, failed });
+        if (i < batches.length - 1) await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
       if (failed > 0 && sent === 0 && queued === 0) {
         toast.error(`Could not send ${failed} email${failed === 1 ? '' : 's'}. Check the delivery status for details.`);
       } else if (failed > 0) {
-        toast.warning(`${sent + queued} sent, ${failed} failed. Retry failed ones from the list.`);
+        toast.warning(`${sent + queued} accepted, ${failed} failed. Retry failed ones from the list.`);
       } else {
-        toast.success(result.message || `${payload.length} RSVP invitation${payload.length === 1 ? '' : 's'} sent`);
+        toast.success(`${payload.length} RSVP invitation${payload.length === 1 ? '' : 's'} sent in ${batches.length} batch${batches.length === 1 ? '' : 'es'}`);
       }
       setRows([newRow()]);
       setCsvRows(null);
       setCsvFileName('');
-      onSent?.(result);
+      if (lastResult) onSent?.(lastResult);
     } catch (error: unknown) {
+      if (sentEmails.size > 0) {
+        setRows((prev) => {
+          const remaining = prev.filter((row) => !sentEmails.has(row.email.trim().toLowerCase()));
+          return remaining.length > 0 ? remaining : [newRow()];
+        });
+        setCsvRows((prev) => prev?.filter((row) => !sentEmails.has(row.email.toLowerCase())) ?? null);
+      }
       const data = (error as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } })?.response?.data;
       const msg = data?.message || Object.values(data?.errors ?? {}).flat()[0] || 'Failed to send invitations';
-      toast.error(String(msg));
+      toast.error(sentEmails.size > 0 ? `${String(msg)} ${sentEmails.size} already handed off; the rest are still in the list.` : String(msg));
+    } finally {
+      setBatchProgress(null);
     }
   };
 
@@ -395,10 +423,15 @@ export function InvitationGenerator({ eventId, isOrganizer, onSent }: Invitation
             </div>
             <Switch id="qr-single-use" checked={qrSingleUse} onCheckedChange={setQrSingleUse} />
           </div>
+          {batchProgress && (
+            <p className="text-xs font-medium text-foreground">
+              Batch {batchProgress.batch} of {batchProgress.batches}: {batchProgress.sent} accepted{batchProgress.failed > 0 ? `, ${batchProgress.failed} failed` : ''}.
+            </p>
+          )}
           <Button onClick={handleSend} disabled={!canSend} className="w-full h-10 rounded-lg font-semibold gap-2">
-            {bulkMutation.isPending ? (
+            {batchProgress || bulkMutation.isPending ? (
               <>
-                <RefreshCw className="w-4 h-4 animate-spin" /> Sending…
+                <RefreshCw className="w-4 h-4 animate-spin" /> Sending batch {batchProgress ? `${batchProgress.batch} of ${batchProgress.batches}` : ''}…
               </>
             ) : (
               <>

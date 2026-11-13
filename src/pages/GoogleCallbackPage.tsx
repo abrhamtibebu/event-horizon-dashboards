@@ -51,7 +51,10 @@ export default function GoogleCallbackPage() {
           return
         }
 
-        persistAuthToken(token, true, expires_in)
+        if (res.data.requires_2fa_setup) {
+          sessionStorage.setItem('auth_2fa_pending', '1')
+        }
+        persistAuthToken(token, true, expires_in, res.data.session_expires_at)
         localStorage.removeItem('mock_auth')
 
         setUser(user)
